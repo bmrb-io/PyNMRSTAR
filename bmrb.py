@@ -263,7 +263,7 @@ def _getSchema(passed_schema=None):
             standard_schema = schema()
         except HTTPError:
             try:
-                standard_schema = schema(schema_file=".bmrb_schema")
+                standard_schema = schema(schema_file="reference_files/schema")
             except:
                 raise ValueError("Could not load a BMRB schema from the "
                                  "internet or from the local repository.")
@@ -312,7 +312,7 @@ def _loadComments(file_to_load=None):
 
     # Figure out where to load the file from
     if file_to_load is None:
-        file_to_load = ".comment3.str"
+        file_to_load = "reference_files/comments"
 
     try:
         comment_entry = entry.fromFile(file_to_load)

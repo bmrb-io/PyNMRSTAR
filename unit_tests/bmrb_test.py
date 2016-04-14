@@ -391,7 +391,7 @@ class TestSequenceFunctions(unittest.TestCase):
         if not os.path.exists("/bmrb/linux/bin/stardiff"):
             return
 
-        start, end = 10000, 20000
+        start, end = 15000, 17000
         sys.stdout.write("\nEntry tests: %5s/%5s" % (start, end))
         for x in range(start, end):
 
