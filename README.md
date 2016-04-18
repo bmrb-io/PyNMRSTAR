@@ -8,22 +8,22 @@ built in help function for documentation.
 
 There are seven module variables you can set to control our behavior.
 
-*Setting bmrb.verbose to True will print some of what is going on to
+* Setting bmrb.verbose to True will print some of what is going on to
 the terminal.
 
-*Setting bmrb.raise_parse_warnings to True will raise an exception if
+* Setting bmrb.raise_parse_warnings to True will raise an exception if
 the parser encounters something problematic. Normally warnings are
 suppressed.
 
-*Setting skip_empty_loops to True will suppress the printing of empty
+* Setting skip_empty_loops to True will suppress the printing of empty
 loops when calling __str__ methods.
 
-*Adding key->value pairs to str_conversion_dict will automatically
+* Adding key->value pairs to str_conversion_dict will automatically
 convert tags whose value matches "key" to the string "value" when
 printing. This allows you to set the default conversion value for
 Booleans or other objects.
 
-*Setting bmrb.allow_v2_entries will allow parsing of NMR-STAR version
+* Setting bmrb.allow_v2_entries will allow parsing of NMR-STAR version
 2.1 entries. Most other methods will not operate correctly on parsed
 2.1 entries. This is only to allow you parse and access the data in
 these entries - nothing else. Only set this if you have a really good
