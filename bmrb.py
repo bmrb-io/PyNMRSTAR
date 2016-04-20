@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 
 """This module provides entry, saveframe, and loop objects. Use python's
 built in help function for documentation.
