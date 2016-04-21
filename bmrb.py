@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 
 """This module provides entry, saveframe, and loop objects. Use python's
 built in help function for documentation.
@@ -283,8 +283,7 @@ def _interpretFile(the_file):
                 the_file.startswith("ftp://")):
             star_buffer = BytesIO(urlopen(the_file).read())
         else:
-            with open(the_file, 'rb') as data_source:
-                star_buffer = BytesIO(data_source.read())
+            star_buffer = BytesIO(open(the_file, 'rb').read())
     else:
         raise ValueError("Cannot figure out how to interpret the file "
                          " you passed.")
@@ -2592,6 +2591,9 @@ else:
 
     # This makes sure that when decimals are printed a lower case "e" is used
     decimal.getcontext().capitals = 0
+
+    # This makes us able to load "utils.bmrb" entries sent from the API server
+    sys.modules['utils.bmrb'] = sys.modules['bmrb']
 
     # This loads the comments
     _loadComments()
