@@ -175,21 +175,21 @@ class TestSequenceFunctions(unittest.TestCase):
 
         self.assertRaises(ValueError, self.entry.getTag, 'bad_tag')
         self.assertEqual(self.entry.getTag("entry.Submission_date"), ['2006-09-07'])
-        self.assertEqual(self.entry.getTag("entry.Submission_date", whole_tag=True), [['Submission_date', '2006-09-07', 17]])
+        self.assertEqual(self.entry.getTag("entry.Submission_date", whole_tag=True), [[u'Submission_date', u'2006-09-07']])
 
     def test_validate(self):
-        validation = ["Value cannot be NULL but is: '_Chem_comp.Provenance':'.' on line '529 of original file'."]
+        validation = [u"Value cannot be NULL but is: '_Chem_comp.Provenance':'.' on line 'None'."]
         self.assertEqual(self.entry.validate(), validation)
 
     def test_saveframe(self):
         frame = self.entry[0]
 
         # Check initial state before tests
-        self.assertEqual(frame.tags, [['Sf_category', 'entry_information', 8], ['Sf_framecode', 'entry_information', 9], ['ID', '15000', 10], ['Title', 'Solution structure of chicken villin headpiece subdomain containing a fluorinated side chain in the core\n', 14], ['Type', 'macromolecule', 15], ['Version_type', 'original', 16], ['Submission_date', '2006-09-07', 17], ['Accession_date', '2006-09-07', 18], ['Last_release_date', '.', 19], ['Original_release_date', '.', 20], ['Origination', 'author', 21], ['NMR_STAR_version', '3.1.1.61', 22], ['Original_NMR_STAR_version', '.', 23], ['Experimental_method', 'NMR', 24], ['Experimental_method_subtype', 'solution', 25], ['Details', '.', 26], ['BMRB_internal_directory_name', '.', 27]])
+        self.assertEqual(frame.tags, [[u'Sf_category', u'entry_information'], [u'Sf_framecode', u'entry_information'], [u'ID', u'15000'], [u'Title', u'Solution structure of chicken villin headpiece subdomain containing a fluorinated side chain in the core\n'], [u'Type', u'macromolecule'], [u'Version_type', u'original'], [u'Submission_date', u'2006-09-07'], [u'Accession_date', u'2006-09-07'], [u'Last_release_date', u'.'], [u'Original_release_date', u'.'], [u'Origination', u'author'], [u'NMR_STAR_version', u'3.1.1.61'], [u'Original_NMR_STAR_version', u'.'], [u'Experimental_method', u'NMR'], [u'Experimental_method_subtype', u'solution'], [u'Details', u'.'], [u'BMRB_internal_directory_name', u'.']])
 
         # Check __delitem__
         del frame['DEtails']
-        self.assertEqual(frame.tags, [['Sf_category', 'entry_information', 8], ['Sf_framecode', 'entry_information', 9], ['ID', '15000', 10], ['Title', 'Solution structure of chicken villin headpiece subdomain containing a fluorinated side chain in the core\n', 14], ['Type', 'macromolecule', 15], ['Version_type', 'original', 16], ['Submission_date', '2006-09-07', 17], ['Accession_date', '2006-09-07', 18], ['Last_release_date', '.', 19], ['Original_release_date', '.', 20], ['Origination', 'author', 21], ['NMR_STAR_version', '3.1.1.61', 22], ['Original_NMR_STAR_version', '.', 23], ['Experimental_method', 'NMR', 24], ['Experimental_method_subtype', 'solution', 25], ['BMRB_internal_directory_name', '.', 27]])
+        self.assertEqual(frame.tags, [[u'Sf_category', u'entry_information'], [u'Sf_framecode', u'entry_information'], [u'ID', u'15000'], [u'Title', u'Solution structure of chicken villin headpiece subdomain containing a fluorinated side chain in the core\n'], [u'Type', u'macromolecule'], [u'Version_type', u'original'], [u'Submission_date', u'2006-09-07'], [u'Accession_date', u'2006-09-07'], [u'Last_release_date', u'.'], [u'Original_release_date', u'.'], [u'Origination', u'author'], [u'NMR_STAR_version', u'3.1.1.61'], [u'Original_NMR_STAR_version', u'.'], [u'Experimental_method', u'NMR'], [u'Experimental_method_subtype', u'solution'], [u'BMRB_internal_directory_name', u'.']])
         self.assertEqual(len(frame), 7)
         del frame[0]
         self.assertEqual(len(frame), 6)
@@ -271,15 +271,16 @@ class TestSequenceFunctions(unittest.TestCase):
         # Test getTag - this is really already tested in the other tests here
         self.assertEqual(frame.getTag("sf_category"), ['entry_information'])
         self.assertEqual(frame.getTag("entry.sf_category"), ['entry_information'])
-        self.assertEqual(frame.getTag("entry.sf_category", whole_tag=True), [['Sf_category', 'entry_information', 8]])
+        self.assertEqual(frame.getTag("entry.sf_category", whole_tag=True), [[u'Sf_category', u'entry_information']])
 
         # Test sort
-        self.assertEqual(frame.tags, [['Sf_category', 'entry_information', 8], ['Sf_framecode', 'entry_information', 9], ['ID', '15000', 10], ['Title', 'Solution structure of chicken villin headpiece subdomain containing a fluorinated side chain in the core\n', 14], ['Type', 'macromolecule', 15], ['Version_type', 'original', 16], ['Submission_date', '2006-09-07', 17], ['Accession_date', '2006-09-07', 18], ['Last_release_date', '.', 19], ['Original_release_date', '.', 20], ['Origination', 'author', 21], ['NMR_STAR_version', '3.1.1.61', 22], ['Original_NMR_STAR_version', '.', 23], ['Experimental_method', 'NMR', 24], ['Experimental_method_subtype', 'solution', 25], ['BMRB_internal_directory_name', '.', 27], ['example1', 5], ['example2', '.']])
+        self.assertEqual(frame.tags, [[u'Sf_category', u'entry_information'], [u'Sf_framecode', u'entry_information'], [u'ID', u'15000'], [u'Title', u'Solution structure of chicken villin headpiece subdomain containing a fluorinated side chain in the core\n'], [u'Type', u'macromolecule'], [u'Version_type', u'original'], [u'Submission_date', u'2006-09-07'], [u'Accession_date', u'2006-09-07'], [u'Last_release_date', u'.'], [u'Original_release_date', u'.'], [u'Origination', u'author'], [u'NMR_STAR_version', u'3.1.1.61'], [u'Original_NMR_STAR_version', u'.'], [u'Experimental_method', u'NMR'], [u'Experimental_method_subtype', u'solution'], [u'BMRB_internal_directory_name', u'.'], [u'example1', 5], [u'example2', u'.']])
+
         self.assertRaises(ValueError, frame.sortTags)
         del frame['example2'], frame['example1']
         frame.tags.append(frame.tags.pop(0))
         frame.sortTags()
-        self.assertEqual(frame.tags, [['Sf_category', 'entry_information', 8], ['Sf_framecode', 'entry_information', 9], ['ID', '15000', 10], ['Title', 'Solution structure of chicken villin headpiece subdomain containing a fluorinated side chain in the core\n', 14], ['Type', 'macromolecule', 15], ['Version_type', 'original', 16], ['Submission_date', '2006-09-07', 17], ['Accession_date', '2006-09-07', 18], ['Last_release_date', '.', 19], ['Original_release_date', '.', 20], ['Origination', 'author', 21], ['NMR_STAR_version', '3.1.1.61', 22], ['Original_NMR_STAR_version', '.', 23], ['Experimental_method', 'NMR', 24], ['Experimental_method_subtype', 'solution', 25], ['BMRB_internal_directory_name', '.', 27]])
+        self.assertEqual(frame.tags, [[u'Sf_category', u'entry_information'], [u'Sf_framecode', u'entry_information'], [u'ID', u'15000'], [u'Title', u'Solution structure of chicken villin headpiece subdomain containing a fluorinated side chain in the core\n'], [u'Type', u'macromolecule'], [u'Version_type', u'original'], [u'Submission_date', u'2006-09-07'], [u'Accession_date', u'2006-09-07'], [u'Last_release_date', u'.'], [u'Original_release_date', u'.'], [u'Origination', u'author'], [u'NMR_STAR_version', u'3.1.1.61'], [u'Original_NMR_STAR_version', u'.'], [u'Experimental_method', u'NMR'], [u'Experimental_method_subtype', u'solution'], [u'BMRB_internal_directory_name', u'.']])
 
         # Test validate
         self.assertEqual(self.entry['assigned_chem_shift_list_1'].validate(), [])
@@ -391,7 +392,7 @@ class TestSequenceFunctions(unittest.TestCase):
         if not os.path.exists("/bmrb/linux/bin/stardiff"):
             return
 
-        start, end = 15000, 17000
+        start, end = 15000, 15500
         sys.stdout.write("\nEntry tests: %5s/%5s" % (start, end))
         for x in range(start, end):
 

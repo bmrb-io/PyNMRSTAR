@@ -100,13 +100,6 @@ str_conversion_dict = {None:"."}
 standard_schema = None
 comment_dictionary = {}
 
-# Get the svn revision number of this file
-try:
-    svn_revision = "$Revision: 185 $".split()[1]
-# If they wget the file from the SVN or something
-except IndexError:
-    svn_revision = "UNKNOWN"
-
 #############################################
 #             Module methods                #
 #############################################
@@ -1040,7 +1033,42 @@ class entry(object):
         """Create an entry corresponding to the most up to date entry on
         the public BMRB server. (Requires ability to initiate outbound
         HTTP connections.)"""
-        return cls(entry_num=entry_num)
+
+        # Try to load the entry using JSON
+        try:
+            import json
+            entry_url = "http://webapi.bmrb.wisc.edu/current/rest/entry/%s/"
+            entry_url = entry_url % entry_num
+
+            # Convert bytes to string if python3
+            serialized_ent = urlopen(entry_url).read()
+            if PY3:
+                serialized_ent = serialized_ent.decode()
+
+            # Parse JSON string to dictionary
+            entry_dictionary = json.loads(serialized_ent)[str(entry_num)]
+            ent =  entry.fromJSON(entry_dictionary)
+
+            # Update the entry source
+            ent_source = "fromDatabase(%s)" % entry_num
+            ent.source = ent_source
+            for saveframe in ent:
+                saveframe.source = ent_source
+                for loop in saveframe:
+                    loop.source = ent_source
+
+            # Return the entry
+            return ent
+        # The entry doesn't exist
+        except (HTTPError, KeyError):
+            raise IOError("Entry '%s' does not exist in the public database." %
+                          entry_num)
+        # If we can't load the JSON, load the entry the old fashioned way
+        except (ImportError, ValueError):
+            if verbose:
+                print("Failed to load entry '%s' in JSON format. Attempting to"
+                      "load from original NMR-STAR file." % entry_num)
+            return cls(entry_num=entry_num)
 
     @classmethod
     def fromFile(cls, the_file):
@@ -1056,8 +1084,9 @@ class entry(object):
 
         # If they provided a string, try to load it using JSON
         if not isinstance(json_dict, dict):
-            raise ValueError("The JSON you provided was neither a Python "
-                             "dictionary nor a JSON string.")
+            raise ValueError("The JSON you provided was not a Python dictionary"
+                             ". If you provided serialized JSON please"
+                             " deserialize before using this method.")
 
         # Make sure it has the correct keys
         for check in ["bmrb_id", "saveframes"]:
@@ -2557,7 +2586,7 @@ if __name__ == '__main__':
     import optparse
     # Specify some basic information about our command
     optparser = optparse.OptionParser(usage="usage: %prog",
-                                      version="SVN_%s" % svn_revision,
+                                      version="1.0",
                                       description="NMR-STAR handling python "
                                                   "module. Usually you'll want "
                                                   "to import this. When ran "
