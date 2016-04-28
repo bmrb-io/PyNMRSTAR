@@ -46,14 +46,12 @@ implement a full validator (at least at present).
 Call directly (rather than importing) to run a self-test.
 """
 
-# Make sure print functions work in python2 and python3
-from __future__ import print_function
-
-__all__ = ['entry', 'saveframe', 'loop', 'schema', 'diff', 'validate', 'PY3']
-
 #############################################
 #                 Imports                   #
 #############################################
+
+# Make sure print functions work in python2 and python3
+from __future__ import print_function
 
 # Standard library imports
 import os
@@ -81,6 +79,9 @@ else:
 #############################################
 #            Global Variables               #
 #############################################
+
+# Set this to allow import * from bmrb to work sensibly
+__all__ = ['entry', 'saveframe', 'loop', 'schema', 'diff', 'validate', 'PY3']
 
 # May be set by calling code
 verbose = False
@@ -460,7 +461,7 @@ class _fastParser(object):
                                 raise ValueError("Loop tags may not be quoted "
                                                  "or semicolon-delineated.",
                                                  self.getLineNumber())
-                            if seen_data == True:
+                            if seen_data:
                                 raise ValueError("Cannot have more loop tags "
                                                  "after loop data.")
                             curloop.addColumn(self.token)
@@ -581,7 +582,7 @@ class _fastParser(object):
         self.last_delineator = ""
 
         # Nothing left
-        if self.token == None:
+        if self.token is None:
             return
 
         # We're at the end if the index is the length
@@ -797,7 +798,7 @@ class schema(object):
         type as specified in this schema."""
 
         # If we don't know what the tag is, just return it
-        if not tag.lower() in self.schema:
+        if tag.lower() not in self.schema:
             if raise_parse_warnings:
                 raise ValueError("There is a tag in the file that isn't in the "
                                  "schema: '%s' on line '%s'" % (tag, linenum))
@@ -861,7 +862,7 @@ class schema(object):
         """ Validates that a tag matches the type it should have
         according to this schema."""
 
-        if not tag.lower() in self.schema:
+        if tag.lower() not in self.schema:
             return ["Tag '%s' not found in schema. Line '%s'." % (tag, linenum)]
 
         (valtype, null_allowed, allowed_category,
@@ -1047,15 +1048,15 @@ class entry(object):
 
             # Parse JSON string to dictionary
             entry_dictionary = json.loads(serialized_ent)[str(entry_num)]
-            ent =  entry.fromJSON(entry_dictionary)
+            ent = entry.fromJSON(entry_dictionary)
 
             # Update the entry source
             ent_source = "fromDatabase(%s)" % entry_num
             ent.source = ent_source
-            for saveframe in ent:
-                saveframe.source = ent_source
-                for loop in saveframe:
-                    loop.source = ent_source
+            for each_saveframe in ent:
+                each_saveframe.source = ent_source
+                for each_loop in each_saveframe:
+                    each_loop.source = ent_source
 
             # Return the entry
             return ent
@@ -1093,7 +1094,7 @@ class entry(object):
             if check not in json_dict:
                 raise ValueError("The JSON you provide must be a hash and must "
                                  "contain the key '%s' - even if the key points"
-                                 " to None." % check)
+                                 " to 'None'." % check)
 
         # Create an entry from scratch and populate it
         ret = entry.fromScratch(json_dict['bmrb_id'])
@@ -1221,7 +1222,7 @@ class entry(object):
         and the [tag_name, tag_value (,tag_linenumber)] pair will be
         returned."""
 
-        if not "." in str(tag) and not allow_v2_entries:
+        if "." not in str(tag) and not allow_v2_entries:
             raise ValueError("You must provide the tag category to call this"
                              " method at the entry level.")
 
@@ -1769,8 +1770,8 @@ class saveframe(object):
         # Check the loops
         for each_loop in self.loops:
             if ((each_loop.category is not None and tag_prefix is not None and
-                    each_loop.category.lower() == tag_prefix.lower()) or
-                        allow_v2_entries):
+                 each_loop.category.lower() == tag_prefix.lower()) or
+                    allow_v2_entries):
                 results.extend(each_loop.getTag(query, whole_tag=whole_tag))
 
         # Check our tags
@@ -2189,7 +2190,7 @@ class loop(object):
                                  (supplied_category, self.category))
 
         column_id = _formatTag(column_id).lower()
-        if not column_id in [x.lower() for x in self.columns]:
+        if column_id not in [x.lower() for x in self.columns]:
             raise ValueError("The column tag '%s' to which you are attempting "
                              "to add data does not yet exist. Create the "
                              "columns before adding data." % column_id)
@@ -2620,9 +2621,6 @@ else:
 
     # This makes sure that when decimals are printed a lower case "e" is used
     decimal.getcontext().capitals = 0
-
-    # This makes us able to load "utils.bmrb" entries sent from the API server
-    sys.modules['utils.bmrb'] = sys.modules['bmrb']
 
     # This loads the comments
     _loadComments()
