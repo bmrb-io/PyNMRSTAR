@@ -743,7 +743,7 @@ class schema(object):
         """Initialize a BMRB schema. With no arguments the most
         up-to-date schema will be fetched from the BMRB FTP site.
         Otherwise pass a URL or a file to load a schema from using the
-        schema_url or schema_file optional arguments."""
+        schema_file optional argument."""
 
         self.headers = []
         self.schema = {}
