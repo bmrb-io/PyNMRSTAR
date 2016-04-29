@@ -56,6 +56,7 @@ from __future__ import print_function
 # Standard library imports
 import os
 import sys
+import json
 import decimal
 
 from copy import deepcopy
@@ -277,7 +278,8 @@ def _interpretFile(the_file):
                 the_file.startswith("ftp://")):
             star_buffer = BytesIO(urlopen(the_file).read())
         else:
-            star_buffer = BytesIO(open(the_file, 'rb').read())
+            with open(the_file, 'rb') as read_file:
+                star_buffer = BytesIO(read_file.read())
     else:
         raise ValueError("Cannot figure out how to interpret the file "
                          " you passed.")
@@ -1037,7 +1039,6 @@ class entry(object):
 
         # Try to load the entry using JSON
         try:
-            import json
             entry_url = "http://webapi.bmrb.wisc.edu/current/rest/entry/%s/"
             entry_url = entry_url % entry_num
 
@@ -1085,9 +1086,11 @@ class entry(object):
 
         # If they provided a string, try to load it using JSON
         if not isinstance(json_dict, dict):
-            raise ValueError("The JSON you provided was not a Python dictionary"
-                             ". If you provided serialized JSON please"
-                             " deserialize before using this method.")
+            try:
+                json_dict = json.loads(json_dict)
+            except (TypeError, ValueError):
+                raise ValueError("The JSON you provided was neither a Python "
+                                 "dictionary nor a JSON string.")
 
         # Make sure it has the correct keys
         for check in ["bmrb_id", "saveframes"]:
@@ -1170,15 +1173,20 @@ class entry(object):
         """Returns a dictionary of saveframe name -> saveframe object"""
         return dict((frame.name, frame) for frame in self.frame_list)
 
-    def getJSON(self):
-        """ Returns this entry in a form that can be serialized. Note
-        that you must still import json and call json.dumps() on the
-        result to serialize the entry."""
+    def getJSON(self, serialize=True):
+        """ Returns the entry in JSON format. If serialize is set to
+        False a dictionary representation of the entry that is
+        serializeable is returned."""
 
-        return {
+        entry_dict = {
             "bmrb_id": self.bmrb_id,
-            "saveframes": [x.getJSON() for x in self.frame_list]
+            "saveframes": [x.getJSON(serialize=False) for x in self.frame_list]
         }
+
+        if serialize:
+            return json.dumps(entry_dict)
+        else:
+            return entry_dict
 
     def getLoopsByCategory(self, value):
         """Allows fetching loops by category."""
@@ -1427,8 +1435,11 @@ class saveframe(object):
 
         # If they provided a string, try to load it using JSON
         if not isinstance(json_dict, dict):
-            raise ValueError("The JSON you provided was neither a Python "
-                             "dictionary nor a JSON string.")
+            try:
+                json_dict = json.loads(json_dict)
+            except (TypeError, ValueError):
+                raise ValueError("The JSON you provided was neither a Python "
+                                 "dictionary nor a JSON string.")
 
         # Make sure it has the correct keys
         for check in ["name", "tag_prefix", "tags", "loops"]:
@@ -1734,17 +1745,22 @@ class saveframe(object):
         csv_buffer.seek(0)
         return csv_buffer.read().replace('\r\n', '\n')
 
-    def getJSON(self):
-        """ Returns this saveframe in a form that can be serialized.
-        Note that you must still import json and call json.dumps() on
-        the result to serialize the entry."""
+    def getJSON(self, serialize=True):
+        """ Returns the saveframe in JSON format. If serialize is set to
+        False a dictionary representation of the saveframe that is
+        serializeable is returned."""
 
-        return {
+        saveframe_data = {
             "name": self.name,
             "tag_prefix": self.tag_prefix,
             "tags": [[x[0], x[1]] for x in self.tags],
-            "loops": [x.getJSON() for x in self.loops]
+            "loops": [x.getJSON(serialize=False) for x in self.loops]
         }
+
+        if serialize:
+            return json.dumps(saveframe_data)
+        else:
+            return saveframe_data
 
     def getLoopByCategory(self, name):
         """Return a loop based on the loop name (category)."""
@@ -2058,15 +2074,18 @@ class loop(object):
 
         # If they provided a string, try to load it using JSON
         if not isinstance(json_dict, dict):
-            raise ValueError("The JSON you provided was neither a Python "
-                             "dictionary nor a JSON string.")
+            try:
+                json_dict = json.loads(json_dict)
+            except (TypeError, ValueError):
+                raise ValueError("The JSON you provided was neither a Python "
+                                 "dictionary nor a JSON string.")
 
         # Make sure it has the correct keys
         for check in ['tags', 'category', 'data']:
             if check not in json_dict:
-                raise ValueError("The JSON you provide must be a hash and must "
-                                 "contain the key '%s' - even if the key points"
-                                 " to None." % check)
+                raise ValueError("The JSON you provide must be a dictionary and"
+                                 " must contain the key '%s' - even if the key "
+                                 "points to None." % check)
 
         # Create a loop from scratch and populate it
         ret = loop.fromScratch()
@@ -2335,15 +2354,21 @@ class loop(object):
 
         return results
 
-    def getJSON(self):
-        """ Returns this loop in a form that can be serialized. Note that
-        you must still import json and call json.dumps() on the result to
-        serialize the entry."""
-        return {
+    def getJSON(self, serialize=True):
+        """ Returns the loop in JSON format. If serialize is set to
+        False a dictionary representation of the loop that is
+        serializeable is returned."""
+
+        loop_dict = {
             "category": self.category,
             "tags": self.columns,
             "data": self.data
         }
+
+        if serialize:
+            return json.dumps(loop_dict)
+        else:
+            return loop_dict
 
     def getTag(self, tags=None, whole_tag=False):
         """Provided a tag name (or a list of tag names), or ordinals
