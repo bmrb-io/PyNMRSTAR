@@ -1305,6 +1305,7 @@ class saveframe(object):
     tags = []
     loops = []
     name = ""
+    category = "unset"
     tag_prefix = None
     source = "unknown"
 
@@ -1451,6 +1452,7 @@ class saveframe(object):
         # Create a saveframe from scratch and populate it
         ret = saveframe.fromScratch(json_dict['name'])
         ret.tag_prefix = json_dict['tag_prefix']
+        ret.category = json_dict.get('category','unset')
         ret.tags = json_dict['tags']
         ret.loops = [loop.fromJSON(x) for x in json_dict['loops']]
         ret.source = "fromJSON()"
@@ -1609,6 +1611,10 @@ class saveframe(object):
         else:
             new_tag = [name, value]
 
+        # Set the category if the tag we are loading is the category
+        if name == "Sf_category":
+            self.category = value
+
         if linenum:
             new_tag.append(linenum)
 
@@ -1752,6 +1758,7 @@ class saveframe(object):
 
         saveframe_data = {
             "name": self.name,
+            "category": self.category,
             "tag_prefix": self.tag_prefix,
             "tags": [[x[0], x[1]] for x in self.tags],
             "loops": [x.getJSON(serialize=False) for x in self.loops]
