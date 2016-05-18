@@ -70,10 +70,10 @@ PY3 = (sys.version_info[0] == 3)
 # Python version dependent loads
 if PY3:
     from urllib.request import urlopen
-    from urllib.error import HTTPError
+    from urllib.error import HTTPError, URLError
     from io import StringIO, BytesIO
 else:
-    from urllib2 import urlopen, HTTPError
+    from urllib2 import urlopen, HTTPError, URLError
     from cStringIO import StringIO
     BytesIO = StringIO
 
@@ -355,11 +355,12 @@ class _fastParser(object):
     def getToken(self):
         """ Returns the next token in the parsing process."""
         self.realgetToken()
-        if verbose:
-            if self.token:
-                print("'" + self.token + "'")
-            else:
-                print("No more tokens.")
+        # This is just too verbose
+        #if verbose:
+        #    if self.token:
+        #        print("'" + self.token + "'")
+        #    else:
+        #        print("No more tokens.")
         return self.token
 
     @staticmethod
@@ -1048,7 +1049,15 @@ class entry(object):
                 serialized_ent = serialized_ent.decode()
 
             # Parse JSON string to dictionary
-            entry_dictionary = json.loads(serialized_ent)[str(entry_num)]
+            json_data = json.loads(serialized_ent)
+            if "error" in json_data:
+                if "does not exist" in json_data["error"]:
+                    raise IOError("Entry '%s' does not exist in the public "
+                                  "database." % entry_num)
+                else:
+                    raise ValueError("An error occured while fetching the entry"
+                                     ": %s" % json_data["error"])
+            entry_dictionary = json_data[str(entry_num)]
             ent = entry.fromJSON(entry_dictionary)
 
             # Update the entry source
@@ -1062,14 +1071,13 @@ class entry(object):
             # Return the entry
             return ent
         # The entry doesn't exist
-        except (HTTPError, KeyError):
+        except KeyError:
             raise IOError("Entry '%s' does not exist in the public database." %
                           entry_num)
-        # If we can't load the JSON, load the entry the old fashioned way
-        except (ImportError, ValueError):
+        except (HTTPError, URLError):
             if verbose:
-                print("Failed to load entry '%s' in JSON format. Attempting to"
-                      "load from original NMR-STAR file." % entry_num)
+                print("BMRB API server appears to be down. Attempting to load "
+                      "from FTP site.")
             return cls(entry_num=entry_num)
 
     @classmethod
