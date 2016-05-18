@@ -273,7 +273,7 @@ def _interpretFile(the_file):
 
     if hasattr(the_file, 'read') and hasattr(the_file, 'readline'):
         star_buffer = the_file
-    elif isinstance(the_file, str):
+    elif isinstance(the_file, str) or isinstance(the_file, unicode):
         if (the_file.startswith("http://") or the_file.startswith("https://") or
                 the_file.startswith("ftp://")):
             star_buffer = BytesIO(urlopen(the_file).read())
