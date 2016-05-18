@@ -1408,6 +1408,12 @@ class saveframe(object):
         parser.parse(star_buffer.read(), source=self.source)
 
         # Copy the first parsed saveframe into ourself
+        if len(tmp_entry.frame_list) > 1:
+            raise ValueError("You attempted to parse one saveframe but the "
+                             "source you provided had more than one saveframe."
+                             " Please either parse all saveframes as an entry "
+                             "or only parse one saveframe. Saveframes detected:"
+                             " " + str(tmp_entry.frame_list))
         self.tags = tmp_entry[0].tags
         self.loops = tmp_entry[0].loops
         self.name = tmp_entry[0].name
@@ -1959,6 +1965,14 @@ class loop(object):
                                " save_")
         parser = _fastParser(entry_to_parse_into=tmp_entry)
         parser.parse(star_buffer.read(), source=self.source)
+
+        # Check that there was only one loop here
+        if len(tmp_entry[0].loops) > 1:
+            raise ValueError("You attempted to parse one loop but the source "
+                             "you provided had more than one loop. Please "
+                             "either parse all loops as a saveframe or only "
+                             "parse one loop. Loops detected:"
+                             " " + str(tmp_entry[0].loops))
 
         # Copy the first parsed saveframe into ourself
         self.columns = tmp_entry[0][0].columns
