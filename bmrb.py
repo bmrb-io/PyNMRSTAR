@@ -777,7 +777,7 @@ class schema(object):
         self.types = {}
 
         if schema_file is None:
-            schema_file = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_star_v3_files/adit_input/xlschem_ann.csv'
+            schema_file = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
         self.schema_file = schema_file
 
         schem_stream = _interpretFile(schema_file)
