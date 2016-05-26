@@ -10,10 +10,27 @@ There are seven module variables you can set to control our behavior.
 
 * Setting bmrb.verbose to True will print some of what is going on to
 the terminal.
-
+s
 * Setting bmrb.raise_parse_warnings to True will raise an exception if
 the parser encounters something problematic. Normally warnings are
 suppressed.
+
+* In addition, if you want to ignore some parse warnings but allow the
+rest, you can specify warnings to ignore by adding the warning to ignore
+to the "warnings_to_ignore" list. Here are descriptions of the parse warnings
+that can be surpressed:
+
+  * "tag-only-loop": A loop with no data was found.
+  * "empty-loop": A loop with no tags or values was found.
+  * "tag-not-in-schema": A tag was found in the entry that was not present
+in the schema.
+  * "invalid-null-value": A tag for which the schema disallows null values
+had a null value.
+  * "bad-multiline": A tag with an improper multi-line value was found.
+Multiline values should look like this:
+\n;\nThe multi-line\nvalue here.\n;\n
+but the tag looked like this:
+\n; The multi-line\nvalue here.\n;\n
 
 * Setting skip_empty_loops to True will suppress the printing of empty
 loops when calling __str__ methods.
