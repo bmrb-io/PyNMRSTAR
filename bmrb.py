@@ -3,7 +3,7 @@
 """This module provides entry, saveframe, and loop objects. Use python's
 built in help function for documentation.
 
-There are seven module variables you can set to control our behavior.
+There are eight module variables you can set to control our behavior.
 
 * Setting bmrb.verbose to True will print some of what is going on to
 the terminal.
@@ -11,6 +11,24 @@ the terminal.
 * Setting bmrb.raise_parse_warnings to True will raise an exception if
 the parser encounters something problematic. Normally warnings are
 suppressed.
+
+* In addition, if you want to ignore some parse warnings but allow the
+rest, you can specify warnings to ignore by adding the warning to ignore
+to the "warnings_to_ignore" list.
+
+Here are descriptions of the parse warnings that can be surpressed:
+
+* "tag-only-loop": A loop with no data was found.
+* "empty-loop": A loop with no tags or values was found.
+* "tag-not-in-schema": A tag was found in the entry that was not present
+in the schema.
+* "invalid-null-value": A tag for which the schema disallows null values
+had a null value.
+* "bad-multiline": A tag with an improper multi-line value was found.
+Multiline values should look like this:
+\n;\nThe multi-line\nvalue here.\n;\n
+but the tag looked like this:
+\n; The multi-line\nvalue here.\n;\n
 
 * Setting skip_empty_loops to True will suppress the printing of empty
 loops when calling __str__ methods.
@@ -89,6 +107,7 @@ verbose = False
 
 allow_v2_entries = False
 raise_parse_warnings = False
+warnings_to_ignore = []
 skip_empty_loops = False
 dont_show_comments = False
 convert_datatypes = False
@@ -481,14 +500,16 @@ class _fastParser(object):
                                                          "semicolon-delineated."
                                                          , self.getLineNumber())
                                     if len(curloop.columns) == 0:
-                                        if raise_parse_warnings:
+                                        if (raise_parse_warnings and
+                                                "tag-only-loop" not in warnings_to_ignore):
                                             lineno = self.getLineNumber()
                                             raise ValueError("Loop with no "
                                                              "tags.", lineno)
                                         curloop = None
                                     elif (len(curloop.data) == 0 and
                                           len(curdata) == 0 and
-                                          raise_parse_warnings):
+                                          raise_parse_warnings and
+                                          "empty-loop" not in warnings_to_ignore):
                                         raise ValueError("Loop with no data.",
                                                          self.getLineNumber())
                                     else:
@@ -653,7 +674,8 @@ class _fastParser(object):
                 # The line was terminated improperly
                 else:
                     if self.nextWhitespace(tmp[until+2:]) == 0:
-                        if raise_parse_warnings:
+                        if (raise_parse_warnings and
+                                "bad-multiline" not in warnings_to_ignore):
                             raise ValueError("Warning: Technically invalid line"
                                              " found in file. Multiline values "
                                              "should terminate with \\n;\\n but"
@@ -803,7 +825,8 @@ class schema(object):
 
         # If we don't know what the tag is, just return it
         if tag.lower() not in self.schema:
-            if raise_parse_warnings:
+            if (raise_parse_warnings and
+                    "tag-not-in-schema" not in warnings_to_ignore):
                 raise ValueError("There is a tag in the file that isn't in the "
                                  "schema: '%s' on line '%s'" % (tag, linenum))
             else:
@@ -817,7 +840,8 @@ class schema(object):
 
         # Check for null
         if value == "." or value == "?":
-            if not null_allowed and raise_parse_warnings:
+            if (not null_allowed and raise_parse_warnings and
+                    "invalid-null-value" not in warnings_to_ignore):
                 raise ValueError("There is a null in the file that isn't "
                                  "allowed according to the schema: '%s' on "
                                  "line '%s'" % (tag, linenum))
@@ -1073,11 +1097,13 @@ class entry(object):
             if convert_datatypes:
                 for each_saveframe in ent:
                     for tag in each_saveframe.tags:
-                        tag[1] = _getSchema().convertTag(each_saveframe.tag_prefix + "." + tag[0], tag[1])
-                    for each_loop in each_saveframe:
-                        for row in each_loop.data:
+                        cur_tag = each_saveframe.tag_prefix + "." + tag[0]
+                        tag[1] = _getSchema().convertTag(cur_tag, tag[1])
+                    for el in each_saveframe:
+                        for row in el.data:
                             for pos in range(0, len(row)):
-                                row[pos] = _getSchema().convertTag(each_loop.category + "." + each_loop.columns[pos], row[pos])
+                                ct = el.category + "." + el.columns[pos]
+                                row[pos] = _getSchema().convertTag(ct, row[pos])
 
             return ent
         # The entry doesn't exist
@@ -1474,7 +1500,7 @@ class saveframe(object):
         # Create a saveframe from scratch and populate it
         ret = saveframe.fromScratch(json_dict['name'])
         ret.tag_prefix = json_dict['tag_prefix']
-        ret.category = json_dict.get('category','unset')
+        ret.category = json_dict.get('category', 'unset')
         ret.tags = json_dict['tags']
         ret.loops = [loop.fromJSON(x) for x in json_dict['loops']]
         ret.source = "fromJSON()"
