@@ -356,11 +356,11 @@ class _fastParser(object):
         """ Returns the next token in the parsing process."""
         self.realgetToken()
         # This is just too verbose
-        #if verbose:
-        #    if self.token:
-        #        print("'" + self.token + "'")
-        #    else:
-        #        print("No more tokens.")
+        if verbose == "very":
+            if self.token:
+                print("'" + self.token + "'")
+            else:
+                print("No more tokens.")
         return self.token
 
     @staticmethod
@@ -483,10 +483,11 @@ class _fastParser(object):
                                     if len(curloop.columns) == 0:
                                         if raise_parse_warnings:
                                             lineno = self.getLineNumber()
-                                            raise ValueError("Loop with no ",
+                                            raise ValueError("Loop with no "
                                                              "tags.", lineno)
                                         curloop = None
                                     elif (len(curloop.data) == 0 and
+                                          len(curdata) == 0 and
                                           raise_parse_warnings):
                                         raise ValueError("Loop with no data.",
                                                          self.getLineNumber())
