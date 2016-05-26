@@ -281,7 +281,7 @@ def _interpretFile(the_file):
             with open(the_file, 'rb') as read_file:
                 star_buffer = BytesIO(read_file.read())
     else:
-        raise ValueError("Cannot figure out how to interpret the file "
+        raise ValueError("Cannot figure out how to interpret the file"
                          " you passed.")
 
     # Decompress the buffer if we are looking at a gzipped file
@@ -1068,7 +1068,16 @@ class entry(object):
                 for each_loop in each_saveframe:
                     each_loop.source = ent_source
 
-            # Return the entry
+            # Convert datatypes
+            if convert_datatypes:
+                for each_saveframe in ent:
+                    for tag in each_saveframe.tags:
+                        tag[1] = _getSchema().convertTag(each_saveframe.tag_prefix + "." + tag[0], tag[1])
+                    for each_loop in each_saveframe:
+                        for row in each_loop.data:
+                            for pos in range(0, len(row)):
+                                row[pos] = _getSchema().convertTag(each_loop.category + "." + each_loop.columns[pos], row[pos])
+
             return ent
         # The entry doesn't exist
         except KeyError:
@@ -1089,8 +1098,7 @@ class entry(object):
 
     @classmethod
     def fromJSON(cls, json_dict):
-        """Create an entry from JSON (unserialized JSON - a python
-        dictionary)."""
+        """Create an entry from JSON (serialized or unserialized JSON)."""
 
         # If they provided a string, try to load it using JSON
         if not isinstance(json_dict, dict):
@@ -1445,8 +1453,7 @@ class saveframe(object):
 
     @classmethod
     def fromJSON(cls, json_dict):
-        """Create a saveframe from JSON (unserialized JSON - a python
-        dictionary)."""
+        """Create a saveframe from JSON (serialized or unserialized JSON)."""
 
         # If they provided a string, try to load it using JSON
         if not isinstance(json_dict, dict):
@@ -2098,8 +2105,7 @@ class loop(object):
 
     @classmethod
     def fromJSON(cls, json_dict):
-        """Create a loop from JSON (unserialized JSON - a python
-        dictionary)."""
+        """Create a loop from JSON (serialized or unserialized JSON)."""
 
         # If they provided a string, try to load it using JSON
         if not isinstance(json_dict, dict):
