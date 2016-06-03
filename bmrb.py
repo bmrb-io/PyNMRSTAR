@@ -229,10 +229,16 @@ def cleanValue(value):
                 ["data_", "save_", "loop_", "stop_", "_"])):
         # If there is a single quote wrap in double quotes
         if "'" in value:
-            value = '"%s"' % value
+            return  '"%s"' % value
         # Either there is a double quote or no quotes
         else:
-            value = "'%s'" % value
+            return "'%s'" % value
+
+    # Quote if necessary
+    if value[0] == "'":
+        return '"' + value + '"'
+    if value[0] == '"':
+        return "'" + value + "'"
 
     # It's good to go
     return value
