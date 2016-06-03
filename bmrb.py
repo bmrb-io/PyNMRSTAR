@@ -16,7 +16,7 @@ suppressed.
 rest, you can specify warnings to ignore by adding the warning to ignore
 to the "warnings_to_ignore" list.
 
-Here are descriptions of the parse warnings that can be surpressed:
+Here are descriptions of the parse warnings that can be suppressed:
 
 * "tag-only-loop": A loop with no data was found.
 * "empty-loop": A loop with no tags or values was found.
@@ -1093,17 +1093,21 @@ class entry(object):
                 for each_loop in each_saveframe:
                     each_loop.source = ent_source
 
+            # TODO: Delete this once the database is remediated
             # Convert datatypes
             if convert_datatypes:
+                schem = _getSchema()
                 for each_saveframe in ent:
                     for tag in each_saveframe.tags:
                         cur_tag = each_saveframe.tag_prefix + "." + tag[0]
-                        tag[1] = _getSchema().convertTag(cur_tag, tag[1])
+                        tag[1] = schem.convertTag(cur_tag, tag[1], linenum="SF %s" % each_saveframe.name)
                     for el in each_saveframe:
                         for row in el.data:
                             for pos in range(0, len(row)):
                                 ct = el.category + "." + el.columns[pos]
-                                row[pos] = _getSchema().convertTag(ct, row[pos])
+                                linenum = "Loop %s" % el.category
+                                row[pos] = schem.convertTag(ct, row[pos],
+                                                            linenum=linenum)
 
             return ent
         # The entry doesn't exist
