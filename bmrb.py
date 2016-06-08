@@ -1,26 +1,44 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 
 """This module provides entry, saveframe, and loop objects. Use python's
 built in help function for documentation.
 
-There are seven module variables you can set to control our behavior.
+There are eight module variables you can set to control our behavior.
 
-*Setting bmrb.verbose to True will print some of what is going on to
+* Setting bmrb.verbose to True will print some of what is going on to
 the terminal.
 
-*Setting bmrb.raise_parse_warnings to True will raise an exception if
+* Setting bmrb.raise_parse_warnings to True will raise an exception if
 the parser encounters something problematic. Normally warnings are
 suppressed.
 
-*Setting skip_empty_loops to True will suppress the printing of empty
+* In addition, if you want to ignore some parse warnings but allow the
+rest, you can specify warnings to ignore by adding the warning to ignore
+to the "warnings_to_ignore" list.
+
+Here are descriptions of the parse warnings that can be suppressed:
+
+* "tag-only-loop": A loop with no data was found.
+* "empty-loop": A loop with no tags or values was found.
+* "tag-not-in-schema": A tag was found in the entry that was not present
+in the schema.
+* "invalid-null-value": A tag for which the schema disallows null values
+had a null value.
+* "bad-multiline": A tag with an improper multi-line value was found.
+Multiline values should look like this:
+\n;\nThe multi-line\nvalue here.\n;\n
+but the tag looked like this:
+\n; The multi-line\nvalue here.\n;\n
+
+* Setting skip_empty_loops to True will suppress the printing of empty
 loops when calling __str__ methods.
 
-*Adding key->value pairs to str_conversion_dict will automatically
+* Adding key->value pairs to str_conversion_dict will automatically
 convert tags whose value matches "key" to the string "value" when
 printing. This allows you to set the default conversion value for
 Booleans or other objects.
 
-*Setting bmrb.allow_v2_entries will allow parsing of NMR-STAR version
+* Setting bmrb.allow_v2_entries will allow parsing of NMR-STAR version
 2.1 entries. Most other methods will not operate correctly on parsed
 2.1 entries. This is only to allow you parse and access the data in
 these entries - nothing else. Only set this if you have a really good
@@ -46,18 +64,17 @@ implement a full validator (at least at present).
 Call directly (rather than importing) to run a self-test.
 """
 
-# Make sure print functions work in python2 and python3
-from __future__ import print_function
-
-__all__ = ['entry', 'saveframe', 'loop', 'schema', 'diff', 'validate', 'PY3']
-
 #############################################
 #                 Imports                   #
 #############################################
 
+# Make sure print functions work in python2 and python3
+from __future__ import print_function
+
 # Standard library imports
 import os
 import sys
+import json
 import decimal
 
 from copy import deepcopy
@@ -71,10 +88,10 @@ PY3 = (sys.version_info[0] == 3)
 # Python version dependent loads
 if PY3:
     from urllib.request import urlopen
-    from urllib.error import HTTPError
+    from urllib.error import HTTPError, URLError
     from io import StringIO, BytesIO
 else:
-    from urllib2 import urlopen, HTTPError
+    from urllib2 import urlopen, HTTPError, URLError
     from cStringIO import StringIO
     BytesIO = StringIO
 
@@ -82,11 +99,15 @@ else:
 #            Global Variables               #
 #############################################
 
+# Set this to allow import * from bmrb to work sensibly
+__all__ = ['entry', 'saveframe', 'loop', 'schema', 'diff', 'validate', 'PY3']
+
 # May be set by calling code
 verbose = False
 
 allow_v2_entries = False
 raise_parse_warnings = False
+warnings_to_ignore = []
 skip_empty_loops = False
 dont_show_comments = False
 convert_datatypes = False
@@ -99,13 +120,6 @@ str_conversion_dict = {None:"."}
 # Used internally
 standard_schema = None
 comment_dictionary = {}
-
-# Get the svn revision number of this file
-try:
-    svn_revision = "$Revision: 185 $".split()[1]
-# If they wget the file from the SVN or something
-except IndexError:
-    svn_revision = "UNKNOWN"
 
 #############################################
 #             Module methods                #
@@ -215,10 +229,16 @@ def cleanValue(value):
                 ["data_", "save_", "loop_", "stop_", "_"])):
         # If there is a single quote wrap in double quotes
         if "'" in value:
-            value = '"%s"' % value
+            return  '"%s"' % value
         # Either there is a double quote or no quotes
         else:
-            value = "'%s'" % value
+            return "'%s'" % value
+
+    # Quote if necessary
+    if value[0] == "'":
+        return '"' + value + '"'
+    if value[0] == '"':
+        return "'" + value + "'"
 
     # It's good to go
     return value
@@ -278,15 +298,15 @@ def _interpretFile(the_file):
 
     if hasattr(the_file, 'read') and hasattr(the_file, 'readline'):
         star_buffer = the_file
-    elif isinstance(the_file, str):
+    elif isinstance(the_file, str) or isinstance(the_file, unicode):
         if (the_file.startswith("http://") or the_file.startswith("https://") or
                 the_file.startswith("ftp://")):
             star_buffer = BytesIO(urlopen(the_file).read())
         else:
-            with open(the_file, 'rb') as data_source:
-                star_buffer = BytesIO(data_source.read())
+            with open(the_file, 'rb') as read_file:
+                star_buffer = BytesIO(read_file.read())
     else:
-        raise ValueError("Cannot figure out how to interpret the file "
+        raise ValueError("Cannot figure out how to interpret the file"
                          " you passed.")
 
     # Decompress the buffer if we are looking at a gzipped file
@@ -360,7 +380,8 @@ class _fastParser(object):
     def getToken(self):
         """ Returns the next token in the parsing process."""
         self.realgetToken()
-        if verbose:
+        # This is just too verbose
+        if verbose == "very":
             if self.token:
                 print("'" + self.token + "'")
             else:
@@ -468,7 +489,7 @@ class _fastParser(object):
                                 raise ValueError("Loop tags may not be quoted "
                                                  "or semicolon-delineated.",
                                                  self.getLineNumber())
-                            if seen_data == True:
+                            if seen_data:
                                 raise ValueError("Cannot have more loop tags "
                                                  "after loop data.")
                             curloop.addColumn(self.token)
@@ -485,13 +506,16 @@ class _fastParser(object):
                                                          "semicolon-delineated."
                                                          , self.getLineNumber())
                                     if len(curloop.columns) == 0:
-                                        if raise_parse_warnings:
+                                        if (raise_parse_warnings and
+                                                "tag-only-loop" not in warnings_to_ignore):
                                             lineno = self.getLineNumber()
-                                            raise ValueError("Loop with no ",
+                                            raise ValueError("Loop with no "
                                                              "tags.", lineno)
                                         curloop = None
                                     elif (len(curloop.data) == 0 and
-                                          raise_parse_warnings):
+                                          len(curdata) == 0 and
+                                          raise_parse_warnings and
+                                          "empty-loop" not in warnings_to_ignore):
                                         raise ValueError("Loop with no data.",
                                                          self.getLineNumber())
                                     else:
@@ -589,7 +613,7 @@ class _fastParser(object):
         self.last_delineator = ""
 
         # Nothing left
-        if self.token == None:
+        if self.token is None:
             return
 
         # We're at the end if the index is the length
@@ -656,7 +680,8 @@ class _fastParser(object):
                 # The line was terminated improperly
                 else:
                     if self.nextWhitespace(tmp[until+2:]) == 0:
-                        if raise_parse_warnings:
+                        if (raise_parse_warnings and
+                                "bad-multiline" not in warnings_to_ignore):
                             raise ValueError("Warning: Technically invalid line"
                                              " found in file. Multiline values "
                                              "should terminate with \\n;\\n but"
@@ -751,14 +776,14 @@ class schema(object):
         """Initialize a BMRB schema. With no arguments the most
         up-to-date schema will be fetched from the BMRB FTP site.
         Otherwise pass a URL or a file to load a schema from using the
-        schema_url or schema_file optional arguments."""
+        schema_file optional argument."""
 
         self.headers = []
         self.schema = {}
         self.types = {}
 
         if schema_file is None:
-            schema_file = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_star_v3_files/adit_input/xlschem_ann.csv'
+            schema_file = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
         self.schema_file = schema_file
 
         schem_stream = _interpretFile(schema_file)
@@ -805,8 +830,9 @@ class schema(object):
         type as specified in this schema."""
 
         # If we don't know what the tag is, just return it
-        if not tag.lower() in self.schema:
-            if raise_parse_warnings:
+        if tag.lower() not in self.schema:
+            if (raise_parse_warnings and
+                    "tag-not-in-schema" not in warnings_to_ignore):
                 raise ValueError("There is a tag in the file that isn't in the "
                                  "schema: '%s' on line '%s'" % (tag, linenum))
             else:
@@ -820,7 +846,8 @@ class schema(object):
 
         # Check for null
         if value == "." or value == "?":
-            if not null_allowed and raise_parse_warnings:
+            if (not null_allowed and raise_parse_warnings and
+                    "invalid-null-value" not in warnings_to_ignore):
                 raise ValueError("There is a null in the file that isn't "
                                  "allowed according to the schema: '%s' on "
                                  "line '%s'" % (tag, linenum))
@@ -869,7 +896,7 @@ class schema(object):
         """ Validates that a tag matches the type it should have
         according to this schema."""
 
-        if not tag.lower() in self.schema:
+        if tag.lower() not in self.schema:
             return ["Tag '%s' not found in schema. Line '%s'." % (tag, linenum)]
 
         (valtype, null_allowed, allowed_category,
@@ -1041,7 +1068,63 @@ class entry(object):
         """Create an entry corresponding to the most up to date entry on
         the public BMRB server. (Requires ability to initiate outbound
         HTTP connections.)"""
-        return cls(entry_num=entry_num)
+
+        # Try to load the entry using JSON
+        try:
+            entry_url = "http://webapi.bmrb.wisc.edu/current/rest/entry/%s/"
+            entry_url = entry_url % entry_num
+
+            # Convert bytes to string if python3
+            serialized_ent = urlopen(entry_url).read()
+            if PY3:
+                serialized_ent = serialized_ent.decode()
+
+            # Parse JSON string to dictionary
+            json_data = json.loads(serialized_ent)
+            if "error" in json_data:
+                if "does not exist" in json_data["error"]:
+                    raise IOError("Entry '%s' does not exist in the public "
+                                  "database." % entry_num)
+                else:
+                    raise ValueError("An error occured while fetching the entry"
+                                     ": %s" % json_data["error"])
+            entry_dictionary = json_data[str(entry_num)]
+            ent = entry.fromJSON(entry_dictionary)
+
+            # Update the entry source
+            ent_source = "fromDatabase(%s)" % entry_num
+            ent.source = ent_source
+            for each_saveframe in ent:
+                each_saveframe.source = ent_source
+                for each_loop in each_saveframe:
+                    each_loop.source = ent_source
+
+            # TODO: Delete this once the database is remediated
+            # Convert datatypes
+            if convert_datatypes:
+                schem = _getSchema()
+                for each_saveframe in ent:
+                    for tag in each_saveframe.tags:
+                        cur_tag = each_saveframe.tag_prefix + "." + tag[0]
+                        tag[1] = schem.convertTag(cur_tag, tag[1], linenum="SF %s" % each_saveframe.name)
+                    for el in each_saveframe:
+                        for row in el.data:
+                            for pos in range(0, len(row)):
+                                ct = el.category + "." + el.columns[pos]
+                                linenum = "Loop %s" % el.category
+                                row[pos] = schem.convertTag(ct, row[pos],
+                                                            linenum=linenum)
+
+            return ent
+        # The entry doesn't exist
+        except KeyError:
+            raise IOError("Entry '%s' does not exist in the public database." %
+                          entry_num)
+        except (HTTPError, URLError):
+            if verbose:
+                print("BMRB API server appears to be down. Attempting to load "
+                      "from FTP site.")
+            return cls(entry_num=entry_num)
 
     @classmethod
     def fromFile(cls, the_file):
@@ -1052,20 +1135,22 @@ class entry(object):
 
     @classmethod
     def fromJSON(cls, json_dict):
-        """Create an entry from JSON (unserialized JSON - a python
-        dictionary)."""
+        """Create an entry from JSON (serialized or unserialized JSON)."""
 
         # If they provided a string, try to load it using JSON
         if not isinstance(json_dict, dict):
-            raise ValueError("The JSON you provided was neither a Python "
-                             "dictionary nor a JSON string.")
+            try:
+                json_dict = json.loads(json_dict)
+            except (TypeError, ValueError):
+                raise ValueError("The JSON you provided was neither a Python "
+                                 "dictionary nor a JSON string.")
 
         # Make sure it has the correct keys
         for check in ["bmrb_id", "saveframes"]:
             if check not in json_dict:
                 raise ValueError("The JSON you provide must be a hash and must "
                                  "contain the key '%s' - even if the key points"
-                                 " to None." % check)
+                                 " to 'None'." % check)
 
         # Create an entry from scratch and populate it
         ret = entry.fromScratch(json_dict['bmrb_id'])
@@ -1141,15 +1226,20 @@ class entry(object):
         """Returns a dictionary of saveframe name -> saveframe object"""
         return dict((frame.name, frame) for frame in self.frame_list)
 
-    def getJSON(self):
-        """ Returns this entry in a form that can be serialized. Note
-        that you must still import json and call json.dumps() on the
-        result to serialize the entry."""
+    def getJSON(self, serialize=True):
+        """ Returns the entry in JSON format. If serialize is set to
+        False a dictionary representation of the entry that is
+        serializeable is returned."""
 
-        return {
+        entry_dict = {
             "bmrb_id": self.bmrb_id,
-            "saveframes": [x.getJSON() for x in self.frame_list]
+            "saveframes": [x.getJSON(serialize=False) for x in self.frame_list]
         }
+
+        if serialize:
+            return json.dumps(entry_dict)
+        else:
+            return entry_dict
 
     def getLoopsByCategory(self, value):
         """Allows fetching loops by category."""
@@ -1193,7 +1283,7 @@ class entry(object):
         and the [tag_name, tag_value (,tag_linenumber)] pair will be
         returned."""
 
-        if not "." in str(tag) and not allow_v2_entries:
+        if "." not in str(tag) and not allow_v2_entries:
             raise ValueError("You must provide the tag category to call this"
                              " method at the entry level.")
 
@@ -1268,6 +1358,7 @@ class saveframe(object):
     tags = []
     loops = []
     name = ""
+    category = "unset"
     tag_prefix = None
     source = "unknown"
 
@@ -1370,6 +1461,12 @@ class saveframe(object):
         parser.parse(star_buffer.read(), source=self.source)
 
         # Copy the first parsed saveframe into ourself
+        if len(tmp_entry.frame_list) > 1:
+            raise ValueError("You attempted to parse one saveframe but the "
+                             "source you provided had more than one saveframe."
+                             " Please either parse all saveframes as an entry "
+                             "or only parse one saveframe. Saveframes detected:"
+                             " " + str(tmp_entry.frame_list))
         self.tags = tmp_entry[0].tags
         self.loops = tmp_entry[0].loops
         self.name = tmp_entry[0].name
@@ -1393,13 +1490,15 @@ class saveframe(object):
 
     @classmethod
     def fromJSON(cls, json_dict):
-        """Create a saveframe from JSON (unserialized JSON - a python
-        dictionary)."""
+        """Create a saveframe from JSON (serialized or unserialized JSON)."""
 
         # If they provided a string, try to load it using JSON
         if not isinstance(json_dict, dict):
-            raise ValueError("The JSON you provided was neither a Python "
-                             "dictionary nor a JSON string.")
+            try:
+                json_dict = json.loads(json_dict)
+            except (TypeError, ValueError):
+                raise ValueError("The JSON you provided was neither a Python "
+                                 "dictionary nor a JSON string.")
 
         # Make sure it has the correct keys
         for check in ["name", "tag_prefix", "tags", "loops"]:
@@ -1411,6 +1510,7 @@ class saveframe(object):
         # Create a saveframe from scratch and populate it
         ret = saveframe.fromScratch(json_dict['name'])
         ret.tag_prefix = json_dict['tag_prefix']
+        ret.category = json_dict.get('category', 'unset')
         ret.tags = json_dict['tags']
         ret.loops = [loop.fromJSON(x) for x in json_dict['loops']]
         ret.source = "fromJSON()"
@@ -1569,6 +1669,10 @@ class saveframe(object):
         else:
             new_tag = [name, value]
 
+        # Set the category if the tag we are loading is the category
+        if name == "Sf_category":
+            self.category = value
+
         if linenum:
             new_tag.append(linenum)
 
@@ -1705,17 +1809,23 @@ class saveframe(object):
         csv_buffer.seek(0)
         return csv_buffer.read().replace('\r\n', '\n')
 
-    def getJSON(self):
-        """ Returns this saveframe in a form that can be serialized.
-        Note that you must still import json and call json.dumps() on
-        the result to serialize the entry."""
+    def getJSON(self, serialize=True):
+        """ Returns the saveframe in JSON format. If serialize is set to
+        False a dictionary representation of the saveframe that is
+        serializeable is returned."""
 
-        return {
+        saveframe_data = {
             "name": self.name,
+            "category": self.category,
             "tag_prefix": self.tag_prefix,
             "tags": [[x[0], x[1]] for x in self.tags],
-            "loops": [x.getJSON() for x in self.loops]
+            "loops": [x.getJSON(serialize=False) for x in self.loops]
         }
+
+        if serialize:
+            return json.dumps(saveframe_data)
+        else:
+            return saveframe_data
 
     def getLoopByCategory(self, name):
         """Return a loop based on the loop name (category)."""
@@ -1741,8 +1851,8 @@ class saveframe(object):
         # Check the loops
         for each_loop in self.loops:
             if ((each_loop.category is not None and tag_prefix is not None and
-                    each_loop.category.lower() == tag_prefix.lower()) or
-                        allow_v2_entries):
+                 each_loop.category.lower() == tag_prefix.lower()) or
+                    allow_v2_entries):
                 results.extend(each_loop.getTag(query, whole_tag=whole_tag))
 
         # Check our tags
@@ -1908,6 +2018,14 @@ class loop(object):
         parser = _fastParser(entry_to_parse_into=tmp_entry)
         parser.parse(star_buffer.read(), source=self.source)
 
+        # Check that there was only one loop here
+        if len(tmp_entry[0].loops) > 1:
+            raise ValueError("You attempted to parse one loop but the source "
+                             "you provided had more than one loop. Please "
+                             "either parse all loops as a saveframe or only "
+                             "parse one loop. Loops detected:"
+                             " " + str(tmp_entry[0].loops))
+
         # Copy the first parsed saveframe into ourself
         self.columns = tmp_entry[0][0].columns
         self.data = tmp_entry[0][0].data
@@ -2024,20 +2142,22 @@ class loop(object):
 
     @classmethod
     def fromJSON(cls, json_dict):
-        """Create a loop from JSON (unserialized JSON - a python
-        dictionary)."""
+        """Create a loop from JSON (serialized or unserialized JSON)."""
 
         # If they provided a string, try to load it using JSON
         if not isinstance(json_dict, dict):
-            raise ValueError("The JSON you provided was neither a Python "
-                             "dictionary nor a JSON string.")
+            try:
+                json_dict = json.loads(json_dict)
+            except (TypeError, ValueError):
+                raise ValueError("The JSON you provided was neither a Python "
+                                 "dictionary nor a JSON string.")
 
         # Make sure it has the correct keys
         for check in ['tags', 'category', 'data']:
             if check not in json_dict:
-                raise ValueError("The JSON you provide must be a hash and must "
-                                 "contain the key '%s' - even if the key points"
-                                 " to None." % check)
+                raise ValueError("The JSON you provide must be a dictionary and"
+                                 " must contain the key '%s' - even if the key "
+                                 "points to None." % check)
 
         # Create a loop from scratch and populate it
         ret = loop.fromScratch()
@@ -2161,7 +2281,7 @@ class loop(object):
                                  (supplied_category, self.category))
 
         column_id = _formatTag(column_id).lower()
-        if not column_id in [x.lower() for x in self.columns]:
+        if column_id not in [x.lower() for x in self.columns]:
             raise ValueError("The column tag '%s' to which you are attempting "
                              "to add data does not yet exist. Create the "
                              "columns before adding data." % column_id)
@@ -2306,15 +2426,21 @@ class loop(object):
 
         return results
 
-    def getJSON(self):
-        """ Returns this loop in a form that can be serialized. Note that
-        you must still import json and call json.dumps() on the result to
-        serialize the entry."""
-        return {
+    def getJSON(self, serialize=True):
+        """ Returns the loop in JSON format. If serialize is set to
+        False a dictionary representation of the loop that is
+        serializeable is returned."""
+
+        loop_dict = {
             "category": self.category,
             "tags": self.columns,
             "data": self.data
         }
+
+        if serialize:
+            return json.dumps(loop_dict)
+        else:
+            return loop_dict
 
     def getTag(self, tags=None, whole_tag=False):
         """Provided a tag name (or a list of tag names), or ordinals
@@ -2558,7 +2684,7 @@ if __name__ == '__main__':
     import optparse
     # Specify some basic information about our command
     optparser = optparse.OptionParser(usage="usage: %prog",
-                                      version="SVN_%s" % svn_revision,
+                                      version="1.0",
                                       description="NMR-STAR handling python "
                                                   "module. Usually you'll want "
                                                   "to import this. When ran "
