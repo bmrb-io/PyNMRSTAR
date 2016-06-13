@@ -20,7 +20,7 @@ database_entry = bmrb.entry.fromDatabase(15000)
 sample_file_location = os.path.join(our_path, "sample_files", "bmr15000_3.str")
 file_entry = bmrb.entry.fromFile(sample_file_location)
 
-class TestSequenceFunctions(unittest.TestCase):
+class TestPyNMRSTAR(unittest.TestCase):
 
     def setUp(self):
         self.entry = copy(database_entry)
@@ -101,7 +101,7 @@ class TestSequenceFunctions(unittest.TestCase):
 
     def test_schema(self):
         default = bmrb.schema()
-        loaded = bmrb.schema("http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_star_v3_files/adit_input/xlschem_ann.csv")
+        loaded = bmrb.schema('http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv')
 
         self.assertEqual(default.schema, loaded.schema)
         self.assertEqual(default.types, loaded.types)

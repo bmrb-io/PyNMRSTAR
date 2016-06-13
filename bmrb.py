@@ -133,6 +133,7 @@ def enableNEFDefaults():
     global str_conversion_dict, skip_empty_loops
     str_conversion_dict = {None:".", True:"true", False:"false"}
     skip_empty_loops = True
+    dont_show_comments = True
 
 def enableBMRBDefaults():
     """ Sets the module variables such that our behavior matches the
@@ -141,6 +142,7 @@ def enableBMRBDefaults():
     global str_conversion_dict, skip_empty_loops
     str_conversion_dict = {None:"."}
     skip_empty_loops = False
+    dont_show_comments = False
 
 def diff(entry1, entry2):
     """Prints the differences between two entries. Non-equal entries
@@ -244,6 +246,14 @@ def cleanValue(value):
     return value
 
 # Internal use only methods
+
+def _jsonSerialize(obj):
+    """JSON serializer for objects not serializable by default json code"""
+
+    # Serialize datetime.date objects by calling str() on them
+    if isinstance(obj, (date, decimal.Decimal)):
+        return str(obj)
+    raise TypeError ("Type not serializable: %s" % type(obj))
 
 def _formatCategory(value):
     """Adds a '_' to the front of a tag (if not present) and strips out
@@ -1024,6 +1034,10 @@ class entry(object):
         parser = _fastParser(entry_to_parse_into=self)
         parser.parse(star_buffer.read(), source=self.source)
 
+    def __len__(self):
+        """ Returns the number of saveframes in the entry."""
+        return len(self.frame_list)
+
     def __lt__(self, other):
         """Returns true if this entry is less than another entry."""
         return self.bmrb_id > other.bmrb_id
@@ -1237,7 +1251,7 @@ class entry(object):
         }
 
         if serialize:
-            return json.dumps(entry_dict)
+            return json.dumps(entry_dict, default=_jsonSerialize)
         else:
             return entry_dict
 
@@ -1823,7 +1837,7 @@ class saveframe(object):
         }
 
         if serialize:
-            return json.dumps(saveframe_data)
+            return json.dumps(saveframe_data, default=_jsonSerialize)
         else:
             return saveframe_data
 
@@ -2438,7 +2452,7 @@ class loop(object):
         }
 
         if serialize:
-            return json.dumps(loop_dict)
+            return json.dumps(loop_dict, default=_jsonSerialize)
         else:
             return loop_dict
 
