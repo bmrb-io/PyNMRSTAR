@@ -245,6 +245,14 @@ def cleanValue(value):
 
 # Internal use only methods
 
+def _jsonSerialize(obj):
+    """JSON serializer for objects not serializable by default json code"""
+
+    # Serialize datetime.date objects by calling str() on them
+    if isinstance(obj, (date, decimal.Decimal)):
+        return str(obj)
+    raise TypeError ("Type not serializable: %s" % type(obj))
+
 def _formatCategory(value):
     """Adds a '_' to the front of a tag (if not present) and strips out
     anything after a '.'"""
@@ -1237,7 +1245,7 @@ class entry(object):
         }
 
         if serialize:
-            return json.dumps(entry_dict)
+            return json.dumps(entry_dict, default=_jsonSerialize)
         else:
             return entry_dict
 
@@ -1823,7 +1831,7 @@ class saveframe(object):
         }
 
         if serialize:
-            return json.dumps(saveframe_data)
+            return json.dumps(saveframe_data, default=_jsonSerialize)
         else:
             return saveframe_data
 
@@ -2438,7 +2446,7 @@ class loop(object):
         }
 
         if serialize:
-            return json.dumps(loop_dict)
+            return json.dumps(loop_dict, default=_jsonSerialize)
         else:
             return loop_dict
 
