@@ -133,6 +133,7 @@ def enableNEFDefaults():
     global str_conversion_dict, skip_empty_loops
     str_conversion_dict = {None:".", True:"true", False:"false"}
     skip_empty_loops = True
+    dont_show_comments = True
 
 def enableBMRBDefaults():
     """ Sets the module variables such that our behavior matches the
@@ -141,6 +142,7 @@ def enableBMRBDefaults():
     global str_conversion_dict, skip_empty_loops
     str_conversion_dict = {None:"."}
     skip_empty_loops = False
+    dont_show_comments = False
 
 def diff(entry1, entry2):
     """Prints the differences between two entries. Non-equal entries
