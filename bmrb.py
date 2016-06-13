@@ -1032,6 +1032,10 @@ class entry(object):
         parser = _fastParser(entry_to_parse_into=self)
         parser.parse(star_buffer.read(), source=self.source)
 
+    def __len__(self):
+        """ Returns the number of saveframes in the entry."""
+        return len(self.frame_list)
+
     def __lt__(self, other):
         """Returns true if this entry is less than another entry."""
         return self.bmrb_id > other.bmrb_id
