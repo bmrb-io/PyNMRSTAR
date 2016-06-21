@@ -1759,7 +1759,10 @@ class saveframe(object):
                                  "entry." % (self.tag_prefix, tag[0]))
                     continue
 
-                if tag[1] != other_tag[0]:
+                # Compare the string version of the tags in case there are
+                #  non-string types. Use the conversion dict to get to str
+                if (str(str_conversion_dict.get(tag[1],tag[1])) !=
+                    str(str_conversion_dict.get(other_tag[0], other_tag[0]))):
                     diffs.append("\tMismatched tag values for tag '%s.%s':"
                                  " '%s' vs '%s'." %
                                  (self.tag_prefix, tag[0],
