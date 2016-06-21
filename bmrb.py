@@ -2339,15 +2339,27 @@ class loop(object):
             if str(self.category).lower() != str(other.category).lower():
                 diffs.append("\t\tCategory of loops does not match: '%s' vs "
                              "'%s'." % (self.category, other.category))
-            # Check data of loops
-            if self.data != other.data:
-                diffs.append("\t\tLoop data does not match for loop with "
-                             "category '%s'." % self.category)
+
             # Check columns of loops
             if ([x.lower() for x in self.columns] !=
                     [x.lower() for x in other.columns]):
                 diffs.append("\t\tLoop columns do not match for loop with "
                              "category '%s'." % self.category)
+
+            # No point checking if data is the same if the columns aren't
+            else:
+                # Only sort the data if it is not already equal
+                if self.data != other.data:
+
+                    # Check data of loops
+                    self_data = sorted(deepcopy(self.data),
+                                       key = lambda x: tuple(x))
+                    other_data = sorted(deepcopy(other.data),
+                                        key = lambda x: tuple(x))
+
+                    if self_data != other_data:
+                        diffs.append("\t\tLoop data does not match for loop "
+                                     "with category '%s'." % self.category)
 
         except Exception as e:
             diffs.append("\t\tAn exception occured while comparing: '%s'." % e)
