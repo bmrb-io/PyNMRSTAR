@@ -1,6 +1,8 @@
 # PyNMRSTAR
 A Python module for reading, writing, and manipulating NMR-STAR files.
 
+[![Build Status](https://travis-ci.org/uwbmrb/PyNMRSTAR.svg?branch=master)](https://travis-ci.org/uwbmrb/PyNMRSTAR)
+
 ====
 
 This module provides entry, saveframe, and loop objects. Use python's
