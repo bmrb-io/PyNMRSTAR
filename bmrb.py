@@ -311,7 +311,9 @@ def _interpretFile(the_file):
     elif isinstance(the_file, str) or isinstance(the_file, unicode):
         if (the_file.startswith("http://") or the_file.startswith("https://") or
                 the_file.startswith("ftp://")):
-            star_buffer = BytesIO(urlopen(the_file).read())
+                url_data = urlopen(the_file)
+                star_buffer = BytesIO(url_data.read())
+                url_data.close()
         else:
             with open(the_file, 'rb') as read_file:
                 star_buffer = BytesIO(read_file.read())
