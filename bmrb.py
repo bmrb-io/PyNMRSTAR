@@ -130,7 +130,7 @@ def enableNEFDefaults():
     """ Sets the module variables such that our behavior matches the NEF
     standard. Specifically, suppress printing empty loops by default and
     convert True -> "true" and False -> "false" when printing."""
-    global str_conversion_dict, skip_empty_loops
+    global str_conversion_dict, skip_empty_loops, dont_show_comments
     str_conversion_dict = {None:".", True:"true", False:"false"}
     skip_empty_loops = True
     dont_show_comments = True
@@ -139,7 +139,7 @@ def enableBMRBDefaults():
     """ Sets the module variables such that our behavior matches the
     BMRB standard. This is the default behavior of this module. This
     method only exists to revert after calling enableNEFDefaults()."""
-    global str_conversion_dict, skip_empty_loops
+    global str_conversion_dict, skip_empty_loops, dont_show_comments
     str_conversion_dict = {None:"."}
     skip_empty_loops = False
     dont_show_comments = False
@@ -253,7 +253,7 @@ def _jsonSerialize(obj):
     # Serialize datetime.date objects by calling str() on them
     if isinstance(obj, (date, decimal.Decimal)):
         return str(obj)
-    raise TypeError ("Type not serializable: %s" % type(obj))
+    raise TypeError("Type not serializable: %s" % type(obj))
 
 def _formatCategory(value):
     """Adds a '_' to the front of a tag (if not present) and strips out
@@ -311,9 +311,9 @@ def _interpretFile(the_file):
     elif isinstance(the_file, str) or isinstance(the_file, unicode):
         if (the_file.startswith("http://") or the_file.startswith("https://") or
                 the_file.startswith("ftp://")):
-                url_data = urlopen(the_file)
-                star_buffer = BytesIO(url_data.read())
-                url_data.close()
+            url_data = urlopen(the_file)
+            star_buffer = BytesIO(url_data.read())
+            url_data.close()
         else:
             with open(the_file, 'rb') as read_file:
                 star_buffer = BytesIO(read_file.read())
@@ -1233,8 +1233,8 @@ class entry(object):
 
         # We could get many different (and unknown Exceptions), so catch
         #  generic Exception
-        except Exception as e:
-            diffs.append("An exception occured while comparing: '%s'." % e)
+        except Exception as err:
+            diffs.append("An exception occured while comparing: '%s'." % err)
 
         return diffs
 
@@ -1763,8 +1763,9 @@ class saveframe(object):
 
                 # Compare the string version of the tags in case there are
                 #  non-string types. Use the conversion dict to get to str
-                if (str(str_conversion_dict.get(tag[1],tag[1])) !=
-                    str(str_conversion_dict.get(other_tag[0], other_tag[0]))):
+                if (str(str_conversion_dict.get(tag[1], tag[1])) !=
+                        str(str_conversion_dict.get(other_tag[0],
+                                                    other_tag[0]))):
                     diffs.append("\tMismatched tag values for tag '%s.%s':"
                                  " '%s' vs '%s'." %
                                  (self.tag_prefix, tag[0],
@@ -1789,8 +1790,8 @@ class saveframe(object):
                     diffs.append("\tNo loop with category '%s' in other"
                                  " entry." % (each_loop.category))
 
-        except Exception as e:
-            diffs.append("\tAn exception occured while comparing: '%s'." % e)
+        except Exception as err:
+            diffs.append("\tAn exception occured while comparing: '%s'." % err)
 
         return diffs
 
@@ -2358,9 +2359,9 @@ class loop(object):
 
                     # Check data of loops
                     self_data = sorted(deepcopy(self.data),
-                                       key = lambda x: tuple(x))
+                                       key=lambda x: tuple(x))
                     other_data = sorted(deepcopy(other.data),
-                                        key = lambda x: tuple(x))
+                                        key=lambda x: tuple(x))
 
                     if self_data != other_data:
                         diffs.append("\t\tLoop data does not match for loop "
