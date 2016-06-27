@@ -67,7 +67,7 @@ Call directly (rather than importing) to run a self-test.
 #############################################
 #                 Imports                   #
 #############################################
-
+Development
 # Make sure print functions work in python2 and python3
 from __future__ import print_function
 
@@ -87,11 +87,11 @@ PY3 = (sys.version_info[0] == 3)
 
 # Python version dependent loads
 if PY3:
-    from urllib.request import urlopen, Request
+    from urllib.request import urlopen
     from urllib.error import HTTPError, URLError
     from io import StringIO, BytesIO
 else:
-    from urllib2 import urlopen, Request, HTTPError, URLError
+    from urllib2 import urlopen, HTTPError, URLError
     from cStringIO import StringIO
     BytesIO = StringIO
 
