@@ -120,6 +120,7 @@ str_conversion_dict = {None:"."}
 # Used internally
 standard_schema = None
 comment_dictionary = {}
+api_url = "http://webapi.bmrb.wisc.edu/current"
 
 #############################################
 #             Module methods                #
@@ -182,10 +183,13 @@ def getEntriesFromDB(entry_list):
     })
 
     # Send a request to the API
-    req = Request("http://webapi.bmrb.wisc.edu/current/jsonrpc",
-                  data, {'Content-Type': 'application/json'})
+    req = Request(api_url + "/jsonrpc", data,
+                  {'Content-Type': 'application/json'})
     conn = urlopen(req)
-    results = json.loads(conn.read())['result']
+    results = json.loads(conn.read())
+    if 'error' in results:
+        raise IOError(results['error']['message'])
+    results = results['result']
     conn.close()
 
     # Parse out the entries
@@ -1121,7 +1125,7 @@ class entry(object):
 
         # Try to load the entry using JSON
         try:
-            entry_url = "http://webapi.bmrb.wisc.edu/current/rest/entry/%s/"
+            entry_url = api_url + "/rest/entry/%s/"
             entry_url = entry_url % entry_num
 
             # Convert bytes to string if python3
