@@ -120,6 +120,7 @@ str_conversion_dict = {None:"."}
 # Used internally
 standard_schema = None
 comment_dictionary = {}
+api_url = "http://webapi.bmrb.wisc.edu/current"
 
 #############################################
 #             Module methods                #
@@ -1087,7 +1088,7 @@ class entry(object):
 
         # Try to load the entry using JSON
         try:
-            entry_url = "http://webapi.bmrb.wisc.edu/current/rest/entry/%s/"
+            entry_url = api_url + "/rest/entry/%s/"
             entry_url = entry_url % entry_num
 
             # Convert bytes to string if python3
