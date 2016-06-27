@@ -163,43 +163,6 @@ def validate(entry_to_validate, validation_schema=None):
     for err in validation:
         print(err)
 
-def getEntriesFromDB(entry_list):
-    """ Returns a dictionary of BMRB entries loaded from the DB. Re-uses a
-    connection to make the process faster than calling fromDatabase()
-    multiple times. Note that a dictionary is always returned containing
-    any entries that were in the database. Entries that were not in the
-    public database will not be present in the dictionary returned. No
-    explicit error is generated, so you must check if an entry is in the
-    dictionary before attempting to access it."""
-
-    data = json.dumps({
-        "method": "entry",
-        "jsonrpc": "2.0",
-        "params": {
-            "ids": entry_list,
-            "format":"json"
-        },
-        "id": "test"
-    })
-
-    # Send a request to the API
-    req = Request(api_url + "/jsonrpc", data,
-                  {'Content-Type': 'application/json'})
-    conn = urlopen(req)
-    results = json.loads(conn.read())
-    if 'error' in results:
-        raise IOError(results['error']['message'])
-    results = results['result']
-    conn.close()
-
-    # Parse out the entries
-    entries = {}
-    for key in [str(x) for x in entry_list]:
-        if key in results:
-            entries[key] = entry.fromJSON(results[key])
-
-    return entries
-
 def cleanValue(value):
     """Automatically quotes the value in the appropriate way. Don't
     quote values you send to this method or they will show up in
