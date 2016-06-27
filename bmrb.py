@@ -67,7 +67,7 @@ Call directly (rather than importing) to run a self-test.
 #############################################
 #                 Imports                   #
 #############################################
-Development
+
 # Make sure print functions work in python2 and python3
 from __future__ import print_function
 
