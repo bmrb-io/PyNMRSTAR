@@ -1123,7 +1123,9 @@ class entry(object):
                 for each_saveframe in ent:
                     for tag in each_saveframe.tags:
                         cur_tag = each_saveframe.tag_prefix + "." + tag[0]
-                        tag[1] = schem.convertTag(cur_tag, tag[1], linenum="SF %s" % each_saveframe.name)
+                        tag[1] = schem.convertTag(cur_tag, tag[1],
+                                                  linenum="SF %s" %
+                                                  each_saveframe.name)
                     for el in each_saveframe:
                         for row in el.data:
                             for pos in range(0, len(row)):
