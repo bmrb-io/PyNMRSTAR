@@ -285,8 +285,8 @@ class TestPyNMRSTAR(unittest.TestCase):
         # Test validate
         self.assertEqual(self.entry['assigned_chem_shift_list_1'].validate(), [])
 
-        # Test setTagPrefix
-        frame.setTagPrefix("new_prefix")
+        # Test set_tag_prefix
+        frame.set_tag_prefix("new_prefix")
         self.assertEqual(frame.tag_prefix, "_new_prefix")
 
 
