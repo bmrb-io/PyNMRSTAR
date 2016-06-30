@@ -377,7 +377,7 @@ def _load_comments(file_to_load=None):
 
 # Internal use class
 class _Parser(object):
-    """Parses an entry quickly. You should not ever use this class directly."""
+    """Parses an entry. You should not ever use this class directly."""
 
     reserved = ["stop_", "loop_", "save_", "data_", "global_"]
 
