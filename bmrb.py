@@ -124,6 +124,7 @@ STR_CONVERSION_DICT = {None:"."}
 STANDARD_SCHEMA = None
 COMMENT_DICTIONARY = {}
 API_URL = "http://webapi.bmrb.wisc.edu/current"
+SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
 
 #############################################
 #             Module methods                #
@@ -375,7 +376,7 @@ def _load_comments(file_to_load=None):
 #############################################
 
 # Internal use class
-class _FastParser(object):
+class _Parser(object):
     """Parses an entry quickly. You should not ever use this class directly."""
 
     reserved = ["stop_", "loop_", "save_", "data_", "global_"]
@@ -801,7 +802,7 @@ class Schema(object):
         self.types = {}
 
         if schema_file is None:
-            schema_file = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
+            schema_file = SCHEMA_URL
         self.schema_file = schema_file
 
         schem_stream = _interpret_file(schema_file)
@@ -1043,7 +1044,7 @@ class Entry(object):
             return
 
         # Load the BMRB entry from the file
-        parser = _FastParser(entry_to_parse_into=self)
+        parser = _Parser(entry_to_parse_into=self)
         parser.parse(star_buffer.read(), source=self.source)
 
     def __len__(self):
@@ -1251,9 +1252,7 @@ class Entry(object):
                                      self.frame_dict()[frame].name)
                         diffs.extend(comp)
 
-        # We could get many different (and unknown Exceptions), so catch
-        #  generic Exception
-        except Exception as err:
+        except AttributeError as err:
             diffs.append("An exception occured while comparing: '%s'." % err)
 
         return diffs
@@ -1499,7 +1498,7 @@ class Saveframe(object):
 
         # Load the BMRB entry from the file
         star_buffer = StringIO("data_1 " + star_buffer.read())
-        parser = _FastParser(entry_to_parse_into=tmp_entry)
+        parser = _Parser(entry_to_parse_into=tmp_entry)
         parser.parse(star_buffer.read(), source=self.source)
 
         # Copy the first parsed saveframe into ourself
@@ -1822,7 +1821,7 @@ class Saveframe(object):
                     diffs.append("\tNo loop with category '%s' in other"
                                  " entry." % (each_loop.category))
 
-        except Exception as err:
+        except AttributeError as err:
             diffs.append("\tAn exception occured while comparing: '%s'." % err)
 
         return diffs
@@ -2073,7 +2072,7 @@ class Loop(object):
         star_buffer = StringIO("data_0 save_internaluseyoushouldntseethis_frame"
                                " _internal.use internal " + star_buffer.read() +
                                " save_")
-        parser = _FastParser(entry_to_parse_into=tmp_entry)
+        parser = _Parser(entry_to_parse_into=tmp_entry)
         parser.parse(star_buffer.read(), source=self.source)
 
         # Check that there was only one loop here
@@ -2414,7 +2413,7 @@ class Loop(object):
                         diffs.append("\t\tLoop data does not match for loop "
                                      "with category '%s'." % self.category)
 
-        except Exception as err:
+        except AttributeError as err:
             diffs.append("\t\tAn exception occured while comparing: '%s'." %
                          err)
 

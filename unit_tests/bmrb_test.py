@@ -82,8 +82,8 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertEqual(bmrb._interpret_file("http://svn.bmrb.wisc.edu/svn/sans/python/unit_tests/sample_files/bmr15000_3.str.gz").read(), local_version)
 
     # Test the parser
-    def test___FastParser(self):
-        self.assertRaises(ValueError, bmrb._FastParser)
+    def test___Parser(self):
+        self.assertRaises(ValueError, bmrb._Parser)
 
         # Check for error when reserved token present in data value
         self.assertRaises(ValueError, bmrb.Entry.from_string, "data_1\nsave_1\n_tag.example loop_\nsave_\n")
@@ -101,7 +101,7 @@ class TestPyNMRSTAR(unittest.TestCase):
 
     def test_Schema(self):
         default = bmrb.Schema()
-        loaded = bmrb.Schema('http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv')
+        loaded = bmrb.Schema(bmrb.SCHEMA_URL)
 
         self.assertEqual(default.schema, loaded.schema)
         self.assertEqual(default.types, loaded.types)
@@ -388,7 +388,8 @@ class TestPyNMRSTAR(unittest.TestCase):
     # Parse and re-print entries to check for divergences. Only use in-house.
     def test_reparse(self):
 
-        # Use a different parsing implementation as a sanity check (used within the BMRB only)
+        # Use a different parsing implementation as a sanity check
+        # (used within the BMRB only)
         if not os.path.exists("/bmrb/linux/bin/stardiff"):
             return
 
@@ -416,7 +417,12 @@ class TestPyNMRSTAR(unittest.TestCase):
             with open("/tmp/comparator1", "w") as tmp:
                 tmp.write(ent_str)
 
-            compare = subprocess.Popen(["/bmrb/linux/bin/stardiff", "-ignore-tag", "_Spectral_peak_list.Text_data", "/tmp/comparator1", location], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            compare = subprocess.Popen(["/bmrb/linux/bin/stardiff",
+                                        "-ignore-tag",
+                                        "_Spectral_peak_list.Text_data",
+                                        "/tmp/comparator1", location],
+                                        stdout=subprocess.PIPE,
+                                        stderr=subprocess.PIPE)
 
             # Wait for stardiff to complete
             compare.wait()
@@ -425,7 +431,10 @@ class TestPyNMRSTAR(unittest.TestCase):
                 results = results.decode()
             compare.stdout.close()
             compare.stderr.close()
-            self.assertEqual("/tmp/comparator1:%s: NO DIFFERENCES REPORTED\n" % location, results, msg="%d: Output inconsistent with original: %s" % (x, results.strip()))
+            self.assertEqual("/tmp/comparator1:%s: NO DIFFERENCES REPORTED\n" %
+                             location, results,
+                             msg="%d: Output inconsistent with original: %s" %
+                             (x, results.strip()))
 
 # Allow unit testing from other modules
 def start_tests():
