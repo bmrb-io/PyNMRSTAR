@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""This module provides entry, saveframe, and loop objects. Use python's
+"""This module provides Entry, Saveframe, and Loop objects. Use python's
 built in help function for documentation.
 
 There are eight module variables you can set to control our behavior.
