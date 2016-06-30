@@ -378,15 +378,12 @@ def _load_comments(file_to_load=None):
 class _FastParser(object):
     """Parses an entry quickly. You should not ever use this class directly."""
 
-    ent = None
-    to_process = ""
-    token = ""
-
     def __init__(self, entry_to_parse_into=None):
         if entry_to_parse_into is None:
             raise ValueError("You must provide an entry to parse into. Also, "
                              "why are you using this class?")
         self.ent = entry_to_parse_into
+        self.to_process = ""
         self.full_data = ""
         self.index = 0
         self.token = ""
@@ -970,11 +967,6 @@ class Entry(object):
     object several ways; (e.g. from a file, from the official database,
     from scratch) see the classmethods."""
 
-    # Put these here for reference
-    bmrb_id = 0
-    frame_list = []
-    source = None
-
     def __delitem__(self, item):
         """Remove the indicated saveframe."""
 
@@ -1001,6 +993,11 @@ class Entry(object):
     def __init__(self, **kargs):
         """Don't use this directly, use fromFile, fromScratch,
         fromString, or fromDatabase to construct."""
+
+        # Default initializations
+        self.bmrb_id = 0
+        self.frame_list = []
+        self.source = None
 
         # They initialized us wrong
         if len(kargs) == 0:
@@ -1399,13 +1396,6 @@ class Entry(object):
 class Saveframe(object):
     """A saveframe. Use the classmethod fromScratch to create one."""
 
-    tags = []
-    loops = []
-    name = ""
-    category = "unset"
-    tag_prefix = None
-    source = "unknown"
-
     def __delitem__(self, item):
         """Remove the indicated tag or loop."""
 
@@ -1468,7 +1458,10 @@ class Saveframe(object):
         # Initialize our local variables
         self.tags = []
         self.loops = []
+        self.name = ""
         self.source = "unknown"
+        self.category = "unset"
+        self.tag_prefix = None
 
         # Update our source if it provided
         if 'source' in kargs:
@@ -2018,11 +2011,6 @@ class Saveframe(object):
 
 class Loop(object):
     """A BMRB loop object."""
-
-    category = None
-    columns = []
-    data = []
-    source = "unknown"
 
     def __eq__(self, other):
         """Returns True if this loop is equal to another loop, False if
