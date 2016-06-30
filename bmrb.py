@@ -378,6 +378,8 @@ def _load_comments(file_to_load=None):
 class _FastParser(object):
     """Parses an entry quickly. You should not ever use this class directly."""
 
+    reserved = ["stop_", "loop_", "save_", "data_", "global_"]
+
     def __init__(self, entry_to_parse_into=None):
         if entry_to_parse_into is None:
             raise ValueError("You must provide an entry to parse into. Also, "
@@ -389,7 +391,6 @@ class _FastParser(object):
         self.token = ""
         self.source = "unknown"
         self.last_delineator = ""
-        self.reserved = ["stop_", "loop_", "save_", "data_", "global_"]
 
     def get_line_number(self):
         """ Returns the current line number that is in the process of
