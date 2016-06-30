@@ -2660,11 +2660,7 @@ class Loop(object):
             for pos in range(0, len(self.data)):
                 self.data[pos][renum_col] = pos + start_value
 
-<<<<<<< HEAD
     def set_category(self, category):
-=======
-    def setCategory(self, category):
->>>>>>> master
         """ Set the category of the loop. Useful if you didn't know the
         category at loop creation time."""
 
