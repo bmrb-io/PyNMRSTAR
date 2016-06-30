@@ -485,7 +485,8 @@ class _Parser(object):
 
             if self.last_delineator != "":
                 raise ValueError("The save_ keyword may not be quoted or "
-                                 "semicolon-delineated.", self.get_line_number())
+                                 "semicolon-delineated.",
+                                 self.get_line_number())
 
             # Add the saveframe
             curframe = Saveframe.from_scratch(self.token[5:], source=source)
@@ -528,8 +529,8 @@ class _Parser(object):
                                     if self.last_delineator != "":
                                         raise ValueError("The stop_ keyword may"
                                                          " not be quoted or "
-                                                         "semicolon-delineated."
-                                                         , self.get_line_number())
+                                                         "semicolon-delineated.",
+                                                         self.get_line_number())
                                     if len(curloop.columns) == 0:
                                         if (RAISE_PARSE_WARNINGS and
                                                 "tag-only-loop" not in WARNINGS_TO_IGNORE):
@@ -544,7 +545,8 @@ class _Parser(object):
                                         raise ValueError("Loop with no data.",
                                                          self.get_line_number())
                                     else:
-                                        curloop.add_data(curdata, rearrange=True)
+                                        curloop.add_data(curdata,
+                                                         rearrange=True)
                                         curloop = None
                                         curdata = []
 
@@ -575,8 +577,8 @@ class _Parser(object):
                                 self.get_token()
 
                     if self.token != "stop_":
-                        raise ValueError("Loop improperly terminated at end of "
-                                         "file.", self.get_line_number())
+                        raise ValueError("Loop improperly terminated at end of"
+                                         " file.", self.get_line_number())
 
                 # Close saveframe
                 elif self.token == "save_":
@@ -631,7 +633,7 @@ class _Parser(object):
         return self.ent
 
     def real_get_token(self):
-        """ Actually processes the input data to find a token. getToken
+        """ Actually processes the input data to find a token. get_token
         is just a wrapper around this with some exception handling."""
 
         # Reset the delineator
@@ -725,8 +727,8 @@ class _Parser(object):
                                          'values should end with "\\n;\\n".',
                                          self.get_line_number())
             else:
-                raise ValueError("Invalid file. Multi-line comment never ends. "
-                                 "Multi-line comments must terminate with a "
+                raise ValueError("Invalid file. Multi-line comment never ends."
+                                 " Multi-line comments must terminate with a "
                                  "line that consists ONLY of a ';' without "
                                  "characters before or after. (Other than the "
                                  "newline.)", self.get_line_number())
@@ -794,7 +796,7 @@ class Schema(object):
         """Initialize a BMRB schema. With no arguments the most
         up-to-date schema will be fetched from the BMRB FTP site.
         Otherwise pass a URL or a file to load a schema from using the
-        schema_file optional argument."""
+        schema_file keyword argument."""
 
         self.schema_order = []
         self.headers = []
@@ -854,8 +856,8 @@ class Schema(object):
         if tag.lower() not in self.schema:
             if (RAISE_PARSE_WARNINGS and
                     "tag-not-in-schema" not in WARNINGS_TO_IGNORE):
-                raise ValueError("There is a tag in the file that isn't in the "
-                                 "schema: '%s' on line '%s'" % (tag, linenum))
+                raise ValueError("There is a tag in the file that isn't in the"
+                                 " schema: '%s' on line '%s'" % (tag, linenum))
             else:
                 if VERBOSE:
                     print("Couldn't convert tag because it is not in the "
@@ -884,10 +886,10 @@ class Schema(object):
             try:
                 return int(value)
             except:
-                raise ValueError("Could not parse the file because a value that"
-                                 " should be an INTEGER is not. Please turn off"
-                                 " CONVERT_DATATYPES or fix the file. Tag: '%s'"
-                                 " on line '%s'" % (tag, linenum))
+                raise ValueError("Could not parse the file because a value "
+                                 "that should be an INTEGER is not. Please "
+                                 "turn off CONVERT_DATATYPES or fix the file. "
+                                 "Tag: '%s' on line '%s'" % (tag, linenum))
 
         # Convert floats
         if "FLOAT" in valtype:
@@ -895,20 +897,20 @@ class Schema(object):
                 # If we used int() we would lose the precision
                 return decimal.Decimal(value)
             except:
-                raise ValueError("Could not parse the file because a value that"
-                                 " should be a FLOAT is not. Please turn off "
-                                 "CONVERT_DATATYPES or fix the file. Tag: '%s' "
-                                 "on line '%s'" % (tag, linenum))
+                raise ValueError("Could not parse the file because a value "
+                                 "that should be a FLOAT is not. Please turn "
+                                 "off CONVERT_DATATYPES or fix the file. Tag: "
+                                 "'%s' on line '%s'" % (tag, linenum))
 
         if "DATETIME year to day" in valtype:
             try:
                 year, month, day = [int(x) for x in value.split("-")]
                 return date(year, month, day)
             except:
-                raise ValueError("Could not parse the file because a value that"
-                                 " should be a DATETIME is not. Please turn off"
-                                 " CONVERT_DATATYPES or fix the file. Tag: '%s'"
-                                 " on line '%s'" % (tag, linenum))
+                raise ValueError("Could not parse the file because a value "
+                                 "that should be a DATETIME is not. Please "
+                                 "turn off CONVERT_DATATYPES or fix the file. "
+                                 "Tag: '%s' on line '%s'" % (tag, linenum))
 
         # We don't know the data type, so just keep it a string
         return value
@@ -918,7 +920,8 @@ class Schema(object):
         according to this schema."""
 
         if tag.lower() not in self.schema:
-            return ["Tag '%s' not found in schema. Line '%s'." % (tag, linenum)]
+            return ["Tag '%s' not found in schema. Line '%s'." %
+                    (tag, linenum)]
 
         (valtype, null_allowed, allowed_category,
          capitalized_tag) = self.schema[tag.lower()]
@@ -960,8 +963,8 @@ class Schema(object):
                         % (capitalized_tag, value, linenum)]
 
         if tag != capitalized_tag:
-            return ["The tag '%s' is improperly capitalized but otherwise valid"
-                    ". Should be '%s'." % (tag, capitalized_tag)]
+            return ["The tag '%s' is improperly capitalized but otherwise "
+                    "valid. Should be '%s'." % (tag, capitalized_tag)]
         return []
 
 class Entry(object):
@@ -993,8 +996,8 @@ class Entry(object):
             return self.get_saveframe_by_name(item)
 
     def __init__(self, **kargs):
-        """Don't use this directly, use fromFile, fromScratch,
-        fromString, or fromDatabase to construct."""
+        """Don't use this directly, use from_file, from_scratch,
+        from_string, or from_database to construct."""
 
         # Default initializations
         self.bmrb_id = 0
@@ -1078,10 +1081,10 @@ class Entry(object):
                         if frame.name == key:
                             self.frame_list[pos] = item
                 else:
-                    raise KeyError("Saveframe with name '%s' does not exist and"
-                                   " therefore cannot be written to. Use the "
-                                   "addSaveframe method to add new saveframes."
-                                   % key)
+                    raise KeyError("Saveframe with name '%s' does not exist "
+                                   "and therefore cannot be written to. Use "
+                                   "the addSaveframe method to add new "
+                                   "saveframes." % key)
         else:
             raise ValueError("You can only assign an entry to a saveframe"
                              " splice.")
@@ -1182,9 +1185,9 @@ class Entry(object):
         # Make sure it has the correct keys
         for check in ["bmrb_id", "saveframes"]:
             if check not in json_dict:
-                raise ValueError("The JSON you provide must be a hash and must "
-                                 "contain the key '%s' - even if the key points"
-                                 " to 'None'." % check)
+                raise ValueError("The JSON you provide must be a hash and must"
+                                 " contain the key '%s' - even if the key "
+                                 "points to 'None'." % check)
 
         # Create an entry from scratch and populate it
         ret = Entry.from_scratch(json_dict['bmrb_id'])
@@ -1267,9 +1270,10 @@ class Entry(object):
         False a dictionary representation of the entry that is
         serializeable is returned."""
 
+        frames = [x.get_json(serialize=False) for x in self.frame_list]
         entry_dict = {
             "bmrb_id": self.bmrb_id,
-            "saveframes": [x.get_json(serialize=False) for x in self.frame_list]
+            "saveframes": frames
         }
 
         if serialize:
@@ -1394,7 +1398,7 @@ class Entry(object):
         return errors
 
 class Saveframe(object):
-    """A saveframe. Use the classmethod fromScratch to create one."""
+    """A saveframe. Use the classmethod from_scratch to create one."""
 
     def __delitem__(self, item):
         """Remove the indicated tag or loop."""
@@ -1506,8 +1510,8 @@ class Saveframe(object):
             raise ValueError("You attempted to parse one saveframe but the "
                              "source you provided had more than one saveframe."
                              " Please either parse all saveframes as an entry "
-                             "or only parse one saveframe. Saveframes detected:"
-                             " " + str(tmp_entry.frame_list))
+                             "or only parse one saveframe. Saveframes "
+                             "detected: " + str(tmp_entry.frame_list))
         self.tags = tmp_entry[0].tags
         self.loops = tmp_entry[0].loops
         self.name = tmp_entry[0].name
@@ -1520,7 +1524,8 @@ class Saveframe(object):
         you do not pass the tag prefix it will be set the first time you
         add a tag."""
 
-        return cls(saveframe_name=sf_name, tag_prefix=tag_prefix, source=source)
+        return cls(saveframe_name=sf_name, tag_prefix=tag_prefix,
+                   source=source)
 
     @classmethod
     def from_file(cls, the_file, csv=False):
@@ -1546,9 +1551,9 @@ class Saveframe(object):
         # Make sure it has the correct keys
         for check in ["name", "tag_prefix", "tags", "loops"]:
             if check not in json_dict:
-                raise ValueError("The JSON you provide must be a hash and must "
-                                 "contain the key '%s' - even if the key points"
-                                 " to None." % check)
+                raise ValueError("The JSON you provide must be a hash and must"
+                                 " contain the key '%s' - even if the key "
+                                 "points to None." % check)
 
         # Create a saveframe from scratch and populate it
         ret = Saveframe.from_scratch(json_dict['name'])
@@ -1587,9 +1592,9 @@ class Saveframe(object):
                         if tmp_loop.category.lower() == key.lower():
                             self.loops[pos] = item
                 else:
-                    raise KeyError("Loop with category '%s' does not exist and "
-                                   "therefore cannot be written to. Use addLoop"
-                                   " instead." % key)
+                    raise KeyError("Loop with category '%s' does not exist and"
+                                   " therefore cannot be written to. Use "
+                                   "addLoop instead." % key)
         else:
             # If the tag already exists, set its value
             self.add_tag(key, item, update=True)
@@ -1896,7 +1901,8 @@ class Saveframe(object):
 
         results = []
 
-        # Make sure this is the correct saveframe if they specify a tag prefix
+        # Make sure this is the correct saveframe if they specify a tag
+        #  prefix
         if "." in query:
             tag_prefix = _format_category(query)
         else:
@@ -1960,8 +1966,8 @@ class Saveframe(object):
                     new_tag_list.extend(existing)
 
         if len(self.tags) != len(new_tag_list):
-            raise ValueError("Refusing to sort. There are tags in the saveframe"
-                             " that do not exist in the schema.")
+            raise ValueError("Refusing to sort. There are tags in the "
+                             "saveframe that do not exist in the schema.")
 
         self.tags = new_tag_list
 
@@ -1999,7 +2005,8 @@ class Saveframe(object):
             lineno = str(tag[2]) + " of original file" if len(tag) > 2 else None
             formatted_tag = self.tag_prefix + "." + tag[0]
             cur_errors = my_schema.val_type(formatted_tag, tag[1],
-                                            category=my_category, linenum=lineno)
+                                            category=my_category,
+                                            linenum=lineno)
             errors.extend(cur_errors)
 
         for each_loop in self.loops:
@@ -2063,7 +2070,7 @@ class Loop(object):
             self.add_column(next(csvreader))
             for row in csvreader:
                 self.add_data(row)
-            self.source = "fromCSV('%s')" % kargs['csv']
+            self.source = "from_csv('%s')" % kargs['csv']
             return
 
         tmp_entry = Entry.from_scratch(0)
@@ -2761,8 +2768,9 @@ class Loop(object):
 
         return errors
 
-# Allow using diff or validate if ran directly
-if __name__ == '__main__':
+def called_directly():
+    """ Figure out what to do if we were called on the command line
+    rather than imported as a module."""
 
     # Specify some basic information about our command
     optparser = optparse.OptionParser(usage="usage: %prog",
@@ -2781,6 +2789,10 @@ if __name__ == '__main__':
     # Options, parse 'em
     (options, cmd_input) = optparser.parse_args()
 
+    if len(cmd_input) > 0:
+        print("No arguments are allowed. Please see the options using --help.")
+        sys.exit(0)
+
     if options.validate is None and options.diff is None:
         print("Running unit tests...")
         try:
@@ -2798,6 +2810,10 @@ if __name__ == '__main__':
     elif options.diff is not None:
         diff(Entry.from_file(options.diff[0]), Entry.from_file(options.diff[1]))
     sys.exit(0)
+
+# Allow using diff or validate if ran directly
+if __name__ == '__main__':
+    called_directly()
 else:
     #############################################
     #          Module initializations           #
