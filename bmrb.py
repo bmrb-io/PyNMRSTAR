@@ -1,20 +1,20 @@
 #!/usr/bin/env python
 
-"""This module provides entry, saveframe, and loop objects. Use python's
+"""This module provides Entry, Saveframe, and Loop objects. Use python's
 built in help function for documentation.
 
 There are eight module variables you can set to control our behavior.
 
-* Setting bmrb.verbose to True will print some of what is going on to
+* Setting bmrb.VERBOSE to True will print some of what is going on to
 the terminal.
 
-* Setting bmrb.raise_parse_warnings to True will raise an exception if
+* Setting bmrb.RAISE_PARSE_WARNINGS to True will raise an exception if
 the parser encounters something problematic. Normally warnings are
 suppressed.
 
 * In addition, if you want to ignore some parse warnings but allow the
 rest, you can specify warnings to ignore by adding the warning to ignore
-to the "warnings_to_ignore" list.
+to the "WARNINGS_TO_IGNORE" list.
 
 Here are descriptions of the parse warnings that can be suppressed:
 
@@ -30,25 +30,25 @@ Multiline values should look like this:
 but the tag looked like this:
 \n; The multi-line\nvalue here.\n;\n
 
-* Setting skip_empty_loops to True will suppress the printing of empty
+* Setting SKIP_EMPTY_LOOPS to True will suppress the printing of empty
 loops when calling __str__ methods.
 
-* Adding key->value pairs to str_conversion_dict will automatically
+* Adding key->value pairs to STR_CONVERSION_DICT will automatically
 convert tags whose value matches "key" to the string "value" when
 printing. This allows you to set the default conversion value for
 Booleans or other objects.
 
-* Setting bmrb.allow_v2_entries will allow parsing of NMR-STAR version
+* Setting bmrb.ALLOW_V2_ENTRIES will allow parsing of NMR-STAR version
 2.1 entries. Most other methods will not operate correctly on parsed
 2.1 entries. This is only to allow you parse and access the data in
 these entries - nothing else. Only set this if you have a really good
 reason to. Attempting to print a 2.1 entry will 'work' but tags that
 were after loops will be moved to before loops.
 
-* Setting bmrb.dont_show_comments to True will supress the printing of
+* Setting bmrb.DONT_SHOW_COMMENTS to True will supress the printing of
 comments before saveframes.
 
-* Setting bmrb.convert_datatypes to True will automatically convert
+* Setting bmrb.CONVERT_DATATYPES to True will automatically convert
 the data loaded from the file into the corresponding python type as
 determined by loading the standard BMRB schema. This would mean that
 all floats will be represented as decimal.Decimal objects, all integers
@@ -76,6 +76,7 @@ import os
 import sys
 import json
 import decimal
+import optparse
 
 from copy import deepcopy
 from csv import reader as csv_reader, writer as csv_writer
@@ -85,6 +86,8 @@ from gzip import GzipFile
 # Determine if we are running in python3
 PY3 = (sys.version_info[0] == 3)
 
+#pylint: disable=wrong-import-position,no-name-in-module
+#pylint: disable=import-error,wrong-import-order
 # Python version dependent loads
 if PY3:
     from urllib.request import urlopen
@@ -100,55 +103,59 @@ else:
 #############################################
 
 # Set this to allow import * from bmrb to work sensibly
-__all__ = ['entry', 'saveframe', 'loop', 'schema', 'diff', 'validate', 'PY3']
+__all__ = ['Entry', 'Saveframe', 'Loop', 'Schema', 'diff', 'validate', 'PY3']
 
 # May be set by calling code
-verbose = False
+VERBOSE = False
 
-allow_v2_entries = False
-raise_parse_warnings = False
-warnings_to_ignore = []
-skip_empty_loops = False
-dont_show_comments = False
-convert_datatypes = False
+ALLOW_V2_ENTRIES = False
+RAISE_PARSE_WARNINGS = False
+WARNINGS_TO_IGNORE = []
+SKIP_EMPTY_LOOPS = False
+DONT_SHOW_COMMENTS = False
+CONVERT_DATATYPES = False
 
-# WARNING: str_conversion_dict cannot contain both booleans and
+# WARNING: STR_CONVERSION_DICT cannot contain both booleans and
 # arithmetic types. Attempting to use both will cause an issue since
 # boolean True == 1 in python and False == 0.
-str_conversion_dict = {None:"."}
+STR_CONVERSION_DICT = {None:"."}
 
 # Used internally
-standard_schema = None
-comment_dictionary = {}
-api_url = "http://webapi.bmrb.wisc.edu/current"
+STANDARD_SCHEMA = None
+COMMENT_DICTIONARY = {}
+API_URL = "http://webapi.bmrb.wisc.edu/current"
+SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
 
 #############################################
 #             Module methods                #
 #############################################
 
 # Public use methods
-def enableNEFDefaults():
+def enable_nef_defaults():
     """ Sets the module variables such that our behavior matches the NEF
     standard. Specifically, suppress printing empty loops by default and
     convert True -> "true" and False -> "false" when printing."""
-    global str_conversion_dict, skip_empty_loops, dont_show_comments
-    str_conversion_dict = {None:".", True:"true", False:"false"}
-    skip_empty_loops = True
-    dont_show_comments = True
 
-def enableBMRBDefaults():
+    global STR_CONVERSION_DICT, SKIP_EMPTY_LOOPS, DONT_SHOW_COMMENTS
+    STR_CONVERSION_DICT = {None:".", True:"true", False:"false"}
+    SKIP_EMPTY_LOOPS = True
+    DONT_SHOW_COMMENTS = True
+
+def enable_bmrb_defaults():
     """ Sets the module variables such that our behavior matches the
     BMRB standard. This is the default behavior of this module. This
-    method only exists to revert after calling enableNEFDefaults()."""
-    global str_conversion_dict, skip_empty_loops, dont_show_comments
-    str_conversion_dict = {None:"."}
-    skip_empty_loops = False
-    dont_show_comments = False
+    method only exists to revert after calling enable_nef_defaults()."""
+
+    global STR_CONVERSION_DICT, SKIP_EMPTY_LOOPS, DONT_SHOW_COMMENTS
+    STR_CONVERSION_DICT = {None:"."}
+    SKIP_EMPTY_LOOPS = False
+    DONT_SHOW_COMMENTS = False
 
 def diff(entry1, entry2):
     """Prints the differences between two entries. Non-equal entries
     will always be detected, but specific differences detected depends
     on order of entries."""
+
     diffs = entry1.compare(entry2)
     if len(diffs) == 0:
         print("Identical entries.")
@@ -157,38 +164,39 @@ def diff(entry1, entry2):
 
 def validate(entry_to_validate, validation_schema=None):
     """Prints a validation report of an entry."""
+
     validation = entry_to_validate.validate(validation_schema)
     if len(validation) == 0:
         print("No problems found during validation.")
     for err in validation:
         print(err)
 
-def cleanValue(value):
+def clean_value(value):
     """Automatically quotes the value in the appropriate way. Don't
     quote values you send to this method or they will show up in
     another set of quotes as part of the actual data. E.g.:
 
-    cleanValue('"e. coli"') returns '\'"e. coli"\''
+    clean_value('"e. coli"') returns '\'"e. coli"\''
 
     while
 
-    cleanValue("e. coli") returns "'e. coli'"
+    clean_value("e. coli") returns "'e. coli'"
 
     This will automatically be called on all values when you use a str()
     method (so don't call it before inserting values into tags or loops).
 
-    Be mindful of the value of str_conversion_dict as it will effect the
+    Be mindful of the value of STR_CONVERSION_DICT as it will effect the
     way the value is converted to a string.
 
     """
 
     # Allow manual specification of conversions for booleans, Nones, etc.
-    if value in str_conversion_dict:
-        if any(isinstance(value, type(x)) for x in str_conversion_dict):
+    if value in STR_CONVERSION_DICT:
+        if any(isinstance(value, type(x)) for x in STR_CONVERSION_DICT):
         # The additional check prevents numerical types from being
         # interpreted as booleans. This is PROVIDED the dictionary
         # does not contain both numericals and booleans
-            value = str_conversion_dict[value]
+            value = STR_CONVERSION_DICT[value]
 
     # Convert non-string types to string
     if not isinstance(value, str):
@@ -248,7 +256,7 @@ def cleanValue(value):
 
 # Internal use only methods
 
-def _jsonSerialize(obj):
+def _json_serialize(obj):
     """JSON serializer for objects not serializable by default json code"""
 
     # Serialize datetime.date objects by calling str() on them
@@ -256,9 +264,10 @@ def _jsonSerialize(obj):
         return str(obj)
     raise TypeError("Type not serializable: %s" % type(obj))
 
-def _formatCategory(value):
+def _format_category(value):
     """Adds a '_' to the front of a tag (if not present) and strips out
     anything after a '.'"""
+
     if value:
         if not value.startswith("_"):
             value = "_" + value
@@ -266,43 +275,44 @@ def _formatCategory(value):
             value = value[:value.index(".")]
     return value
 
-def _formatTag(value):
+def _format_tag(value):
     """Strips anything before the '.'"""
+
     if '.' in value:
         value = value[value.index('.')+1:]
     return value
 
-def _fromIterable(iterables):
+def _from_iterable(iterables):
     """ A simple implementation of chain.from_iterable.
-    As such: _fromIterable(['ABC', 'DEF']) --> A B C D E F """
+    As such: _from_iterable(['ABC', 'DEF']) --> A B C D E F """
 
     for item in iterables:
         for element in item:
             yield element
 
-def _getSchema(passed_schema=None):
+def _get_schema(passed_schema=None):
     """If passed a schema (not None) it returns it. If passed none,
     it checks if the default schema has been initialized. If not
     initialzed, it initializes it. Then it returns the default schema."""
 
-    global standard_schema
+    global STANDARD_SCHEMA
     if passed_schema is None:
-        passed_schema = standard_schema
+        passed_schema = STANDARD_SCHEMA
     if passed_schema is None:
         # If we fail to get the schema don't do anything
         try:
-            standard_schema = schema()
+            STANDARD_SCHEMA = Schema()
         except HTTPError:
             try:
-                standard_schema = schema(schema_file="reference_files/schema")
+                STANDARD_SCHEMA = Schema(schema_file="reference_files/schema")
             except:
                 raise ValueError("Could not load a BMRB schema from the "
                                  "internet or from the local repository.")
-        passed_schema = standard_schema
+        passed_schema = STANDARD_SCHEMA
 
     return passed_schema
 
-def _interpretFile(the_file):
+def _interpret_file(the_file):
     """Helper method returns some sort of object with a read() method.
     the_file could be a URL, a file location, a file object, or a
     gzipped version of any of the above."""
@@ -340,7 +350,7 @@ def _interpretFile(the_file):
 
     return star_buffer
 
-def _loadComments(file_to_load=None):
+def _load_comments(file_to_load=None):
     """ Loads the comments that should be placed in written files. """
 
     # Figure out where to load the file from
@@ -348,53 +358,53 @@ def _loadComments(file_to_load=None):
         file_to_load = "reference_files/comments"
 
     try:
-        comment_entry = entry.fromFile(file_to_load)
+        comment_entry = Entry.from_file(file_to_load)
     except IOError:
         return
 
     # Load the comments
-    categories = comment_entry.getTag("_comment.category")
-    comments = comment_entry.getTag("_comment.comment")
+    categories = comment_entry.get_tag("_comment.category")
+    comments = comment_entry.get_tag("_comment.comment")
 
     for pos, val in enumerate(categories):
         comment = comments[pos]
         if comment != ".":
-            comment_dictionary[val] = comments[pos].rstrip() + "\n\n"
+            COMMENT_DICTIONARY[val] = comments[pos].rstrip() + "\n\n"
 
 #############################################
 #                Classes                    #
 #############################################
 
 # Internal use class
-class _fastParser(object):
-    """Parses an entry quickly. You should not ever use this class directly."""
+class _Parser(object):
+    """Parses an entry. You should not ever use this class directly."""
 
-    ent = None
-    to_process = ""
-    token = ""
+    reserved = ["stop_", "loop_", "save_", "data_", "global_"]
 
     def __init__(self, entry_to_parse_into=None):
         if entry_to_parse_into is None:
             raise ValueError("You must provide an entry to parse into. Also, "
                              "why are you using this class?")
         self.ent = entry_to_parse_into
+        self.to_process = ""
         self.full_data = ""
         self.index = 0
         self.token = ""
         self.source = "unknown"
         self.last_delineator = ""
-        self.reserved = ["stop_", "loop_", "save_", "data_", "global_"]
 
-    def getLineNumber(self):
+    def get_line_number(self):
         """ Returns the current line number that is in the process of
         being parsed."""
+
         return self.full_data[0:self.index].count("\n")+1
 
-    def getToken(self):
+    def get_token(self):
         """ Returns the next token in the parsing process."""
-        self.realgetToken()
-        # This is just too verbose
-        if verbose == "very":
+
+        self.real_get_token()
+        # This is just too VERBOSE
+        if VERBOSE == "very":
             if self.token:
                 print("'" + self.token + "'")
             else:
@@ -402,9 +412,10 @@ class _fastParser(object):
         return self.token
 
     @staticmethod
-    def indexHandle(haystack, needle, startpos=None):
+    def index_handle(haystack, needle, startpos=None):
         """ Finds the index while catching ValueError and returning
         None instead."""
+
         try:
             pos = haystack.index(needle, startpos)
             return pos
@@ -412,10 +423,11 @@ class _fastParser(object):
             return None
 
     @staticmethod
-    def nextWhitespace(data):
+    def next_whitespace(data):
         """ Returns the position of the next whitespace character in the
         provided string. If no whitespace it returns the length of the
         string."""
+
         whitespace = " \t\n\v"
         for pos, char in enumerate(data):
             if char in whitespace:
@@ -436,18 +448,18 @@ class _fastParser(object):
         curdata = []
 
         # Get the first token
-        self.getToken()
+        self.get_token()
 
         # Make sure this is actually a STAR file
         if not self.token.startswith("data_"):
             raise ValueError("Invalid file. NMR-STAR files must start with"
                              " 'data_'. Did you accidentally select the wrong"
-                             " file?", self.getLineNumber())
+                             " file?", self.get_line_number())
 
         # Make sure there is a data name
         elif len(self.token) < 6:
             raise ValueError("'data_' must be followed by data name. Simply "
-                             "'data_' is not allowed.", self.getLineNumber())
+                             "'data_' is not allowed.", self.get_line_number())
 
         if self.last_delineator != "":
             raise ValueError("The data_ keyword may not be quoted or "
@@ -458,54 +470,55 @@ class _fastParser(object):
         self.source = source
 
         # We are expecting to get saveframes
-        while self.getToken() != None:
+        while self.get_token() != None:
 
             if not self.token.startswith("save_"):
                 raise ValueError("Only 'save_NAME' is valid in the body of a "
                                  "NMR-STAR file. Found '" + self.token + "'.",
-                                 self.getLineNumber())
+                                 self.get_line_number())
 
             if len(self.token) < 6:
                 raise ValueError("'save_' must be followed by saveframe name. "
                                  "You have a 'save_' tag which is illegal "
                                  "without a specified saveframe name.",
-                                 self.getLineNumber())
+                                 self.get_line_number())
 
             if self.last_delineator != "":
                 raise ValueError("The save_ keyword may not be quoted or "
-                                 "semicolon-delineated.", self.getLineNumber())
+                                 "semicolon-delineated.",
+                                 self.get_line_number())
 
             # Add the saveframe
-            curframe = saveframe.fromScratch(self.token[5:], source=source)
-            self.ent.addSaveframe(curframe)
+            curframe = Saveframe.from_scratch(self.token[5:], source=source)
+            self.ent.add_saveframe(curframe)
 
             # We are in a saveframe
-            while self.getToken() != None:
+            while self.get_token() != None:
 
                 if self.token == "loop_":
                     if self.last_delineator != "":
                         raise ValueError("The loop_ keyword may not be quoted "
                                          "or semicolon-delineated.",
-                                         self.getLineNumber())
+                                         self.get_line_number())
 
-                    curloop = loop.fromScratch(source=source)
-                    curframe.addLoop(curloop)
+                    curloop = Loop.from_scratch(source=source)
+                    curframe.add_loop(curloop)
 
                     # We are in a loop
                     seen_data = False
                     in_loop = True
-                    while in_loop and self.getToken() != None:
+                    while in_loop and self.get_token() != None:
 
                         # Add a column
                         if self.token.startswith("_"):
                             if self.last_delineator != "":
                                 raise ValueError("Loop tags may not be quoted "
                                                  "or semicolon-delineated.",
-                                                 self.getLineNumber())
+                                                 self.get_line_number())
                             if seen_data:
                                 raise ValueError("Cannot have more loop tags "
                                                  "after loop data.")
-                            curloop.addColumn(self.token)
+                            curloop.add_column(self.token)
 
                         # On to data
                         else:
@@ -516,23 +529,24 @@ class _fastParser(object):
                                     if self.last_delineator != "":
                                         raise ValueError("The stop_ keyword may"
                                                          " not be quoted or "
-                                                         "semicolon-delineated."
-                                                         , self.getLineNumber())
+                                                         "semicolon-delineated.",
+                                                         self.get_line_number())
                                     if len(curloop.columns) == 0:
-                                        if (raise_parse_warnings and
-                                                "tag-only-loop" not in warnings_to_ignore):
-                                            lineno = self.getLineNumber()
+                                        if (RAISE_PARSE_WARNINGS and
+                                                "tag-only-loop" not in WARNINGS_TO_IGNORE):
+                                            lineno = self.get_line_number()
                                             raise ValueError("Loop with no "
                                                              "tags.", lineno)
                                         curloop = None
                                     elif (len(curloop.data) == 0 and
                                           len(curdata) == 0 and
-                                          raise_parse_warnings and
-                                          "empty-loop" not in warnings_to_ignore):
+                                          RAISE_PARSE_WARNINGS and
+                                          "empty-loop" not in WARNINGS_TO_IGNORE):
                                         raise ValueError("Loop with no data.",
-                                                         self.getLineNumber())
+                                                         self.get_line_number())
                                     else:
-                                        curloop.addData(curdata, rearrange=True)
+                                        curloop.add_data(curdata,
+                                                         rearrange=True)
                                         curloop = None
                                         curdata = []
 
@@ -543,7 +557,7 @@ class _fastParser(object):
                                     if len(curloop.columns) == 0:
                                         raise ValueError("Data found in loop "
                                                          "before loop tags.",
-                                                         self.getLineNumber())
+                                                         self.get_line_number())
 
                                     if (self.token in self.reserved and
                                             self.last_delineator == ""):
@@ -555,30 +569,30 @@ class _fastParser(object):
                                                          "wasn't properly "
                                                          "terminated? Illegal "
                                                          "value: " + self.token,
-                                                         self.getLineNumber())
+                                                         self.get_line_number())
                                     curdata.append(self.token)
                                     seen_data = True
 
                                 # Get the next token
-                                self.getToken()
+                                self.get_token()
 
                     if self.token != "stop_":
-                        raise ValueError("Loop improperly terminated at end of "
-                                         "file.", self.getLineNumber())
+                        raise ValueError("Loop improperly terminated at end of"
+                                         " file.", self.get_line_number())
 
                 # Close saveframe
                 elif self.token == "save_":
                     if self.last_delineator != "":
                         raise ValueError("The save_ keyword may not be quoted "
                                          "or semicolon-delineated.",
-                                         self.getLineNumber())
-                    if not allow_v2_entries:
+                                         self.get_line_number())
+                    if not ALLOW_V2_ENTRIES:
                         if curframe.tag_prefix is None:
                             raise ValueError("The tag prefix was never set! "
                                              "Either the saveframe had no tags,"
                                              " you tried to read a version 2.1 "
                                              "file without setting "
-                                             "allow_v2_entries to True, or "
+                                             "ALLOW_V2_ENTRIES to True, or "
                                              "there is something else wrong "
                                              "with your file. Saveframe error "
                                              "occured: '%s'" % curframe.name)
@@ -589,37 +603,37 @@ class _fastParser(object):
                 elif not self.token.startswith("_"):
                     raise ValueError("Invalid token found in saveframe '" +
                                      curframe.name +  "': '" + self.token +
-                                     "'", self.getLineNumber())
+                                     "'", self.get_line_number())
 
                 # Add a tag
                 else:
                     if self.last_delineator != "":
                         raise ValueError("Saveframe tags may not be quoted or "
                                          "semicolon-delineated.",
-                                         self.getLineNumber())
+                                         self.get_line_number())
                     curtag = self.token
 
                     # We are in a saveframe and waiting for the saveframe tag
-                    self.getToken()
+                    self.get_token()
                     if (self.token in self.reserved and
                             self.last_delineator == ""):
                         raise ValueError("Cannot use keywords as data values "
                                          "unless quoted or semi-colon "
                                          "delineated. Illegal value: " +
-                                         self.token, self.getLineNumber())
-                    curframe.addTag(curtag, self.token, self.getLineNumber())
+                                         self.token, self.get_line_number())
+                    curframe.add_tag(curtag, self.token, self.get_line_number())
 
             if self.token != "save_":
                 raise ValueError("Saveframe improperly terminated at end of "
-                                 "file.", self.getLineNumber())
+                                 "file.", self.get_line_number())
 
         # Free the memory of the original copy of the data we parsed
         self.full_data = None
 
         return self.ent
 
-    def realgetToken(self):
-        """ Actually processes the input data to find a token. getToken
+    def real_get_token(self):
+        """ Actually processes the input data to find a token. get_token
         is just a wrapper around this with some exception handling."""
 
         # Reset the delineator
@@ -672,7 +686,7 @@ class _fastParser(object):
         # Skip comments
         if tmp.startswith("#"):
             self.index += len(tmp)
-            return self.getToken()
+            return self.get_token()
 
         # Handle multi-line values
         if tmp.startswith(";\n"):
@@ -681,7 +695,7 @@ class _fastParser(object):
             # Search for end of multi-line value
             if "\n;" in tmp:
                 until = tmp.index("\n;")
-                valid = self.indexHandle(tmp, "\n;\n")
+                valid = self.index_handle(tmp, "\n;\n")
 
                 # The line is terminated properly
                 if valid == until:
@@ -692,16 +706,16 @@ class _fastParser(object):
 
                 # The line was terminated improperly
                 else:
-                    if self.nextWhitespace(tmp[until+2:]) == 0:
-                        if (raise_parse_warnings and
-                                "bad-multiline" not in warnings_to_ignore):
+                    if self.next_whitespace(tmp[until+2:]) == 0:
+                        if (RAISE_PARSE_WARNINGS and
+                                "bad-multiline" not in WARNINGS_TO_IGNORE):
                             raise ValueError("Warning: Technically invalid line"
                                              " found in file. Multiline values "
                                              "should terminate with \\n;\\n but"
                                              " in this file only \\n; with "
                                              "non-return whitespace following "
                                              "was found.",
-                                             self.getLineNumber())
+                                             self.get_line_number())
                         self.token = tmp[0:until+1]
                         self.index += until + 4
                         self.last_delineator = ";"
@@ -711,30 +725,30 @@ class _fastParser(object):
                                          'ended with a "\\n;" and then a '
                                          'non-whitespace value. Multi-line '
                                          'values should end with "\\n;\\n".',
-                                         self.getLineNumber())
+                                         self.get_line_number())
             else:
-                raise ValueError("Invalid file. Multi-line comment never ends. "
-                                 "Multi-line comments must terminate with a "
+                raise ValueError("Invalid file. Multi-line comment never ends."
+                                 " Multi-line comments must terminate with a "
                                  "line that consists ONLY of a ';' without "
                                  "characters before or after. (Other than the "
-                                 "newline.)", self.getLineNumber())
+                                 "newline.)", self.get_line_number())
 
         # Handle values quoted with '
         if tmp.startswith("'"):
-            until = self.indexHandle(tmp, "'", 1)
+            until = self.index_handle(tmp, "'", 1)
 
             if until is None:
                 raise ValueError("Invalid file. Single quoted value was never "
-                                 "terminated.", self.getLineNumber())
+                                 "terminated.", self.get_line_number())
 
             # Make sure we don't stop for quotes that are not followed
             #  by whitespace
             try:
                 while tmp[until+1:until+2] not in " \t\n":
-                    until = self.indexHandle(tmp, "'", until+1)
+                    until = self.index_handle(tmp, "'", until+1)
             except TypeError:
                 raise ValueError("Invalid file. Single quoted value was never "
-                                 "terminated.", self.getLineNumber())
+                                 "terminated.", self.get_line_number())
 
             self.token = tmp[1:until]
             self.index += until+1
@@ -743,20 +757,20 @@ class _fastParser(object):
 
         # Handle values quoted with "
         if tmp.startswith('"'):
-            until = self.indexHandle(tmp, '"', 1)
+            until = self.index_handle(tmp, '"', 1)
 
             if until is None:
                 raise ValueError("Invalid file. Double quoted value was never "
-                                 "terminated.", self.getLineNumber())
+                                 "terminated.", self.get_line_number())
 
             # Make sure we don't stop for quotes that are not followed
             #  by whitespace
             try:
                 while tmp[until+1:until+2] not in " \t\n":
-                    until = self.indexHandle(tmp, '"', until+1)
+                    until = self.index_handle(tmp, '"', until+1)
             except TypeError:
                 raise ValueError("Invalid file. Double quoted value was never "
-                                 "terminated.", self.getLineNumber())
+                                 "terminated.", self.get_line_number())
 
             self.token = tmp[1:until]
             self.index += until+1
@@ -764,7 +778,7 @@ class _fastParser(object):
             return
 
         # Figure out where this token ends
-        white = self.nextWhitespace(tmp)
+        white = self.next_whitespace(tmp)
         if white == len(tmp):
             self.token = tmp
             self.index += len(self.token) + 1
@@ -775,14 +789,14 @@ class _fastParser(object):
         self.token = tmp[0:white]
         return
 
-class schema(object):
+class Schema(object):
     """A BMRB schema. Used to validate STAR files."""
 
     def __init__(self, schema_file=None):
         """Initialize a BMRB schema. With no arguments the most
         up-to-date schema will be fetched from the BMRB FTP site.
         Otherwise pass a URL or a file to load a schema from using the
-        schema_file optional argument."""
+        schema_file keyword argument."""
 
         self.schema_order = []
         self.headers = []
@@ -790,10 +804,10 @@ class schema(object):
         self.types = {}
 
         if schema_file is None:
-            schema_file = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
+            schema_file = SCHEMA_URL
         self.schema_file = schema_file
 
-        schem_stream = _interpretFile(schema_file)
+        schem_stream = _interpret_file(schema_file)
         fix_newlines = StringIO('\n'.join(schem_stream.read().splitlines()))
 
         csv_reader_instance = csv_reader(fix_newlines)
@@ -821,29 +835,31 @@ class schema(object):
                 self.types[line[8][:line[8].index(".")]] = (line[1], line[42])
                 self.schema_order.append(line[8])
             else:
-                if verbose:
+                if VERBOSE:
                     print("Detected invalid tag in schema: %s" % line)
 
     def __repr__(self):
         """Return how we can be initialized."""
-        return "bmrb.schema(schema_file='%s')" % self.schema_file
+
+        return "bmrb.Schema(schema_file='%s')" % self.schema_file
 
     def __str__(self):
         """Print the schema that we are adhering to."""
+
         return "BMRB schema loaded from: '%s'" % self.schema_file
 
-    def convertTag(self, tag, value, linenum=None):
+    def convert_tag(self, tag, value, linenum=None):
         """ Converts the provided tag from string to the appropriate
         type as specified in this schema."""
 
         # If we don't know what the tag is, just return it
         if tag.lower() not in self.schema:
-            if (raise_parse_warnings and
-                    "tag-not-in-schema" not in warnings_to_ignore):
-                raise ValueError("There is a tag in the file that isn't in the "
-                                 "schema: '%s' on line '%s'" % (tag, linenum))
+            if (RAISE_PARSE_WARNINGS and
+                    "tag-not-in-schema" not in WARNINGS_TO_IGNORE):
+                raise ValueError("There is a tag in the file that isn't in the"
+                                 " schema: '%s' on line '%s'" % (tag, linenum))
             else:
-                if verbose:
+                if VERBOSE:
                     print("Couldn't convert tag because it is not in the "
                           "dictionary: " + tag)
                 return value
@@ -853,8 +869,8 @@ class schema(object):
 
         # Check for null
         if value == "." or value == "?":
-            if (not null_allowed and raise_parse_warnings and
-                    "invalid-null-value" not in warnings_to_ignore):
+            if (not null_allowed and RAISE_PARSE_WARNINGS and
+                    "invalid-null-value" not in WARNINGS_TO_IGNORE):
                 raise ValueError("There is a null in the file that isn't "
                                  "allowed according to the schema: '%s' on "
                                  "line '%s'" % (tag, linenum))
@@ -870,10 +886,10 @@ class schema(object):
             try:
                 return int(value)
             except:
-                raise ValueError("Could not parse the file because a value that"
-                                 " should be an INTEGER is not. Please turn off"
-                                 " convert_datatypes or fix the file. Tag: '%s'"
-                                 " on line '%s'" % (tag, linenum))
+                raise ValueError("Could not parse the file because a value "
+                                 "that should be an INTEGER is not. Please "
+                                 "turn off CONVERT_DATATYPES or fix the file. "
+                                 "Tag: '%s' on line '%s'" % (tag, linenum))
 
         # Convert floats
         if "FLOAT" in valtype:
@@ -881,30 +897,31 @@ class schema(object):
                 # If we used int() we would lose the precision
                 return decimal.Decimal(value)
             except:
-                raise ValueError("Could not parse the file because a value that"
-                                 " should be a FLOAT is not. Please turn off "
-                                 "convert_datatypes or fix the file. Tag: '%s' "
-                                 "on line '%s'" % (tag, linenum))
+                raise ValueError("Could not parse the file because a value "
+                                 "that should be a FLOAT is not. Please turn "
+                                 "off CONVERT_DATATYPES or fix the file. Tag: "
+                                 "'%s' on line '%s'" % (tag, linenum))
 
         if "DATETIME year to day" in valtype:
             try:
                 year, month, day = [int(x) for x in value.split("-")]
                 return date(year, month, day)
             except:
-                raise ValueError("Could not parse the file because a value that"
-                                 " should be a DATETIME is not. Please turn off"
-                                 " convert_datatypes or fix the file. Tag: '%s'"
-                                 " on line '%s'" % (tag, linenum))
+                raise ValueError("Could not parse the file because a value "
+                                 "that should be a DATETIME is not. Please "
+                                 "turn off CONVERT_DATATYPES or fix the file. "
+                                 "Tag: '%s' on line '%s'" % (tag, linenum))
 
         # We don't know the data type, so just keep it a string
         return value
 
-    def valType(self, tag, value, category=None, linenum=None):
+    def val_type(self, tag, value, category=None, linenum=None):
         """ Validates that a tag matches the type it should have
         according to this schema."""
 
         if tag.lower() not in self.schema:
-            return ["Tag '%s' not found in schema. Line '%s'." % (tag, linenum)]
+            return ["Tag '%s' not found in schema. Line '%s'." %
+                    (tag, linenum)]
 
         (valtype, null_allowed, allowed_category,
          capitalized_tag) = self.schema[tag.lower()]
@@ -946,24 +963,19 @@ class schema(object):
                         % (capitalized_tag, value, linenum)]
 
         if tag != capitalized_tag:
-            return ["The tag '%s' is improperly capitalized but otherwise valid"
-                    ". Should be '%s'." % (tag, capitalized_tag)]
+            return ["The tag '%s' is improperly capitalized but otherwise "
+                    "valid. Should be '%s'." % (tag, capitalized_tag)]
         return []
 
-class entry(object):
+class Entry(object):
     """An OO representation of a BMRB entry. You can initialize this
     object several ways; (e.g. from a file, from the official database,
     from scratch) see the classmethods."""
 
-    # Put these here for reference
-    bmrb_id = 0
-    frame_list = []
-    source = None
-
     def __delitem__(self, item):
         """Remove the indicated saveframe."""
 
-        if isinstance(item, saveframe):
+        if isinstance(item, Saveframe):
             del self.frame_list[self.frame_list.index(item)]
             return
         else:
@@ -972,18 +984,25 @@ class entry(object):
     def __eq__(self, other):
         """Returns True if this entry is equal to another entry, false
         if it is not equal."""
+
         return len(self.compare(other)) == 0
 
     def __getitem__(self, item):
         """Get the indicated saveframe."""
+
         try:
             return self.frame_list[item]
         except TypeError:
-            return self.getSaveframeByName(item)
+            return self.get_saveframe_by_name(item)
 
     def __init__(self, **kargs):
-        """Don't use this directly, use fromFile, fromScratch,
-        fromString, or fromDatabase to construct."""
+        """Don't use this directly, use from_file, from_scratch,
+        from_string, or from_database to construct."""
+
+        # Default initializations
+        self.bmrb_id = 0
+        self.frame_list = []
+        self.source = None
 
         # They initialized us wrong
         if len(kargs) == 0:
@@ -1001,12 +1020,12 @@ class entry(object):
         if 'the_string' in kargs:
             # Parse from a string by wrapping it in StringIO
             star_buffer = StringIO(kargs['the_string'])
-            self.source = "fromString()"
+            self.source = "from_string()"
         elif 'file_name' in kargs:
-            star_buffer = _interpretFile(kargs['file_name'])
-            self.source = "fromFile('%s')" % kargs['file_name']
+            star_buffer = _interpret_file(kargs['file_name'])
+            self.source = "from_file('%s')" % kargs['file_name']
         elif 'entry_num' in kargs:
-            self.source = "fromDatabase(%s)" % kargs['entry_num']
+            self.source = "from_database(%s)" % kargs['entry_num']
 
             # The location to fetch entries from
             entry_number = kargs['entry_num']
@@ -1024,65 +1043,69 @@ class entry(object):
         else:
             # Initialize a blank entry
             self.bmrb_id = kargs['bmrb_id']
-            self.source = "fromScratch()"
+            self.source = "from_scratch()"
             return
 
         # Load the BMRB entry from the file
-        parser = _fastParser(entry_to_parse_into=self)
+        parser = _Parser(entry_to_parse_into=self)
         parser.parse(star_buffer.read(), source=self.source)
 
     def __len__(self):
         """ Returns the number of saveframes in the entry."""
+
         return len(self.frame_list)
 
     def __lt__(self, other):
         """Returns true if this entry is less than another entry."""
+
         return self.bmrb_id > other.bmrb_id
 
     def __repr__(self):
         """Returns a description of the entry."""
-        return "<bmrb.entry '%s' %s>" % (self.bmrb_id, self.source)
+
+        return "<bmrb.Entry '%s' %s>" % (self.bmrb_id, self.source)
 
     def __setitem__(self, key, item):
         """Set the indicated saveframe."""
 
         # It is a saveframe
-        if isinstance(item, saveframe):
+        if isinstance(item, Saveframe):
             # Add by ordinal
             try:
                 self.frame_list[key] = item
             except TypeError:
                 # Add by key
-                if key in self.frameDict():
+                if key in self.frame_dict():
                     dict((frame.name, frame) for frame in self.frame_list)
                     for pos, frame in enumerate(self.frame_list):
                         if frame.name == key:
                             self.frame_list[pos] = item
                 else:
-                    raise KeyError("Saveframe with name '%s' does not exist and"
-                                   " therefore cannot be written to. Use the "
-                                   "addSaveframe method to add new saveframes."
-                                   % key)
+                    raise KeyError("Saveframe with name '%s' does not exist "
+                                   "and therefore cannot be written to. Use "
+                                   "the addSaveframe method to add new "
+                                   "saveframes." % key)
         else:
             raise ValueError("You can only assign an entry to a saveframe"
                              " splice.")
 
     def __str__(self):
         """Returns the entire entry in STAR format as a string."""
+
         ret_string = "data_%s\n\n" % self.bmrb_id
         for frame in self.frame_list:
             ret_string += str(frame) + "\n"
         return ret_string
 
     @classmethod
-    def fromDatabase(cls, entry_num):
+    def from_database(cls, entry_num):
         """Create an entry corresponding to the most up to date entry on
         the public BMRB server. (Requires ability to initiate outbound
         HTTP connections.)"""
 
         # Try to load the entry using JSON
         try:
-            entry_url = api_url + "/rest/entry/%s/"
+            entry_url = API_URL + "/rest/entry/%s/"
             entry_url = entry_url % entry_num
 
             # Convert bytes to string if python3
@@ -1100,10 +1123,10 @@ class entry(object):
                     raise ValueError("An error occured while fetching the entry"
                                      ": %s" % json_data["error"])
             entry_dictionary = json_data[str(entry_num)]
-            ent = entry.fromJSON(entry_dictionary)
+            ent = Entry.from_json(entry_dictionary)
 
             # Update the entry source
-            ent_source = "fromDatabase(%s)" % entry_num
+            ent_source = "from_database(%s)" % entry_num
             ent.source = ent_source
             for each_saveframe in ent:
                 each_saveframe.source = ent_source
@@ -1112,19 +1135,21 @@ class entry(object):
 
             # TODO: Delete this once the database is remediated
             # Convert datatypes
-            if convert_datatypes:
-                schem = _getSchema()
+            if CONVERT_DATATYPES:
+                schem = _get_schema()
                 for each_saveframe in ent:
                     for tag in each_saveframe.tags:
                         cur_tag = each_saveframe.tag_prefix + "." + tag[0]
-                        tag[1] = schem.convertTag(cur_tag, tag[1], linenum="SF %s" % each_saveframe.name)
-                    for el in each_saveframe:
-                        for row in el.data:
+                        tag[1] = schem.convert_tag(cur_tag, tag[1],
+                                                   linenum="SF %s" %
+                                                   each_saveframe.name)
+                    for loop in each_saveframe:
+                        for row in loop.data:
                             for pos in range(0, len(row)):
-                                ct = el.category + "." + el.columns[pos]
-                                linenum = "Loop %s" % el.category
-                                row[pos] = schem.convertTag(ct, row[pos],
-                                                            linenum=linenum)
+                                catgry = loop.category + "." + loop.columns[pos]
+                                linenum = "Loop %s" % loop.category
+                                row[pos] = schem.convert_tag(catgry, row[pos],
+                                                             linenum=linenum)
 
             return ent
         # The entry doesn't exist
@@ -1132,20 +1157,21 @@ class entry(object):
             raise IOError("Entry '%s' does not exist in the public database." %
                           entry_num)
         except (HTTPError, URLError):
-            if verbose:
+            if VERBOSE:
                 print("BMRB API server appears to be down. Attempting to load "
                       "from FTP site.")
             return cls(entry_num=entry_num)
 
     @classmethod
-    def fromFile(cls, the_file):
+    def from_file(cls, the_file):
         """Create an entry by loading in a file. If the_file starts with
         http://, https://, or ftp:// then we will use those protocols to
         attempt to open the file."""
+
         return cls(file_name=the_file)
 
     @classmethod
-    def fromJSON(cls, json_dict):
+    def from_json(cls, json_dict):
         """Create an entry from JSON (serialized or unserialized JSON)."""
 
         # If they provided a string, try to load it using JSON
@@ -1159,35 +1185,37 @@ class entry(object):
         # Make sure it has the correct keys
         for check in ["bmrb_id", "saveframes"]:
             if check not in json_dict:
-                raise ValueError("The JSON you provide must be a hash and must "
-                                 "contain the key '%s' - even if the key points"
-                                 " to 'None'." % check)
+                raise ValueError("The JSON you provide must be a hash and must"
+                                 " contain the key '%s' - even if the key "
+                                 "points to 'None'." % check)
 
         # Create an entry from scratch and populate it
-        ret = entry.fromScratch(json_dict['bmrb_id'])
-        ret.frame_list = [saveframe.fromJSON(x) for x in
+        ret = Entry.from_scratch(json_dict['bmrb_id'])
+        ret.frame_list = [Saveframe.from_json(x) for x in
                           json_dict['saveframes']]
-        ret.source = "fromJSON()"
+        ret.source = "from_json()"
 
         # Return the new loop
         return ret
 
     @classmethod
-    def fromString(cls, the_string):
+    def from_string(cls, the_string):
         """Create an entry by parsing a string."""
+
         return cls(the_string=the_string)
 
     @classmethod
-    def fromScratch(cls, bmrb_id):
+    def from_scratch(cls, bmrb_id):
         """Create an empty entry that you can programatically add to.
         You must pass a number corresponding to the BMRB ID. If this
         is not a "real" BMRB entry, use 0 as the BMRB ID."""
+
         return cls(bmrb_id=bmrb_id)
 
-    def addSaveframe(self, frame):
+    def add_saveframe(self, frame):
         """Add a saveframe to the entry."""
 
-        if not isinstance(frame, saveframe):
+        if not isinstance(frame, Saveframe):
             raise ValueError("You can only add instances of saveframes "
                              "using this method.")
 
@@ -1198,6 +1226,7 @@ class entry(object):
         Otherwise returns 1 if different and 0 if equal. Non-equal
         entries will always be detected, but specific differences
         detected depends on order of entries."""
+
         diffs = []
         if self is other:
             return []
@@ -1214,48 +1243,48 @@ class entry(object):
                 diffs.append("The number of saveframes in the entries are not"
                              " equal: '%d' vs '%d'." %
                              (len(self.frame_list), len(other.frame_list)))
-            for frame in self.frameDict():
-                if other.frameDict().get(frame, None) is None:
+            for frame in self.frame_dict():
+                if other.frame_dict().get(frame, None) is None:
                     diffs.append("No saveframe with name '%s' in other entry." %
-                                 self.frameDict()[frame].name)
+                                 self.frame_dict()[frame].name)
                 else:
-                    comp = self.frameDict()[frame].compare(
-                        other.frameDict()[frame])
+                    comp = self.frame_dict()[frame].compare(
+                        other.frame_dict()[frame])
                     if len(comp) > 0:
                         diffs.append("Saveframes do not match: '%s'." %
-                                     self.frameDict()[frame].name)
+                                     self.frame_dict()[frame].name)
                         diffs.extend(comp)
 
-        # We could get many different (and unknown Exceptions), so catch
-        #  generic Exception
-        except Exception as err:
+        except AttributeError as err:
             diffs.append("An exception occured while comparing: '%s'." % err)
 
         return diffs
 
-    def frameDict(self):
+    def frame_dict(self):
         """Returns a dictionary of saveframe name -> saveframe object"""
+
         return dict((frame.name, frame) for frame in self.frame_list)
 
-    def getJSON(self, serialize=True):
+    def get_json(self, serialize=True):
         """ Returns the entry in JSON format. If serialize is set to
         False a dictionary representation of the entry that is
         serializeable is returned."""
 
+        frames = [x.get_json(serialize=False) for x in self.frame_list]
         entry_dict = {
             "bmrb_id": self.bmrb_id,
-            "saveframes": [x.getJSON(serialize=False) for x in self.frame_list]
+            "saveframes": frames
         }
 
         if serialize:
-            return json.dumps(entry_dict, default=_jsonSerialize)
+            return json.dumps(entry_dict, default=_json_serialize)
         else:
             return entry_dict
 
-    def getLoopsByCategory(self, value):
+    def get_loops_by_category(self, value):
         """Allows fetching loops by category."""
 
-        value = _formatCategory(value).lower()
+        value = _format_category(value).lower()
 
         results = []
         for frame in self.frame_list:
@@ -1264,47 +1293,49 @@ class entry(object):
                     results.append(one_loop)
         return results
 
-    def getSaveframeByName(self, frame):
+    def get_saveframe_by_name(self, frame):
         """Allows fetching a saveframe by name."""
-        frames = self.frameDict()
+
+        frames = self.frame_dict()
         if frame in frames:
             return frames[frame]
         else:
             raise KeyError("No saveframe with name '%s'" % frame)
 
-    def getSaveframesByCategory(self, value):
+    def get_saveframes_by_category(self, value):
         """Allows fetching saveframes by category."""
-        return self.getSaveframesByTagAndValue("sf_category", value)
 
-    def getSaveframesByTagAndValue(self, tag_name, value):
+        return self.get_saveframes_by_tag_and_value("sf_category", value)
+
+    def get_saveframes_by_tag_and_value(self, tag_name, value):
         """Allows fetching saveframe(s) by tag and tag value."""
 
         ret_frames = []
 
         for frame in self.frame_list:
-            results = frame.getTag(tag_name)
+            results = frame.get_tag(tag_name)
             if results != [] and results[0] == value:
                 ret_frames.append(frame)
 
         return ret_frames
 
-    def getTag(self, tag, whole_tag=False):
+    def get_tag(self, tag, whole_tag=False):
         """ Given a tag (E.g. _Assigned_chem_shift_list.Data_file_name)
         return a list of all values for that tag. Specify whole_tag=True
         and the [tag_name, tag_value (,tag_linenumber)] pair will be
         returned."""
 
-        if "." not in str(tag) and not allow_v2_entries:
+        if "." not in str(tag) and not ALLOW_V2_ENTRIES:
             raise ValueError("You must provide the tag category to call this"
                              " method at the entry level.")
 
         results = []
         for frame in self.frame_list:
-            results.extend(frame.getTag(tag, whole_tag=whole_tag))
+            results.extend(frame.get_tag(tag, whole_tag=whole_tag))
 
         return results
 
-    def getTags(self, tags):
+    def get_tags(self, tags):
         """ Given a list of tags, get all of the tags and return the
         results in a dictionary."""
 
@@ -1314,28 +1345,31 @@ class entry(object):
 
         results = {}
         for tag in tags:
-            results[tag] = self.getTag(tag)
+            results[tag] = self.get_tag(tag)
 
         return results
 
-    def nefString(self):
+    def nef_string(self):
         """ Returns a string representation of the entry in NEF. """
 
         # Store the current values of these module variables
-        global str_conversion_dict, skip_empty_loops
-        tmp_dict, tmp_loops_state = str_conversion_dict, skip_empty_loops
+        global STR_CONVERSION_DICT, SKIP_EMPTY_LOOPS, DONT_SHOW_COMMENTS
+        tmp_dict, tmp_loops_state = STR_CONVERSION_DICT, SKIP_EMPTY_LOOPS
+        tmp_dont_show_comments = DONT_SHOW_COMMENTS
 
         # Change to NEF defaults and get the string representation
-        enableNEFDefaults()
+        enable_nef_defaults()
         result = str(self)
 
         # Revert module variables
-        str_conversion_dict, skip_empty_loops = tmp_dict, tmp_loops_state
+        STR_CONVERSION_DICT, SKIP_EMPTY_LOOPS = tmp_dict, tmp_loops_state
+        DONT_SHOW_COMMENTS = tmp_dont_show_comments
         return result
 
-    def printTree(self):
+    def print_tree(self):
         """Prints a summary, tree style, of the frames and loops in
         the entry."""
+
         print(repr(self))
         for pos, frame in enumerate(self):
             print("\t[%d] %s" % (pos, repr(frame)))
@@ -1356,69 +1390,66 @@ class entry(object):
 
         # Check for saveframes with same name
         saveframe_names = sorted(x.name for x in self)
-        for x in range(0, len(saveframe_names)-2):
-            if saveframe_names[x] == saveframe_names[x+1]:
+        for ordinal in range(0, len(saveframe_names)-2):
+            if saveframe_names[ordinal] == saveframe_names[ordinal+1]:
                 errors.append("Multiple saveframes with same name: " +
-                              saveframe_names[x])
+                              saveframe_names[ordinal])
 
         return errors
 
-class saveframe(object):
-    """A saveframe. Use the classmethod fromScratch to create one."""
-
-    tags = []
-    loops = []
-    name = ""
-    category = "unset"
-    tag_prefix = None
-    source = "unknown"
+class Saveframe(object):
+    """A saveframe. Use the classmethod from_scratch to create one."""
 
     def __delitem__(self, item):
         """Remove the indicated tag or loop."""
 
         # If they specify the specific loop to delete, go ahead and delete it
-        if isinstance(item, loop):
+        if isinstance(item, Loop):
             del self.loops[self.loops.index(item)]
             return
 
         # See if the result of get(item) is a loop. If so, delete it
         # (calls this method recursively)
         to_delete = self.__getitem__(item)
-        if isinstance(to_delete, loop):
+        if isinstance(to_delete, Loop):
             self.__delitem__(to_delete)
             return
 
         # It must be a tag. Try to delete the tag
         else:
-            self.deleteTag(item)
+            self.delete_tag(item)
 
     def __eq__(self, other):
         """Returns True if this saveframe is equal to another saveframe,
         False if it is equal."""
+
         return len(self.compare(other)) == 0
 
     def __getitem__(self, item):
         """Get the indicated loop or tag."""
+
         try:
             return self.loops[item]
         except TypeError:
-            results = self.getTag(item)
+            results = self.get_tag(item)
             if results != []:
                 return results
             else:
                 try:
-                    return self.loopDict()[item.lower()]
+                    return self.loop_dict()[item.lower()]
                 except KeyError:
                     raise KeyError("No tag or loop matching '%s'" % item)
 
     def __len__(self):
         """Return the number of loops in this saveframe."""
+
         return len(self.loops)
 
     def __lt__(self, other):
         """Returns True if this saveframe sorts lower than the compared
         saveframe, false otherwise. The alphabetical ordering of the
         saveframe category is used to perform the comparison."""
+
         return self.tag_prefix < other.tag_prefix
 
     def __init__(self, **kargs):
@@ -1431,7 +1462,10 @@ class saveframe(object):
         # Initialize our local variables
         self.tags = []
         self.loops = []
+        self.name = ""
         self.source = "unknown"
+        self.category = "unset"
+        self.tag_prefix = None
 
         # Update our source if it provided
         if 'source' in kargs:
@@ -1440,15 +1474,15 @@ class saveframe(object):
         if 'the_string' in kargs:
             # Parse from a string by wrapping it in StringIO
             star_buffer = StringIO(kargs['the_string'])
-            self.source = "fromString()"
+            self.source = "from_string()"
         elif 'file_name' in kargs:
-            star_buffer = _interpretFile(kargs['file_name'])
-            self.source = "fromFile('%s')" % kargs['file_name']
+            star_buffer = _interpret_file(kargs['file_name'])
+            self.source = "from_file('%s')" % kargs['file_name']
         elif 'saveframe_name' in kargs:
             # If they are creating from scratch, just get the saveframe name
             self.name = kargs['saveframe_name']
             if 'tag_prefix' in kargs:
-                self.tag_prefix = _formatCategory(kargs['tag_prefix'])
+                self.tag_prefix = _format_category(kargs['tag_prefix'])
             return
 
         # If we are reading from a CSV file, go ahead and parse it
@@ -1459,16 +1493,16 @@ class saveframe(object):
             if len(tags) != len(values):
                 raise ValueError("Your CSV data is invalid. The header length"
                                  " does not match the data length.")
-            for x in range(0, len(tags)):
-                self.addTag(tags[x], values[x])
+            for ordinal in range(0, len(tags)):
+                self.add_tag(tags[ordinal], values[ordinal])
             return
 
 
-        tmp_entry = entry.fromScratch(0)
+        tmp_entry = Entry.from_scratch(0)
 
         # Load the BMRB entry from the file
         star_buffer = StringIO("data_1 " + star_buffer.read())
-        parser = _fastParser(entry_to_parse_into=tmp_entry)
+        parser = _Parser(entry_to_parse_into=tmp_entry)
         parser.parse(star_buffer.read(), source=self.source)
 
         # Copy the first parsed saveframe into ourself
@@ -1476,31 +1510,34 @@ class saveframe(object):
             raise ValueError("You attempted to parse one saveframe but the "
                              "source you provided had more than one saveframe."
                              " Please either parse all saveframes as an entry "
-                             "or only parse one saveframe. Saveframes detected:"
-                             " " + str(tmp_entry.frame_list))
+                             "or only parse one saveframe. Saveframes "
+                             "detected: " + str(tmp_entry.frame_list))
         self.tags = tmp_entry[0].tags
         self.loops = tmp_entry[0].loops
         self.name = tmp_entry[0].name
         self.tag_prefix = tmp_entry[0].tag_prefix
 
     @classmethod
-    def fromScratch(cls, sf_name, tag_prefix=None, source="fromScratch()"):
+    def from_scratch(cls, sf_name, tag_prefix=None, source="from_scratch()"):
         """Create an empty saveframe that you can programatically add
         to. You may also pass the tag prefix as the second argument. If
         you do not pass the tag prefix it will be set the first time you
         add a tag."""
-        return cls(saveframe_name=sf_name, tag_prefix=tag_prefix, source=source)
+
+        return cls(saveframe_name=sf_name, tag_prefix=tag_prefix,
+                   source=source)
 
     @classmethod
-    def fromFile(cls, the_file, csv=False):
+    def from_file(cls, the_file, csv=False):
         """Create a saveframe by loading in a file. Specify csv=True is
         the file is a CSV file. If the_file starts with http://,
         https://, or ftp:// then we will use those protocols to attempt
         to open the file."""
+
         return cls(file_name=the_file, csv=csv)
 
     @classmethod
-    def fromJSON(cls, json_dict):
+    def from_json(cls, json_dict):
         """Create a saveframe from JSON (serialized or unserialized JSON)."""
 
         # If they provided a string, try to load it using JSON
@@ -1514,56 +1551,58 @@ class saveframe(object):
         # Make sure it has the correct keys
         for check in ["name", "tag_prefix", "tags", "loops"]:
             if check not in json_dict:
-                raise ValueError("The JSON you provide must be a hash and must "
-                                 "contain the key '%s' - even if the key points"
-                                 " to None." % check)
+                raise ValueError("The JSON you provide must be a hash and must"
+                                 " contain the key '%s' - even if the key "
+                                 "points to None." % check)
 
         # Create a saveframe from scratch and populate it
-        ret = saveframe.fromScratch(json_dict['name'])
+        ret = Saveframe.from_scratch(json_dict['name'])
         ret.tag_prefix = json_dict['tag_prefix']
         ret.category = json_dict.get('category', 'unset')
         ret.tags = json_dict['tags']
-        ret.loops = [loop.fromJSON(x) for x in json_dict['loops']]
-        ret.source = "fromJSON()"
+        ret.loops = [Loop.from_json(x) for x in json_dict['loops']]
+        ret.source = "from_json()"
 
         # Return the new loop
         return ret
 
     @classmethod
-    def fromString(cls, the_string, csv=False):
+    def from_string(cls, the_string, csv=False):
         """Create a saveframe by parsing a string. Specify csv=True is
         the string is in CSV format and not NMR-STAR format."""
+
         return cls(the_string=the_string, csv=csv)
 
     def __repr__(self):
         """Returns a description of the saveframe."""
-        return "<bmrb.saveframe '%s'>" % self.name
+
+        return "<bmrb.Saveframe '%s'>" % self.name
 
     def __setitem__(self, key, item):
         """Set the indicated loop or tag."""
 
         # It's a loop
-        if isinstance(item, loop):
+        if isinstance(item, Loop):
             try:
                 integer = int(str(key))
                 self.loops[integer] = item
             except ValueError:
-                if key.lower() in self.loopDict():
+                if key.lower() in self.loop_dict():
                     for pos, tmp_loop in enumerate(self.loops):
                         if tmp_loop.category.lower() == key.lower():
                             self.loops[pos] = item
                 else:
-                    raise KeyError("Loop with category '%s' does not exist and "
-                                   "therefore cannot be written to. Use addLoop"
-                                   " instead." % key)
+                    raise KeyError("Loop with category '%s' does not exist and"
+                                   " therefore cannot be written to. Use "
+                                   "addLoop instead." % key)
         else:
             # If the tag already exists, set its value
-            self.addTag(key, item, update=True)
+            self.add_tag(key, item, update=True)
 
     def __str__(self):
         """Returns the saveframe in STAR format as a string."""
 
-        if allow_v2_entries:
+        if ALLOW_V2_ENTRIES:
             if self.tag_prefix is None:
                 width = max([len(x[0]) for x in self.tags])
             else:
@@ -1581,18 +1620,18 @@ class saveframe(object):
         ret_string = ""
 
         # Insert the comment if not disabled
-        if not dont_show_comments:
+        if not DONT_SHOW_COMMENTS:
             # Figure out what the entry category is
             try:
-                our_category = self.getTag("Sf_category")[0]
+                our_category = self.get_tag("Sf_category")[0]
             except IndexError:
                 try:
-                    our_category = self.getTag("_Saveframe_category")[0]
+                    our_category = self.get_tag("_Saveframe_category")[0]
                 except IndexError:
                     our_category = None
 
-            if our_category in comment_dictionary:
-                ret_string = comment_dictionary[our_category]
+            if our_category in COMMENT_DICTIONARY:
+                ret_string = COMMENT_DICTIONARY[our_category]
 
         # Print the saveframe
         ret_string += "save_%s\n" % self.name
@@ -1601,19 +1640,19 @@ class saveframe(object):
 
         # Print the tags
         for each_tag in self.tags:
-            cleanTag = cleanValue(each_tag[1])
+            clean_tag = clean_value(each_tag[1])
 
-            if allow_v2_entries and self.tag_prefix is None:
-                if "\n" in cleanTag:
-                    ret_string += mstring % (each_tag[0], cleanTag)
+            if ALLOW_V2_ENTRIES and self.tag_prefix is None:
+                if "\n" in clean_tag:
+                    ret_string += mstring % (each_tag[0], clean_tag)
                 else:
-                    ret_string += pstring % (each_tag[0], cleanTag)
+                    ret_string += pstring % (each_tag[0], clean_tag)
             else:
                 formatted_tag = self.tag_prefix+"."+each_tag[0]
-                if "\n" in cleanTag:
-                    ret_string += mstring % (formatted_tag, cleanTag)
+                if "\n" in clean_tag:
+                    ret_string += mstring % (formatted_tag, clean_tag)
                 else:
-                    ret_string += pstring % (formatted_tag, cleanTag)
+                    ret_string += pstring % (formatted_tag, clean_tag)
 
         # Print any loops
         for each_loop in self.loops:
@@ -1623,11 +1662,11 @@ class saveframe(object):
         ret_string += "save_\n"
         return ret_string
 
-    def addLoop(self, loop_to_add):
+    def add_loop(self, loop_to_add):
         """Add a loop to the saveframe loops."""
 
-        if (loop_to_add.category in self.loopDict() or
-                str(loop_to_add.category).lower() in self.loopDict()):
+        if (loop_to_add.category in self.loop_dict() or
+                str(loop_to_add.category).lower() in self.loop_dict()):
             if loop_to_add.category is None:
                 raise ValueError("You cannot have two loops with the same "
                                  "category in one saveframe. You are getting "
@@ -1640,14 +1679,14 @@ class saveframe(object):
 
         self.loops.append(loop_to_add)
 
-    def addTag(self, name, value, linenum=None, update=False):
+    def add_tag(self, name, value, linenum=None, update=False):
         """Add a tag to the tag list. Does a bit of validation and
         parsing. Set update to true to update a tag if it exists rather
         than raise an exception."""
 
         if "." in name:
             if name[0] != ".":
-                prefix = _formatCategory(name)
+                prefix = _format_category(name)
                 if self.tag_prefix is None:
                     self.tag_prefix = prefix
                 elif self.tag_prefix != prefix:
@@ -1660,12 +1699,12 @@ class saveframe(object):
                 name = name[1:]
 
         # No duplicate tags
-        if self.getTag(name) != []:
+        if self.get_tag(name) != []:
             if not update:
                 raise ValueError("There is already a tag with the name '%s'." %
                                  name)
             else:
-                self.getTag(name, whole_tag=True)[0][1] = value
+                self.get_tag(name, whole_tag=True)[0][1] = value
                 return
 
         if "." in name:
@@ -1674,8 +1713,8 @@ class saveframe(object):
             raise ValueError("Tag names can not contain spaces.")
 
         # See if we need to convert the datatype
-        if convert_datatypes:
-            new_tag = [name, _getSchema().convertTag(
+        if CONVERT_DATATYPES:
+            new_tag = [name, _get_schema().convert_tag(
                 self.tag_prefix + "." + name, value, linenum=linenum)]
         else:
             new_tag = [name, value]
@@ -1687,21 +1726,22 @@ class saveframe(object):
         if linenum:
             new_tag.append(linenum)
 
-        if verbose:
+        if VERBOSE:
             print("Adding tag: '%s' with value '%s'" % (name, value))
 
         self.tags.append(new_tag)
 
-    def addTags(self, tag_list, update=False):
+    def add_tags(self, tag_list, update=False):
         """Adds multiple tags to the list. Input should be a list of
         tuples that are either [key, value] or [key]. In the latter case
         the value will be set to ".".  Set update to true to update a
         tag if it exists rather than raise an exception."""
+
         for tag_pair in tag_list:
             if len(tag_pair) == 2:
-                self.addTag(tag_pair[0], tag_pair[1], update=update)
+                self.add_tag(tag_pair[0], tag_pair[1], update=update)
             elif len(tag_pair) == 1:
-                self.addTag(tag_pair[0], ".", update=update)
+                self.add_tag(tag_pair[0], ".", update=update)
             else:
                 raise ValueError("You provided an invalid tag/value to add:"
                                  " '%s'." % tag_pair)
@@ -1710,6 +1750,7 @@ class saveframe(object):
         """Returns the differences between two saveframes as a list.
         Non-equal saveframes will always be detected, but specific
         differences detected depends on order of saveframes."""
+
         diffs = []
 
         # Check if this is literally the same object
@@ -1749,7 +1790,7 @@ class saveframe(object):
                              (len(self.tags), len(other.tags)))
 
             for tag in self.tags:
-                other_tag = other.getTag(tag[0])
+                other_tag = other.get_tag(tag[0])
 
                 if other_tag == []:
                     diffs.append("\tNo tag with name '%s.%s' in compared "
@@ -1758,8 +1799,8 @@ class saveframe(object):
 
                 # Compare the string version of the tags in case there are
                 #  non-string types. Use the conversion dict to get to str
-                if (str(str_conversion_dict.get(tag[1], tag[1])) !=
-                        str(str_conversion_dict.get(other_tag[0],
+                if (str(STR_CONVERSION_DICT.get(tag[1], tag[1])) !=
+                        str(STR_CONVERSION_DICT.get(other_tag[0],
                                                     other_tag[0]))):
                     diffs.append("\tMismatched tag values for tag '%s.%s':"
                                  " '%s' vs '%s'." %
@@ -1772,7 +1813,7 @@ class saveframe(object):
                              "'%d' vs '%d'." %
                              (len(self.loops), len(other.loops)))
 
-            compare_loop_dict = other.loopDict()
+            compare_loop_dict = other.loop_dict()
             for each_loop in self.loops:
                 if each_loop.category.lower() in compare_loop_dict:
                     compare = each_loop.compare(
@@ -1785,14 +1826,15 @@ class saveframe(object):
                     diffs.append("\tNo loop with category '%s' in other"
                                  " entry." % (each_loop.category))
 
-        except Exception as err:
+        except AttributeError as err:
             diffs.append("\tAn exception occured while comparing: '%s'." % err)
 
         return diffs
 
-    def deleteTag(self, tag):
+    def delete_tag(self, tag):
         """Deletes a tag from the saveframe based on tag name."""
-        tag = _formatTag(tag).lower()
+
+        tag = _format_tag(tag).lower()
 
         for position, each_tag in enumerate(self.tags):
             # If the tag is a match, remove it
@@ -1801,10 +1843,11 @@ class saveframe(object):
 
         raise KeyError("There is no tag with name '%s' to remove." % tag)
 
-    def getDataAsCSV(self, header=True, show_category=True):
+    def get_data_as_csv(self, header=True, show_category=True):
         """Return the data contained in the loops, properly CSVd, as a
         string. Set header to False omit the header. Set show_category
         to False to omit the loop category from the headers."""
+
         csv_buffer = StringIO()
         cwriter = csv_writer(csv_buffer)
 
@@ -1824,7 +1867,7 @@ class saveframe(object):
         csv_buffer.seek(0)
         return csv_buffer.read().replace('\r\n', '\n')
 
-    def getJSON(self, serialize=True):
+    def get_json(self, serialize=True):
         """ Returns the saveframe in JSON format. If serialize is set to
         False a dictionary representation of the saveframe that is
         serializeable is returned."""
@@ -1834,32 +1877,34 @@ class saveframe(object):
             "category": self.category,
             "tag_prefix": self.tag_prefix,
             "tags": [[x[0], x[1]] for x in self.tags],
-            "loops": [x.getJSON(serialize=False) for x in self.loops]
+            "loops": [x.get_json(serialize=False) for x in self.loops]
         }
 
         if serialize:
-            return json.dumps(saveframe_data, default=_jsonSerialize)
+            return json.dumps(saveframe_data, default=_json_serialize)
         else:
             return saveframe_data
 
-    def getLoopByCategory(self, name):
+    def get_loop_by_category(self, name):
         """Return a loop based on the loop name (category)."""
-        name = _formatCategory(name).lower()
+
+        name = _format_category(name).lower()
         for each_loop in self.loops:
             if str(each_loop.category).lower() == name:
                 return each_loop
         raise KeyError("No loop with category '%s'." % name)
 
-    def getTag(self, query, whole_tag=False):
+    def get_tag(self, query, whole_tag=False):
         """Allows fetching the value of a tag by tag name. Specify
         whole_tag=True and the [tag_name, tag_value] pair will be
         returned."""
 
         results = []
 
-        # Make sure this is the correct saveframe if they specify a tag prefix
+        # Make sure this is the correct saveframe if they specify a tag
+        #  prefix
         if "." in query:
-            tag_prefix = _formatCategory(query)
+            tag_prefix = _format_category(query)
         else:
             tag_prefix = self.tag_prefix
 
@@ -1867,12 +1912,12 @@ class saveframe(object):
         for each_loop in self.loops:
             if ((each_loop.category is not None and tag_prefix is not None and
                  each_loop.category.lower() == tag_prefix.lower()) or
-                    allow_v2_entries):
-                results.extend(each_loop.getTag(query, whole_tag=whole_tag))
+                    ALLOW_V2_ENTRIES):
+                results.extend(each_loop.get_tag(query, whole_tag=whole_tag))
 
         # Check our tags
-        query = _formatTag(query).lower()
-        if (allow_v2_entries or
+        query = _format_tag(query).lower()
+        if (ALLOW_V2_ENTRIES or
                 (tag_prefix is not None and
                  tag_prefix.lower() == self.tag_prefix.lower())):
             for tag in self.tags:
@@ -1884,50 +1929,56 @@ class saveframe(object):
 
         return results
 
-    def loopDict(self):
+    def loop_dict(self):
         """Returns a hash of loop category -> loop."""
+
         res = {}
         for each_loop in self.loops:
             if each_loop.category is not None:
                 res[each_loop.category.lower()] = each_loop
         return res
 
-    def loopIterator(self):
+    def loop_iterator(self):
         """Returns an iterator for saveframe loops."""
+
         return iter(self.loops)
 
-    def setTagPrefix(self, tag_prefix):
+    def set_tag_prefix(self, tag_prefix):
         """Set the tag prefix for this saveframe."""
-        self.tag_prefix = _formatCategory(tag_prefix)
 
-    def sortTags(self, validation_schema=None):
+        self.tag_prefix = _format_category(tag_prefix)
+
+    def sort_tags(self, validation_schema=None):
         """ Sort the tags so they are in the same order as a BMRB
         schema. Will automatically use the standard schema if none
         is provided."""
 
         new_tag_list = []
+        lower_tag_prefix = self.tag_prefix.lower()
 
-        for check in _getSchema(validation_schema).schema_order:
+        for check in _get_schema(validation_schema).schema_order:
             # Only proceed if it has the same category as us
-            if _formatCategory(check).lower() == self.tag_prefix.lower():
-                tag_name = _formatTag(check)
+            if _format_category(check).lower() == lower_tag_prefix:
+                tag_name = _format_tag(check)
                 # If we currently have the tag, add it to the new tag list
-                existing = self.getTag(tag_name, whole_tag=True)
+                existing = self.get_tag(tag_name, whole_tag=True)
                 if existing != []:
                     new_tag_list.extend(existing)
 
         if len(self.tags) != len(new_tag_list):
-            raise ValueError("Refusing to sort. There are tags in the saveframe"
-                             " that do not exist in the schema.")
+            raise ValueError("Refusing to sort. There are tags in the "
+                             "saveframe that do not exist in the schema.")
 
         self.tags = new_tag_list
 
-    def tagIterator(self):
+    def tag_iterator(self):
         """Returns an iterator for saveframe tags."""
+
         return iter(self.tags)
 
-    def printTree(self):
+    def print_tree(self):
         """Prints a summary, tree style, of the loops in the saveframe."""
+
         print(repr(self))
         for pos, each_loop in enumerate(self):
             print("\t[%d] %s" % (pos, repr(each_loop)))
@@ -1939,12 +1990,12 @@ class saveframe(object):
         0-length list indicates no errors found."""
 
         # Get the default schema if we are not passed a schema
-        my_schema = _getSchema(validation_schema)
+        my_schema = _get_schema(validation_schema)
 
         errors = []
 
         try:
-            my_category = self.getTag("Sf_category")[0]
+            my_category = self.get_tag("Sf_category")[0]
         except IndexError:
             errors.append("Cannot properly validate saveframe: '" + self.name +
                           "'. No saveframe category defined.")
@@ -1953,8 +2004,9 @@ class saveframe(object):
         for tag in self.tags:
             lineno = str(tag[2]) + " of original file" if len(tag) > 2 else None
             formatted_tag = self.tag_prefix + "." + tag[0]
-            cur_errors = my_schema.valType(formatted_tag, tag[1],
-                                           category=my_category, linenum=lineno)
+            cur_errors = my_schema.val_type(formatted_tag, tag[1],
+                                            category=my_category,
+                                            linenum=lineno)
             errors.extend(cur_errors)
 
         for each_loop in self.loops:
@@ -1964,27 +2016,24 @@ class saveframe(object):
 
         return errors
 
-class loop(object):
+class Loop(object):
     """A BMRB loop object."""
-
-    category = None
-    columns = []
-    data = []
-    source = "unknown"
 
     def __eq__(self, other):
         """Returns True if this loop is equal to another loop, False if
         it is different."""
+
         return len(self.compare(other)) == 0
 
     def __getitem__(self, item):
         """Get the indicated row from the data array."""
+
         try:
             return self.data[item]
         except TypeError:
             if isinstance(item, tuple):
                 item = list(item)
-            return self.getTag(tags=item)
+            return self.get_tag(tags=item)
 
     def __init__(self, **kargs):
         """Use the classmethods to initialize."""
@@ -2001,7 +2050,7 @@ class loop(object):
 
         # Update our category if provided
         if 'category' in kargs:
-            self.category = _formatCategory(kargs['category'])
+            self.category = _format_category(kargs['category'])
             return
 
         # They initialized us wrong
@@ -2011,26 +2060,26 @@ class loop(object):
         if 'the_string' in kargs:
             # Parse from a string by wrapping it in StringIO
             star_buffer = StringIO(kargs['the_string'])
-            self.source = "fromString()"
+            self.source = "from_string()"
         elif 'file_name' in kargs:
-            star_buffer = _interpretFile(kargs['file_name'])
-            self.source = "fromFile('%s')" % kargs['file_name']
+            star_buffer = _interpret_file(kargs['file_name'])
+            self.source = "from_file('%s')" % kargs['file_name']
         # If we are reading from a CSV file, go ahead and parse it
         if 'csv' in kargs and kargs['csv']:
             csvreader = csv_reader(star_buffer)
-            self.addColumn(next(csvreader))
+            self.add_column(next(csvreader))
             for row in csvreader:
-                self.addData(row)
-            self.source = "fromCSV('%s')" % kargs['csv']
+                self.add_data(row)
+            self.source = "from_csv('%s')" % kargs['csv']
             return
 
-        tmp_entry = entry.fromScratch(0)
+        tmp_entry = Entry.from_scratch(0)
 
         # Load the BMRB entry from the file
         star_buffer = StringIO("data_0 save_internaluseyoushouldntseethis_frame"
                                " _internal.use internal " + star_buffer.read() +
                                " save_")
-        parser = _fastParser(entry_to_parse_into=tmp_entry)
+        parser = _Parser(entry_to_parse_into=tmp_entry)
         parser.parse(star_buffer.read(), source=self.source)
 
         # Check that there was only one loop here
@@ -2048,24 +2097,27 @@ class loop(object):
 
     def __len__(self):
         """Return the number of rows of data."""
+
         return len(self.data)
 
     def __lt__(self, other):
         """Returns True if this loop sorts lower than the compared
         loop, false otherwise."""
+
         return self.category < other.category
 
     def __repr__(self):
         """Returns a description of the loop."""
-        if allow_v2_entries and self.category is None:
+
+        if ALLOW_V2_ENTRIES and self.category is None:
             common = os.path.commonprefix(self.columns)
             if common.endswith("_"):
                 common = common[:-1]
             if common == "":
                 common = "Unknown"
-            return "<bmrb.loop '%s'>" % common
+            return "<bmrb.Loop '%s'>" % common
         else:
-            return "<bmrb.loop '%s'>" % self.category
+            return "<bmrb.Loop '%s'>" % self.category
 
     def __str__(self):
         """Returns the loop in STAR format as a string."""
@@ -2073,7 +2125,7 @@ class loop(object):
         # Check if there is any data in this loop
         if len(self.data) == 0:
             # They do not want us to print empty loops
-            if skip_empty_loops:
+            if SKIP_EMPTY_LOOPS:
                 return ""
             else:
                 # If we have no columns than return the empty loop
@@ -2100,7 +2152,7 @@ class loop(object):
 
 
         # Check to make sure our category is set
-        if self.category is None and not allow_v2_entries:
+        if self.category is None and not ALLOW_V2_ENTRIES:
             raise ValueError("The category was never set for this loop. Either "
                              "add a column with the category intact, specify it"
                              " when generating the loop, or set it using "
@@ -2122,7 +2174,7 @@ class loop(object):
             working_data = []
             # Put quotes as needed on the data
             for datum in self.data:
-                working_data.append([cleanValue(x) for x in datum])
+                working_data.append([clean_value(x) for x in datum])
 
             # The nightmare below creates a list of the maximum length of
             #  elements in each column in the self.data matrix. Don't try to
@@ -2141,22 +2193,23 @@ class loop(object):
 
                 # Print the data (combine the columns widths with their data)
                 column_width_list = [d for d in zip(title_widths, datum)]
-                ret_string += pstring % tuple(_fromIterable(column_width_list))
+                ret_string += pstring % tuple(_from_iterable(column_width_list))
 
         # Close the loop
         ret_string += "   stop_\n"
         return ret_string
 
     @classmethod
-    def fromFile(cls, the_file, csv=False):
+    def from_file(cls, the_file, csv=False):
         """Create a saveframe by loading in a file. Specify csv=True if
         the file is a CSV file. If the_file starts with http://,
         https://, or ftp:// then we will use those protocols to attempt
         to open the file."""
+
         return cls(file_name=the_file, csv=csv)
 
     @classmethod
-    def fromJSON(cls, json_dict):
+    def from_json(cls, json_dict):
         """Create a loop from JSON (serialized or unserialized JSON)."""
 
         # If they provided a string, try to load it using JSON
@@ -2175,30 +2228,32 @@ class loop(object):
                                  "points to None." % check)
 
         # Create a loop from scratch and populate it
-        ret = loop.fromScratch()
+        ret = Loop.from_scratch()
         ret.columns = json_dict['tags']
         ret.category = json_dict['category']
         ret.data = json_dict['data']
-        ret.source = "fromJSON()"
+        ret.source = "from_json()"
 
         # Return the new loop
         return ret
 
     @classmethod
-    def fromScratch(cls, category=None, source="fromScratch()"):
+    def from_scratch(cls, category=None, source="from_scratch()"):
         """Create an empty saveframe that you can programatically add
         to. You may also pass the tag prefix as the second argument. If
         you do not pass the tag prefix it will be set the first time you
         add a tag."""
+
         return cls(category=category, source=source)
 
     @classmethod
-    def fromString(cls, the_string, csv=False):
+    def from_string(cls, the_string, csv=False):
         """Create a saveframe by parsing a string. Specify csv=True is
         the string is in CSV format and not NMR-STAR format."""
+
         return cls(the_string=the_string, csv=csv)
 
-    def addColumn(self, name, ignore_duplicates=False):
+    def add_column(self, name, ignore_duplicates=False):
         """Add a column to the column list. Does a bit of validation
         and parsing. Set ignore_duplicates to true to ignore attempts
         to add the same tag more than once rather than raise an
@@ -2210,8 +2265,8 @@ class loop(object):
         # If they have passed multiple columns to add, call ourself
         #  on each of them in succession
         if isinstance(name, (list, tuple)):
-            for x in name:
-                self.addColumn(x, ignore_duplicates=ignore_duplicates)
+            for item in name:
+                self.add_column(item, ignore_duplicates=ignore_duplicates)
             return
 
         name = name.strip()
@@ -2245,7 +2300,7 @@ class loop(object):
             raise ValueError("Column names can not contain spaces.")
         self.columns.append(name)
 
-    def addData(self, the_list, rearrange=False):
+    def add_data(self, the_list, rearrange=False):
         """Add a list to the data field. Items in list can be any type,
         they will be converted to string and formatted correctly. The
         list must have the same cardinality as the column names or you
@@ -2272,30 +2327,31 @@ class loop(object):
                              " does not match the number of columns!")
 
         # Auto convert datatypes if option set
-        if convert_datatypes:
+        tschem = _get_schema()
+        if CONVERT_DATATYPES:
             for row in processed_data:
                 for column, datum in enumerate(row):
-                    row[column] = _getSchema().convertTag(self.category + "." +
-                                                          self.columns[column],
-                                                          datum,
-                                                          linenum="Loop %s" %
-                                                          self.category)
+                    row[column] = tschem.convert_tag(self.category + "." +
+                                                     self.columns[column],
+                                                     datum,
+                                                     linenum="Loop %s" %
+                                                     self.category)
 
         self.data = processed_data
 
-    def addDataByColumn(self, column_id, value):
+    def add_data_by_column(self, column_id, value):
         """Add data to the loop one element at a time, based on column.
         Useful when adding data from SANS parsers."""
 
         # Make sure the category matches - if provided
         if "." in column_id:
-            supplied_category = _formatCategory(str(column_id))
+            supplied_category = _format_category(str(column_id))
             if supplied_category.lower() != self.category.lower():
                 raise ValueError("Category provided in your column '%s' does "
                                  "not match this loop's category '%s'." %
                                  (supplied_category, self.category))
 
-        column_id = _formatTag(column_id).lower()
+        column_id = _format_tag(column_id).lower()
         if column_id not in [x.lower() for x in self.columns]:
             raise ValueError("The column tag '%s' to which you are attempting "
                              "to add data does not yet exist. Create the "
@@ -2309,15 +2365,17 @@ class loop(object):
             raise ValueError("You cannot add data out of column order.")
         self.data[-1].append(value)
 
-    def clearData(self):
+    def clear_data(self):
         """Erases all data in this loop. Does not erase the data columns
         or loop category."""
+
         self.data = []
 
     def compare(self, other):
         """Returns the differences between two loops as a list. Order of
         loops being compared does not make a difference on the specific
         errors detected."""
+
         diffs = []
 
         # Check if this is literally the same object
@@ -2362,25 +2420,26 @@ class loop(object):
                         diffs.append("\t\tLoop data does not match for loop "
                                      "with category '%s'." % self.category)
 
-        except Exception as e:
-            diffs.append("\t\tAn exception occured while comparing: '%s'." % e)
+        except AttributeError as err:
+            diffs.append("\t\tAn exception occured while comparing: '%s'." %
+                         err)
 
         return diffs
 
-    def deleteDataByTagValue(self, tag, value, index_tag=None):
+    def delete_data_by_tag_value(self, tag, value, index_tag=None):
         """Deletes all rows which contain the provided value in the
         provided column. If index_tag is provided, that column is
         renumbered starting with 1. Returns the deleted rows."""
 
         # Make sure the category matches - if provided
         if "." in tag:
-            supplied_category = _formatCategory(str(tag))
+            supplied_category = _format_category(str(tag))
             if supplied_category.lower() != self.category.lower():
                 raise ValueError("Category provided in your column '%s' does "
                                  "not match this loop's category '%s'." %
                                  (supplied_category, self.category))
 
-        cleaned_tag = _formatTag(str(tag)).lower()
+        cleaned_tag = _format_tag(str(tag)).lower()
         columns_lower = [x.lower() for x in self.columns]
 
         try:
@@ -2401,23 +2460,25 @@ class loop(object):
 
         # Re-number if they so desire
         if index_tag is not None:
-            self.renumberRows(index_tag)
+            self.renumber_rows(index_tag)
 
         return deleted
 
-    def getColumns(self):
+    def get_columns(self):
         """ Return the columns for this entry with the category
         included. Throws ValueError if the category was never set."""
+
         if not self.category:
             raise ValueError("You never set the category of this loop.")
 
         return [self.category + "." + x for x in self.columns]
 
-    def getDataAsCSV(self, header=True, show_category=True):
+    def get_data_as_csv(self, header=True, show_category=True):
         """Return the data contained in the loops, properly CSVd, as a
         string. Set header to False to omit the header. Set
         show_category to false to omit the loop category from the
         headers."""
+
         csv_buffer = StringIO()
         cwriter = csv_writer(csv_buffer)
 
@@ -2439,11 +2500,11 @@ class loop(object):
         csv_buffer.seek(0)
         return csv_buffer.read().replace('\r\n', '\n')
 
-    def getDataByTag(self, tags=None):
+    def get_data_by_tag(self, tags=None):
         """ Identical to getTag but wraps the results in a list even if
         only fetching one tag. Primarily exists for legacy code."""
 
-        results = self.getTag(tags=tags)
+        results = self.get_tag(tags=tags)
 
         if isinstance(tags, list):
             if len(tags) == 1:
@@ -2453,7 +2514,7 @@ class loop(object):
 
         return results
 
-    def getJSON(self, serialize=True):
+    def get_json(self, serialize=True):
         """ Returns the loop in JSON format. If serialize is set to
         False a dictionary representation of the loop that is
         serializeable is returned."""
@@ -2465,11 +2526,11 @@ class loop(object):
         }
 
         if serialize:
-            return json.dumps(loop_dict, default=_jsonSerialize)
+            return json.dumps(loop_dict, default=_json_serialize)
         else:
             return loop_dict
 
-    def getTag(self, tags=None, whole_tag=False):
+    def get_tag(self, tags=None, whole_tag=False):
         """Provided a tag name (or a list of tag names), or ordinals
         corresponding to columns, return the selected tags by row as
         a list of lists."""
@@ -2489,11 +2550,11 @@ class loop(object):
         #  it during the process)
         for pos, item in enumerate([str(x) for x in lower_tags]):
             if ("." in item and
-                    _formatCategory(item).lower() != self.category.lower()):
+                    _format_category(item).lower() != self.category.lower()):
                 raise ValueError("Cannot fetch data with column '%s' because "
                                  "the category does not match the category of "
                                  "this loop '%s'." % (item, self.category))
-            lower_tags[pos] = _formatTag(item).lower()
+            lower_tags[pos] = _format_tag(item).lower()
 
         # Make a lower case copy of the columns
         columns_lower = [x.lower() for x in self.columns]
@@ -2510,7 +2571,7 @@ class loop(object):
             elif isinstance(query, int):
                 column_ids.append(query)
             else:
-                if allow_v2_entries:
+                if ALLOW_V2_ENTRIES:
                     return []
                 else:
                     raise ValueError("Could not locate the the column with name"
@@ -2531,11 +2592,12 @@ class loop(object):
                 return [[row[col_id] for col_id in column_ids] for
                         row in self.data]
 
-    def printTree(self):
+    def print_tree(self):
         """Prints a summary, tree style, of the loop."""
+
         print(repr(self))
 
-    def renumberRows(self, index_tag, start_value=1, maintain_ordering=False):
+    def renumber_rows(self, index_tag, start_value=1, maintain_ordering=False):
         """Renumber a given column incrementally. Set start_value to
         initial value if 1 is not acceptable. Set maintain_ordering to
         preserve sequence with offset.
@@ -2544,13 +2606,13 @@ class loop(object):
 
         # Make sure the category matches
         if "." in str(index_tag):
-            supplied_category = _formatCategory(str(index_tag))
+            supplied_category = _format_category(str(index_tag))
             if supplied_category.lower() != self.category.lower():
                 raise ValueError("Category provided in your tag '%s' does not "
                                  "match this loop's category '%s'." %
                                  (supplied_category, self.category))
 
-        cleaned_tag = _formatTag(str(index_tag))
+        cleaned_tag = _format_tag(str(index_tag))
         columns_lower = [x.lower() for x in self.columns]
 
         # The column to replace in is the column they specify
@@ -2579,31 +2641,32 @@ class loop(object):
             #  have to restore the original values
             data_copy = deepcopy(self.data)
 
-            for x in range(0, len(self.data)):
+            for pos in range(0, len(self.data)):
                 try:
-                    if x == 0:
+                    if pos == 0:
                         offset = start_value - int(self.data[0][renum_col])
-                    self.data[x][renum_col] = int(self.data[x][renum_col]) +\
-                                                  offset
+                    new_data = int(self.data[pos][renum_col]) + offset
+                    self.data[pos][renum_col] = new_data
                 except ValueError:
                     self.data = data_copy
                     raise ValueError("You can't renumber a row containing "
                                      "anything that can't be coerced into an "
                                      "integer using maintain_ordering. I.e. "
                                      "what am I suppose to renumber '%s' to?" %
-                                     self.data[x][renum_col])
+                                     self.data[pos][renum_col])
 
         # Simple renumbering algorithm if we don't need to maintain the ordering
         else:
-            for x in range(0, len(self.data)):
-                self.data[x][renum_col] = x + start_value
+            for pos in range(0, len(self.data)):
+                self.data[pos][renum_col] = pos + start_value
 
-    def setCategory(self, category):
+    def set_category(self, category):
         """ Set the category of the loop. Useful if you didn't know the
         category at loop creation time."""
-        self.category = _formatCategory(category)
 
-    def sortRows(self, tags, key=None):
+        self.category = _format_category(category)
+
+    def sort_rows(self, tags, key=None):
         """ Sort the data in the rows by their values for a given column
         or columns. Specify the columns using their names or ordinals.
         Accepts a list or an int/float. By default we will sort
@@ -2634,14 +2697,14 @@ class loop(object):
 
             # Make sure the category matches
             if "." in cur_tag:
-                supplied_category = _formatCategory(cur_tag)
+                supplied_category = _format_category(cur_tag)
                 if supplied_category.lower() != self.category.lower():
                     raise ValueError("Category provided in your tag '%s' does "
                                      "not match this loop's category '%s'." %
                                      (supplied_category, self.category))
 
             # Get a lower case version of the tag
-            cleaned_tag = _formatTag(cur_tag)
+            cleaned_tag = _format_tag(cur_tag)
 
             # The column to replace in is the column they specify
             try:
@@ -2685,7 +2748,7 @@ class loop(object):
         list indicates no errors found."""
 
         # Get the default schema if we are not passed a schema
-        my_schema = _getSchema(validation_schema)
+        my_schema = _get_schema(validation_schema)
 
         errors = []
 
@@ -2698,17 +2761,17 @@ class loop(object):
                               (self.category, rownum))
             for pos, datum in enumerate(row):
                 lineno = str(rownum) + " column " + str(pos) + " of loop"
-                errors.extend(my_schema.valType(self.category + "." +
-                                                self.columns[pos], datum,
-                                                category=category,
-                                                linenum=lineno))
+                errors.extend(my_schema.val_type(self.category + "." +
+                                                 self.columns[pos], datum,
+                                                 category=category,
+                                                 linenum=lineno))
 
         return errors
 
-# Allow using diff or validate if ran directly
-if __name__ == '__main__':
+def called_directly():
+    """ Figure out what to do if we were called on the command line
+    rather than imported as a module."""
 
-    import optparse
     # Specify some basic information about our command
     optparser = optparse.OptionParser(usage="usage: %prog",
                                       version="1.0",
@@ -2726,18 +2789,31 @@ if __name__ == '__main__':
     # Options, parse 'em
     (options, cmd_input) = optparser.parse_args()
 
+    if len(cmd_input) > 0:
+        print("No arguments are allowed. Please see the options using --help.")
+        sys.exit(0)
+
     if options.validate is None and options.diff is None:
         print("Running unit tests...")
-        from unit_tests import bmrb_test
+        try:
+            #pylint: disable=relative-import,wrong-import-order
+            from unit_tests import bmrb_test
+        except ImportError:
+            print("No testing module available with this installation.")
+            sys.exit(0)
         bmrb_test.start_tests()
     elif options.validate is not None and options.diff is not None:
         print("You cannot validate and diff at the same time.")
         sys.exit(1)
     elif options.validate is not None:
-        validate(entry.fromFile(options.validate))
+        validate(Entry.from_file(options.validate))
     elif options.diff is not None:
-        diff(entry.fromFile(options.diff[0]), entry.fromFile(options.diff[1]))
+        diff(Entry.from_file(options.diff[0]), Entry.from_file(options.diff[1]))
     sys.exit(0)
+
+# Allow using diff or validate if ran directly
+if __name__ == '__main__':
+    called_directly()
 else:
     #############################################
     #          Module initializations           #
@@ -2747,4 +2823,4 @@ else:
     decimal.getcontext().capitals = 0
 
     # This loads the comments
-    _loadComments()
+    _load_comments()
