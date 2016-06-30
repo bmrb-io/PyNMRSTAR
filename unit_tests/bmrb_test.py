@@ -393,7 +393,7 @@ class TestPyNMRSTAR(unittest.TestCase):
         if not os.path.exists("/bmrb/linux/bin/stardiff"):
             return
 
-        start, end = 15000, 15010
+        start, end = 15000, 15500
         sys.stdout.write("\nEntry tests: %5s/%5s" % (start, end))
         for x in range(start, end):
 
