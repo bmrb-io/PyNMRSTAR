@@ -778,19 +778,13 @@ class _fastParser(object):
 class schema(object):
     """A BMRB schema. Used to validate STAR files."""
 
-    headers = []
-
-    schema_order = []
-    schema = {}
-    types = {}
-    schema_file = None
-
     def __init__(self, schema_file=None):
         """Initialize a BMRB schema. With no arguments the most
         up-to-date schema will be fetched from the BMRB FTP site.
         Otherwise pass a URL or a file to load a schema from using the
         schema_file optional argument."""
 
+        self.schema_order = []
         self.headers = []
         self.schema = {}
         self.types = {}
@@ -2605,7 +2599,7 @@ class loop(object):
                 self.data[x][renum_col] = x + start_value
 
     def setCategory(self, category):
-        """ Set the category of the loop. Usefull if you didn't know the
+        """ Set the category of the loop. Useful if you didn't know the
         category at loop creation time."""
         self.category = _formatCategory(category)
 
