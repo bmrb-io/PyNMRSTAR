@@ -2047,7 +2047,6 @@ class Saveframe(object):
 
         mod_key = lambda x:_tag_key(self.tag_prefix + "." + x[0])
         self.tags.sort(key=mod_key)
-        return
 
     def tag_iterator(self):
         """Returns an iterator for saveframe tags."""
