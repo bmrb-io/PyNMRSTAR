@@ -377,8 +377,10 @@ def _tag_key(x, schema=None):
     try:
         return _get_schema(schema).schema_order.index(x)
     except ValueError:
-        raise ValueError("Cannot sort because the following tag is not in the "
-                         "schema: %s" % x)
+        # Generate an arbitrary sort order for tags that aren't in the
+        #  schema but make sure that they always come after tags in the
+        #   schema
+        return len(_get_schema(schema).schema_order) + hash(x)
 
 #############################################
 #                Classes                    #
@@ -1377,19 +1379,22 @@ class Entry(object):
 
             try:
                 return (ordering.index(x.tag_prefix), x.get_tag("ID"))
-            except KeyError:
-                raise ValueError("Cannot finish normalizing entry. There was a "
-                                 "saveframe without a category assigned: %s" %
-                                 x.name)
+            except ValueError:
+                # Generate an arbitrary sort order for saveframes that aren't
+                #  in the schema but make sure that they always come after
+                #   saveframes in the schema
+                return (len(ordering) + hash(x), x.get_tag("ID"))
 
         def loop_key(x):
             """ Helper function to sort the loops."""
 
             try:
                 return ordering.index(x.category)
-            except AttributeError:
-                raise ValueError("Cannot finish normalizing entry. There was a "
-                                 "loop without a category assigned.")
+            except ValueError:
+                # Generate an arbitrary sort order for loops that aren't in the
+                #  schema but make sure that they always come after loops in the
+                #   schema
+                return len(ordering) + hash(x)
 
         # Go through all the saveframes
         for each_frame in self:
