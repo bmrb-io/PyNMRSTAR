@@ -101,7 +101,7 @@ class TestPyNMRSTAR(unittest.TestCase):
 
     def test_Schema(self):
         default = bmrb.Schema()
-        loaded = bmrb.Schema(bmrb.SCHEMA_URL)
+        loaded = bmrb.Schema(bmrb._SCHEMA_URL)
 
         self.assertEqual(default.schema, loaded.schema)
         self.assertEqual(default.types, loaded.types)
@@ -276,7 +276,7 @@ class TestPyNMRSTAR(unittest.TestCase):
         # Test sort
         self.assertEqual(frame.tags, [[u'Sf_category', u'entry_information'], [u'Sf_framecode', u'entry_information'], [u'ID', u'15000'], [u'Title', u'Solution structure of chicken villin headpiece subdomain containing a fluorinated side chain in the core\n'], [u'Type', u'macromolecule'], [u'Version_type', u'original'], [u'Submission_date', u'2006-09-07'], [u'Accession_date', u'2006-09-07'], [u'Last_release_date', u'.'], [u'Original_release_date', u'.'], [u'Origination', u'author'], [u'NMR_STAR_version', u'3.1.1.61'], [u'Original_NMR_STAR_version', u'.'], [u'Experimental_method', u'NMR'], [u'Experimental_method_subtype', u'solution'], [u'BMRB_internal_directory_name', u'.'], [u'example1', 5], [u'example2', u'.']])
 
-        self.assertRaises(ValueError, frame.sort_tags)
+        frame.sort_tags
         del frame['example2'], frame['example1']
         frame.tags.append(frame.tags.pop(0))
         frame.sort_tags()

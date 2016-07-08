@@ -121,10 +121,11 @@ CONVERT_DATATYPES = False
 STR_CONVERSION_DICT = {None:"."}
 
 # Used internally
-STANDARD_SCHEMA = None
-COMMENT_DICTIONARY = {}
-API_URL = "http://webapi.bmrb.wisc.edu/current"
-SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
+_STANDARD_SCHEMA = None
+_COMMENT_DICTIONARY = {}
+_API_URL = "http://webapi.bmrb.wisc.edu/current"
+_SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
+_WHITESPACE = " \t\n\v"
 
 #############################################
 #             Module methods                #
@@ -162,10 +163,10 @@ def diff(entry1, entry2):
     for difference in diffs:
         print(difference)
 
-def validate(entry_to_validate, validation_schema=None):
+def validate(entry_to_validate, schema=None):
     """Prints a validation report of an entry."""
 
-    validation = entry_to_validate.validate(validation_schema)
+    validation = entry_to_validate.validate(schema)
     if len(validation) == 0:
         print("No problems found during validation.")
     for err in validation:
@@ -221,7 +222,7 @@ def clean_value(value):
         for pos, char in enumerate(value):
             next_char = value[pos+1:pos+2]
 
-            if next_char != "" and next_char in " \t\n\v":
+            if next_char != "" and next_char in _WHITESPACE:
                 if char == "'":
                     can_wrap_single = False
                 if char == '"':
@@ -295,20 +296,20 @@ def _get_schema(passed_schema=None):
     it checks if the default schema has been initialized. If not
     initialzed, it initializes it. Then it returns the default schema."""
 
-    global STANDARD_SCHEMA
+    global _STANDARD_SCHEMA
     if passed_schema is None:
-        passed_schema = STANDARD_SCHEMA
+        passed_schema = _STANDARD_SCHEMA
     if passed_schema is None:
         # If we fail to get the schema don't do anything
         try:
-            STANDARD_SCHEMA = Schema()
+            _STANDARD_SCHEMA = Schema()
         except HTTPError:
             try:
-                STANDARD_SCHEMA = Schema(schema_file="reference_files/schema")
+                _STANDARD_SCHEMA = Schema(schema_file="reference_files/schema")
             except:
                 raise ValueError("Could not load a BMRB schema from the "
                                  "internet or from the local repository.")
-        passed_schema = STANDARD_SCHEMA
+        passed_schema = _STANDARD_SCHEMA
 
     return passed_schema
 
@@ -369,7 +370,17 @@ def _load_comments(file_to_load=None):
     for pos, val in enumerate(categories):
         comment = comments[pos]
         if comment != ".":
-            COMMENT_DICTIONARY[val] = comments[pos].rstrip() + "\n\n"
+            _COMMENT_DICTIONARY[val] = comments[pos].rstrip() + "\n\n"
+
+def _tag_key(x, schema=None):
+    """ Helper function to figure out how to sort the tags."""
+    try:
+        return _get_schema(schema).schema_order.index(x)
+    except ValueError:
+        # Generate an arbitrary sort order for tags that aren't in the
+        #  schema but make sure that they always come after tags in the
+        #   schema
+        return len(_get_schema(schema).schema_order) + hash(x)
 
 #############################################
 #                Classes                    #
@@ -428,9 +439,8 @@ class _Parser(object):
         provided string. If no whitespace it returns the length of the
         string."""
 
-        whitespace = " \t\n\v"
         for pos, char in enumerate(data):
-            if char in whitespace:
+            if char in _WHITESPACE:
                 return pos
         return len(data)
 
@@ -545,8 +555,9 @@ class _Parser(object):
                                         raise ValueError("Loop with no data.",
                                                          self.get_line_number())
                                     else:
-                                        curloop.add_data(curdata,
-                                                         rearrange=True)
+                                        if len(curdata) > 0:
+                                            curloop.add_data(curdata,
+                                                             rearrange=True)
                                         curloop = None
                                         curdata = []
 
@@ -659,7 +670,7 @@ class _Parser(object):
                 raw_tmp = self.full_data[self.index:newline_index]
             except ValueError:
                 # End of file
-                self.token = self.full_data[self.index:].lstrip(" \t\n\v")
+                self.token = self.full_data[self.index:].lstrip(_WHITESPACE)
                 if self.token == "":
                     self.token = None
                 self.index = len(self.full_data)
@@ -667,7 +678,7 @@ class _Parser(object):
 
             newline_index = self.full_data.index("\n", self.index+1)
             raw_tmp = self.full_data[self.index:newline_index+1]
-            tmp = raw_tmp.lstrip(" \t\n\v")
+            tmp = raw_tmp.lstrip(_WHITESPACE)
 
         # If it is a multiline comment, recalculate our viewing window
         if tmp[0:2] == ";\n":
@@ -802,9 +813,10 @@ class Schema(object):
         self.headers = []
         self.schema = {}
         self.types = {}
+        self.category_order = []
 
         if schema_file is None:
-            schema_file = SCHEMA_URL
+            schema_file = _SCHEMA_URL
         self.schema_file = schema_file
 
         schem_stream = _interpret_file(schema_file)
@@ -834,6 +846,11 @@ class Schema(object):
                                                 line[1], line[8])
                 self.types[line[8][:line[8].index(".")]] = (line[1], line[42])
                 self.schema_order.append(line[8])
+
+                # Store just the categories as well
+                formatted = _format_category(line[8])
+                if formatted not in self.category_order:
+                    self.category_order.append(formatted)
             else:
                 if VERBOSE:
                     print("Detected invalid tag in schema: %s" % line)
@@ -1105,7 +1122,7 @@ class Entry(object):
 
         # Try to load the entry using JSON
         try:
-            entry_url = API_URL + "/rest/entry/%s/"
+            entry_url = _API_URL + "/rest/entry/%s/"
             entry_url = entry_url % entry_num
 
             # Convert bytes to string if python3
@@ -1349,6 +1366,51 @@ class Entry(object):
 
         return results
 
+    def normalize(self, schema=None):
+        """ Sorts saveframes, loops, and tags according to the schema
+        provided (or BMRB default if none provided) and according
+        to the assigned ID."""
+
+        # The saveframe/loop order
+        ordering = _get_schema(schema).category_order
+        # Use these to sort saveframes and loops
+        def sf_key(x):
+            """ Helper function to sort the saveframes."""
+
+            try:
+                return (ordering.index(x.tag_prefix), x.get_tag("ID"))
+            except ValueError:
+                # Generate an arbitrary sort order for saveframes that aren't
+                #  in the schema but make sure that they always come after
+                #   saveframes in the schema
+                return (len(ordering) + hash(x), x.get_tag("ID"))
+
+        def loop_key(x):
+            """ Helper function to sort the loops."""
+
+            try:
+                return ordering.index(x.category)
+            except ValueError:
+                # Generate an arbitrary sort order for loops that aren't in the
+                #  schema but make sure that they always come after loops in the
+                #   schema
+                return len(ordering) + hash(x)
+
+        # Go through all the saveframes
+        for each_frame in self:
+            each_frame.sort_tags()
+            # Iterate through the loops
+            for each_loop in each_frame:
+                each_loop.sort_tags()
+
+                # See if we can sort the rows (in addition to columns)
+                try:
+                    each_loop.sort_rows("Ordinal")
+                except ValueError:
+                    pass
+            each_frame.loops.sort(key=loop_key)
+        self.frame_list.sort(key=sf_key)
+
     def nef_string(self):
         """ Returns a string representation of the entry in NEF. """
 
@@ -1366,6 +1428,49 @@ class Entry(object):
         DONT_SHOW_COMMENTS = tmp_dont_show_comments
         return result
 
+    def rename_saveframe(self, original_name, new_name):
+        """ Renames a saveframe and updates all pointers to that
+        saveframe in the entry with the new name."""
+
+        # Strip off the starting $ in the names
+        if original_name.startswith("$"):
+            original_name = original_name[1:]
+        if new_name.startswith("$"):
+            new_name = new_name[1:]
+
+        # This can raise a ValueError, but no point catching it
+        #  since it really is a ValueError if they provide a name
+        #   of a saveframe that doesn't exist in the entry.
+        change_frame = self.get_saveframe_by_name(original_name)
+
+        # Make sure the new saveframe name is valid
+        for char in new_name:
+            if char in _WHITESPACE:
+                raise ValueError("You cannot have whitespace characters in a "
+                                 "saveframe name. Illegal character: '%s'" %
+                                 char)
+
+        # Update the saveframe
+        change_frame['Sf_category'] = new_name
+        change_frame.name = new_name
+
+        # What the new references should look like
+        old_reference = "$" + original_name
+        new_reference = "$" + new_name
+
+        # Go through all the saveframes
+        for each_frame in self:
+            # Iterate through the tags
+            for each_tag in each_frame.tags:
+                if each_tag[1] == old_reference:
+                    each_tag[1] = new_reference
+            # Iterate through the loops
+            for each_loop in each_frame:
+                for each_row in each_loop:
+                    for pos, val in enumerate(each_row):
+                        if val == old_reference:
+                            each_row[pos] = new_reference
+
     def print_tree(self):
         """Prints a summary, tree style, of the frames and loops in
         the entry."""
@@ -1376,7 +1481,7 @@ class Entry(object):
             for pos2, one_loop in enumerate(frame):
                 print("\t\t[%d] %s" % (pos2, repr(one_loop)))
 
-    def validate(self, validation_schema=None):
+    def validate(self, schema=None):
         """Validate an entry against a STAR schema. You can pass your
         own custom schema if desired, otherwise the schema will be
         fetched from the BMRB servers. Returns a list of errors found.
@@ -1386,7 +1491,7 @@ class Entry(object):
 
         # Ask the saveframes to check themselves for errors
         for frame in self:
-            errors.extend(frame.validate(validation_schema=validation_schema))
+            errors.extend(frame.validate(schema=schema))
 
         # Check for saveframes with same name
         saveframe_names = sorted(x.name for x in self)
@@ -1630,8 +1735,8 @@ class Saveframe(object):
                 except IndexError:
                     our_category = None
 
-            if our_category in COMMENT_DICTIONARY:
-                ret_string = COMMENT_DICTIONARY[our_category]
+            if our_category in _COMMENT_DICTIONARY:
+                ret_string = _COMMENT_DICTIONARY[our_category]
 
         # Print the saveframe
         ret_string += "save_%s\n" % self.name
@@ -1948,28 +2053,14 @@ class Saveframe(object):
 
         self.tag_prefix = _format_category(tag_prefix)
 
-    def sort_tags(self, validation_schema=None):
+    def sort_tags(self, schema=None):
         """ Sort the tags so they are in the same order as a BMRB
         schema. Will automatically use the standard schema if none
         is provided."""
 
-        new_tag_list = []
-        lower_tag_prefix = self.tag_prefix.lower()
-
-        for check in _get_schema(validation_schema).schema_order:
-            # Only proceed if it has the same category as us
-            if _format_category(check).lower() == lower_tag_prefix:
-                tag_name = _format_tag(check)
-                # If we currently have the tag, add it to the new tag list
-                existing = self.get_tag(tag_name, whole_tag=True)
-                if existing != []:
-                    new_tag_list.extend(existing)
-
-        if len(self.tags) != len(new_tag_list):
-            raise ValueError("Refusing to sort. There are tags in the "
-                             "saveframe that do not exist in the schema.")
-
-        self.tags = new_tag_list
+        mod_key = lambda x: _tag_key(self.tag_prefix + "." + x[0],
+                                     schema=schema)
+        self.tags.sort(key=mod_key)
 
     def tag_iterator(self):
         """Returns an iterator for saveframe tags."""
@@ -1983,14 +2074,14 @@ class Saveframe(object):
         for pos, each_loop in enumerate(self):
             print("\t[%d] %s" % (pos, repr(each_loop)))
 
-    def validate(self, validation_schema=None):
+    def validate(self, schema=None):
         """Validate a saveframe against a STAR schema. You can pass your
         own custom schema if desired, otherwise the schema will be
         fetched from the BMRB servers. Returns a list of errors found.
         0-length list indicates no errors found."""
 
         # Get the default schema if we are not passed a schema
-        my_schema = _get_schema(validation_schema)
+        my_schema = _get_schema(schema)
 
         errors = []
 
@@ -2012,7 +2103,7 @@ class Saveframe(object):
         for each_loop in self.loops:
             errors.extend(
                 each_loop.validate(
-                    validation_schema=validation_schema, category=my_category))
+                    schema=schema, category=my_category))
 
         return errors
 
@@ -2666,6 +2757,23 @@ class Loop(object):
 
         self.category = _format_category(category)
 
+    def sort_tags(self, schema=None):
+        """ Rearranges the columns and data in the loop to match the order
+        from the schema. Uses the BMRB schema unless one is provided."""
+
+        current_order = self.get_columns()
+
+        # Sort the tags
+        loc_key = lambda x: _tag_key(x, schema=schema)
+        sorted_order = sorted(current_order, key=loc_key)
+
+        # Don't touch the data if the tags are already in order
+        if sorted_order == current_order:
+            return
+        else:
+            self.data = self.get_tag(sorted_order)
+            self.columns = [_format_tag(x) for x in sorted_order]
+
     def sort_rows(self, tags, key=None):
         """ Sort the data in the rows by their values for a given column
         or columns. Specify the columns using their names or ordinals.
@@ -2741,14 +2849,14 @@ class Loop(object):
                     tmp_data = sorted(self.data, key=key)
             self.data = tmp_data
 
-    def validate(self, validation_schema=None, category=None):
+    def validate(self, schema=None, category=None):
         """Validate a loop against a STAR schema. You can pass your own
         custom schema if desired, otherwise the schema will be fetched
         from the BMRB servers. Returns a list of errors found. 0-length
         list indicates no errors found."""
 
         # Get the default schema if we are not passed a schema
-        my_schema = _get_schema(validation_schema)
+        my_schema = _get_schema(schema)
 
         errors = []
 
