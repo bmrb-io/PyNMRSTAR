@@ -1372,6 +1372,49 @@ class Entry(object):
         DONT_SHOW_COMMENTS = tmp_dont_show_comments
         return result
 
+    def rename_saveframe(self, original_name, new_name):
+        """ Renames a saveframe and updates all pointers to that
+        saveframe in the entry with the new name."""
+
+        # Strip off the starting $ in the names
+        if original_name.startswith("$"):
+            original_name = original_name[1:]
+        if new_name.startswith("$"):
+            new_name = new_name[1:]
+
+        # This can raise a ValueError, but no point catching it
+        #  since it really is a ValueError if they provide a name
+        #   of a saveframe that doesn't exist in the entry.
+        change_frame = self.get_saveframe_by_name(original_name)
+
+        # Make sure the new saveframe name is valid
+        for char in new_name:
+            if char in _WHITESPACE:
+                raise ValueError("You cannot have whitespace characters in a "
+                                 "saveframe name. Illegal character: '%s'" %
+                                 char)
+
+        # Update the saveframe
+        change_frame['Sf_category'] = new_name
+        change_frame.name = new_name
+
+        # What the new references should look like
+        old_reference = "$" + original_name
+        new_reference = "$" + new_name
+
+        # Go through all the saveframes
+        for each_frame in self:
+            # Iterate through the tags
+            for each_tag in each_frame.tags:
+                if each_tag[1] == old_reference:
+                    each_tag[1] = new_reference
+            # Iterate through the loops
+            for each_loop in each_frame:
+                for each_row in each_loop:
+                    for pos, val in enumerate(each_row):
+                        if val == old_reference:
+                            each_row[pos] = new_reference
+
     def print_tree(self):
         """Prints a summary, tree style, of the frames and loops in
         the entry."""
