@@ -121,10 +121,11 @@ CONVERT_DATATYPES = False
 STR_CONVERSION_DICT = {None:"."}
 
 # Used internally
-STANDARD_SCHEMA = None
-COMMENT_DICTIONARY = {}
-API_URL = "http://webapi.bmrb.wisc.edu/current"
-SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
+_STANDARD_SCHEMA = None
+_COMMENT_DICTIONARY = {}
+_API_URL = "http://webapi.bmrb.wisc.edu/current"
+_SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
+_WHITESPACE = " \t\n\v"
 
 #############################################
 #             Module methods                #
@@ -221,7 +222,7 @@ def clean_value(value):
         for pos, char in enumerate(value):
             next_char = value[pos+1:pos+2]
 
-            if next_char != "" and next_char in " \t\n\v":
+            if next_char != "" and next_char in _WHITESPACE:
                 if char == "'":
                     can_wrap_single = False
                 if char == '"':
@@ -295,20 +296,20 @@ def _get_schema(passed_schema=None):
     it checks if the default schema has been initialized. If not
     initialzed, it initializes it. Then it returns the default schema."""
 
-    global STANDARD_SCHEMA
+    global _STANDARD_SCHEMA
     if passed_schema is None:
-        passed_schema = STANDARD_SCHEMA
+        passed_schema = _STANDARD_SCHEMA
     if passed_schema is None:
         # If we fail to get the schema don't do anything
         try:
-            STANDARD_SCHEMA = Schema()
+            _STANDARD_SCHEMA = Schema()
         except HTTPError:
             try:
-                STANDARD_SCHEMA = Schema(schema_file="reference_files/schema")
+                _STANDARD_SCHEMA = Schema(schema_file="reference_files/schema")
             except:
                 raise ValueError("Could not load a BMRB schema from the "
                                  "internet or from the local repository.")
-        passed_schema = STANDARD_SCHEMA
+        passed_schema = _STANDARD_SCHEMA
 
     return passed_schema
 
@@ -369,7 +370,7 @@ def _load_comments(file_to_load=None):
     for pos, val in enumerate(categories):
         comment = comments[pos]
         if comment != ".":
-            COMMENT_DICTIONARY[val] = comments[pos].rstrip() + "\n\n"
+            _COMMENT_DICTIONARY[val] = comments[pos].rstrip() + "\n\n"
 
 #############################################
 #                Classes                    #
@@ -428,9 +429,8 @@ class _Parser(object):
         provided string. If no whitespace it returns the length of the
         string."""
 
-        whitespace = " \t\n\v"
         for pos, char in enumerate(data):
-            if char in whitespace:
+            if char in _WHITESPACE:
                 return pos
         return len(data)
 
@@ -659,7 +659,7 @@ class _Parser(object):
                 raw_tmp = self.full_data[self.index:newline_index]
             except ValueError:
                 # End of file
-                self.token = self.full_data[self.index:].lstrip(" \t\n\v")
+                self.token = self.full_data[self.index:].lstrip(_WHITESPACE)
                 if self.token == "":
                     self.token = None
                 self.index = len(self.full_data)
@@ -667,7 +667,7 @@ class _Parser(object):
 
             newline_index = self.full_data.index("\n", self.index+1)
             raw_tmp = self.full_data[self.index:newline_index+1]
-            tmp = raw_tmp.lstrip(" \t\n\v")
+            tmp = raw_tmp.lstrip(_WHITESPACE)
 
         # If it is a multiline comment, recalculate our viewing window
         if tmp[0:2] == ";\n":
@@ -802,9 +802,10 @@ class Schema(object):
         self.headers = []
         self.schema = {}
         self.types = {}
+        self.category_order = []
 
         if schema_file is None:
-            schema_file = SCHEMA_URL
+            schema_file = _SCHEMA_URL
         self.schema_file = schema_file
 
         schem_stream = _interpret_file(schema_file)
@@ -834,6 +835,11 @@ class Schema(object):
                                                 line[1], line[8])
                 self.types[line[8][:line[8].index(".")]] = (line[1], line[42])
                 self.schema_order.append(line[8])
+
+                # Store just the categories as well
+                formatted = _format_category(line[8])
+                if formatted not in self.category_order:
+                    self.category_order.append(formatted)
             else:
                 if VERBOSE:
                     print("Detected invalid tag in schema: %s" % line)
@@ -1105,7 +1111,7 @@ class Entry(object):
 
         # Try to load the entry using JSON
         try:
-            entry_url = API_URL + "/rest/entry/%s/"
+            entry_url = _API_URL + "/rest/entry/%s/"
             entry_url = entry_url % entry_num
 
             # Convert bytes to string if python3
@@ -1630,8 +1636,8 @@ class Saveframe(object):
                 except IndexError:
                     our_category = None
 
-            if our_category in COMMENT_DICTIONARY:
-                ret_string = COMMENT_DICTIONARY[our_category]
+            if our_category in _COMMENT_DICTIONARY:
+                ret_string = _COMMENT_DICTIONARY[our_category]
 
         # Print the saveframe
         ret_string += "save_%s\n" % self.name
