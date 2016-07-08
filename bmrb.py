@@ -1355,6 +1355,41 @@ class Entry(object):
 
         return results
 
+    def normalize(self):
+        """ Sorts saveframes, loops, and tags according to the schema
+        and according to the assigned ID. """
+
+        # The saveframe/loop order
+        ordering = _get_schema().category_order
+        # Use these to sort saveframes and loops
+        def sf_key(x):
+            """ Helper function to sort the saveframes."""
+
+            try:
+                return (ordering.index(x.tag_prefix), x.get_tag("ID"))
+            except KeyError:
+                raise ValueError("Cannot finish normalizing entry. There was a "
+                                 "saveframe without a category assigned: %s" %
+                                 x.name)
+
+        def loop_key(x):
+            """ Helper function to sort the loops."""
+
+            try:
+                return ordering.index(x.category)
+            except AttributeError:
+                raise ValueError("Cannot finish normalizing entry. There was a "
+                                 "loop without a category assigned.")
+
+        # Go through all the saveframes
+        for each_frame in self:
+            each_frame.sort_tags()
+            # Iterate through the loops
+            for each_loop in each_frame:
+                each_loop.sort_tags()
+            each_frame.loops.sort(key=loop_key)
+        self.frame_list.sort(key=sf_key)
+
     def nef_string(self):
         """ Returns a string representation of the entry in NEF. """
 
