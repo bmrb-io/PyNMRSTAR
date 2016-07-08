@@ -1100,7 +1100,7 @@ class Entry(object):
                 else:
                     raise KeyError("Saveframe with name '%s' does not exist "
                                    "and therefore cannot be written to. Use "
-                                   "the addSaveframe method to add new "
+                                   "the add_saveframe method to add new "
                                    "saveframes." % key)
         else:
             raise ValueError("You can only assign an entry to a saveframe"
@@ -1699,7 +1699,7 @@ class Saveframe(object):
                 else:
                     raise KeyError("Loop with category '%s' does not exist and"
                                    " therefore cannot be written to. Use "
-                                   "addLoop instead." % key)
+                                   "add_loop instead." % key)
         else:
             # If the tag already exists, set its value
             self.add_tag(key, item, update=True)
@@ -2247,7 +2247,7 @@ class Loop(object):
             raise ValueError("The category was never set for this loop. Either "
                              "add a column with the category intact, specify it"
                              " when generating the loop, or set it using "
-                             "setCategory.")
+                             "set_category.")
 
         # Print the categories
         if self.category is None:
@@ -2592,7 +2592,7 @@ class Loop(object):
         return csv_buffer.read().replace('\r\n', '\n')
 
     def get_data_by_tag(self, tags=None):
-        """ Identical to getTag but wraps the results in a list even if
+        """ Identical to get_tag but wraps the results in a list even if
         only fetching one tag. Primarily exists for legacy code."""
 
         results = self.get_tag(tags=tags)
