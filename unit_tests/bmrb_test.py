@@ -101,7 +101,7 @@ class TestPyNMRSTAR(unittest.TestCase):
 
     def test_Schema(self):
         default = bmrb.Schema()
-        loaded = bmrb.Schema(bmrb.SCHEMA_URL)
+        loaded = bmrb.Schema(bmrb._SCHEMA_URL)
 
         self.assertEqual(default.schema, loaded.schema)
         self.assertEqual(default.types, loaded.types)

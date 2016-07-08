@@ -163,10 +163,10 @@ def diff(entry1, entry2):
     for difference in diffs:
         print(difference)
 
-def validate(entry_to_validate, validation_schema=None):
+def validate(entry_to_validate, schema=None):
     """Prints a validation report of an entry."""
 
-    validation = entry_to_validate.validate(validation_schema)
+    validation = entry_to_validate.validate(schema)
     if len(validation) == 0:
         print("No problems found during validation.")
     for err in validation:
@@ -372,13 +372,13 @@ def _load_comments(file_to_load=None):
         if comment != ".":
             _COMMENT_DICTIONARY[val] = comments[pos].rstrip() + "\n\n"
 
-def _tag_key(x):
+def _tag_key(x, schema=None):
     """ Helper function to figure out how to sort the tags."""
     try:
-        return _get_schema().schema_order.index(x)
+        return _get_schema(schema).schema_order.index(x)
     except ValueError:
         raise ValueError("Cannot sort because the following tag is not in the "
-                         "schema: %s" % x )
+                         "schema: %s" % x)
 
 #############################################
 #                Classes                    #
@@ -1364,12 +1364,13 @@ class Entry(object):
 
         return results
 
-    def normalize(self):
+    def normalize(self, schema=None):
         """ Sorts saveframes, loops, and tags according to the schema
-        and according to the assigned ID. """
+        provided (or BMRB default if none provided) and according
+        to the assigned ID."""
 
         # The saveframe/loop order
-        ordering = _get_schema().category_order
+        ordering = _get_schema(schema).category_order
         # Use these to sort saveframes and loops
         def sf_key(x):
             """ Helper function to sort the saveframes."""
@@ -1475,7 +1476,7 @@ class Entry(object):
             for pos2, one_loop in enumerate(frame):
                 print("\t\t[%d] %s" % (pos2, repr(one_loop)))
 
-    def validate(self, validation_schema=None):
+    def validate(self, schema=None):
         """Validate an entry against a STAR schema. You can pass your
         own custom schema if desired, otherwise the schema will be
         fetched from the BMRB servers. Returns a list of errors found.
@@ -1485,7 +1486,7 @@ class Entry(object):
 
         # Ask the saveframes to check themselves for errors
         for frame in self:
-            errors.extend(frame.validate(validation_schema=validation_schema))
+            errors.extend(frame.validate(schema=schema))
 
         # Check for saveframes with same name
         saveframe_names = sorted(x.name for x in self)
@@ -2047,12 +2048,13 @@ class Saveframe(object):
 
         self.tag_prefix = _format_category(tag_prefix)
 
-    def sort_tags(self, validation_schema=None):
+    def sort_tags(self, schema=None):
         """ Sort the tags so they are in the same order as a BMRB
         schema. Will automatically use the standard schema if none
         is provided."""
 
-        mod_key = lambda x:_tag_key(self.tag_prefix + "." + x[0])
+        mod_key = lambda x: _tag_key(self.tag_prefix + "." + x[0],
+                                     schema=schema)
         self.tags.sort(key=mod_key)
 
     def tag_iterator(self):
@@ -2067,14 +2069,14 @@ class Saveframe(object):
         for pos, each_loop in enumerate(self):
             print("\t[%d] %s" % (pos, repr(each_loop)))
 
-    def validate(self, validation_schema=None):
+    def validate(self, schema=None):
         """Validate a saveframe against a STAR schema. You can pass your
         own custom schema if desired, otherwise the schema will be
         fetched from the BMRB servers. Returns a list of errors found.
         0-length list indicates no errors found."""
 
         # Get the default schema if we are not passed a schema
-        my_schema = _get_schema(validation_schema)
+        my_schema = _get_schema(schema)
 
         errors = []
 
@@ -2096,7 +2098,7 @@ class Saveframe(object):
         for each_loop in self.loops:
             errors.extend(
                 each_loop.validate(
-                    validation_schema=validation_schema, category=my_category))
+                    schema=schema, category=my_category))
 
         return errors
 
@@ -2750,14 +2752,15 @@ class Loop(object):
 
         self.category = _format_category(category)
 
-    def sort_tags(self):
+    def sort_tags(self, schema=None):
         """ Rearranges the columns and data in the loop to match the order
-        from the BMRB schema."""
+        from the schema. Uses the BMRB schema unless one is provided."""
 
         current_order = self.get_columns()
 
         # Sort the tags
-        sorted_order = sorted(current_order, key=_tag_key)
+        loc_key = lambda x: _tag_key(x, schema=schema)
+        sorted_order = sorted(current_order, key=loc_key)
 
         # Don't touch the data if the tags are already in order
         if sorted_order == current_order:
@@ -2841,14 +2844,14 @@ class Loop(object):
                     tmp_data = sorted(self.data, key=key)
             self.data = tmp_data
 
-    def validate(self, validation_schema=None, category=None):
+    def validate(self, schema=None, category=None):
         """Validate a loop against a STAR schema. You can pass your own
         custom schema if desired, otherwise the schema will be fetched
         from the BMRB servers. Returns a list of errors found. 0-length
         list indicates no errors found."""
 
         # Get the default schema if we are not passed a schema
-        my_schema = _get_schema(validation_schema)
+        my_schema = _get_schema(schema)
 
         errors = []
 
