@@ -553,8 +553,9 @@ class _Parser(object):
                                         raise ValueError("Loop with no data.",
                                                          self.get_line_number())
                                     else:
-                                        curloop.add_data(curdata,
-                                                         rearrange=True)
+                                        if len(curdata) > 0:
+                                            curloop.add_data(curdata,
+                                                             rearrange=True)
                                         curloop = None
                                         curdata = []
 
@@ -1395,6 +1396,12 @@ class Entry(object):
             # Iterate through the loops
             for each_loop in each_frame:
                 each_loop.sort_tags()
+
+                # See if we can sort the rows (in addition to columns)
+                try:
+                    each_loop.sort_rows("Ordinal")
+                except ValueError:
+                    pass
             each_frame.loops.sort(key=loop_key)
         self.frame_list.sort(key=sf_key)
 
