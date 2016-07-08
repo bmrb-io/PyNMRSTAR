@@ -372,6 +372,14 @@ def _load_comments(file_to_load=None):
         if comment != ".":
             _COMMENT_DICTIONARY[val] = comments[pos].rstrip() + "\n\n"
 
+def _tag_key(x):
+    """ Helper function to figure out how to sort the tags."""
+    try:
+        return _get_schema().schema_order.index(x)
+    except ValueError:
+        raise ValueError("Cannot sort because the following tag is not in the "
+                         "schema: %s" % x )
+
 #############################################
 #                Classes                    #
 #############################################
@@ -2037,23 +2045,9 @@ class Saveframe(object):
         schema. Will automatically use the standard schema if none
         is provided."""
 
-        new_tag_list = []
-        lower_tag_prefix = self.tag_prefix.lower()
-
-        for check in _get_schema(validation_schema).schema_order:
-            # Only proceed if it has the same category as us
-            if _format_category(check).lower() == lower_tag_prefix:
-                tag_name = _format_tag(check)
-                # If we currently have the tag, add it to the new tag list
-                existing = self.get_tag(tag_name, whole_tag=True)
-                if existing != []:
-                    new_tag_list.extend(existing)
-
-        if len(self.tags) != len(new_tag_list):
-            raise ValueError("Refusing to sort. There are tags in the "
-                             "saveframe that do not exist in the schema.")
-
-        self.tags = new_tag_list
+        mod_key = lambda x:_tag_key(self.tag_prefix + "." + x[0])
+        self.tags.sort(key=mod_key)
+        return
 
     def tag_iterator(self):
         """Returns an iterator for saveframe tags."""
@@ -2754,18 +2748,10 @@ class Loop(object):
         """ Rearranges the columns and data in the loop to match the order
         from the BMRB schema."""
 
-        def sort_key(x):
-            """ Helper function to figure out how to sort the tags."""
-            try:
-                return _get_schema().schema_order.index(x)
-            except ValueError:
-                raise ValueError("Cannot sort the loop because the following "
-                                 "tag is not in the schema: %s" % x )
-
         current_order = self.get_columns()
 
         # Sort the tags
-        sorted_order = sorted(current_order, key=sort_key)
+        sorted_order = sorted(current_order, key=_tag_key)
 
         # Don't touch the data if the tags are already in order
         if sorted_order == current_order:
