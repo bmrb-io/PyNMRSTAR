@@ -2750,6 +2750,30 @@ class Loop(object):
 
         self.category = _format_category(category)
 
+    def sort_tags(self):
+        """ Rearranges the columns and data in the loop to match the order
+        from the BMRB schema."""
+
+        def sort_key(x):
+            """ Helper function to figure out how to sort the tags."""
+            try:
+                return _get_schema().schema_order.index(x)
+            except ValueError:
+                raise ValueError("Cannot sort the loop because the following "
+                                 "tag is not in the schema: %s" % x )
+
+        current_order = self.get_columns()
+
+        # Sort the tags
+        sorted_order = sorted(current_order, key=sort_key)
+
+        # Don't touch the data if the tags are already in order
+        if sorted_order == current_order:
+            return
+        else:
+            self.data = self.get_tag(sorted_order)
+            self.columns = [_format_tag(x) for x in sorted_order]
+
     def sort_rows(self, tags, key=None):
         """ Sort the data in the rows by their values for a given column
         or columns. Specify the columns using their names or ordinals.
