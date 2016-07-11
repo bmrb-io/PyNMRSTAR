@@ -401,18 +401,30 @@ class TestPyNMRSTAR(unittest.TestCase):
         tmp = copy(database_entry)
         tmp.rename_saveframe('F5-Phe-cVHP', 'jons_frame')
         tmp.rename_saveframe('jons_frame', 'F5-Phe-cVHP')
-        self.assertEquals(tmp, database_entry)
+        self.assertEqual(tmp, database_entry)
 
     def test_normalize(self):
 
         tmp = copy(database_entry)
+        tmp.normalize()
+        # Make sure the frames are already in the right order
+        self.assertEqual(tmp.frame_list, database_entry.frame_list)
+
+        # Shuffle our local entry
         random.shuffle(tmp.frame_list)
         for frame in tmp:
             random.shuffle(frame.loops)
             random.shuffle(frame.tags)
-        self.assertNotEqual(tmp, database_entry)
-        database_entry.normalize()
+
+        # Might as well test equality testing while shuffled:
         self.assertEqual(tmp, database_entry)
+        #self.assertNotEqual(tmp, database_entry)
+
+        # Test that the frames are in a different order
+        self.assertNotEqual(tmp.frame_list, database_entry.frame_list)
+        tmp.normalize()
+        # And test they have been put back together
+        self.assertEqual(tmp.frame_list, database_entry.frame_list)
 
     # Parse and re-print entries to check for divergences. Only use in-house.
     def test_reparse(self):
@@ -422,7 +434,7 @@ class TestPyNMRSTAR(unittest.TestCase):
         if not os.path.exists("/bmrb/linux/bin/stardiff"):
             return
 
-        start, end = 15000, 15000
+        start, end = 15000, 15500
         sys.stdout.write("\nEntry tests: %5s/%5s" % (start, end))
         for x in range(start, end):
 
