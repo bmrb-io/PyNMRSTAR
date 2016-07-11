@@ -2210,6 +2210,33 @@ class Loop(object):
         else:
             return "<bmrb.Loop '%s'>" % self.category
 
+    def __setitem__(self, key, item):
+        """Set all of the instances of a tag to the provided value.
+        If there are 5 rows of data in the loop, you will need to
+        assign a list with 5 elements."""
+
+        tag = _format_tag(key)
+
+        # Check that their tag is in the loop
+        if tag not in self.columns:
+            raise ValueError("Cannot assign to tag '%s' as it does not exist "
+                             "in this loop." % key)
+
+        # Determine where to assign
+        column = self.columns.index(tag)
+
+        # Make sure they provide a list of the correct length
+        if len(self[key]) != len(item):
+            raise ValueError("To assign to a tag you must provide a list (or "
+                             "iterable) of a length equal to the number of "
+                             "values that currently exist for that tag. The tag"
+                             " '%s' current has %d values and you supplied "
+                             "%d values." % (key, len(self[key]), len(item)))
+
+        # Do the assignment
+        for pos, row in enumerate(self.data):
+            row[column] = item[pos]
+
     def __str__(self):
         """Returns the loop in STAR format as a string."""
 
