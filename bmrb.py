@@ -1451,7 +1451,7 @@ class Entry(object):
                                  char)
 
         # Update the saveframe
-        change_frame['Sf_category'] = new_name
+        change_frame['Sf_framecode'] = new_name
         change_frame.name = new_name
 
         # What the new references should look like
@@ -2502,10 +2502,8 @@ class Loop(object):
                 if self.data != other.data:
 
                     # Check data of loops
-                    self_data = sorted(deepcopy(self.data),
-                                       key=lambda x: tuple(x))
-                    other_data = sorted(deepcopy(other.data),
-                                        key=lambda x: tuple(x))
+                    self_data = sorted(deepcopy(self.data))
+                    other_data = sorted(deepcopy(other.data))
 
                     if self_data != other_data:
                         diffs.append("\t\tLoop data does not match for loop "
@@ -2779,7 +2777,7 @@ class Loop(object):
         or columns. Specify the columns using their names or ordinals.
         Accepts a list or an int/float. By default we will sort
         numerically. If that fails we do a string sort. Supply a
-        function as key_func and we will order the elements based on the
+        function as key and we will order the elements based on the
         keys it provides. See the help for sorted() for more details. If
         you provide multiple columns to sort by, they are interpreted as
         increasing order of sort priority."""
@@ -2839,12 +2837,14 @@ class Loop(object):
             #  Then fallback to string sort.
             try:
                 if key is None:
-                    tmp_data = sorted(self.data, key=lambda x: float(x[column]))
+                    tmp_data = sorted(self.data,
+                                      key=lambda x, pos=column: float(x[pos]))
                 else:
                     tmp_data = sorted(self.data, key=key)
             except ValueError:
                 if key is None:
-                    tmp_data = sorted(self.data, key=lambda x: x[column])
+                    tmp_data = sorted(self.data,
+                                      key=lambda x, pos=column: x[pos])
                 else:
                     tmp_data = sorted(self.data, key=key)
             self.data = tmp_data
