@@ -3,12 +3,18 @@
 # Standard imports
 import os
 import sys
+import random
 import unittest
 import subprocess
 from copy import deepcopy as copy
 
 # Determine if we are running in python3
 PY3 = (sys.version_info[0] == 3)
+
+if PY3:
+    from io import StringIO
+else:
+    from cStringIO import StringIO
 
 # Local imports
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
@@ -296,9 +302,15 @@ class TestPyNMRSTAR(unittest.TestCase):
         # Check eq
         self.assertEqual(test_loop == self.entry[0][0], True)
         self.assertEqual(test_loop != self.entry[0][1], True)
-        # Check getitem
+        # Check __getitem__
         self.assertEqual(test_loop['_Entry_author.Ordinal'], ['1', '2', '3', '4', '5'])
         self.assertEqual(test_loop[['_Entry_author.Ordinal', '_Entry_author.Middle_initials']], [['1', 'C.'], ['2', '.'], ['3', 'B.'], ['4', 'H.'], ['5', 'L.']])
+        # Test __setitem__
+        test_loop['_Entry_author.Ordinal'] = [1]*5
+        self.assertEqual(test_loop['_Entry_author.Ordinal'], [1,1,1,1,1])
+        test_loop['_Entry_author.Ordinal'] = ['1','2','3','4','5']
+        self.assertRaises(ValueError, test_loop.__setitem__, '_Entry_author.Ordinal', [1])
+        self.assertRaises(ValueError, test_loop.__setitem__, '_Wrong_loop.Ordinal', [1,2,3,4,5])
         # Check __init__
         self.assertRaises(ValueError, bmrb.Loop)
         test = bmrb.Loop.from_scratch(category="test")
@@ -385,6 +397,34 @@ class TestPyNMRSTAR(unittest.TestCase):
 
         bmrb.SKIP_EMPTY_LOOPS = False
 
+    def test_rename_saveframe(self):
+        tmp = copy(database_entry)
+        tmp.rename_saveframe('F5-Phe-cVHP', 'jons_frame')
+        tmp.rename_saveframe('jons_frame', 'F5-Phe-cVHP')
+        self.assertEqual(tmp, database_entry)
+
+    def test_normalize(self):
+
+        tmp = copy(database_entry)
+        tmp.normalize()
+        # Make sure the frames are already in the right order
+        self.assertEqual(tmp.frame_list, database_entry.frame_list)
+
+        # Shuffle our local entry
+        random.shuffle(tmp.frame_list)
+        for frame in tmp:
+            random.shuffle(frame.loops)
+            random.shuffle(frame.tags)
+
+        # Might as well test equality testing while shuffled:
+        self.assertEqual(tmp, database_entry)
+
+        # Test that the frames are in a different order
+        self.assertNotEqual(tmp.frame_list, database_entry.frame_list)
+        tmp.normalize()
+        # And test they have been put back together
+        self.assertEqual(tmp.frame_list, database_entry.frame_list)
+
     # Parse and re-print entries to check for divergences. Only use in-house.
     def test_reparse(self):
 
@@ -413,25 +453,22 @@ class TestPyNMRSTAR(unittest.TestCase):
             reent = bmrb.Entry.from_string(ent_str)
             self.assertEqual(reent, ent_str)
 
-            # Write our data to a pipe for stardiff to read from
-            with open("/tmp/comparator1", "w") as tmp:
-                tmp.write(ent_str)
+            if PY3:
+                ent_str = ent_str.encode()
 
             compare = subprocess.Popen(["/bmrb/linux/bin/stardiff",
                                         "-ignore-tag",
                                         "_Spectral_peak_list.Text_data",
-                                        "/tmp/comparator1", location],
+                                        "-", location],
+                                        stdin=subprocess.PIPE,
                                         stdout=subprocess.PIPE,
                                         stderr=subprocess.PIPE)
+            results = compare.communicate(input=ent_str)[0]
 
-            # Wait for stardiff to complete
-            compare.wait()
-            results = compare.stdout.read()
             if PY3:
                 results = results.decode()
-            compare.stdout.close()
-            compare.stderr.close()
-            self.assertEqual("/tmp/comparator1:%s: NO DIFFERENCES REPORTED\n" %
+
+            self.assertEqual("<standard input>:%s: NO DIFFERENCES REPORTED\n" %
                              location, results,
                              msg="%d: Output inconsistent with original: %s" %
                              (x, results.strip()))

@@ -1004,6 +1004,11 @@ class Entry(object):
 
         return len(self.compare(other)) == 0
 
+    def __ne__(self, other):
+        """It isn't enough to define __eq__ in python2.x."""
+
+        return not self == other
+
     def __getitem__(self, item):
         """Get the indicated saveframe."""
 
@@ -1529,6 +1534,11 @@ class Saveframe(object):
         False if it is equal."""
 
         return len(self.compare(other)) == 0
+
+    def __ne__(self, other):
+        """It isn't enough to define __eq__ in python2.x."""
+
+        return not self == other
 
     def __getitem__(self, item):
         """Get the indicated loop or tag."""
@@ -2115,6 +2125,11 @@ class Loop(object):
         it is different."""
 
         return len(self.compare(other)) == 0
+
+    def __ne__(self, other):
+        """It isn't enough to define __eq__ in python2.x."""
+
+        return not self == other
 
     def __getitem__(self, item):
         """Get the indicated row from the data array."""
