@@ -1451,7 +1451,7 @@ class Entry(object):
                                  char)
 
         # Update the saveframe
-        change_frame['Sf_category'] = new_name
+        change_frame['Sf_framecode'] = new_name
         change_frame.name = new_name
 
         # What the new references should look like
