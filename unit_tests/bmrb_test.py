@@ -10,6 +10,11 @@ from copy import deepcopy as copy
 # Determine if we are running in python3
 PY3 = (sys.version_info[0] == 3)
 
+if PY3:
+    from io import StringIO
+else:
+    from cStringIO import StringIO
+
 # Local imports
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
 import bmrb
@@ -413,25 +418,22 @@ class TestPyNMRSTAR(unittest.TestCase):
             reent = bmrb.Entry.from_string(ent_str)
             self.assertEqual(reent, ent_str)
 
-            # Write our data to a pipe for stardiff to read from
-            with open("/tmp/comparator1", "w") as tmp:
-                tmp.write(ent_str)
+            if PY3:
+                ent_str = ent_str.encode()
 
             compare = subprocess.Popen(["/bmrb/linux/bin/stardiff",
                                         "-ignore-tag",
                                         "_Spectral_peak_list.Text_data",
-                                        "/tmp/comparator1", location],
+                                        "-", location],
+                                        stdin=subprocess.PIPE,
                                         stdout=subprocess.PIPE,
                                         stderr=subprocess.PIPE)
+            results = compare.communicate(input=ent_str)[0]
 
-            # Wait for stardiff to complete
-            compare.wait()
-            results = compare.stdout.read()
             if PY3:
                 results = results.decode()
-            compare.stdout.close()
-            compare.stderr.close()
-            self.assertEqual("/tmp/comparator1:%s: NO DIFFERENCES REPORTED\n" %
+
+            self.assertEqual("<standard input>:%s: NO DIFFERENCES REPORTED\n" %
                              location, results,
                              msg="%d: Output inconsistent with original: %s" %
                              (x, results.strip()))
