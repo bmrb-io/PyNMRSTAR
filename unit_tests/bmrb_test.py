@@ -3,6 +3,7 @@
 # Standard imports
 import os
 import sys
+import random
 import unittest
 import subprocess
 from copy import deepcopy as copy
@@ -301,9 +302,15 @@ class TestPyNMRSTAR(unittest.TestCase):
         # Check eq
         self.assertEqual(test_loop == self.entry[0][0], True)
         self.assertEqual(test_loop != self.entry[0][1], True)
-        # Check getitem
+        # Check __getitem__
         self.assertEqual(test_loop['_Entry_author.Ordinal'], ['1', '2', '3', '4', '5'])
         self.assertEqual(test_loop[['_Entry_author.Ordinal', '_Entry_author.Middle_initials']], [['1', 'C.'], ['2', '.'], ['3', 'B.'], ['4', 'H.'], ['5', 'L.']])
+        # Test __setitem__
+        test_loop['_Entry_author.Ordinal'] = [1]*5
+        self.assertEqual(test_loop['_Entry_author.Ordinal'], [1,1,1,1,1])
+        test_loop['_Entry_author.Ordinal'] = ['1','2','3','4','5']
+        self.assertRaises(ValueError, test_loop.__setitem__, '_Entry_author.Ordinal', [1])
+        self.assertRaises(ValueError, test_loop.__setitem__, '_Wrong_loop.Ordinal', [1,2,3,4,5])
         # Check __init__
         self.assertRaises(ValueError, bmrb.Loop)
         test = bmrb.Loop.from_scratch(category="test")
@@ -390,6 +397,23 @@ class TestPyNMRSTAR(unittest.TestCase):
 
         bmrb.SKIP_EMPTY_LOOPS = False
 
+    def test_rename_saveframe(self):
+        tmp = copy(database_entry)
+        tmp.rename_saveframe('F5-Phe-cVHP', 'jons_frame')
+        tmp.rename_saveframe('jons_frame', 'F5-Phe-cVHP')
+        self.assertEquals(tmp, database_entry)
+
+    def test_normalize(self):
+
+        tmp = copy(database_entry)
+        random.shuffle(tmp.frame_list)
+        for frame in tmp:
+            random.shuffle(frame.loops)
+            random.shuffle(frame.tags)
+        self.assertNotEqual(tmp, database_entry)
+        database_entry.normalize()
+        self.assertEqual(tmp, database_entry)
+
     # Parse and re-print entries to check for divergences. Only use in-house.
     def test_reparse(self):
 
@@ -398,7 +422,7 @@ class TestPyNMRSTAR(unittest.TestCase):
         if not os.path.exists("/bmrb/linux/bin/stardiff"):
             return
 
-        start, end = 15000, 15500
+        start, end = 15000, 15000
         sys.stdout.write("\nEntry tests: %5s/%5s" % (start, end))
         for x in range(start, end):
 
