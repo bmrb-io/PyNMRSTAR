@@ -418,7 +418,6 @@ class TestPyNMRSTAR(unittest.TestCase):
 
         # Might as well test equality testing while shuffled:
         self.assertEqual(tmp, database_entry)
-        #self.assertNotEqual(tmp, database_entry)
 
         # Test that the frames are in a different order
         self.assertNotEqual(tmp.frame_list, database_entry.frame_list)
