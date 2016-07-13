@@ -1007,7 +1007,7 @@ class Entry(object):
     def __ne__(self, other):
         """It isn't enough to define __eq__ in python2.x."""
 
-        return not self == other
+        return not self.__eq__(other)
 
     def __getitem__(self, item):
         """Get the indicated saveframe."""
@@ -1443,6 +1443,13 @@ class Entry(object):
         if new_name.startswith("$"):
             new_name = new_name[1:]
 
+        # Make sure there is no saveframe called what
+        #  the new name is
+        if [x.name for x in self.frame_list].count(new_name) > 0:
+            raise ValueError("Cannot rename a saveframe as '%s' because a "
+                             "saveframe with the name already exists." %
+                             new_name)
+
         # This can raise a ValueError, but no point catching it
         #  since it really is a ValueError if they provide a name
         #   of a saveframe that doesn't exist in the entry.
@@ -1486,24 +1493,63 @@ class Entry(object):
             for pos2, one_loop in enumerate(frame):
                 print("\t\t[%d] %s" % (pos2, repr(one_loop)))
 
-    def validate(self, schema=None):
-        """Validate an entry against a STAR schema. You can pass your
-        own custom schema if desired, otherwise the schema will be
-        fetched from the BMRB servers. Returns a list of errors found.
-        0-length list indicates no errors found."""
+    def validate(self, validate_schema=True, schema=None,
+                 validate_star=True):
+        """Validate an entry in a variety of ways. Returns a list of
+        errors found. 0-length list indicates no errors found. By
+        default all validation modes are enabled.
+
+        validate_schema - Determines if the entry is validated against
+        the NMR-STAR schema. You can pass your own custom schema if desired,
+        otherwise the schema will be fetched from the BMRB servers.
+
+        validate_star - Determines if the STAR syntax checks are ran."""
 
         errors = []
 
+        # They should validate for something...
+        if not validate_star and not validate_schema:
+            errors.append("Validate() should be called with at least one "
+                          "validation method enabled.")
+
+        if validate_star:
+
+            # Check for saveframes with same name
+            saveframe_names = sorted(x.name for x in self)
+            for ordinal in range(0, len(saveframe_names)-2):
+                if saveframe_names[ordinal] == saveframe_names[ordinal+1]:
+                    errors.append("Multiple saveframes with same name: '%s'" %
+                                  saveframe_names[ordinal])
+
+            # Check for dangling references
+            fdict = self.frame_dict()
+
+            for each_frame in self:
+                # Iterate through the tags
+                for each_tag in each_frame.tags:
+                    if (each_tag[1].startswith("$")
+                            and each_tag[1][1:] not in fdict):
+                        errors.append("Dangling saveframe reference '%s' in "
+                                      "tag '%s.%s'" % (each_tag[1],
+                                                       each_frame.tag_prefix,
+                                                       each_tag[0]))
+
+                # Iterate through the loops
+                for each_loop in each_frame:
+                    for each_row in each_loop:
+                        for pos, val in enumerate(each_row):
+                            if val.startswith("$") and val[1:] not in fdict:
+                                errors.append("Dangling saveframe reference "
+                                              "'%s' in tag '%s.%s'" %
+                                              (val,
+                                               each_loop.category,
+                                               each_loop.columns[pos]))
+
         # Ask the saveframes to check themselves for errors
         for frame in self:
-            errors.extend(frame.validate(schema=schema))
-
-        # Check for saveframes with same name
-        saveframe_names = sorted(x.name for x in self)
-        for ordinal in range(0, len(saveframe_names)-2):
-            if saveframe_names[ordinal] == saveframe_names[ordinal+1]:
-                errors.append("Multiple saveframes with same name: " +
-                              saveframe_names[ordinal])
+            errors.extend(frame.validate(validate_schema=validate_schema,
+                                         schema=schema,
+                                         validate_star=validate_star))
 
         return errors
 
@@ -1538,7 +1584,7 @@ class Saveframe(object):
     def __ne__(self, other):
         """It isn't enough to define __eq__ in python2.x."""
 
-        return not self == other
+        return not self.__eq__(other)
 
     def __getitem__(self, item):
         """Get the indicated loop or tag."""
@@ -2084,14 +2130,17 @@ class Saveframe(object):
         for pos, each_loop in enumerate(self):
             print("\t[%d] %s" % (pos, repr(each_loop)))
 
-    def validate(self, schema=None):
-        """Validate a saveframe against a STAR schema. You can pass your
-        own custom schema if desired, otherwise the schema will be
-        fetched from the BMRB servers. Returns a list of errors found.
-        0-length list indicates no errors found."""
+    def validate(self, validate_schema=True, schema=None,
+                 validate_star=True):
+        """Validate a saveframe in a variety of ways. Returns a list of
+        errors found. 0-length list indicates no errors found. By
+        default all validation modes are enabled.
 
-        # Get the default schema if we are not passed a schema
-        my_schema = _get_schema(schema)
+        validate_schema - Determines if the entry is validated against
+        the NMR-STAR schema. You can pass your own custom schema if desired,
+        otherwise the schema will be fetched from the BMRB servers.
+
+        validate_star - Determines if the STAR syntax checks are ran."""
 
         errors = []
 
@@ -2102,18 +2151,25 @@ class Saveframe(object):
                           "'. No saveframe category defined.")
             my_category = None
 
-        for tag in self.tags:
-            lineno = str(tag[2]) + " of original file" if len(tag) > 2 else None
-            formatted_tag = self.tag_prefix + "." + tag[0]
-            cur_errors = my_schema.val_type(formatted_tag, tag[1],
-                                            category=my_category,
-                                            linenum=lineno)
-            errors.extend(cur_errors)
+        if validate_schema:
+            # Get the default schema if we are not passed a schema
+            my_schema = _get_schema(schema)
 
+            for tag in self.tags:
+                lineno = str(tag[2]) + " of original file" if len(tag) > 2 else None
+                formatted_tag = self.tag_prefix + "." + tag[0]
+                cur_errors = my_schema.val_type(formatted_tag, tag[1],
+                                                category=my_category,
+                                                linenum=lineno)
+                errors.extend(cur_errors)
+
+        # Check the loops for errors
         for each_loop in self.loops:
             errors.extend(
-                each_loop.validate(
-                    schema=schema, category=my_category))
+                each_loop.validate(validate_schema=validate_schema,
+                                   schema=schema,
+                                   validate_star=validate_star,
+                                   category=my_category))
 
         return errors
 
@@ -2129,7 +2185,7 @@ class Loop(object):
     def __ne__(self, other):
         """It isn't enough to define __eq__ in python2.x."""
 
-        return not self == other
+        return not self.__eq__(other)
 
     def __getitem__(self, item):
         """Get the indicated row from the data array."""
@@ -2891,30 +2947,42 @@ class Loop(object):
                     tmp_data = sorted(self.data, key=key)
             self.data = tmp_data
 
-    def validate(self, schema=None, category=None):
-        """Validate a loop against a STAR schema. You can pass your own
-        custom schema if desired, otherwise the schema will be fetched
-        from the BMRB servers. Returns a list of errors found. 0-length
-        list indicates no errors found."""
+    def validate(self, validate_schema=True, schema=None,
+                 validate_star=True, category=None):
+        """Validate a loop in a variety of ways. Returns a list of
+        errors found. 0-length list indicates no errors found. By
+        default all validation modes are enabled.
 
-        # Get the default schema if we are not passed a schema
-        my_schema = _get_schema(schema)
+        validate_schema - Determines if the entry is validated against
+        the NMR-STAR schema. You can pass your own custom schema if desired,
+        otherwise the schema will be fetched from the BMRB servers.
+
+        validate_star - Determines if the STAR syntax checks are ran."""
 
         errors = []
 
-        # Check the data
-        for rownum, row in enumerate(self.data):
-            # Make sure the width matches
-            if len(row) != len(self.columns):
-                errors.append("Loop '%s' data width does not match it's column "
-                              "tag width on row '%d'." %
-                              (self.category, rownum))
-            for pos, datum in enumerate(row):
-                lineno = str(rownum) + " column " + str(pos) + " of loop"
-                errors.extend(my_schema.val_type(self.category + "." +
-                                                 self.columns[pos], datum,
-                                                 category=category,
-                                                 linenum=lineno))
+        if validate_schema:
+            # Get the default schema if we are not passed a schema
+            my_schema = _get_schema(schema)
+
+            # Check the data
+            for rownum, row in enumerate(self.data):
+                for pos, datum in enumerate(row):
+                    lineno = str(rownum) + " column " + str(pos) + " of loop"
+                    errors.extend(my_schema.val_type(self.category + "." +
+                                                     self.columns[pos], datum,
+                                                     category=category,
+                                                     linenum=lineno))
+
+        if validate_star:
+            # Check for wrong data size
+            num_cols = len(self.columns)
+            for rownum, row in enumerate(self.data):
+                # Make sure the width matches
+                if len(row) != num_cols:
+                    errors.append("Loop '%s' data width does not match it's "
+                                  "column tag width on row '%d'." %
+                                  (self.category, rownum))
 
         return errors
 
