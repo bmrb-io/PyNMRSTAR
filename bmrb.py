@@ -475,8 +475,8 @@ class _Parser(object):
             raise ValueError("The data_ keyword may not be quoted or "
                              "semicolon-delineated.")
 
-        # Set the bmrb_id
-        self.ent.bmrb_id = self.token[5:]
+        # Set the entry_id
+        self.ent.entry_id = self.token[5:]
         self.source = source
 
         # We are expecting to get saveframes
@@ -1022,7 +1022,7 @@ class Entry(object):
         from_string, or from_database to construct."""
 
         # Default initializations
-        self.bmrb_id = 0
+        self.entry_id = 0
         self.frame_list = []
         self.source = None
 
@@ -1064,7 +1064,7 @@ class Entry(object):
                               "database." % entry_number)
         else:
             # Initialize a blank entry
-            self.bmrb_id = kargs['bmrb_id']
+            self.entry_id = kargs['entry_id']
             self.source = "from_scratch()"
             return
 
@@ -1080,12 +1080,12 @@ class Entry(object):
     def __lt__(self, other):
         """Returns true if this entry is less than another entry."""
 
-        return self.bmrb_id > other.bmrb_id
+        return self.entry_id > other.entry_id
 
     def __repr__(self):
         """Returns a description of the entry."""
 
-        return "<bmrb.Entry '%s' %s>" % (self.bmrb_id, self.source)
+        return "<bmrb.Entry '%s' %s>" % (self.entry_id, self.source)
 
     def __setitem__(self, key, item):
         """Set the indicated saveframe."""
@@ -1114,7 +1114,7 @@ class Entry(object):
     def __str__(self):
         """Returns the entire entry in STAR format as a string."""
 
-        ret_string = "data_%s\n\n" % self.bmrb_id
+        ret_string = "data_%s\n\n" % self.entry_id
         for frame in self.frame_list:
             ret_string += str(frame) + "\n"
         return ret_string
@@ -1205,14 +1205,24 @@ class Entry(object):
                                  "dictionary nor a JSON string.")
 
         # Make sure it has the correct keys
-        for check in ["bmrb_id", "saveframes"]:
-            if check not in json_dict:
-                raise ValueError("The JSON you provide must be a hash and must"
-                                 " contain the key '%s' - even if the key "
-                                 "points to 'None'." % check)
+        if "saveframes" not in json_dict:
+            raise ValueError("The JSON you provide must be a hash and must"
+                             " contain the key 'saveframes' - even if the key "
+                             "points to 'None'.")
+
+        if "entry_id" not in json_dict and "bmrb_id" not in json_dict:
+            raise ValueError("The JSON you provide must be a hash and must"
+                             " contain the key 'entry_id' - even if the key "
+                             "points to 'None'.")
+
+
+        # Until the migration is complete, 'bmrb_id' is a synonym for
+        #  'entry_id'
+        if not 'entry_id' in json_dict:
+            json_dict['entry_id'] = json_dict['bmrb_id']
 
         # Create an entry from scratch and populate it
-        ret = Entry.from_scratch(json_dict['bmrb_id'])
+        ret = Entry.from_scratch(json_dict['entry_id'])
         ret.frame_list = [Saveframe.from_json(x) for x in
                           json_dict['saveframes']]
         ret.source = "from_json()"
@@ -1227,12 +1237,12 @@ class Entry(object):
         return cls(the_string=the_string)
 
     @classmethod
-    def from_scratch(cls, bmrb_id):
+    def from_scratch(cls, entry_id):
         """Create an empty entry that you can programatically add to.
-        You must pass a number corresponding to the BMRB ID. If this
-        is not a "real" BMRB entry, use 0 as the BMRB ID."""
+        You must pass a number corresponding to the entry ID/name.
+        (The unique identifier "xxx" from "data_xxx".)"""
 
-        return cls(bmrb_id=bmrb_id)
+        return cls(entry_id=entry_id)
 
     def add_saveframe(self, frame):
         """Add a saveframe to the entry."""
@@ -1258,9 +1268,9 @@ class Entry(object):
             else:
                 return ['String was not exactly equal to entry.']
         try:
-            if str(self.bmrb_id) != str(other.bmrb_id):
-                diffs.append("BMRB ID does not match between entries: "
-                             "'%s' vs '%s'." % (self.bmrb_id, other.bmrb_id))
+            if str(self.entry_id) != str(other.entry_id):
+                diffs.append("Entry ID does not match between entries: "
+                             "'%s' vs '%s'." % (self.entry_id, other.entry_id))
             if len(self.frame_list) != len(other.frame_list):
                 diffs.append("The number of saveframes in the entries are not"
                              " equal: '%d' vs '%d'." %
@@ -1293,8 +1303,11 @@ class Entry(object):
         serializeable is returned."""
 
         frames = [x.get_json(serialize=False) for x in self.frame_list]
+
+        # Store the "bmrb_id" as well to prevent old code from breaking
         entry_dict = {
-            "bmrb_id": self.bmrb_id,
+            "entry_id": self.entry_id,
+            "bmrb_id": self.entry_id,
             "saveframes": frames
         }
 
