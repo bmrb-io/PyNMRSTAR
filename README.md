@@ -163,11 +163,10 @@ attempt to open the file.
 
 Create an entry from JSON (serialized or unserialized JSON).
 
-#### def `from_scratch(cls, bmrb_id)`
+#### def `from_scratch(cls, entry_id)`
 
 Create an empty entry that you can programatically add to.
-You must pass a number corresponding to the BMRB ID. If this
-is not a "real" BMRB entry, use 0 as the BMRB ID.
+You must pass a value corresponding to the Entry ID.
 
 #### def `from_string(cls, the_string)`
 
