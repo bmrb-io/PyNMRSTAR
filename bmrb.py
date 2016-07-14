@@ -475,8 +475,8 @@ class _Parser(object):
             raise ValueError("The data_ keyword may not be quoted or "
                              "semicolon-delineated.")
 
-        # Set the bmrb_id
-        self.ent.bmrb_id = self.token[5:]
+        # Set the entry_id
+        self.ent.entry_id = self.token[5:]
         self.source = source
 
         # We are expecting to get saveframes
@@ -1007,7 +1007,7 @@ class Entry(object):
     def __ne__(self, other):
         """It isn't enough to define __eq__ in python2.x."""
 
-        return not self == other
+        return not self.__eq__(other)
 
     def __getitem__(self, item):
         """Get the indicated saveframe."""
@@ -1022,13 +1022,13 @@ class Entry(object):
         from_string, or from_database to construct."""
 
         # Default initializations
-        self.bmrb_id = 0
+        self.entry_id = 0
         self.frame_list = []
         self.source = None
 
         # They initialized us wrong
         if len(kargs) == 0:
-            raise ValueError("You must provide either a BMRB ID, a file name, "
+            raise ValueError("You must provide either a Entry ID, a file name, "
                              "an entry number, or a string to initialize. Use "
                              "the class methods.")
         elif len(kargs) > 1:
@@ -1064,7 +1064,7 @@ class Entry(object):
                               "database." % entry_number)
         else:
             # Initialize a blank entry
-            self.bmrb_id = kargs['bmrb_id']
+            self.entry_id = kargs['entry_id']
             self.source = "from_scratch()"
             return
 
@@ -1080,12 +1080,12 @@ class Entry(object):
     def __lt__(self, other):
         """Returns true if this entry is less than another entry."""
 
-        return self.bmrb_id > other.bmrb_id
+        return self.entry_id > other.entry_id
 
     def __repr__(self):
         """Returns a description of the entry."""
 
-        return "<bmrb.Entry '%s' %s>" % (self.bmrb_id, self.source)
+        return "<bmrb.Entry '%s' %s>" % (self.entry_id, self.source)
 
     def __setitem__(self, key, item):
         """Set the indicated saveframe."""
@@ -1114,7 +1114,7 @@ class Entry(object):
     def __str__(self):
         """Returns the entire entry in STAR format as a string."""
 
-        ret_string = "data_%s\n\n" % self.bmrb_id
+        ret_string = "data_%s\n\n" % self.entry_id
         for frame in self.frame_list:
             ret_string += str(frame) + "\n"
         return ret_string
@@ -1205,14 +1205,24 @@ class Entry(object):
                                  "dictionary nor a JSON string.")
 
         # Make sure it has the correct keys
-        for check in ["bmrb_id", "saveframes"]:
-            if check not in json_dict:
-                raise ValueError("The JSON you provide must be a hash and must"
-                                 " contain the key '%s' - even if the key "
-                                 "points to 'None'." % check)
+        if "saveframes" not in json_dict:
+            raise ValueError("The JSON you provide must be a hash and must"
+                             " contain the key 'saveframes' - even if the key "
+                             "points to 'None'.")
+
+        if "entry_id" not in json_dict and "bmrb_id" not in json_dict:
+            raise ValueError("The JSON you provide must be a hash and must"
+                             " contain the key 'entry_id' - even if the key "
+                             "points to 'None'.")
+
+
+        # Until the migration is complete, 'bmrb_id' is a synonym for
+        #  'entry_id'
+        if not 'entry_id' in json_dict:
+            json_dict['entry_id'] = json_dict['bmrb_id']
 
         # Create an entry from scratch and populate it
-        ret = Entry.from_scratch(json_dict['bmrb_id'])
+        ret = Entry.from_scratch(json_dict['entry_id'])
         ret.frame_list = [Saveframe.from_json(x) for x in
                           json_dict['saveframes']]
         ret.source = "from_json()"
@@ -1227,12 +1237,12 @@ class Entry(object):
         return cls(the_string=the_string)
 
     @classmethod
-    def from_scratch(cls, bmrb_id):
+    def from_scratch(cls, entry_id):
         """Create an empty entry that you can programatically add to.
-        You must pass a number corresponding to the BMRB ID. If this
-        is not a "real" BMRB entry, use 0 as the BMRB ID."""
+        You must pass a value corresponding to the Entry ID.
+        (The unique identifier "xxx" from "data_xxx".)"""
 
-        return cls(bmrb_id=bmrb_id)
+        return cls(entry_id=entry_id)
 
     def add_saveframe(self, frame):
         """Add a saveframe to the entry."""
@@ -1258,9 +1268,9 @@ class Entry(object):
             else:
                 return ['String was not exactly equal to entry.']
         try:
-            if str(self.bmrb_id) != str(other.bmrb_id):
-                diffs.append("BMRB ID does not match between entries: "
-                             "'%s' vs '%s'." % (self.bmrb_id, other.bmrb_id))
+            if str(self.entry_id) != str(other.entry_id):
+                diffs.append("Entry ID does not match between entries: "
+                             "'%s' vs '%s'." % (self.entry_id, other.entry_id))
             if len(self.frame_list) != len(other.frame_list):
                 diffs.append("The number of saveframes in the entries are not"
                              " equal: '%d' vs '%d'." %
@@ -1293,8 +1303,11 @@ class Entry(object):
         serializeable is returned."""
 
         frames = [x.get_json(serialize=False) for x in self.frame_list]
+
+        # Store the "bmrb_id" as well to prevent old code from breaking
         entry_dict = {
-            "bmrb_id": self.bmrb_id,
+            "entry_id": self.entry_id,
+            "bmrb_id": self.entry_id,
             "saveframes": frames
         }
 
@@ -1443,6 +1456,13 @@ class Entry(object):
         if new_name.startswith("$"):
             new_name = new_name[1:]
 
+        # Make sure there is no saveframe called what
+        #  the new name is
+        if [x.name for x in self.frame_list].count(new_name) > 0:
+            raise ValueError("Cannot rename a saveframe as '%s' because a "
+                             "saveframe with the name already exists." %
+                             new_name)
+
         # This can raise a ValueError, but no point catching it
         #  since it really is a ValueError if they provide a name
         #   of a saveframe that doesn't exist in the entry.
@@ -1486,24 +1506,63 @@ class Entry(object):
             for pos2, one_loop in enumerate(frame):
                 print("\t\t[%d] %s" % (pos2, repr(one_loop)))
 
-    def validate(self, schema=None):
-        """Validate an entry against a STAR schema. You can pass your
-        own custom schema if desired, otherwise the schema will be
-        fetched from the BMRB servers. Returns a list of errors found.
-        0-length list indicates no errors found."""
+    def validate(self, validate_schema=True, schema=None,
+                 validate_star=True):
+        """Validate an entry in a variety of ways. Returns a list of
+        errors found. 0-length list indicates no errors found. By
+        default all validation modes are enabled.
+
+        validate_schema - Determines if the entry is validated against
+        the NMR-STAR schema. You can pass your own custom schema if desired,
+        otherwise the schema will be fetched from the BMRB servers.
+
+        validate_star - Determines if the STAR syntax checks are ran."""
 
         errors = []
 
+        # They should validate for something...
+        if not validate_star and not validate_schema:
+            errors.append("Validate() should be called with at least one "
+                          "validation method enabled.")
+
+        if validate_star:
+
+            # Check for saveframes with same name
+            saveframe_names = sorted(x.name for x in self)
+            for ordinal in range(0, len(saveframe_names)-2):
+                if saveframe_names[ordinal] == saveframe_names[ordinal+1]:
+                    errors.append("Multiple saveframes with same name: '%s'" %
+                                  saveframe_names[ordinal])
+
+            # Check for dangling references
+            fdict = self.frame_dict()
+
+            for each_frame in self:
+                # Iterate through the tags
+                for each_tag in each_frame.tags:
+                    if (each_tag[1].startswith("$")
+                            and each_tag[1][1:] not in fdict):
+                        errors.append("Dangling saveframe reference '%s' in "
+                                      "tag '%s.%s'" % (each_tag[1],
+                                                       each_frame.tag_prefix,
+                                                       each_tag[0]))
+
+                # Iterate through the loops
+                for each_loop in each_frame:
+                    for each_row in each_loop:
+                        for pos, val in enumerate(each_row):
+                            if val.startswith("$") and val[1:] not in fdict:
+                                errors.append("Dangling saveframe reference "
+                                              "'%s' in tag '%s.%s'" %
+                                              (val,
+                                               each_loop.category,
+                                               each_loop.columns[pos]))
+
         # Ask the saveframes to check themselves for errors
         for frame in self:
-            errors.extend(frame.validate(schema=schema))
-
-        # Check for saveframes with same name
-        saveframe_names = sorted(x.name for x in self)
-        for ordinal in range(0, len(saveframe_names)-2):
-            if saveframe_names[ordinal] == saveframe_names[ordinal+1]:
-                errors.append("Multiple saveframes with same name: " +
-                              saveframe_names[ordinal])
+            errors.extend(frame.validate(validate_schema=validate_schema,
+                                         schema=schema,
+                                         validate_star=validate_star))
 
         return errors
 
@@ -1538,7 +1597,7 @@ class Saveframe(object):
     def __ne__(self, other):
         """It isn't enough to define __eq__ in python2.x."""
 
-        return not self == other
+        return not self.__eq__(other)
 
     def __getitem__(self, item):
         """Get the indicated loop or tag."""
@@ -2084,14 +2143,17 @@ class Saveframe(object):
         for pos, each_loop in enumerate(self):
             print("\t[%d] %s" % (pos, repr(each_loop)))
 
-    def validate(self, schema=None):
-        """Validate a saveframe against a STAR schema. You can pass your
-        own custom schema if desired, otherwise the schema will be
-        fetched from the BMRB servers. Returns a list of errors found.
-        0-length list indicates no errors found."""
+    def validate(self, validate_schema=True, schema=None,
+                 validate_star=True):
+        """Validate a saveframe in a variety of ways. Returns a list of
+        errors found. 0-length list indicates no errors found. By
+        default all validation modes are enabled.
 
-        # Get the default schema if we are not passed a schema
-        my_schema = _get_schema(schema)
+        validate_schema - Determines if the entry is validated against
+        the NMR-STAR schema. You can pass your own custom schema if desired,
+        otherwise the schema will be fetched from the BMRB servers.
+
+        validate_star - Determines if the STAR syntax checks are ran."""
 
         errors = []
 
@@ -2102,18 +2164,25 @@ class Saveframe(object):
                           "'. No saveframe category defined.")
             my_category = None
 
-        for tag in self.tags:
-            lineno = str(tag[2]) + " of original file" if len(tag) > 2 else None
-            formatted_tag = self.tag_prefix + "." + tag[0]
-            cur_errors = my_schema.val_type(formatted_tag, tag[1],
-                                            category=my_category,
-                                            linenum=lineno)
-            errors.extend(cur_errors)
+        if validate_schema:
+            # Get the default schema if we are not passed a schema
+            my_schema = _get_schema(schema)
 
+            for tag in self.tags:
+                lineno = str(tag[2]) + " of original file" if len(tag) > 2 else None
+                formatted_tag = self.tag_prefix + "." + tag[0]
+                cur_errors = my_schema.val_type(formatted_tag, tag[1],
+                                                category=my_category,
+                                                linenum=lineno)
+                errors.extend(cur_errors)
+
+        # Check the loops for errors
         for each_loop in self.loops:
             errors.extend(
-                each_loop.validate(
-                    schema=schema, category=my_category))
+                each_loop.validate(validate_schema=validate_schema,
+                                   schema=schema,
+                                   validate_star=validate_star,
+                                   category=my_category))
 
         return errors
 
@@ -2129,7 +2198,7 @@ class Loop(object):
     def __ne__(self, other):
         """It isn't enough to define __eq__ in python2.x."""
 
-        return not self == other
+        return not self.__eq__(other)
 
     def __getitem__(self, item):
         """Get the indicated row from the data array."""
@@ -2891,30 +2960,42 @@ class Loop(object):
                     tmp_data = sorted(self.data, key=key)
             self.data = tmp_data
 
-    def validate(self, schema=None, category=None):
-        """Validate a loop against a STAR schema. You can pass your own
-        custom schema if desired, otherwise the schema will be fetched
-        from the BMRB servers. Returns a list of errors found. 0-length
-        list indicates no errors found."""
+    def validate(self, validate_schema=True, schema=None,
+                 validate_star=True, category=None):
+        """Validate a loop in a variety of ways. Returns a list of
+        errors found. 0-length list indicates no errors found. By
+        default all validation modes are enabled.
 
-        # Get the default schema if we are not passed a schema
-        my_schema = _get_schema(schema)
+        validate_schema - Determines if the entry is validated against
+        the NMR-STAR schema. You can pass your own custom schema if desired,
+        otherwise the schema will be fetched from the BMRB servers.
+
+        validate_star - Determines if the STAR syntax checks are ran."""
 
         errors = []
 
-        # Check the data
-        for rownum, row in enumerate(self.data):
-            # Make sure the width matches
-            if len(row) != len(self.columns):
-                errors.append("Loop '%s' data width does not match it's column "
-                              "tag width on row '%d'." %
-                              (self.category, rownum))
-            for pos, datum in enumerate(row):
-                lineno = str(rownum) + " column " + str(pos) + " of loop"
-                errors.extend(my_schema.val_type(self.category + "." +
-                                                 self.columns[pos], datum,
-                                                 category=category,
-                                                 linenum=lineno))
+        if validate_schema:
+            # Get the default schema if we are not passed a schema
+            my_schema = _get_schema(schema)
+
+            # Check the data
+            for rownum, row in enumerate(self.data):
+                for pos, datum in enumerate(row):
+                    lineno = str(rownum) + " column " + str(pos) + " of loop"
+                    errors.extend(my_schema.val_type(self.category + "." +
+                                                     self.columns[pos], datum,
+                                                     category=category,
+                                                     linenum=lineno))
+
+        if validate_star:
+            # Check for wrong data size
+            num_cols = len(self.columns)
+            for rownum, row in enumerate(self.data):
+                # Make sure the width matches
+                if len(row) != num_cols:
+                    errors.append("Loop '%s' data width does not match it's "
+                                  "column tag width on row '%d'." %
+                                  (self.category, rownum))
 
         return errors
 

@@ -160,9 +160,9 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertEqual(self.entry.compare(str(self.entry)), [])
         self.assertEqual(self.entry.compare(self.entry), [])
 
-        self.entry.bmrb_id = 14999
+        self.entry.entry_id = 14999
         self.entry.frame_list.pop()
-        self.assertEqual(file_entry.compare(self.entry), ["BMRB ID does not match between entries: '15000' vs '14999'.", "The number of saveframes in the entries are not equal: '25' vs '24'.", "No saveframe with name 'assigned_chem_shift_list_1' in other entry."])
+        self.assertEqual(file_entry.compare(self.entry), ["Entry ID does not match between entries: '15000' vs '14999'.", "The number of saveframes in the entries are not equal: '25' vs '24'.", "No saveframe with name 'assigned_chem_shift_list_1' in other entry."])
 
     def test_getmethods(self):
         self.assertEqual(5, len(self.entry.get_loops_by_category("_Vendor")))
