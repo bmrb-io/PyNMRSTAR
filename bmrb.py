@@ -1028,7 +1028,7 @@ class Entry(object):
 
         # They initialized us wrong
         if len(kargs) == 0:
-            raise ValueError("You must provide either a BMRB ID, a file name, "
+            raise ValueError("You must provide either a Entry ID, a file name, "
                              "an entry number, or a string to initialize. Use "
                              "the class methods.")
         elif len(kargs) > 1:
@@ -1239,7 +1239,7 @@ class Entry(object):
     @classmethod
     def from_scratch(cls, entry_id):
         """Create an empty entry that you can programatically add to.
-        You must pass a number corresponding to the entry ID/name.
+        You must pass a value corresponding to the Entry ID.
         (The unique identifier "xxx" from "data_xxx".)"""
 
         return cls(entry_id=entry_id)
