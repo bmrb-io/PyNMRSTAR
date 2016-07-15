@@ -777,7 +777,7 @@ class _Parser(object):
             # Make sure we don't stop for quotes that are not followed
             #  by whitespace
             try:
-                while tmp[until+1:until+2] not in " \t\n":
+                while tmp[until+1:until+2] not in _WHITESPACE:
                     until = self.index_handle(tmp, '"', until+1)
             except TypeError:
                 raise ValueError("Invalid file. Double quoted value was never "
@@ -1822,7 +1822,7 @@ class Saveframe(object):
                 else:
                     ret_string += pstring % (each_tag[0], clean_tag)
             else:
-                formatted_tag = self.tag_prefix+"."+each_tag[0]
+                formatted_tag = self.tag_prefix + "." + each_tag[0]
                 if "\n" in clean_tag:
                     ret_string += mstring % (formatted_tag, clean_tag)
                 else:
