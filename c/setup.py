@@ -1,9 +1,9 @@
 from distutils.core import setup, Extension
 
-module1 = Extension('bmrb',
-                    sources = ['bmrbmodule.c'])
+module1 = Extension('cnmrstarparser',
+                    sources = ['cnmrstarparsermodule.c'])
 
-setup (name = 'PackageName',
+setup (name = 'cNMR-STAR Parser',
        version = '1.0',
-       description = 'This is a demo package',
+       description = 'This is a really fast NMR-STAR parser.',
        ext_modules = [module1])
