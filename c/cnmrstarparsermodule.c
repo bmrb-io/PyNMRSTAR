@@ -19,10 +19,12 @@ parser_data parser = {NULL, NULL, (void *)1, 0, 0, 0};
 
 void reset_parser(parser_data * parser){
     parser->source = NULL;
-    free(parser->full_data);
+    //free(parser->full_data);
     parser->full_data = NULL;
-    free(parser->token);
-    parser->token = NULL;
+    if (parser->token != (void *)1){
+        free(parser->token);
+    }
+    parser->token = (void *)1;
     parser->index = 0;
     parser->length = 0;
     parser->last_delineator = 0;
@@ -58,6 +60,8 @@ long get_index(char * haystack, char * needle, long start_pos){
 
 void get_file(const char *fname, parser_data * parser){
     //printf("Parsing: %s\n", fname);
+
+    reset_parser(parser);
 
     // Open the file
     FILE *f = fopen(fname, "rb");
@@ -171,7 +175,6 @@ char * get_token(parser_data * parser){
 
     // Nothing left
     if (parser->token == NULL){
-        reset_parser(parser);
         return parser->token;
     }
 
@@ -281,7 +284,7 @@ long get_line_number(parser_data * parser){
 
 
 static PyObject *
-load(PyObject *self, PyObject *args)
+PARSE_load(PyObject *self, PyObject *args)
 {
     const char *file;
 
@@ -294,7 +297,24 @@ load(PyObject *self, PyObject *args)
 }
 
 static PyObject *
-token(PyObject *self, PyObject *args)
+PARSE_load_string(PyObject *self, PyObject *args)
+{
+    char *data;
+
+    if (!PyArg_ParseTuple(args, "s", &data))
+        return NULL;
+
+    // Read the string into our object
+    reset_parser(&parser);
+    parser.full_data = data;
+    parser.length = strlen(data);
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject *
+PARSE_get_token(PyObject *self, PyObject *args)
 {
     char * token;
     token = get_token(&parser);
@@ -302,11 +322,24 @@ token(PyObject *self, PyObject *args)
     return Py_BuildValue("s", token);
 }
 
+static PyObject *
+PARSE_get_line_no(PyObject *self, PyObject *args)
+{
+    long line_no;
+    line_no = get_line_number(&parser);
+
+    return Py_BuildValue("l", line_no);
+}
+
 static PyMethodDef cnmrstarparserMethods[] = {
-    {"load",  load, METH_VARARGS,
+    {"load",  PARSE_load, METH_VARARGS,
      "Load a file in preparation to parse."},
-     {"get_token",  token, METH_VARARGS,
+     {"load_string",  PARSE_load_string, METH_VARARGS,
+     "Load a string in preparation to parse."},
+     {"get_token",  PARSE_get_token, METH_VARARGS,
      "Get one token from the file. Returns NULL when file is exhausted."},
+     {"get_line_number",  PARSE_get_line_no, METH_VARARGS,
+     "Get the line number of the last token."},
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 
