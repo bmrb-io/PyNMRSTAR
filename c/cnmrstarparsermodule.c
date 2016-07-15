@@ -15,7 +15,7 @@ typedef struct {
 } parser_data;
 
 // Initialize the parser
-parser_data parser = {NULL, NULL, (void *)1, 0, 0, 0};
+parser_data parser = {NULL, NULL, (void *)1, 0, 0, ' '};
 
 void reset_parser(parser_data * parser){
     parser->source = NULL;
@@ -149,7 +149,7 @@ char * update_token(parser_data * parser, long length){
 
     // Figure out what to set the last delineator as
     if (parser->index == 0){
-        parser->last_delineator = 's';
+        parser->last_delineator = ' ';
     } else {
         char ld = parser->full_data[parser->index-1];
         if ((ld == '\n') && (parser->index > 2) && (parser->full_data[parser->index-2] == ';')){
