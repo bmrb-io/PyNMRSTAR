@@ -408,7 +408,7 @@ class _Parser(object):
         self.index = 0
         self.token = ""
         self.source = "unknown"
-        self.last_delineator = ""
+        self.last_delineator = " "
 
     def get_line_number(self):
         """ Returns the current line number that is in the process of
@@ -418,6 +418,14 @@ class _Parser(object):
             return cnmrstarparser.get_line_number()
         else:
             return self.full_data[0:self.index].count("\n")+1
+
+    def get_delineator(self):
+        """ Returns the delineator for the last token."""
+
+        if cnmrstarparser != None:
+            return cnmrstarparser.get_last_delineator()
+        else:
+            return self.last_delineator
 
     def get_token(self):
         """ Returns the next token in the parsing process."""
@@ -487,7 +495,7 @@ class _Parser(object):
             raise ValueError("'data_' must be followed by data name. Simply "
                              "'data_' is not allowed.", self.get_line_number())
 
-        if self.last_delineator != "":
+        if self.get_delineator() != " ":
             raise ValueError("The data_ keyword may not be quoted or "
                              "semicolon-delineated.")
 
@@ -509,7 +517,7 @@ class _Parser(object):
                                  "without a specified saveframe name.",
                                  self.get_line_number())
 
-            if self.last_delineator != "":
+            if self.get_delineator() != " ":
                 raise ValueError("The save_ keyword may not be quoted or "
                                  "semicolon-delineated.",
                                  self.get_line_number())
@@ -522,7 +530,7 @@ class _Parser(object):
             while self.get_token() != None:
 
                 if self.token == "loop_":
-                    if self.last_delineator != "":
+                    if self.get_delineator() != " ":
                         raise ValueError("The loop_ keyword may not be quoted "
                                          "or semicolon-delineated.",
                                          self.get_line_number())
@@ -537,7 +545,7 @@ class _Parser(object):
 
                         # Add a column
                         if self.token.startswith("_"):
-                            if self.last_delineator != "":
+                            if self.get_delineator() != " ":
                                 raise ValueError("Loop tags may not be quoted "
                                                  "or semicolon-delineated.",
                                                  self.get_line_number())
@@ -552,7 +560,7 @@ class _Parser(object):
                             # We are in the data block of a loop
                             while self.token != None:
                                 if self.token == "stop_":
-                                    if self.last_delineator != "":
+                                    if self.get_delineator() != " ":
                                         raise ValueError("The stop_ keyword may"
                                                          " not be quoted or "
                                                          "semicolon-delineated.",
@@ -587,7 +595,7 @@ class _Parser(object):
                                                          self.get_line_number())
 
                                     if (self.token in self.reserved and
-                                            self.last_delineator == ""):
+                                            self.get_delineator() == " "):
                                         raise ValueError("Cannot use keywords "
                                                          "as data values unless"
                                                          " quoted or semi-colon"
@@ -609,7 +617,7 @@ class _Parser(object):
 
                 # Close saveframe
                 elif self.token == "save_":
-                    if self.last_delineator != "":
+                    if self.get_delineator() != " ":
                         raise ValueError("The save_ keyword may not be quoted "
                                          "or semicolon-delineated.",
                                          self.get_line_number())
@@ -634,7 +642,7 @@ class _Parser(object):
 
                 # Add a tag
                 else:
-                    if self.last_delineator != "":
+                    if self.get_delineator() != " ":
                         raise ValueError("Saveframe tags may not be quoted or "
                                          "semicolon-delineated.",
                                          self.get_line_number())
@@ -643,7 +651,7 @@ class _Parser(object):
                     # We are in a saveframe and waiting for the saveframe tag
                     self.get_token()
                     if (self.token in self.reserved and
-                            self.last_delineator == ""):
+                            self.get_delineator() == " "):
                         raise ValueError("Cannot use keywords as data values "
                                          "unless quoted or semi-colon "
                                          "delineated. Illegal value: " +
@@ -664,7 +672,7 @@ class _Parser(object):
         is just a wrapper around this with some exception handling."""
 
         # Reset the delineator
-        self.last_delineator = ""
+        self.last_delineator = " "
 
         # Nothing left
         if self.token is None:
