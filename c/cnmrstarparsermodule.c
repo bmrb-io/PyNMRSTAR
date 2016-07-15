@@ -309,7 +309,7 @@ PARSE_load_string(PyObject *self, PyObject *args)
     parser.full_data = data;
     parser.length = strlen(data);
 
-    Py_INCREF(Py_None);
+    //Py_INCREF(Py_None);
     return Py_None;
 }
 
@@ -331,6 +331,12 @@ PARSE_get_line_no(PyObject *self, PyObject *args)
     return Py_BuildValue("l", line_no);
 }
 
+static PyObject *
+PARSE_get_last_delineator(PyObject *self, PyObject *args)
+{
+    return Py_BuildValue("c", parser.last_delineator);
+}
+
 static PyMethodDef cnmrstarparserMethods[] = {
     {"load",  PARSE_load, METH_VARARGS,
      "Load a file in preparation to parse."},
@@ -340,6 +346,8 @@ static PyMethodDef cnmrstarparserMethods[] = {
      "Get one token from the file. Returns NULL when file is exhausted."},
      {"get_line_number",  PARSE_get_line_no, METH_VARARGS,
      "Get the line number of the last token."},
+     {"get_last_delineator",  PARSE_get_last_delineator, METH_VARARGS,
+     "Get the last token delineator."},
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 
@@ -347,4 +355,17 @@ PyMODINIT_FUNC
 initcnmrstarparser(void)
 {
     (void) Py_InitModule("cnmrstarparser", cnmrstarparserMethods);
+}
+
+/* Keep here so that the manual build for testing still works. */
+int main(int argc, char *argv[]){
+
+    // Read the file
+    get_file(argv[1], &parser);
+
+    // Print the tokens
+    while(get_token(&parser) != NULL){
+        //printf("Token (%lu): %s\n", get_line_number(&parser), parser.token);
+        printf("Token (%c): %s\n", parser.last_delineator, parser.token);
+    }
 }
