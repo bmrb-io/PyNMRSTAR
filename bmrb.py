@@ -98,6 +98,12 @@ else:
     from cStringIO import StringIO
     BytesIO = StringIO
 
+# See if we can use the fast tokenizer
+try:
+    import cnmrstarparser
+except ImportError:
+    cnmrstarparser = None
+
 #############################################
 #            Global Variables               #
 #############################################
@@ -408,19 +414,27 @@ class _Parser(object):
         """ Returns the current line number that is in the process of
         being parsed."""
 
-        return self.full_data[0:self.index].count("\n")+1
+        if cnmrstarparser != None:
+            return cnmrstarparser.get_line_number()
+        else:
+            return self.full_data[0:self.index].count("\n")+1
 
     def get_token(self):
         """ Returns the next token in the parsing process."""
 
-        self.real_get_token()
-        # This is just too VERBOSE
-        if VERBOSE == "very":
-            if self.token:
-                print("'" + self.token + "'")
-            else:
-                print("No more tokens.")
-        return self.token
+        if cnmrstarparser != None:
+            self.token =  cnmrstarparser.get_token()
+            return self.token
+        else:
+
+            self.real_get_token()
+            # This is just too VERBOSE
+            if VERBOSE == "very":
+                if self.token:
+                    print("'" + self.token + "'")
+                else:
+                    print("No more tokens.")
+            return self.token
 
     @staticmethod
     def index_handle(haystack, needle, startpos=None):
@@ -428,8 +442,7 @@ class _Parser(object):
         None instead."""
 
         try:
-            pos = haystack.index(needle, startpos)
-            return pos
+            return haystack.index(needle, startpos)
         except ValueError:
             return None
 
@@ -448,8 +461,11 @@ class _Parser(object):
         """ Parses the string provided as data as an NMR-STAR entry
         and returns the parsed entry. Raises ValueError on exceptions."""
 
-        # Fix DOS line endings
-        self.full_data = data.replace("\r\n", "\n").replace("\r", "\n") + "\n"
+        if cnmrstarparser != None:
+            cnmrstarparser.load_string(data)
+        else:
+            # Fix DOS line endings
+            self.full_data = data.replace("\r\n", "\n").replace("\r", "\n") + "\n"
 
         # Create the NMRSTAR object
         curframe = None
