@@ -18,6 +18,9 @@ typedef struct {
     char last_delineator;
 } parser_data;
 
+// Initialize the parser
+parser_data parser = {NULL, NULL, (void *)1, 0, 0, 0, 0};
+
 //void PyErr_SetString(void);
 
 void reset_parser(parser_data * parser){
@@ -33,14 +36,14 @@ void reset_parser(parser_data * parser){
 
 void print_parser_state(parser_data * parser){
     if (parser->source){
-        //printf("parser(%s):\n", parser->source);
+        printf("parser(%s):\n", parser->source);
     } else {
-        //printf("parser(NULL)\n");
+        printf("parser(NULL)\n");
         return;
     }
-    //printf(" Pos: %lu/%lu\n", parser->index, parser->length);
-    //printf(" Last delim: '%c'\n", parser->last_delineator);
-    //printf(" Last token: '%s'\n\n", parser->token);
+    printf(" Pos: %lu/%lu\n", parser->index, parser->length);
+    printf(" Last delim: '%c'\n", parser->last_delineator);
+    printf(" Last token: '%s'\n\n", parser->token);
 }
 
 /* Return the index of the first match of needle in haystack, or -1 */
@@ -49,10 +52,6 @@ long get_index(char * haystack, char * needle, long start_pos){
     haystack += sizeof(char) * start_pos;
     char * start = strstr(haystack, needle);
 
-    // Word not found
-    //if (!start){
-    //    return -1;
-    //}
     // Return the end if string not found
     if (!start){
         return strlen(haystack) - start_pos;
@@ -70,7 +69,7 @@ void get_file(const char *fname, parser_data * parser){
     FILE *f = fopen(fname, "rb");
     if (!f){
         //PyErr_SetString(PyExc_IOError, "Could not open file.");
-        //printf("Could not open file.");
+        printf("Could not open file.");
         return;
     }
 
@@ -83,7 +82,7 @@ void get_file(const char *fname, parser_data * parser){
     char *string = malloc(fsize + 1);
     if (fread(string, fsize, 1, f) != 1){
         //PyErr_SetString(PyExc_IOError, "Short read of file.");
-        //printf("File read error.");
+        printf("File read error.");
         return;
     }
 
@@ -183,13 +182,11 @@ char * get_token(parser_data * parser){
 
     // Nothing left
     if (parser->token == NULL){
-        //printf("get_token called with nothing left.\n");
         return parser->token;
     }
 
     // We're at the end if the index is the length
     if (parser->index >= parser->length){
-        //printf("just got to the end.\n");
         parser->token = NULL;
         return parser->token;
     }
@@ -199,7 +196,6 @@ char * get_token(parser_data * parser){
 
     // Stop if we are at the end
     if (check_finished(parser)){
-        //printf("finished before seen token\n");
         parser->token = NULL;
         return parser->token;
     }
@@ -287,16 +283,13 @@ long get_line_number(parser_data * parser){
 
 int main(int argc, char *argv[]){
 
-    // Initialize the parser
-    parser_data parser = {NULL, NULL, (void *)1, 0, 0, 0, 0};
-
     // Read the file
     get_file(argv[1], &parser);
 
     // Print the tokens
     while(get_token(&parser) != NULL){
         //printf("Token (%lu): %s\n", get_line_number(&parser), parser.token);
-        //printf("Token (%c): %s\n", parser.last_delineator, parser.token);
+        printf("Token (%c): %s\n", parser.last_delineator, parser.token);
     }
     reset_parser(&parser);
 }
