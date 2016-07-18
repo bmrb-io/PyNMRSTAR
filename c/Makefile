@@ -3,4 +3,4 @@ parser: cnmrstarparsermodule.c
 	python setup.py build
 	cp build/*/*.so ..
 clean:
-	rm -rfv parser build/
+	rm -rfv parser build/ ../cnmrstarparser.so
