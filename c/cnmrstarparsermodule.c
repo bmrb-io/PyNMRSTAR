@@ -1,9 +1,9 @@
 #include <Python.h>
 
-//#include <stdio.h>
-//#include <stdlib.h>
-//#include <string.h>
-//#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
 #include <stdbool.h>
 
 // Our whitepspace chars
@@ -26,7 +26,6 @@ void reset_parser(parser_data * parser){
 
     if (parser->source != NULL){
         free(parser->full_data);
-        free(parser->source);
         parser->source = NULL;
     }
 
@@ -105,7 +104,8 @@ void get_file(char *fname, parser_data * parser){
 
 /* Determines if a character is whitespace */
 bool is_whitespace(char test){
-    for (int x=0; x<sizeof(whitespace); x++){
+    int x;
+    for (x=0; x<sizeof(whitespace); x++){
         if (test == whitespace[x]){
             return true;
         }
@@ -218,6 +218,7 @@ char * get_token(parser_data * parser){
         long length = get_index(parser->full_data, search, parser->index);
         parser->index += 2;
         return update_token(parser, length-1);
+        // TODO: Check that multiline comment ended
     }
 
     // Handle values quoted with '
@@ -272,7 +273,8 @@ char * get_token(parser_data * parser){
 // Get the current line number
 long get_line_number(parser_data * parser){
     long num_lines = 0;
-    for (long x = 0; x < parser->index; x++){
+    long x;
+    for (x = 0; x < parser->index; x++){
         if (parser->full_data[x] == '\n'){
             num_lines++;
         }
@@ -333,6 +335,39 @@ PARSE_get_token(PyObject *self)
 }
 
 static PyObject *
+PARSE_get_token_list(PyObject *self)
+{
+    PyObject * str;
+    char * token = get_token(&parser);
+    PyObject * list = PyList_New(0);
+    if (!list)
+        return NULL;
+
+    while (token != NULL){
+
+        // Create a python string
+        str = PyString_FromString(token);
+        if (!str){
+            return NULL;
+        }
+        if (PyList_Append(list, str) != 0){
+            return NULL;
+        }
+
+        // Get the next token
+        token = get_token(&parser);
+
+        // Otherwise we will leak memory
+        Py_DECREF(str);
+    }
+    if (PyList_Reverse(list) != 0){
+        return NULL;
+    }
+
+    return list;
+}
+
+static PyObject *
 PARSE_get_line_no(PyObject *self)
 {
     long line_no;
@@ -348,34 +383,30 @@ PARSE_get_last_delineator(PyObject *self)
 }
 
 static PyMethodDef cnmrstarparserMethods[] = {
-    {"load",  PARSE_load, METH_VARARGS,
+    {"load",  (PyCFunction)PARSE_load, METH_VARARGS,
      "Load a file in preparation to parse."},
-     {"load_string",  PARSE_load_string, METH_VARARGS,
+
+     {"load_string",  (PyCFunction)PARSE_load_string, METH_VARARGS,
      "Load a string in preparation to parse."},
+
      {"get_token",  (PyCFunction)PARSE_get_token, METH_NOARGS,
      "Get one token from the file. Returns NULL when file is exhausted."},
+
+     {"get_token_list",  (PyCFunction)PARSE_get_token_list, METH_NOARGS,
+     "Get all of the tokens as a list."},
+
      {"get_line_number",  (PyCFunction)PARSE_get_line_no, METH_NOARGS,
      "Get the line number of the last token."},
+
      {"get_last_delineator",  (PyCFunction)PARSE_get_last_delineator, METH_NOARGS,
      "Get the last token delineator."},
+
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 
 PyMODINIT_FUNC
 initcnmrstarparser(void)
 {
-    (void) Py_InitModule("cnmrstarparser", cnmrstarparserMethods);
-}
-
-/* Keep here so that the manual build for testing still works. */
-int main(int argc, char *argv[]){
-
-    // Read the file
-    get_file(argv[1], &parser);
-
-    // Print the tokens
-    while(get_token(&parser) != NULL){
-        //printf("Token (%lu): %s\n", get_line_number(&parser), parser.token);
-        printf("Token (%c): %s\n", parser.last_delineator, parser.token);
-    }
+    Py_InitModule3("cnmrstarparser", cnmrstarparserMethods,
+                         "A NMR-STAR parser implemented in C.");
 }
