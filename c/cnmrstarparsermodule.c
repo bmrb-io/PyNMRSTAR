@@ -352,11 +352,11 @@ static PyMethodDef cnmrstarparserMethods[] = {
      "Load a file in preparation to parse."},
      {"load_string",  PARSE_load_string, METH_VARARGS,
      "Load a string in preparation to parse."},
-     {"get_token",  PARSE_get_token, METH_VARARGS,
+     {"get_token",  (PyCFunction)PARSE_get_token, METH_NOARGS,
      "Get one token from the file. Returns NULL when file is exhausted."},
-     {"get_line_number",  PARSE_get_line_no, METH_VARARGS,
+     {"get_line_number",  (PyCFunction)PARSE_get_line_no, METH_NOARGS,
      "Get the line number of the last token."},
-     {"get_last_delineator",  PARSE_get_last_delineator, METH_VARARGS,
+     {"get_last_delineator",  (PyCFunction)PARSE_get_last_delineator, METH_NOARGS,
      "Get the last token delineator."},
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
