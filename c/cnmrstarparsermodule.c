@@ -1,4 +1,9 @@
 #include <Python.h>
+
+//#include <stdio.h>
+//#include <stdlib.h>
+//#include <string.h>
+//#include <errno.h>
 #include <stdbool.h>
 
 // Our whitepspace chars
@@ -6,7 +11,7 @@ char whitespace[4] = " \n\t\v";
 
 // A parser struct to keep track of state
 typedef struct {
-    const char * source;
+    char * source;
     char * full_data;
     char * token;
     long index;
@@ -18,8 +23,13 @@ typedef struct {
 parser_data parser = {NULL, NULL, (void *)1, 0, 0, ' '};
 
 void reset_parser(parser_data * parser){
-    parser->source = NULL;
-    //free(parser->full_data);
+
+    if (parser->source != NULL){
+        free(parser->full_data);
+        free(parser->source);
+        parser->source = NULL;
+    }
+
     parser->full_data = NULL;
     if (parser->token != (void *)1){
         free(parser->token);
@@ -27,7 +37,7 @@ void reset_parser(parser_data * parser){
     parser->token = (void *)1;
     parser->index = 0;
     parser->length = 0;
-    parser->last_delineator = 0;
+    parser->last_delineator = ' ';
 }
 
 void print_parser_state(parser_data * parser){
@@ -58,7 +68,7 @@ long get_index(char * haystack, char * needle, long start_pos){
     return diff;
 }
 
-void get_file(const char *fname, parser_data * parser){
+void get_file(char *fname, parser_data * parser){
     //printf("Parsing: %s\n", fname);
 
     reset_parser(parser);
@@ -90,7 +100,7 @@ void get_file(const char *fname, parser_data * parser){
     parser->length = fsize;
     parser->source = fname;
     parser->index = 0;
-    parser->last_delineator = 0;
+    parser->last_delineator = ' ';
 }
 
 /* Determines if a character is whitespace */
@@ -281,19 +291,19 @@ long get_line_number(parser_data * parser){
 
 
 
-
-
 static PyObject *
 PARSE_load(PyObject *self, PyObject *args)
 {
-    const char *file;
+    char *file;
 
     if (!PyArg_ParseTuple(args, "s", &file))
         return NULL;
 
     // Read the file
     get_file(file, &parser);
-    return Py_BuildValue("");
+
+    Py_INCREF(Py_None);
+    return Py_None;
 }
 
 static PyObject *
@@ -309,12 +319,12 @@ PARSE_load_string(PyObject *self, PyObject *args)
     parser.full_data = data;
     parser.length = strlen(data);
 
-    //Py_INCREF(Py_None);
+    Py_INCREF(Py_None);
     return Py_None;
 }
 
 static PyObject *
-PARSE_get_token(PyObject *self, PyObject *args)
+PARSE_get_token(PyObject *self)
 {
     char * token;
     token = get_token(&parser);
@@ -323,7 +333,7 @@ PARSE_get_token(PyObject *self, PyObject *args)
 }
 
 static PyObject *
-PARSE_get_line_no(PyObject *self, PyObject *args)
+PARSE_get_line_no(PyObject *self)
 {
     long line_no;
     line_no = get_line_number(&parser);
@@ -332,7 +342,7 @@ PARSE_get_line_no(PyObject *self, PyObject *args)
 }
 
 static PyObject *
-PARSE_get_last_delineator(PyObject *self, PyObject *args)
+PARSE_get_last_delineator(PyObject *self)
 {
     return Py_BuildValue("c", parser.last_delineator);
 }
