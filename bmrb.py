@@ -431,7 +431,7 @@ class _Parser(object):
         """ Returns the next token in the parsing process."""
 
         if cnmrstarparser != None:
-            self.token =  cnmrstarparser.get_token()
+            self.token = cnmrstarparser.get_token()
             return self.token
         else:
 
@@ -617,7 +617,7 @@ class _Parser(object):
 
                 # Close saveframe
                 elif self.token == "save_":
-                    if self.get_delineator() != " ":
+                    if self.get_delineator() not in " ;":
                         raise ValueError("The save_ keyword may not be quoted "
                                          "or semicolon-delineated.",
                                          self.get_line_number())
@@ -779,7 +779,7 @@ class _Parser(object):
             # Make sure we don't stop for quotes that are not followed
             #  by whitespace
             try:
-                while tmp[until+1:until+2] not in " \t\n":
+                while tmp[until+1:until+2] not in _WHITESPACE:
                     until = self.index_handle(tmp, "'", until+1)
             except TypeError:
                 raise ValueError("Invalid file. Single quoted value was never "
