@@ -7,6 +7,7 @@
 
 // Our whitepspace chars
 char whitespace[4] = " \n\t\v";
+bool verbose = false;
 
 // A parser struct to keep track of state
 typedef struct {
@@ -67,9 +68,7 @@ long get_index(char * haystack, char * needle, long start_pos){
 }
 
 void get_file(char *fname, parser_data * parser){
-    //printf("Parsing: %s\n", fname);
 
-    printf("%p\n", done_parsing);
     reset_parser(parser);
 
     // Open the file
@@ -136,7 +135,7 @@ void pass_whitespace(parser_data * parser){
 
 /* Determines if we are done parsing. */
 bool check_finished(parser_data * parser){
-    if (parser->index == parser->length){
+    if (parser->index >= parser->length){
         free(parser->token);
         parser->token = done_parsing;
         return true;
@@ -386,6 +385,8 @@ PARSE_get_token(PyObject *self)
         return Py_None;
     }
 
+    if (verbose)
+        printf("Token: %s\n", token);
     return Py_BuildValue("s", token);
 }
 
