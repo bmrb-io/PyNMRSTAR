@@ -39,18 +39,6 @@ void reset_parser(parser_data * parser){
     parser->last_delineator = ' ';
 }
 
-void print_parser_state(parser_data * parser){
-    if (parser->source){
-        printf("parser(%s):\n", parser->source);
-    } else {
-        printf("parser(NULL)\n");
-        return;
-    }
-    printf(" Pos: %lu/%lu\n", parser->index, parser->length);
-    printf(" Last delim: '%c'\n", parser->last_delineator);
-    printf(" Last token: '%s'\n\n", parser->token);
-}
-
 /* Return the index of the first match of needle in haystack, or -1 */
 long get_index(char * haystack, char * needle, long start_pos){
 
@@ -133,16 +121,6 @@ void pass_whitespace(parser_data * parser){
     }
 }
 
-/* Determines if we are done parsing. */
-bool check_finished(parser_data * parser){
-    if (parser->index >= parser->length){
-        free(parser->token);
-        parser->token = done_parsing;
-        return true;
-    }
-    return false;
-}
-
 bool check_multiline(parser_data * parser, long length){
     long x;
     for (x=parser->index; x <= parser->index+length; x++){
@@ -199,7 +177,7 @@ long get_line_number(parser_data * parser){
 char * get_token(parser_data * parser){
 
     // Reset the delineator
-    parser->last_delineator = '\0';
+    parser->last_delineator = '?';
 
     // Set up a tmp str pointer to use for searches
     char * search;
@@ -215,7 +193,9 @@ char * get_token(parser_data * parser){
     pass_whitespace(parser);
 
     // Stop if we are at the end
-    if (check_finished(parser)){
+    if (parser->index >= parser->length){
+        free(parser->token);
+        parser->token = done_parsing;
         return parser->token;
     }
 
@@ -226,6 +206,7 @@ char * get_token(parser_data * parser){
 
         // Handle the edge case where this is the last line of the file and there is no newline
         if (length == -1){
+            free(parser->token);
             parser->token = done_parsing;
             return parser->token;
         }
@@ -244,6 +225,7 @@ char * get_token(parser_data * parser){
         if (length == -1){
             snprintf(err, err_size-1, "Invalid file. Semicolon-delineated value was not terminated. Error on line: %ld", get_line_number(parser));
             PyErr_SetString(PyExc_ValueError, err);
+            free(parser->token);
             parser->token = NULL;
             return parser->token;
         }
@@ -261,6 +243,7 @@ char * get_token(parser_data * parser){
         if (end_quote == -1){
             snprintf(err, err_size-1, "Invalid file. Single quoted value was not terminated. Error on line: %ld", get_line_number(parser));
             PyErr_SetString(PyExc_ValueError, err);
+            free(parser->token);
             parser->token = NULL;
             return parser->token;
         }
@@ -270,7 +253,7 @@ char * get_token(parser_data * parser){
             long next_index = get_index(parser->full_data, search, parser->index+end_quote+2);
             if (next_index == -1){
                 PyErr_SetString(PyExc_ValueError, "Invalid file. Single quoted value was never terminated at end of file.");
-                parser->index = parser->length;
+                free(parser->token);
                 parser->token = NULL;
                 return parser->token;
             }
@@ -281,6 +264,7 @@ char * get_token(parser_data * parser){
         if (check_multiline(parser, end_quote)){
             snprintf(err, err_size-1, "Invalid file. Single quoted value was not terminated on the same line it began. Error on line: %ld", get_line_number(parser));
             PyErr_SetString(PyExc_ValueError, err);
+            free(parser->token);
             parser->token = NULL;
             return parser->token;
         }
@@ -299,6 +283,7 @@ char * get_token(parser_data * parser){
         if (end_quote == -1){
             snprintf(err, err_size-1, "Invalid file. Double quoted value was not terminated. Error on line: %ld", get_line_number(parser));
             PyErr_SetString(PyExc_ValueError, err);
+            free(parser->token);
             parser->token = NULL;
             return parser->token;
         }
@@ -308,7 +293,7 @@ char * get_token(parser_data * parser){
             long next_index = get_index(parser->full_data, search, parser->index+end_quote+2);
             if (next_index == -1){
                 PyErr_SetString(PyExc_ValueError, "Invalid file. Double quoted value was never terminated at end of file.");
-                parser->index = parser->length;
+                free(parser->token);
                 parser->token = NULL;
                 return parser->token;
             }
@@ -319,6 +304,7 @@ char * get_token(parser_data * parser){
         if (check_multiline(parser, end_quote)){
             snprintf(err, err_size-1, "Invalid file. Double quoted value was not terminated on the same line it began. Error on line: %ld", get_line_number(parser));
             PyErr_SetString(PyExc_ValueError, err);
+            free(parser->token);
             parser->token = NULL;
             return parser->token;
         }
