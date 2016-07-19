@@ -98,6 +98,12 @@ else:
     from cStringIO import StringIO
     BytesIO = StringIO
 
+# See if we can use the fast tokenizer
+try:
+    import cnmrstarparser
+except ImportError:
+    cnmrstarparser = None
+
 #############################################
 #            Global Variables               #
 #############################################
@@ -402,24 +408,41 @@ class _Parser(object):
         self.index = 0
         self.token = ""
         self.source = "unknown"
-        self.last_delineator = ""
+        self.last_delineator = " "
 
     def get_line_number(self):
         """ Returns the current line number that is in the process of
         being parsed."""
 
-        return self.full_data[0:self.index].count("\n")+1
+        if cnmrstarparser != None:
+            return cnmrstarparser.get_line_number()
+        else:
+            return self.full_data[0:self.index].count("\n")+1
+
+    def get_delineator(self):
+        """ Returns the delineator for the last token."""
+
+        if cnmrstarparser != None:
+            return cnmrstarparser.get_last_delineator()
+        else:
+            return self.last_delineator
 
     def get_token(self):
         """ Returns the next token in the parsing process."""
 
-        self.real_get_token()
+        if cnmrstarparser != None:
+            self.token = cnmrstarparser.get_token()
+        else:
+            self.real_get_token()
+
         # This is just too VERBOSE
         if VERBOSE == "very":
             if self.token:
                 print("'" + self.token + "'")
             else:
                 print("No more tokens.")
+
+        # Return the token
         return self.token
 
     @staticmethod
@@ -428,8 +451,7 @@ class _Parser(object):
         None instead."""
 
         try:
-            pos = haystack.index(needle, startpos)
-            return pos
+            return haystack.index(needle, startpos)
         except ValueError:
             return None
 
@@ -448,8 +470,13 @@ class _Parser(object):
         """ Parses the string provided as data as an NMR-STAR entry
         and returns the parsed entry. Raises ValueError on exceptions."""
 
-        # Fix DOS line endings
-        self.full_data = data.replace("\r\n", "\n").replace("\r", "\n") + "\n"
+        data = data.replace("\r\n", "\n").replace("\r", "\n")
+
+        if cnmrstarparser != None:
+            cnmrstarparser.load_string(data)
+        else:
+            # Fix DOS line endings
+            self.full_data = data + "\n"
 
         # Create the NMRSTAR object
         curframe = None
@@ -471,7 +498,7 @@ class _Parser(object):
             raise ValueError("'data_' must be followed by data name. Simply "
                              "'data_' is not allowed.", self.get_line_number())
 
-        if self.last_delineator != "":
+        if self.get_delineator() != " ":
             raise ValueError("The data_ keyword may not be quoted or "
                              "semicolon-delineated.")
 
@@ -493,7 +520,7 @@ class _Parser(object):
                                  "without a specified saveframe name.",
                                  self.get_line_number())
 
-            if self.last_delineator != "":
+            if self.get_delineator() != " ":
                 raise ValueError("The save_ keyword may not be quoted or "
                                  "semicolon-delineated.",
                                  self.get_line_number())
@@ -506,7 +533,7 @@ class _Parser(object):
             while self.get_token() != None:
 
                 if self.token == "loop_":
-                    if self.last_delineator != "":
+                    if self.get_delineator() != " ":
                         raise ValueError("The loop_ keyword may not be quoted "
                                          "or semicolon-delineated.",
                                          self.get_line_number())
@@ -521,7 +548,7 @@ class _Parser(object):
 
                         # Add a column
                         if self.token.startswith("_"):
-                            if self.last_delineator != "":
+                            if self.get_delineator() != " ":
                                 raise ValueError("Loop tags may not be quoted "
                                                  "or semicolon-delineated.",
                                                  self.get_line_number())
@@ -536,7 +563,7 @@ class _Parser(object):
                             # We are in the data block of a loop
                             while self.token != None:
                                 if self.token == "stop_":
-                                    if self.last_delineator != "":
+                                    if self.get_delineator() != " ":
                                         raise ValueError("The stop_ keyword may"
                                                          " not be quoted or "
                                                          "semicolon-delineated.",
@@ -571,7 +598,7 @@ class _Parser(object):
                                                          self.get_line_number())
 
                                     if (self.token in self.reserved and
-                                            self.last_delineator == ""):
+                                            self.get_delineator() == " "):
                                         raise ValueError("Cannot use keywords "
                                                          "as data values unless"
                                                          " quoted or semi-colon"
@@ -593,7 +620,7 @@ class _Parser(object):
 
                 # Close saveframe
                 elif self.token == "save_":
-                    if self.last_delineator != "":
+                    if self.get_delineator() not in " ;":
                         raise ValueError("The save_ keyword may not be quoted "
                                          "or semicolon-delineated.",
                                          self.get_line_number())
@@ -618,7 +645,7 @@ class _Parser(object):
 
                 # Add a tag
                 else:
-                    if self.last_delineator != "":
+                    if self.get_delineator() != " ":
                         raise ValueError("Saveframe tags may not be quoted or "
                                          "semicolon-delineated.",
                                          self.get_line_number())
@@ -627,7 +654,7 @@ class _Parser(object):
                     # We are in a saveframe and waiting for the saveframe tag
                     self.get_token()
                     if (self.token in self.reserved and
-                            self.last_delineator == ""):
+                            self.get_delineator() == " "):
                         raise ValueError("Cannot use keywords as data values "
                                          "unless quoted or semi-colon "
                                          "delineated. Illegal value: " +
@@ -648,7 +675,7 @@ class _Parser(object):
         is just a wrapper around this with some exception handling."""
 
         # Reset the delineator
-        self.last_delineator = ""
+        self.last_delineator = " "
 
         # Nothing left
         if self.token is None:
@@ -755,7 +782,7 @@ class _Parser(object):
             # Make sure we don't stop for quotes that are not followed
             #  by whitespace
             try:
-                while tmp[until+1:until+2] not in " \t\n":
+                while tmp[until+1:until+2] not in _WHITESPACE:
                     until = self.index_handle(tmp, "'", until+1)
             except TypeError:
                 raise ValueError("Invalid file. Single quoted value was never "
@@ -777,7 +804,7 @@ class _Parser(object):
             # Make sure we don't stop for quotes that are not followed
             #  by whitespace
             try:
-                while tmp[until+1:until+2] not in " \t\n":
+                while tmp[until+1:until+2] not in _WHITESPACE:
                     until = self.index_handle(tmp, '"', until+1)
             except TypeError:
                 raise ValueError("Invalid file. Double quoted value was never "
@@ -1822,7 +1849,7 @@ class Saveframe(object):
                 else:
                     ret_string += pstring % (each_tag[0], clean_tag)
             else:
-                formatted_tag = self.tag_prefix+"."+each_tag[0]
+                formatted_tag = self.tag_prefix + "." + each_tag[0]
                 if "\n" in clean_tag:
                     ret_string += mstring % (formatted_tag, clean_tag)
                 else:
