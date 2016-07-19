@@ -432,17 +432,18 @@ class _Parser(object):
 
         if cnmrstarparser != None:
             self.token = cnmrstarparser.get_token()
-            return self.token
         else:
-
             self.real_get_token()
-            # This is just too VERBOSE
-            if VERBOSE == "very":
-                if self.token:
-                    print("'" + self.token + "'")
-                else:
-                    print("No more tokens.")
-            return self.token
+
+        # This is just too VERBOSE
+        if VERBOSE == "very":
+            if self.token:
+                print("'" + self.token + "'")
+            else:
+                print("No more tokens.")
+
+        # Return the token
+        return self.token
 
     @staticmethod
     def index_handle(haystack, needle, startpos=None):
@@ -469,11 +470,13 @@ class _Parser(object):
         """ Parses the string provided as data as an NMR-STAR entry
         and returns the parsed entry. Raises ValueError on exceptions."""
 
+        data = data.replace("\r\n", "\n").replace("\r", "\n")
+
         if cnmrstarparser != None:
             cnmrstarparser.load_string(data)
         else:
             # Fix DOS line endings
-            self.full_data = data.replace("\r\n", "\n").replace("\r", "\n") + "\n"
+            self.full_data = data + "\n"
 
         # Create the NMRSTAR object
         curframe = None

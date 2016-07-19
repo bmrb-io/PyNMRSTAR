@@ -1,11 +1,10 @@
 from distutils.core import setup, Extension
 
-module1 = Extension('cnmrstarparser',
-                    sources = ['cnmrstarparsermodule.c'])
-#,
-#                    extra_compile_args=["-funroll-loops", "-O3"])
+cnmrstarparser = Extension('cnmrstarparser',
+                    sources = ['cnmrstarparsermodule.c'],
+                    extra_compile_args=["-funroll-loops", "-O3"])
 
 setup (name = 'cNMR-STAR Parser',
        version = '1.0',
        description = 'This is a really fast NMR-STAR parser.',
-       ext_modules = [module1])
+       ext_modules = [cnmrstarparser])
