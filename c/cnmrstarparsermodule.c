@@ -1,6 +1,10 @@
 #include <Python.h>
 #include <stdbool.h>
 
+// Use for returning errors
+#define err_size 500
+#define done_parsing  (void *)1
+
 // Our whitepspace chars
 char whitespace[4] = " \n\t\v";
 
@@ -15,7 +19,7 @@ typedef struct {
 } parser_data;
 
 // Initialize the parser
-parser_data parser = {NULL, NULL, (void *)1, 0, 0, ' '};
+parser_data parser = {NULL, NULL, done_parsing, 0, 0, ' '};
 
 void reset_parser(parser_data * parser){
 
@@ -25,10 +29,10 @@ void reset_parser(parser_data * parser){
     }
 
     parser->full_data = NULL;
-    if (parser->token != (void *)1){
+    if (parser->token != done_parsing){
         free(parser->token);
     }
-    parser->token = (void *)1;
+    parser->token = NULL;
     parser->index = 0;
     parser->length = 0;
     parser->last_delineator = ' ';
@@ -54,7 +58,7 @@ long get_index(char * haystack, char * needle, long start_pos){
 
     // Return the end if string not found
     if (!start){
-        return strlen(haystack) - start_pos;
+        return -1;
     }
 
     // Calculate the length into start is the new word
@@ -65,6 +69,7 @@ long get_index(char * haystack, char * needle, long start_pos){
 void get_file(char *fname, parser_data * parser){
     //printf("Parsing: %s\n", fname);
 
+    printf("%p\n", done_parsing);
     reset_parser(parser);
 
     // Open the file
@@ -123,32 +128,41 @@ long get_next_whitespace(char * string, long start_pos){
 
 /* Scan the index to the next non-whitespace char */
 void pass_whitespace(parser_data * parser){
-
-    //printf("Scan from %ld\n", parser->index);
     while ((parser->index < parser->length) &&
             (is_whitespace(parser->full_data[parser->index]))){
         parser->index++;
     }
-    //printf("Scan to %ld\n", parser->index);
 }
 
 /* Determines if we are done parsing. */
 bool check_finished(parser_data * parser){
     if (parser->index == parser->length){
         free(parser->token);
-        parser->token = NULL;
+        parser->token = done_parsing;
         return true;
     }
     return false;
 }
 
+bool check_multiline(parser_data * parser, long length){
+    long x;
+    for (x=parser->index; x <= parser->index+length; x++){
+        if (parser->full_data[x] == '\n'){
+            return true;
+        }
+    }
+    return false;
+
+}
+
 /* Returns a new token char * */
 char * update_token(parser_data * parser, long length){
 
-    if (parser->token != (void *)1){
+    if (parser->token != done_parsing){
         free(parser->token);
     }
     parser->token = malloc(length+1);
+    //printf("index %ld par_len %ld my_len %ld\n", parser->index, parser->length, length);
     memcpy(parser->token, &parser->full_data[parser->index], length);
     parser->token[length] = '\0';
 
@@ -170,6 +184,19 @@ char * update_token(parser_data * parser, long length){
     return parser->token;
 }
 
+
+// Get the current line number
+long get_line_number(parser_data * parser){
+    long num_lines = 0;
+    long x;
+    for (x = 0; x < parser->index; x++){
+        if (parser->full_data[x] == '\n'){
+            num_lines++;
+        }
+    }
+    return num_lines + 1;
+}
+
 char * get_token(parser_data * parser){
 
     // Reset the delineator
@@ -177,15 +204,11 @@ char * get_token(parser_data * parser){
 
     // Set up a tmp str pointer to use for searches
     char * search;
+    // And an error char array
+    char err[err_size] = "Unknown error.";
 
     // Nothing left
-    if (parser->token == NULL){
-        return parser->token;
-    }
-
-    // We're at the end if the index is the length
-    if (parser->index >= parser->length){
-        parser->token = NULL;
+    if (parser->token == done_parsing){
         return parser->token;
     }
 
@@ -194,26 +217,40 @@ char * get_token(parser_data * parser){
 
     // Stop if we are at the end
     if (check_finished(parser)){
-        parser->token = NULL;
         return parser->token;
     }
 
     // See if this is a comment - if so skip it
     if (parser->full_data[parser->index] == '#'){
         search = "\n";
-        //printf("Skipping comment of length: %ld\n", get_index(parser->full_data, search, parser->index));
-        parser->index += get_index(parser->full_data, search, parser->index);
+        long length = get_index(parser->full_data, search, parser->index);
+
+        // Handle the edge case where this is the last line of the file and there is no newline
+        if (length == -1){
+            parser->token = done_parsing;
+            return parser->token;
+        }
+
+        // Skip to the next non-comment
+        parser->index += length;
         return get_token(parser);
     }
 
     // See if this is a multiline comment
     if ((parser->length - parser->index > 1) && (parser->full_data[parser->index] == ';') && (parser->full_data[parser->index+1] == '\n')){
-        //printf("Multiline\n");
         search = "\n;";
         long length = get_index(parser->full_data, search, parser->index);
+
+        // Handle the edge case where this is the last line of the file and there is no newline
+        if (length == -1){
+            snprintf(err, err_size-1, "Invalid file. Semicolon-delineated value was not terminated. Error on line: %ld", get_line_number(parser));
+            PyErr_SetString(PyExc_ValueError, err);
+            parser->token = NULL;
+            return parser->token;
+        }
+
         parser->index += 2;
         return update_token(parser, length-1);
-        // TODO: Check that multiline comment ended
     }
 
     // Handle values quoted with '
@@ -221,16 +258,32 @@ char * get_token(parser_data * parser){
         search = "'";
         long end_quote = get_index(parser->full_data, search, parser->index + 1);
 
-        if (parser->index + end_quote == parser->length){
-            PyErr_SetString(PyExc_IOError, "Invalid file. Single quoted value was never terminated.");
-            parser->index = parser->length;
+        // Handle the case where there is no terminating quote in the file
+        if (end_quote == -1){
+            snprintf(err, err_size-1, "Invalid file. Single quoted value was not terminated. Error on line: %ld", get_line_number(parser));
+            PyErr_SetString(PyExc_ValueError, err);
             parser->token = NULL;
             return parser->token;
         }
 
         // Make sure we don't stop for quotes that are not followed by whitespace
         while ((parser->index+end_quote+2 < parser->length) && (!is_whitespace(parser->full_data[parser->index+end_quote+2]))){
-            end_quote += get_index(parser->full_data, search, parser->index+end_quote+2) + 1;
+            long next_index = get_index(parser->full_data, search, parser->index+end_quote+2);
+            if (next_index == -1){
+                PyErr_SetString(PyExc_ValueError, "Invalid file. Single quoted value was never terminated at end of file.");
+                parser->index = parser->length;
+                parser->token = NULL;
+                return parser->token;
+            }
+            end_quote += next_index + 1;
+        }
+
+        // See if the quote has a newline
+        if (check_multiline(parser, end_quote)){
+            snprintf(err, err_size-1, "Invalid file. Single quoted value was not terminated on the same line it began. Error on line: %ld", get_line_number(parser));
+            PyErr_SetString(PyExc_ValueError, err);
+            parser->token = NULL;
+            return parser->token;
         }
 
         // Move the index 1 to skip the '
@@ -243,16 +296,32 @@ char * get_token(parser_data * parser){
         search = "\"";
         long end_quote = get_index(parser->full_data, search, parser->index + 1);
 
-        if (parser->index + end_quote == parser->length){
-            PyErr_SetString(PyExc_IOError, "Invalid file. Double quoted value was never terminated.");
-            parser->index = parser->length;
+        // Handle the case where there is no terminating quote in the file
+        if (end_quote == -1){
+            snprintf(err, err_size-1, "Invalid file. Double quoted value was not terminated. Error on line: %ld", get_line_number(parser));
+            PyErr_SetString(PyExc_ValueError, err);
             parser->token = NULL;
             return parser->token;
         }
 
         // Make sure we don't stop for quotes that are not followed by whitespace
         while ((parser->index+end_quote+2 < parser->length) && (!is_whitespace(parser->full_data[parser->index+end_quote+2]))){
-            end_quote += get_index(parser->full_data, search, parser->index+end_quote+2) + 1;
+            long next_index = get_index(parser->full_data, search, parser->index+end_quote+2);
+            if (next_index == -1){
+                PyErr_SetString(PyExc_ValueError, "Invalid file. Double quoted value was never terminated at end of file.");
+                parser->index = parser->length;
+                parser->token = NULL;
+                return parser->token;
+            }
+            end_quote += next_index + 1;
+        }
+
+        // See if the quote has a newline
+        if (check_multiline(parser, end_quote)){
+            snprintf(err, err_size-1, "Invalid file. Double quoted value was not terminated on the same line it began. Error on line: %ld", get_line_number(parser));
+            PyErr_SetString(PyExc_ValueError, err);
+            parser->token = NULL;
+            return parser->token;
         }
 
         // Move the index 1 to skip the "
@@ -264,26 +333,6 @@ char * get_token(parser_data * parser){
     long end_pos = get_next_whitespace(parser->full_data, parser->index);
     return update_token(parser, end_pos - parser->index);
 }
-
-// Get the current line number
-long get_line_number(parser_data * parser){
-    long num_lines = 0;
-    long x;
-    for (x = 0; x < parser->index; x++){
-        if (parser->full_data[x] == '\n'){
-            num_lines++;
-        }
-    }
-    return num_lines;
-}
-
-
-
-
-
-
-
-
 
 
 
@@ -326,6 +375,17 @@ PARSE_get_token(PyObject *self)
     char * token;
     token = get_token(&parser);
 
+    // Pass errors up the chain
+    if (token == NULL){
+        return NULL;
+    }
+
+    // Return python none if done parsing
+    if (token == done_parsing){
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
     return Py_BuildValue("s", token);
 }
 
@@ -333,12 +393,16 @@ static PyObject *
 PARSE_get_token_list(PyObject *self)
 {
     PyObject * str;
-    char * token = get_token(&parser);
     PyObject * list = PyList_New(0);
     if (!list)
         return NULL;
 
-    while (token != NULL){
+    char * token = get_token(&parser);
+    // Pass errors up the chain
+    if (token == NULL)
+        return NULL;
+
+    while (token != done_parsing){
 
         // Create a python string
         str = PyString_FromString(token);
@@ -351,6 +415,10 @@ PARSE_get_token_list(PyObject *self)
 
         // Get the next token
         token = get_token(&parser);
+
+        // Pass errors up the chain
+        if (token == NULL)
+            return NULL;
 
         // Otherwise we will leak memory
         Py_DECREF(str);
