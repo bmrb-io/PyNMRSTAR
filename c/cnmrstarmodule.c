@@ -58,7 +58,7 @@ long get_index(char * haystack, char * needle, long start_pos){
     return diff;
 }
 
-/* Use to look for common unset bits between strings. */
+/* Use to look for common unset bits between strings.
 void get_common_bits(void){
     char one[5] = "data_";
     char two[5] = "save_";
@@ -83,7 +83,7 @@ void get_common_bits(void){
         }
     }
     return;
-}
+}*/
 
 
 void get_file(char *fname, parser_data * parser){
