@@ -1,10 +1,10 @@
 from distutils.core import setup, Extension
 
-cnmrstarparser = Extension('cnmrstarparser',
-                    sources = ['cnmrstarparsermodule.c'],
+cnmrstar = Extension('cnmrstar',
+                    sources = ['cnmrstarmodule.c'],
                     extra_compile_args=["-funroll-loops", "-O3"])
 
-setup (name = 'cNMR-STAR Parser',
+setup (name = 'cNMR-STAR Tools',
        version = '1.0',
-       description = 'This is a really fast NMR-STAR parser.',
-       ext_modules = [cnmrstarparser])
+       description = 'This contains a really fast NMR-STAR tokenizer and value sanitizer.',
+       ext_modules = [cnmrstar])

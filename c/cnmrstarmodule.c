@@ -596,7 +596,7 @@ PARSE_get_last_delineator(PyObject *self)
     return Py_BuildValue("c", parser.last_delineator);
 }
 
-static PyMethodDef cnmrstarparserMethods[] = {
+static PyMethodDef cnmrstarMethods[] = {
     {"clean_value",  (PyCFunction)clean_string, METH_VARARGS,
      "Properly quote or encapsulate a value before printing."},
 
@@ -622,8 +622,8 @@ static PyMethodDef cnmrstarparserMethods[] = {
 };
 
 PyMODINIT_FUNC
-initcnmrstarparser(void)
+initcnmrstar(void)
 {
-    Py_InitModule3("cnmrstarparser", cnmrstarparserMethods,
+    Py_InitModule3("cnmrstar", cnmrstarMethods,
                          "A NMR-STAR parser implemented in C.");
 }
