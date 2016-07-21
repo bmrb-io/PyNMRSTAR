@@ -441,7 +441,7 @@ class _Parser(object):
     def get_token(self):
         """ Returns the next token in the parsing process."""
 
-        if cnmrstar != None:
+        if cnmrstar is not None:
             self.token = cnmrstar.get_token()
         else:
             self.real_get_token()
@@ -1255,7 +1255,7 @@ class Entry(object):
 
         # Until the migration is complete, 'bmrb_id' is a synonym for
         #  'entry_id'
-        if not 'entry_id' in json_dict:
+        if 'entry_id' not in json_dict:
             json_dict['entry_id'] = json_dict['bmrb_id']
 
         # Create an entry from scratch and populate it
