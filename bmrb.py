@@ -104,6 +104,19 @@ try:
 except ImportError:
     cnmrstarparser = None
 
+# See if we can import from_iterable
+try:
+    from itertools import chain as _chain
+    _from_iterable = _chain.from_iterable
+except ImportError:
+    def _from_iterable(iterables):
+        """ A simple implementation of chain.from_iterable.
+        As such: _from_iterable(['ABC', 'DEF']) --> A B C D E F """
+
+        for item in iterables:
+            for element in item:
+                yield element
+
 #############################################
 #            Global Variables               #
 #############################################
@@ -200,10 +213,16 @@ def clean_value(value):
     # Allow manual specification of conversions for booleans, Nones, etc.
     if value in STR_CONVERSION_DICT:
         if any(isinstance(value, type(x)) for x in STR_CONVERSION_DICT):
-        # The additional check prevents numerical types from being
-        # interpreted as booleans. This is PROVIDED the dictionary
-        # does not contain both numericals and booleans
             value = STR_CONVERSION_DICT[value]
+
+    # Use the fast code if it is available
+    if cnmrstarparser != None:
+        # It's faster to assume we are working with a string and catch
+        #  errors than to check the instance for every object and convert
+        try:
+            return cnmrstarparser.clean_value(value)
+        except (ValueError, TypeError):
+            return cnmrstarparser.clean_value(str(value))
 
     # Convert non-string types to string
     if not isinstance(value, str):
@@ -288,14 +307,6 @@ def _format_tag(value):
     if '.' in value:
         value = value[value.index('.')+1:]
     return value
-
-def _from_iterable(iterables):
-    """ A simple implementation of chain.from_iterable.
-    As such: _from_iterable(['ABC', 'DEF']) --> A B C D E F """
-
-    for item in iterables:
-        for element in item:
-            yield element
 
 def _get_schema(passed_schema=None):
     """If passed a schema (not None) it returns it. If passed none,
@@ -1141,9 +1152,8 @@ class Entry(object):
     def __str__(self):
         """Returns the entire entry in STAR format as a string."""
 
-        ret_string = "data_%s\n\n" % self.entry_id
-        for frame in self.frame_list:
-            ret_string += str(frame) + "\n"
+        ret_string = ("data_%s\n\n" % self.entry_id +
+                      "\n".join([str(frame) for frame in self.frame_list]))
         return ret_string
 
     @classmethod
@@ -2397,6 +2407,8 @@ class Loop(object):
 
         ret_string += "\n"
 
+        row_strings = []
+
         if len(self.data) != 0:
 
             # Make a copy of the data
@@ -2420,12 +2432,12 @@ class Loop(object):
                     if "\n" in item:
                         datum[pos] = "\n;\n%s;\n" % item
 
-                # Print the data (combine the columns widths with their data)
+                # Print the data (combine the column's widths with their data)
                 column_width_list = [d for d in zip(title_widths, datum)]
-                ret_string += pstring % tuple(_from_iterable(column_width_list))
+                row_strings.append(pstring % tuple(_from_iterable(column_width_list)))
 
         # Close the loop
-        ret_string += "   stop_\n"
+        ret_string += "".join(row_strings) + "   stop_\n"
         return ret_string
 
     @classmethod
