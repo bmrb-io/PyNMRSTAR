@@ -100,9 +100,9 @@ else:
 
 # See if we can use the fast tokenizer
 try:
-    import cnmrstarparser
+    import cnmrstar
 except ImportError:
-    cnmrstarparser = None
+    cnmrstar = None
 
 # See if we can import from_iterable
 try:
@@ -216,13 +216,13 @@ def clean_value(value):
             value = STR_CONVERSION_DICT[value]
 
     # Use the fast code if it is available
-    if cnmrstarparser != None:
+    if cnmrstar != None:
         # It's faster to assume we are working with a string and catch
         #  errors than to check the instance for every object and convert
         try:
-            return cnmrstarparser.clean_value(value)
+            return cnmrstar.clean_value(value)
         except (ValueError, TypeError):
-            return cnmrstarparser.clean_value(str(value))
+            return cnmrstar.clean_value(str(value))
 
     # Convert non-string types to string
     if not isinstance(value, str):
@@ -425,24 +425,24 @@ class _Parser(object):
         """ Returns the current line number that is in the process of
         being parsed."""
 
-        if cnmrstarparser != None:
-            return cnmrstarparser.get_line_number()
+        if cnmrstar != None:
+            return cnmrstar.get_line_number()
         else:
             return self.full_data[0:self.index].count("\n")+1
 
     def get_delineator(self):
         """ Returns the delineator for the last token."""
 
-        if cnmrstarparser != None:
-            return cnmrstarparser.get_last_delineator()
+        if cnmrstar != None:
+            return cnmrstar.get_last_delineator()
         else:
             return self.last_delineator
 
     def get_token(self):
         """ Returns the next token in the parsing process."""
 
-        if cnmrstarparser != None:
-            self.token = cnmrstarparser.get_token()
+        if cnmrstar != None:
+            self.token = cnmrstar.get_token()
         else:
             self.real_get_token()
 
@@ -483,8 +483,8 @@ class _Parser(object):
 
         data = data.replace("\r\n", "\n").replace("\r", "\n")
 
-        if cnmrstarparser != None:
-            cnmrstarparser.load_string(data)
+        if cnmrstar != None:
+            cnmrstar.load_string(data)
         else:
             # Fix DOS line endings
             self.full_data = data + "\n"
