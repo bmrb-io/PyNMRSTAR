@@ -20,6 +20,9 @@ else:
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
 import bmrb
 
+if bmrb.cnmrstar:
+    print("Using C library...")
+
 # We will use this for our tests
 our_path = os.path.dirname(os.path.realpath(__file__))
 database_entry = bmrb.Entry.from_database(15000)

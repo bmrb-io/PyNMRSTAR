@@ -98,6 +98,25 @@ else:
     from cStringIO import StringIO
     BytesIO = StringIO
 
+# See if we can use the fast tokenizer
+try:
+    import cnmrstar
+except ImportError:
+    cnmrstar = None
+
+# See if we can import from_iterable
+try:
+    from itertools import chain as _chain
+    _from_iterable = _chain.from_iterable
+except ImportError:
+    def _from_iterable(iterables):
+        """ A simple implementation of chain.from_iterable.
+        As such: _from_iterable(['ABC', 'DEF']) --> A B C D E F """
+
+        for item in iterables:
+            for element in item:
+                yield element
+
 #############################################
 #            Global Variables               #
 #############################################
@@ -194,10 +213,16 @@ def clean_value(value):
     # Allow manual specification of conversions for booleans, Nones, etc.
     if value in STR_CONVERSION_DICT:
         if any(isinstance(value, type(x)) for x in STR_CONVERSION_DICT):
-        # The additional check prevents numerical types from being
-        # interpreted as booleans. This is PROVIDED the dictionary
-        # does not contain both numericals and booleans
             value = STR_CONVERSION_DICT[value]
+
+    # Use the fast code if it is available
+    if cnmrstar != None:
+        # It's faster to assume we are working with a string and catch
+        #  errors than to check the instance for every object and convert
+        try:
+            return cnmrstar.clean_value(value)
+        except (ValueError, TypeError):
+            return cnmrstar.clean_value(str(value))
 
     # Convert non-string types to string
     if not isinstance(value, str):
@@ -282,14 +307,6 @@ def _format_tag(value):
     if '.' in value:
         value = value[value.index('.')+1:]
     return value
-
-def _from_iterable(iterables):
-    """ A simple implementation of chain.from_iterable.
-    As such: _from_iterable(['ABC', 'DEF']) --> A B C D E F """
-
-    for item in iterables:
-        for element in item:
-            yield element
 
 def _get_schema(passed_schema=None):
     """If passed a schema (not None) it returns it. If passed none,
@@ -402,24 +419,41 @@ class _Parser(object):
         self.index = 0
         self.token = ""
         self.source = "unknown"
-        self.last_delineator = ""
+        self.last_delineator = " "
 
     def get_line_number(self):
         """ Returns the current line number that is in the process of
         being parsed."""
 
-        return self.full_data[0:self.index].count("\n")+1
+        if cnmrstar != None:
+            return cnmrstar.get_line_number()
+        else:
+            return self.full_data[0:self.index].count("\n")+1
+
+    def get_delineator(self):
+        """ Returns the delineator for the last token."""
+
+        if cnmrstar != None:
+            return cnmrstar.get_last_delineator()
+        else:
+            return self.last_delineator
 
     def get_token(self):
         """ Returns the next token in the parsing process."""
 
-        self.real_get_token()
+        if cnmrstar is not None:
+            self.token = cnmrstar.get_token()
+        else:
+            self.real_get_token()
+
         # This is just too VERBOSE
         if VERBOSE == "very":
             if self.token:
                 print("'" + self.token + "'")
             else:
                 print("No more tokens.")
+
+        # Return the token
         return self.token
 
     @staticmethod
@@ -428,8 +462,7 @@ class _Parser(object):
         None instead."""
 
         try:
-            pos = haystack.index(needle, startpos)
-            return pos
+            return haystack.index(needle, startpos)
         except ValueError:
             return None
 
@@ -448,8 +481,13 @@ class _Parser(object):
         """ Parses the string provided as data as an NMR-STAR entry
         and returns the parsed entry. Raises ValueError on exceptions."""
 
-        # Fix DOS line endings
-        self.full_data = data.replace("\r\n", "\n").replace("\r", "\n") + "\n"
+        data = data.replace("\r\n", "\n").replace("\r", "\n")
+
+        if cnmrstar != None:
+            cnmrstar.load_string(data)
+        else:
+            # Fix DOS line endings
+            self.full_data = data + "\n"
 
         # Create the NMRSTAR object
         curframe = None
@@ -471,7 +509,7 @@ class _Parser(object):
             raise ValueError("'data_' must be followed by data name. Simply "
                              "'data_' is not allowed.", self.get_line_number())
 
-        if self.last_delineator != "":
+        if self.get_delineator() != " ":
             raise ValueError("The data_ keyword may not be quoted or "
                              "semicolon-delineated.")
 
@@ -493,7 +531,7 @@ class _Parser(object):
                                  "without a specified saveframe name.",
                                  self.get_line_number())
 
-            if self.last_delineator != "":
+            if self.get_delineator() != " ":
                 raise ValueError("The save_ keyword may not be quoted or "
                                  "semicolon-delineated.",
                                  self.get_line_number())
@@ -506,7 +544,7 @@ class _Parser(object):
             while self.get_token() != None:
 
                 if self.token == "loop_":
-                    if self.last_delineator != "":
+                    if self.get_delineator() != " ":
                         raise ValueError("The loop_ keyword may not be quoted "
                                          "or semicolon-delineated.",
                                          self.get_line_number())
@@ -521,7 +559,7 @@ class _Parser(object):
 
                         # Add a column
                         if self.token.startswith("_"):
-                            if self.last_delineator != "":
+                            if self.get_delineator() != " ":
                                 raise ValueError("Loop tags may not be quoted "
                                                  "or semicolon-delineated.",
                                                  self.get_line_number())
@@ -536,7 +574,7 @@ class _Parser(object):
                             # We are in the data block of a loop
                             while self.token != None:
                                 if self.token == "stop_":
-                                    if self.last_delineator != "":
+                                    if self.get_delineator() != " ":
                                         raise ValueError("The stop_ keyword may"
                                                          " not be quoted or "
                                                          "semicolon-delineated.",
@@ -571,7 +609,7 @@ class _Parser(object):
                                                          self.get_line_number())
 
                                     if (self.token in self.reserved and
-                                            self.last_delineator == ""):
+                                            self.get_delineator() == " "):
                                         raise ValueError("Cannot use keywords "
                                                          "as data values unless"
                                                          " quoted or semi-colon"
@@ -593,7 +631,7 @@ class _Parser(object):
 
                 # Close saveframe
                 elif self.token == "save_":
-                    if self.last_delineator != "":
+                    if self.get_delineator() not in " ;":
                         raise ValueError("The save_ keyword may not be quoted "
                                          "or semicolon-delineated.",
                                          self.get_line_number())
@@ -618,7 +656,7 @@ class _Parser(object):
 
                 # Add a tag
                 else:
-                    if self.last_delineator != "":
+                    if self.get_delineator() != " ":
                         raise ValueError("Saveframe tags may not be quoted or "
                                          "semicolon-delineated.",
                                          self.get_line_number())
@@ -627,7 +665,7 @@ class _Parser(object):
                     # We are in a saveframe and waiting for the saveframe tag
                     self.get_token()
                     if (self.token in self.reserved and
-                            self.last_delineator == ""):
+                            self.get_delineator() == " "):
                         raise ValueError("Cannot use keywords as data values "
                                          "unless quoted or semi-colon "
                                          "delineated. Illegal value: " +
@@ -648,7 +686,7 @@ class _Parser(object):
         is just a wrapper around this with some exception handling."""
 
         # Reset the delineator
-        self.last_delineator = ""
+        self.last_delineator = " "
 
         # Nothing left
         if self.token is None:
@@ -755,7 +793,7 @@ class _Parser(object):
             # Make sure we don't stop for quotes that are not followed
             #  by whitespace
             try:
-                while tmp[until+1:until+2] not in " \t\n":
+                while tmp[until+1:until+2] not in _WHITESPACE:
                     until = self.index_handle(tmp, "'", until+1)
             except TypeError:
                 raise ValueError("Invalid file. Single quoted value was never "
@@ -777,7 +815,7 @@ class _Parser(object):
             # Make sure we don't stop for quotes that are not followed
             #  by whitespace
             try:
-                while tmp[until+1:until+2] not in " \t\n":
+                while tmp[until+1:until+2] not in _WHITESPACE:
                     until = self.index_handle(tmp, '"', until+1)
             except TypeError:
                 raise ValueError("Invalid file. Double quoted value was never "
@@ -1114,9 +1152,8 @@ class Entry(object):
     def __str__(self):
         """Returns the entire entry in STAR format as a string."""
 
-        ret_string = "data_%s\n\n" % self.entry_id
-        for frame in self.frame_list:
-            ret_string += str(frame) + "\n"
+        ret_string = ("data_%s\n\n" % self.entry_id +
+                      "\n".join([str(frame) for frame in self.frame_list]))
         return ret_string
 
     @classmethod
@@ -1218,7 +1255,7 @@ class Entry(object):
 
         # Until the migration is complete, 'bmrb_id' is a synonym for
         #  'entry_id'
-        if not 'entry_id' in json_dict:
+        if 'entry_id' not in json_dict:
             json_dict['entry_id'] = json_dict['bmrb_id']
 
         # Create an entry from scratch and populate it
@@ -1822,7 +1859,7 @@ class Saveframe(object):
                 else:
                     ret_string += pstring % (each_tag[0], clean_tag)
             else:
-                formatted_tag = self.tag_prefix+"."+each_tag[0]
+                formatted_tag = self.tag_prefix + "." + each_tag[0]
                 if "\n" in clean_tag:
                     ret_string += mstring % (formatted_tag, clean_tag)
                 else:
@@ -2370,6 +2407,8 @@ class Loop(object):
 
         ret_string += "\n"
 
+        row_strings = []
+
         if len(self.data) != 0:
 
             # Make a copy of the data
@@ -2393,12 +2432,12 @@ class Loop(object):
                     if "\n" in item:
                         datum[pos] = "\n;\n%s;\n" % item
 
-                # Print the data (combine the columns widths with their data)
+                # Print the data (combine the column's widths with their data)
                 column_width_list = [d for d in zip(title_widths, datum)]
-                ret_string += pstring % tuple(_from_iterable(column_width_list))
+                row_strings.append(pstring % tuple(_from_iterable(column_width_list)))
 
         # Close the loop
-        ret_string += "   stop_\n"
+        ret_string += "".join(row_strings) + "   stop_\n"
         return ret_string
 
     @classmethod

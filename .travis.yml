@@ -9,3 +9,4 @@ python:
   - "nightly"
 # command to run tests
 script: ./bmrb.py
+install: cd c; make; cd ..
