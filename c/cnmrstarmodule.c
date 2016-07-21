@@ -10,12 +10,23 @@
 
 // Check if py3
 #if PY_MAJOR_VERSION >= 3
-#define IS_PY3K
+#define PyString_FromString PyUnicode_FromString
+#define PyString_FromFormat PyUnicode_FromFormat
+#endif
+
+struct module_state {
+    PyObject *error;
+};
+
+#if PY_MAJOR_VERSION >= 3
+#define GETSTATE(m) ((struct module_state*)PyModule_GetState(m))
+#else
+#define GETSTATE(m) (&_state)
+static struct module_state _state;
 #endif
 
 // Our whitepspace chars
 char whitespace[4] = " \n\t\v";
-bool verbose = false;
 
 // A parser struct to keep track of state
 typedef struct {
@@ -32,15 +43,14 @@ parser_data parser = {NULL, NULL, done_parsing, 0, 0, ' '};
 
 void reset_parser(parser_data * parser){
 
-    if (parser->source != NULL){
+    if (parser->full_data != NULL){
         free(parser->full_data);
-        parser->source = NULL;
+        parser->full_data = NULL;
     }
-
-    parser->full_data = NULL;
     if (parser->token != done_parsing){
         free(parser->token);
     }
+    parser->source = NULL;
     parser->token = NULL;
     parser->index = 0;
     parser->length = 0;
@@ -397,7 +407,7 @@ static PyObject * clean_string(PyObject *self, PyObject *args){
             return PyString_FromFormat("%s\n", str);
         } else {
             // Return as is if it already ends with a newline
-            return Py_BuildValue("s", str);
+            return PyString_FromString(str);
         }
     }
 
@@ -479,7 +489,7 @@ static PyObject * clean_string(PyObject *self, PyObject *args){
     }
 
     // If we got here it's good to go as it is
-    return Py_BuildValue("s", str);
+    return PyString_FromString(str);
 }
 
 
@@ -508,8 +518,11 @@ PARSE_load_string(PyObject *self, PyObject *args)
 
     // Read the string into our object
     reset_parser(&parser);
-    parser.full_data = data;
+
+    // Copy the input data to a newly malloc'd location so we don't lose it
     parser.length = strlen(data);
+    parser.full_data = malloc(parser.length+1);
+    snprintf(parser.full_data, parser.length+1, "%s", data);
 
     Py_INCREF(Py_None);
     return Py_None;
@@ -532,9 +545,8 @@ PARSE_get_token(PyObject *self)
         return Py_None;
     }
 
-    if (verbose)
-        printf("Token: %s\n", token);
-    return Py_BuildValue("s", token);
+    //printf("Tok: %s", token);
+    return PyString_FromString(token);
 }
 
 static PyObject *
@@ -547,8 +559,10 @@ PARSE_get_token_list(PyObject *self)
 
     char * token = get_token(&parser);
     // Pass errors up the chain
-    if (token == NULL)
+    if (token == NULL){
+        Py_DECREF(list);
         return NULL;
+    }
 
     while (token != done_parsing){
 
@@ -558,6 +572,7 @@ PARSE_get_token_list(PyObject *self)
             return NULL;
         }
         if (PyList_Append(list, str) != 0){
+            Py_DECREF(str);
             return NULL;
         }
 
@@ -565,8 +580,10 @@ PARSE_get_token_list(PyObject *self)
         token = get_token(&parser);
 
         // Pass errors up the chain
-        if (token == NULL)
+        if (token == NULL){
+            Py_DECREF(str);
             return NULL;
+        }
 
         // Otherwise we will leak memory
         Py_DECREF(str);
@@ -590,10 +607,10 @@ PARSE_get_line_no(PyObject *self)
 static PyObject *
 PARSE_get_last_delineator(PyObject *self)
 {
-    return Py_BuildValue("c", parser.last_delineator);
+    return PyString_FromString(&parser.last_delineator);
 }
 
-static PyMethodDef cnmrstarMethods[] = {
+static PyMethodDef cnmrstar_methods[] = {
     {"clean_value",  (PyCFunction)clean_string, METH_VARARGS,
      "Properly quote or encapsulate a value before printing."},
 
@@ -618,9 +635,59 @@ static PyMethodDef cnmrstarMethods[] = {
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 
+#if PY_MAJOR_VERSION >= 3
+
+static int myextension_traverse(PyObject *m, visitproc visit, void *arg) {
+    Py_VISIT(GETSTATE(m)->error);
+    return 0;
+}
+
+static int myextension_clear(PyObject *m) {
+    Py_CLEAR(GETSTATE(m)->error);
+    return 0;
+}
+
+static struct PyModuleDef moduledef = {
+        PyModuleDef_HEAD_INIT,
+        "cnmrstar",
+        NULL,
+        sizeof(struct module_state),
+        cnmrstar_methods,
+        NULL,
+        myextension_traverse,
+        myextension_clear,
+        NULL
+};
+
+#define INITERROR return NULL
+
 PyMODINIT_FUNC
+PyInit_cnmrstar(void)
+
+#else
+#define INITERROR return
+
+void
 initcnmrstar(void)
+#endif
 {
-    Py_InitModule3("cnmrstar", cnmrstarMethods,
-                         "A NMR-STAR parser implemented in C.");
+#if PY_MAJOR_VERSION >= 3
+    PyObject *module = PyModule_Create(&moduledef);
+#else
+    PyObject *module = Py_InitModule3("cnmrstar", cnmrstar_methods, "A NMR-STAR parser implemented in C.");
+#endif
+
+    if (module == NULL)
+        INITERROR;
+    struct module_state *st = GETSTATE(module);
+
+    st->error = PyErr_NewException("cnmrstar.Error", NULL, NULL);
+    if (st->error == NULL) {
+        Py_DECREF(module);
+        INITERROR;
+    }
+
+#if PY_MAJOR_VERSION >= 3
+    return module;
+#endif
 }
