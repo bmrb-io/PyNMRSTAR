@@ -100,9 +100,22 @@ else:
 
 # See if we can use the fast tokenizer
 try:
-    import cnmrstarparser
+    import cnmrstar
 except ImportError:
-    cnmrstarparser = None
+    cnmrstar = None
+
+# See if we can import from_iterable
+try:
+    from itertools import chain as _chain
+    _from_iterable = _chain.from_iterable
+except ImportError:
+    def _from_iterable(iterables):
+        """ A simple implementation of chain.from_iterable.
+        As such: _from_iterable(['ABC', 'DEF']) --> A B C D E F """
+
+        for item in iterables:
+            for element in item:
+                yield element
 
 #############################################
 #            Global Variables               #
@@ -200,10 +213,16 @@ def clean_value(value):
     # Allow manual specification of conversions for booleans, Nones, etc.
     if value in STR_CONVERSION_DICT:
         if any(isinstance(value, type(x)) for x in STR_CONVERSION_DICT):
-        # The additional check prevents numerical types from being
-        # interpreted as booleans. This is PROVIDED the dictionary
-        # does not contain both numericals and booleans
             value = STR_CONVERSION_DICT[value]
+
+    # Use the fast code if it is available
+    if cnmrstar != None:
+        # It's faster to assume we are working with a string and catch
+        #  errors than to check the instance for every object and convert
+        try:
+            return cnmrstar.clean_value(value)
+        except (ValueError, TypeError):
+            return cnmrstar.clean_value(str(value))
 
     # Convert non-string types to string
     if not isinstance(value, str):
@@ -288,14 +307,6 @@ def _format_tag(value):
     if '.' in value:
         value = value[value.index('.')+1:]
     return value
-
-def _from_iterable(iterables):
-    """ A simple implementation of chain.from_iterable.
-    As such: _from_iterable(['ABC', 'DEF']) --> A B C D E F """
-
-    for item in iterables:
-        for element in item:
-            yield element
 
 def _get_schema(passed_schema=None):
     """If passed a schema (not None) it returns it. If passed none,
@@ -414,24 +425,24 @@ class _Parser(object):
         """ Returns the current line number that is in the process of
         being parsed."""
 
-        if cnmrstarparser != None:
-            return cnmrstarparser.get_line_number()
+        if cnmrstar != None:
+            return cnmrstar.get_line_number()
         else:
             return self.full_data[0:self.index].count("\n")+1
 
     def get_delineator(self):
         """ Returns the delineator for the last token."""
 
-        if cnmrstarparser != None:
-            return cnmrstarparser.get_last_delineator()
+        if cnmrstar != None:
+            return cnmrstar.get_last_delineator()
         else:
             return self.last_delineator
 
     def get_token(self):
         """ Returns the next token in the parsing process."""
 
-        if cnmrstarparser != None:
-            self.token = cnmrstarparser.get_token()
+        if cnmrstar is not None:
+            self.token = cnmrstar.get_token()
         else:
             self.real_get_token()
 
@@ -472,8 +483,8 @@ class _Parser(object):
 
         data = data.replace("\r\n", "\n").replace("\r", "\n")
 
-        if cnmrstarparser != None:
-            cnmrstarparser.load_string(data)
+        if cnmrstar != None:
+            cnmrstar.load_string(data)
         else:
             # Fix DOS line endings
             self.full_data = data + "\n"
@@ -1141,9 +1152,8 @@ class Entry(object):
     def __str__(self):
         """Returns the entire entry in STAR format as a string."""
 
-        ret_string = "data_%s\n\n" % self.entry_id
-        for frame in self.frame_list:
-            ret_string += str(frame) + "\n"
+        ret_string = ("data_%s\n\n" % self.entry_id +
+                      "\n".join([str(frame) for frame in self.frame_list]))
         return ret_string
 
     @classmethod
@@ -1245,7 +1255,7 @@ class Entry(object):
 
         # Until the migration is complete, 'bmrb_id' is a synonym for
         #  'entry_id'
-        if not 'entry_id' in json_dict:
+        if 'entry_id' not in json_dict:
             json_dict['entry_id'] = json_dict['bmrb_id']
 
         # Create an entry from scratch and populate it
@@ -2397,6 +2407,8 @@ class Loop(object):
 
         ret_string += "\n"
 
+        row_strings = []
+
         if len(self.data) != 0:
 
             # Make a copy of the data
@@ -2420,12 +2432,12 @@ class Loop(object):
                     if "\n" in item:
                         datum[pos] = "\n;\n%s;\n" % item
 
-                # Print the data (combine the columns widths with their data)
+                # Print the data (combine the column's widths with their data)
                 column_width_list = [d for d in zip(title_widths, datum)]
-                ret_string += pstring % tuple(_from_iterable(column_width_list))
+                row_strings.append(pstring % tuple(_from_iterable(column_width_list)))
 
         # Close the loop
-        ret_string += "   stop_\n"
+        ret_string += "".join(row_strings) + "   stop_\n"
         return ret_string
 
     @classmethod
