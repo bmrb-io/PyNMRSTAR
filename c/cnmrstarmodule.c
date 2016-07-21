@@ -3,10 +3,15 @@
 
 // Use for returning errors
 #define err_size 500
+// Use as a special pointer value
 #define done_parsing  (void *)1
-
 // Check if a bit is set
 #define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
+
+// Check if py3
+#if PY_MAJOR_VERSION >= 3
+#define IS_PY3K
+#endif
 
 // Our whitepspace chars
 char whitespace[4] = " \n\t\v";
@@ -74,7 +79,8 @@ void get_common_bits(void){
 
     printf("Comb: \n");
     for (x=0; x< 5; x++){
-        for (int y=0; y<7; y++){
+        int y;
+        for (y=0; y<7; y++){
             if (CHECK_BIT(comb[x], y)){
                 printf("%d.%d: 1\n", x, y);
             } else {
@@ -350,15 +356,6 @@ char * get_token(parser_data * parser){
     return update_token(parser, end_pos - parser->index);
 }
 
-// Used to wrap the string in quotes, or add a newline
-static PyObject * pystring_gen(char * format_string, char * value, long len){
-    char * new_str = malloc(len+3);
-    snprintf(new_str, len+3, format_string, value);
-    PyObject * pystr = Py_BuildValue("s", new_str);
-    free(new_str);
-    return pystr;
-}
-
 // Implements startswith
 bool starts_with(const char *a, const char *b)
 {
@@ -397,7 +394,7 @@ static PyObject * clean_string(PyObject *self, PyObject *args){
     if (strstr(str, "\n") != NULL){
         // But always newline terminate it
         if (str[len-1] != '\n'){
-            return pystring_gen("%s\n", str, len);
+            return PyString_FromFormat("%s\n", str);
         } else {
             // Return as is if it already ends with a newline
             return Py_BuildValue("s", str);
@@ -428,11 +425,11 @@ static PyObject * clean_string(PyObject *self, PyObject *args){
 
         // Return the string with whatever type of quoting we are allowed
         if ((!can_wrap_single) && (!can_wrap_double))
-            return pystring_gen("%s\n", str, len);
+            return PyString_FromFormat("%s\n", str);
         if (can_wrap_single)
-            return pystring_gen("'%s'", str, len);
+            return PyString_FromFormat("'%s'", str);
         if (can_wrap_double)
-            return pystring_gen("\"%s\"", str, len);
+            return PyString_FromFormat("\"%s\"", str);
     }
 
     // Check for special characters in a tag that would require quoting.
@@ -475,10 +472,10 @@ static PyObject * clean_string(PyObject *self, PyObject *args){
     if (needs_wrapping){
         // If there is a single quote wrap in double quotes
         if (has_single)
-            return pystring_gen("\"%s\"", str, len);
+            return PyString_FromFormat("\"%s\"", str);
         // Either there is a double quote or no quotes
         else
-            return pystring_gen("'%s'", str, len);
+            return PyString_FromFormat("'%s'", str);
     }
 
     // If we got here it's good to go as it is
