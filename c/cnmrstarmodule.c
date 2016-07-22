@@ -25,7 +25,7 @@ struct module_state {
 static struct module_state _state;
 #endif
 
-// Our whitepspace chars
+// Our whitespace chars
 char whitespace[4] = " \n\t\v";
 
 // A parser struct to keep track of state
@@ -221,6 +221,8 @@ long get_line_number(parser_data * parser){
     return num_lines + 1;
 }
 
+/* Gets one token from the file/string. Returns NULL on error and
+   done_parsing if there are no more tokens. */
 char * get_token(parser_data * parser){
 
     // Reset the delineator
@@ -366,6 +368,27 @@ char * get_token(parser_data * parser){
     return update_token(parser, end_pos - parser->index);
 }
 
+/* IDEA: Implementing the tokenizer following this pattern may
+ * be slightly faster:
+
+function readToken() // note: returns only one token each time
+    while !eof
+        c = peekChar()
+        if c in A-Za-z
+            return readIdentifier()
+        else if c in 0-9
+            return readInteger()
+        else if c in ' \n\r\t\v\f'
+            nextChar()
+        ...
+    return EOF
+
+    *
+    */
+
+
+
+
 // Implements startswith
 bool starts_with(const char *a, const char *b)
 {
@@ -460,7 +483,7 @@ static PyObject * clean_string(PyObject *self, PyObject *args){
 
     // If we don't already know we need to wrap it, see if there is whitespace
     //  or quotes
-    if (!needs_wrapping){
+    else {
         long x;
         for (x=0; x<len; x++){
             // Check for whitespace chars
