@@ -1100,6 +1100,9 @@ class Entry(object):
             except HTTPError:
                 raise IOError("Entry '%s' does not exist in the public "
                               "database." % entry_number)
+            except URLError:
+                raise IOError("You don't appear to have an active internet "
+                              "connection. Cannot fetch entry.")
         else:
             # Initialize a blank entry
             self.entry_id = kargs['entry_id']
