@@ -320,7 +320,7 @@ def _get_schema(passed_schema=None):
         # If we fail to get the schema don't do anything
         try:
             _STANDARD_SCHEMA = Schema()
-        except HTTPError:
+        except (HTTPError, URLError):
             try:
                 _STANDARD_SCHEMA = Schema(schema_file="reference_files/schema")
             except:
@@ -481,12 +481,12 @@ class _Parser(object):
         """ Parses the string provided as data as an NMR-STAR entry
         and returns the parsed entry. Raises ValueError on exceptions."""
 
+        # Fix DOS line endings
         data = data.replace("\r\n", "\n").replace("\r", "\n")
 
         if cnmrstar != None:
             cnmrstar.load_string(data)
         else:
-            # Fix DOS line endings
             self.full_data = data + "\n"
 
         # Create the NMRSTAR object
