@@ -698,10 +698,10 @@ class _Parser(object):
                                                          "value: " + self.token)
                                         return
 
-                                    if self.delineator != ' ':
-                                        self.line_number += 1
                                     if self.delineator == "$":
                                         self.token = self.token[1:]
+                                    if curdata == curloop.num_col - 1:
+                                        self.line_number -= 1
                                     handler.data(curloop.category + "." + curloop.columns[curdata], curloop.col_lines[curdata], self.token, self.line_number+1, conv_delin[self.delineator], True)
                                     curdata = (curdata + 1) % curloop.num_col
                                     seen_data = True
