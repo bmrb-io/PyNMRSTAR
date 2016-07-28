@@ -231,6 +231,10 @@ char * update_token(parser_data * parser, long length){
         }
     }
 
+    if (parser->token[0] == '$'){
+        parser->last_delineator = '$';
+    }
+
     // Update the line number
     update_line_number(parser, parser->index, length + 1);
 
@@ -597,14 +601,15 @@ PARSE_get_token_full(PyObject *self)
         return NULL;
     }
 
+    parser_data * my_parser = &parser;
+
     // Return python none if done parsing
     if (token == done_parsing){
         Py_INCREF(Py_None);
-        return Py_None;
+        return Py_BuildValue("Olc", Py_None, my_parser->line_no, my_parser->last_delineator);
     }
 
-    parser_data * my_parser = &parser;
-    return Py_BuildValue("OOO", PyString_FromString(token), Py_BuildValue("l", my_parser->line_no), PyString_FromString(&parser.last_delineator));
+    return Py_BuildValue("slc", token, my_parser->line_no, my_parser->last_delineator);
 }
 
 static PyMethodDef cnmrstar_methods[] = {
