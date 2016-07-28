@@ -603,21 +603,19 @@ PARSE_get_token_full(PyObject *self)
 
     parser_data * my_parser = &parser;
 
-    #if PY_MAJOR_VERSION >= 3
-    // Return python none if done parsing
+
     if (token == done_parsing){
+        // Return python none if done parsing
         Py_INCREF(Py_None);
+
+    #if PY_MAJOR_VERSION >= 3
         return Py_BuildValue("OlC", Py_None, my_parser->line_no, my_parser->last_delineator);
     }
-
     return Py_BuildValue("slC", token, my_parser->line_no, my_parser->last_delineator);
+
     #else
-    // Return python none if done parsing
-    if (token == done_parsing){
-        Py_INCREF(Py_None);
         return Py_BuildValue("Olc", Py_None, my_parser->line_no, my_parser->last_delineator);
     }
-
     return Py_BuildValue("slc", token, my_parser->line_no, my_parser->last_delineator);
     #endif
 }
