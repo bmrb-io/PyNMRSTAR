@@ -122,7 +122,9 @@ except ImportError:
 #############################################
 
 # Set this to allow import * from bmrb to work sensibly
-__all__ = ['Entry', 'Saveframe', 'Loop', 'Schema', 'diff', 'validate', 'PY3']
+__all__ = ['Entry', 'Saveframe', 'Loop', 'Schema', 'diff', 'validate',
+           'enable_nef_defaults', 'enable_nmrstar_defaults', 'sans_parse',
+           'PY3']
 
 # May be set by calling code
 VERBOSE = False
@@ -161,10 +163,10 @@ def enable_nef_defaults():
     SKIP_EMPTY_LOOPS = True
     DONT_SHOW_COMMENTS = True
 
-def enable_bmrb_defaults():
+def enable_nmrstar_defaults():
     """ Sets the module variables such that our behavior matches the
-    BMRB standard. This is the default behavior of this module. This
-    method only exists to revert after calling enable_nef_defaults()."""
+    BMRB standard (NMR-STAR). This is the default behavior of this module.
+    This method only exists to revert after calling enable_nef_defaults()."""
 
     global STR_CONVERSION_DICT, SKIP_EMPTY_LOOPS, DONT_SHOW_COMMENTS
     STR_CONVERSION_DICT = {None:"."}
