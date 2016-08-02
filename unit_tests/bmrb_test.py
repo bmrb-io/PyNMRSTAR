@@ -39,8 +39,8 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertEqual(bmrb.STR_CONVERSION_DICT, {None:".", True:"true", False:"false"})
         self.assertEqual(bmrb.SKIP_EMPTY_LOOPS, True)
 
-    def test_enable_bmrb_defaults(self):
-        bmrb.enable_bmrb_defaults()
+    def test_enable_nmrstar_defaults(self):
+        bmrb.enable_nmrstar_defaults()
         self.assertEqual(bmrb.STR_CONVERSION_DICT, {None:"."})
         self.assertEqual(bmrb.SKIP_EMPTY_LOOPS, False)
 
