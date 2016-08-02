@@ -35,11 +35,12 @@ typedef struct {
     char * token;
     long index;
     long length;
+    long line_no;
     char last_delineator;
 } parser_data;
 
 // Initialize the parser
-parser_data parser = {NULL, NULL, done_parsing, 0, 0, ' '};
+parser_data parser = {NULL, NULL, done_parsing, 0, 0, 0, ' '};
 
 void reset_parser(parser_data * parser){
 
@@ -54,7 +55,17 @@ void reset_parser(parser_data * parser){
     parser->token = NULL;
     parser->index = 0;
     parser->length = 0;
+    parser->line_no = 0;
     parser->last_delineator = ' ';
+}
+
+static PyObject *
+PARSE_reset(PyObject *self)
+{
+    reset_parser(&parser);
+
+    Py_INCREF(Py_None);
+    return Py_None;
 }
 
 /* Return the index of the first match of needle in haystack, or -1 */
@@ -132,8 +143,6 @@ void get_file(char *fname, parser_data * parser){
     parser->full_data = string;
     parser->length = fsize;
     parser->source = fname;
-    parser->index = 0;
-    parser->last_delineator = ' ';
 }
 
 /* Determines if a character is whitespace */
@@ -164,6 +173,13 @@ long get_next_whitespace(char * string, long start_pos){
 void pass_whitespace(parser_data * parser){
     while ((parser->index < parser->length) &&
             (is_whitespace(parser->full_data[parser->index]))){
+
+        // Keep track of skipped newlines
+        if (parser->full_data[parser->index] == '\n'){
+            parser->line_no++;
+            //printf("Skipping in pass_whitespace\n");
+        }
+
         parser->index++;
     }
 }
@@ -179,14 +195,25 @@ bool check_multiline(parser_data * parser, long length){
 
 }
 
+void update_line_number(parser_data * parser, long start_pos, long length){
+    long x;
+    for (x=start_pos; x< start_pos + length; x++){
+        if (parser->full_data[x] == '\n'){
+            parser->line_no++;
+            //printf("Skipping in update_line_number\n");
+        }
+    }
+}
+
 /* Returns a new token char * */
 char * update_token(parser_data * parser, long length){
 
     if (parser->token != done_parsing){
         free(parser->token);
     }
+
+    // Allocate space for the token and copy the data into it
     parser->token = malloc(length+1);
-    //printf("index %ld par_len %ld my_len %ld\n", parser->index, parser->length, length);
     memcpy(parser->token, &parser->full_data[parser->index], length);
     parser->token[length] = '\0';
 
@@ -203,6 +230,13 @@ char * update_token(parser_data * parser, long length){
             parser->last_delineator = ' ';
         }
     }
+
+    if (parser->token[0] == '$'){
+        parser->last_delineator = '$';
+    }
+
+    // Update the line number
+    update_line_number(parser, parser->index, length + 1);
 
     parser->index += length + 1;
     return parser->token;
@@ -224,6 +258,8 @@ long get_line_number(parser_data * parser){
 /* Gets one token from the file/string. Returns NULL on error and
    done_parsing if there are no more tokens. */
 char * get_token(parser_data * parser){
+
+    //printf("Cur index: %ld\n", parser->index + 1);
 
     // Reset the delineator
     parser->last_delineator = '?';
@@ -265,7 +301,7 @@ char * get_token(parser_data * parser){
         return get_token(parser);
     }
 
-    // See if this is a multiline comment
+    // See if this is a multiline value
     if ((parser->length - parser->index > 1) && (parser->full_data[parser->index] == ';') && (parser->full_data[parser->index+1] == '\n')){
         search = "\n;";
         long length = get_index(parser->full_data, search, parser->index);
@@ -278,6 +314,9 @@ char * get_token(parser_data * parser){
             parser->token = NULL;
             return parser->token;
         }
+
+        // We started with a newline so make sure to count it
+        parser->line_no++;
 
         parser->index += 2;
         return update_token(parser, length-1);
@@ -552,7 +591,7 @@ PARSE_load_string(PyObject *self, PyObject *args)
 }
 
 static PyObject *
-PARSE_get_token(PyObject *self)
+PARSE_get_token_full(PyObject *self)
 {
     char * token;
     token = get_token(&parser);
@@ -562,75 +601,23 @@ PARSE_get_token(PyObject *self)
         return NULL;
     }
 
-    // Return python none if done parsing
+    parser_data * my_parser = &parser;
+
+
     if (token == done_parsing){
+        // Return python none if done parsing
         Py_INCREF(Py_None);
-        return Py_None;
+
+    #if PY_MAJOR_VERSION >= 3
+        return Py_BuildValue("OlC", Py_None, my_parser->line_no, my_parser->last_delineator);
     }
+    return Py_BuildValue("slC", token, my_parser->line_no, my_parser->last_delineator);
 
-    //printf("Tok: %s", token);
-    return PyString_FromString(token);
-}
-
-static PyObject *
-PARSE_get_token_list(PyObject *self)
-{
-    PyObject * str;
-    PyObject * list = PyList_New(0);
-    if (!list)
-        return NULL;
-
-    char * token = get_token(&parser);
-    // Pass errors up the chain
-    if (token == NULL){
-        Py_DECREF(list);
-        return NULL;
+    #else
+        return Py_BuildValue("Olc", Py_None, my_parser->line_no, my_parser->last_delineator);
     }
-
-    while (token != done_parsing){
-
-        // Create a python string
-        str = PyString_FromString(token);
-        if (!str){
-            return NULL;
-        }
-        if (PyList_Append(list, str) != 0){
-            Py_DECREF(str);
-            return NULL;
-        }
-
-        // Get the next token
-        token = get_token(&parser);
-
-        // Pass errors up the chain
-        if (token == NULL){
-            Py_DECREF(str);
-            return NULL;
-        }
-
-        // Otherwise we will leak memory
-        Py_DECREF(str);
-    }
-    if (PyList_Reverse(list) != 0){
-        return NULL;
-    }
-
-    return list;
-}
-
-static PyObject *
-PARSE_get_line_no(PyObject *self)
-{
-    long line_no;
-    line_no = get_line_number(&parser);
-
-    return Py_BuildValue("l", line_no);
-}
-
-static PyObject *
-PARSE_get_last_delineator(PyObject *self)
-{
-    return PyString_FromString(&parser.last_delineator);
+    return Py_BuildValue("slc", token, my_parser->line_no, my_parser->last_delineator);
+    #endif
 }
 
 static PyMethodDef cnmrstar_methods[] = {
@@ -643,17 +630,11 @@ static PyMethodDef cnmrstar_methods[] = {
      {"load_string",  (PyCFunction)PARSE_load_string, METH_VARARGS,
      "Load a string in preparation to parse."},
 
-     {"get_token",  (PyCFunction)PARSE_get_token, METH_NOARGS,
-     "Get one token from the file. Returns NULL when file is exhausted."},
+     {"get_token_full",  (PyCFunction)PARSE_get_token_full, METH_NOARGS,
+     "Get one token from the file as well as the line number and delineator."},
 
-     {"get_token_list",  (PyCFunction)PARSE_get_token_list, METH_NOARGS,
-     "Get all of the tokens as a list."},
-
-     {"get_line_number",  (PyCFunction)PARSE_get_line_no, METH_NOARGS,
-     "Get the line number of the last token."},
-
-     {"get_last_delineator",  (PyCFunction)PARSE_get_last_delineator, METH_NOARGS,
-     "Get the last token delineator."},
+     {"reset",  (PyCFunction)PARSE_reset, METH_NOARGS,
+     "Reset the parser state."},
 
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
