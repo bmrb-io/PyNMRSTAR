@@ -225,7 +225,7 @@ class _ContentHandler(object):
     def data(self, tag, tagline, val, valline, delim, inloop):
         raise Exception("Abstract method called")
 
-class _Handler(_ContentHandler):
+class _PrinterHandler(_ContentHandler):
     def startData(self, line, name):
         print("startData: %d %s" % (line, name))
     def endData(self, line, name):
@@ -241,10 +241,9 @@ class _Handler(_ContentHandler):
     def comment(self, line, text):
         return False
     def data(self, tag, tagline, val, valline, delim, inloop):
-        print(tag, ":", val, tagline, valline, delim, inloop)
+        print("%s : %s %s %s" % (tag, val, delim, inloop))
 
-
-def sans_parse(entry_to_parse, handler=_Handler(),
+def sans_parse(entry_to_parse, handler=_PrinterHandler(),
                error_handler=_ErrorHandler()):
     """ Parses a NMR-STAR file or string in SANS mode and makes a
     callback for every token it encounters. Expects a handler (with the
@@ -596,13 +595,14 @@ class _Parser(object):
             return
 
         if self.delineator != " ":
-            if not error_handler.warning(self.line_number, "The data_ keyword may not be quoted or "
+            if error_handler.warning(self.line_number, "The data_ keyword may not be quoted or "
                              "semicolon-delineated."):
                 return
 
         # Start data
         curid = self.token[5:]
-        handler.startData(self.line_number, curid)
+        if handler.startData(self.line_number, curid):
+            return
 
         # We are expecting to get saveframes
         while self.get_token() != None:
@@ -619,12 +619,14 @@ class _Parser(object):
                 return
 
             if self.delineator != " ":
-                if not error_handler.error(self.line_number, "The save_ keyword may not be quoted or "
+                if error_handler.error(self.line_number, "The save_ keyword may not be quoted or "
                                  "semicolon-delineated."):
                     return
 
             # Add the saveframe
-            handler.startSaveframe(self.line_number, self.token[5:])
+            if handler.startSaveframe(self.line_number, self.token[5:]):
+                return
+
             curframe = self.token[5:]
 
             # We are in a saveframe
@@ -632,14 +634,15 @@ class _Parser(object):
 
                 if self.token == "loop_":
                     if self.delineator != " ":
-                        if not error_handler.error(self.line_number, "The loop_ keyword may not be quoted "
+                        if error_handler.error(self.line_number, "The loop_ keyword may not be quoted "
                                          "or semicolon-delineated."):
                             return
 
                     curloop = Loop.from_scratch()
                     curloop.col_lines = []
                     curloop.num_col = 0
-                    handler.startLoop(self.line_number)
+                    if handler.startLoop(self.line_number):
+                        return
 
                     # We are in a loop
                     seen_data = False
@@ -649,11 +652,11 @@ class _Parser(object):
                         # Add a column
                         if self.token.startswith("_"):
                             if self.delineator != " ":
-                                if not error_handler.error(self.line_number, "Loop tags may not be quoted "
+                                if error_handler.error(self.line_number, "Loop tags may not be quoted "
                                                  "or semicolon-delineated."):
                                     return
                             if seen_data:
-                                if not error_handler.warning(self.line_number, "Cannot have more loop tags "
+                                if error_handler.warning(self.line_number, "Cannot have more loop tags "
                                                  "after loop data."):
                                     return
                             curloop.add_column(self.token)
@@ -667,16 +670,16 @@ class _Parser(object):
                             while self.token != None:
                                 if self.token == "stop_":
                                     if self.delineator != " ":
-                                        if not error_handler.error(self.line_number, "The stop_ keyword may"
+                                        if error_handler.error(self.line_number, "The stop_ keyword may"
                                                          " not be quoted or "
                                                          "semicolon-delineated."):
                                             return
                                     if curloop.num_col == 0:
-                                        if not error_handler.warning(self.line_number, "Loop with no tags."):
+                                        if error_handler.warning(self.line_number, "Loop with no tags."):
                                             return
                                         curloop = None
                                     if (not seen_data):
-                                        if not error_handler.warning(self.line_number, "Loop with no data."):
+                                        if error_handler.warning(self.line_number, "Loop with no data."):
                                             return
 
                                     # We've seen the end of a loop
@@ -704,7 +707,8 @@ class _Parser(object):
                                         self.token = self.token[1:]
                                     if curdata == curloop.num_col - 1:
                                         self.line_number -= 1
-                                    handler.data(curloop.category + "." + curloop.columns[curdata], curloop.col_lines[curdata], self.token, self.line_number+1, conv_delin[self.delineator], True)
+                                    if handler.data(curloop.category + "." + curloop.columns[curdata], curloop.col_lines[curdata], self.token, self.line_number+1, conv_delin[self.delineator], True):
+                                        return
                                     curdata = (curdata + 1) % curloop.num_col
                                     seen_data = True
 
@@ -717,7 +721,9 @@ class _Parser(object):
                         return
 
                     # End of a loop
-                    handler.endLoop(self.line_number)
+                    if handler.endLoop(self.line_number):
+                        return
+
                     if curdata % curloop.num_col != 0:
                         error_handler.fatalError(self.line_number, "Loop count error.")
                         return
@@ -725,11 +731,12 @@ class _Parser(object):
                 # Close saveframe
                 elif self.token == "save_":
                     if self.delineator not in " ;":
-                        if not error_handler.error(self.line_number, "The save_ keyword may not be quoted "
+                        if error_handler.error(self.line_number, "The save_ keyword may not be quoted "
                                          "or semicolon-delineated."):
                             return
 
-                    handler.endSaveframe(self.line_number, curframe)
+                    if handler.endSaveframe(self.line_number, curframe):
+                        return
                     curframe = None
                     break
 
@@ -743,7 +750,7 @@ class _Parser(object):
                 # Add a tag
                 else:
                     if self.delineator != " ":
-                        if not error_handler.error(self.line_number, "Saveframe tags may not be quoted or "
+                        if error_handler.error(self.line_number, "Saveframe tags may not be quoted or "
                                          "semicolon-delineated."):
                             return
                     curtag = self.token
@@ -753,7 +760,7 @@ class _Parser(object):
                     self.get_token()
                     if (self.token in self.reserved and
                             self.delineator == " "):
-                        if not error_handler.error(self.line_number, "Cannot use keywords as data values "
+                        if error_handler.error(self.line_number, "Cannot use keywords as data values "
                                          "unless quoted or semi-colon "
                                          "delineated. Illegal value: " +
                                          self.token):
@@ -761,12 +768,15 @@ class _Parser(object):
 
                     if self.delineator == '\'' or self.delineator == '"' or self.delineator == ";":
                         self.line_number += 1
+                    if self.delineator == ";":
+                        curline -= 1
                     if self.delineator == "$":
                         self.token = self.token[1:]
-                    handler.data(curtag, curline+1, self.token, self.line_number, conv_delin[self.delineator], False)
+                    if handler.data(curtag, curline+1, self.token, self.line_number, conv_delin[self.delineator], False):
+                        return
 
             if self.token != "save_":
-                if not error_handler.error(self.line_number, "Saveframe improperly terminated at end of "
+                if error_handler.error(self.line_number, "Saveframe improperly terminated at end of "
                                  "file."):
                     return
 
