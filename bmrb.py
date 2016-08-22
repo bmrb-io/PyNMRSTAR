@@ -195,13 +195,11 @@ def validate(entry_to_validate, schema=None):
 
 class _ErrorHandler(object):
     def fatalError(self, line, msg):
-        sys.stderr.write("Critical parse error in line %s: %s\n" % (line, msg))
+        print("Critical parse error in line %s: %s\n" % (line, msg))
     def error(self, line, msg):
-        sys.stderr.write("Parse error in line %s: %s\n" % (line, msg))
-        return False
+        print("Parse error in line %s: %s\n" % (line, msg))
     def warning(self, line, msg):
-        sys.stderr.write("Parser warning in line %s: %s\n" % (line, msg))
-        return False
+        print("Parser warning in line %s: %s\n" % (line, msg))
 
 class _ContentHandler(object):
     def startData(self, line, name):
@@ -268,8 +266,7 @@ def sans_parse(entry_to_parse, handler=_PrinterHandler(),
     * error(self, line, msg)
     * warning(self, line, msg)"""
 
-    dummy_ent = Entry.from_scratch("")
-    parser = _Parser(dummy_ent)
+    parser = _Parser()
     parser.sans_parse(_interpret_file(entry_to_parse).read(), handler,
                       error_handler)
 
@@ -492,9 +489,11 @@ class _Parser(object):
     reserved = ["stop_", "loop_", "save_", "data_", "global_"]
 
     def __init__(self, entry_to_parse_into=None):
+
+        # Just make an entry to parse into if called with no entry passed
         if entry_to_parse_into is None:
-            raise ValueError("You must provide an entry to parse into. Also, "
-                             "why are you using this class?")
+            entry_to_parse_into = Entry.from_scratch("")
+
         self.ent = entry_to_parse_into
         self.to_process = ""
         self.full_data = ""
@@ -703,6 +702,15 @@ class _Parser(object):
                                                          "value: " + self.token)
                                         return
 
+
+                                    # Check for reserved keywords... SLOW!
+                                    #if self.delineator == ";":
+                                    #    for x in ["save_", "stop_", "loop_"]:
+                                    #        if x in self.token:
+                                    #            if error_handler.warning(self.line_number+1,
+                                    #                                     "Keyword in value: %s" % x):
+                                    #                return
+
                                     if self.delineator == "$":
                                         self.token = self.token[1:]
                                     if curdata == curloop.num_col - 1:
@@ -765,6 +773,14 @@ class _Parser(object):
                                          "delineated. Illegal value: " +
                                          self.token):
                             return
+
+                    # Check for reserved keywords... SLOW!
+                    #if self.delineator == ";":
+                    #    for x in ["save_", "stop_", "loop_"]:
+                    #        if x in self.token:
+                    #            if error_handler.warning(self.line_number+1,
+                    #                                     "Keyword in value: %s" % x):
+                    #                return
 
                     if self.delineator == '\'' or self.delineator == '"' or self.delineator == ";":
                         self.line_number += 1
