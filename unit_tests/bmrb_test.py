@@ -92,7 +92,6 @@ class TestPyNMRSTAR(unittest.TestCase):
 
     # Test the parser
     def test___Parser(self):
-        self.assertRaises(ValueError, bmrb._Parser)
 
         # Check for error when reserved token present in data value
         self.assertRaises(ValueError, bmrb.Entry.from_string, "data_1\nsave_1\n_tag.example loop_\nsave_\n")

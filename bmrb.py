@@ -195,13 +195,11 @@ def validate(entry_to_validate, schema=None):
 
 class _ErrorHandler(object):
     def fatalError(self, line, msg):
-        sys.stderr.write("Critical parse error in line %s: %s\n" % (line, msg))
+        print("Critical parse error in line %s: %s\n" % (line, msg))
     def error(self, line, msg):
-        sys.stderr.write("Parse error in line %s: %s\n" % (line, msg))
-        return False
+        print("Parse error in line %s: %s\n" % (line, msg))
     def warning(self, line, msg):
-        sys.stderr.write("Parser warning in line %s: %s\n" % (line, msg))
-        return False
+        print("Parser warning in line %s: %s\n" % (line, msg))
 
 class _ContentHandler(object):
     def startData(self, line, name):
@@ -225,7 +223,7 @@ class _ContentHandler(object):
     def data(self, tag, tagline, val, valline, delim, inloop):
         raise Exception("Abstract method called")
 
-class _Handler(_ContentHandler):
+class _PrinterHandler(_ContentHandler):
     def startData(self, line, name):
         print("startData: %d %s" % (line, name))
     def endData(self, line, name):
@@ -241,10 +239,9 @@ class _Handler(_ContentHandler):
     def comment(self, line, text):
         return False
     def data(self, tag, tagline, val, valline, delim, inloop):
-        print(tag, ":", val, tagline, valline, delim, inloop)
+        print("%s : %s %s %s" % (tag, val, delim, inloop))
 
-
-def sans_parse(entry_to_parse, handler=_Handler(),
+def sans_parse(entry_to_parse, handler=_PrinterHandler(),
                error_handler=_ErrorHandler()):
     """ Parses a NMR-STAR file or string in SANS mode and makes a
     callback for every token it encounters. Expects a handler (with the
@@ -269,8 +266,7 @@ def sans_parse(entry_to_parse, handler=_Handler(),
     * error(self, line, msg)
     * warning(self, line, msg)"""
 
-    dummy_ent = Entry.from_scratch("")
-    parser = _Parser(dummy_ent)
+    parser = _Parser()
     parser.sans_parse(_interpret_file(entry_to_parse).read(), handler,
                       error_handler)
 
@@ -493,9 +489,11 @@ class _Parser(object):
     reserved = ["stop_", "loop_", "save_", "data_", "global_"]
 
     def __init__(self, entry_to_parse_into=None):
+
+        # Just make an entry to parse into if called with no entry passed
         if entry_to_parse_into is None:
-            raise ValueError("You must provide an entry to parse into. Also, "
-                             "why are you using this class?")
+            entry_to_parse_into = Entry.from_scratch("")
+
         self.ent = entry_to_parse_into
         self.to_process = ""
         self.full_data = ""
@@ -584,47 +582,58 @@ class _Parser(object):
 
         # Make sure this is actually a STAR file
         if not self.token.startswith("data_"):
-            error_handler.fatalError(self.line_number, "Invalid file. NMR-STAR files must start with"
-                             " 'data_'. Did you accidentally select the wrong"
-                             " file?")
+            error_handler.fatalError(self.line_number,
+                                     "Invalid file. NMR-STAR files must start "
+                                     "with 'data_'. Did you accidentally select"
+                                     " the wrong file?")
             return
 
         # Make sure there is a data name
         elif len(self.token) < 6:
-            error_handler.fatalError(self.line_number, "'data_' must be followed by data name. Simply "
-                             "'data_' is not allowed.")
+            error_handler.fatalError(self.line_number,
+                                     "'data_' must be followed by data name. "
+                                     "Simply 'data_' is not allowed.")
             return
 
         if self.delineator != " ":
-            if not error_handler.warning(self.line_number, "The data_ keyword may not be quoted or "
-                             "semicolon-delineated."):
+            if error_handler.warning(self.line_number,
+                                     "The data_ keyword may not be quoted or "
+                                     "semicolon-delineated."):
                 return
 
         # Start data
         curid = self.token[5:]
-        handler.startData(self.line_number, curid)
+        if handler.startData(self.line_number, curid):
+            return
 
         # We are expecting to get saveframes
         while self.get_token() != None:
 
             if not self.token.startswith("save_"):
-                error_handler.fatalError(self.line_number, "Only 'save_NAME' is valid in the body of a "
-                                 "NMR-STAR file. Found '" + self.token + "'.")
+                error_handler.fatalError(self.line_number,
+                                         "Only 'save_NAME' is valid in the body"
+                                         "of a NMR-STAR file. Found '" +
+                                         self.token + "'.")
                 return
 
             if len(self.token) < 6:
-                error_handler.fatalError(self.line_number, "'save_' must be followed by saveframe name. "
-                                 "You have a 'save_' tag which is illegal "
-                                 "without a specified saveframe name.")
+                error_handler.fatalError(self.line_number,
+                                         "'save_' must be followed by saveframe"
+                                         " name. You have a 'save_' tag which "
+                                         "is illegal without a specified "
+                                         "saveframe name.")
                 return
 
             if self.delineator != " ":
-                if not error_handler.error(self.line_number, "The save_ keyword may not be quoted or "
-                                 "semicolon-delineated."):
+                if error_handler.error(self.line_number,
+                                       "The save_ keyword may not be quoted or "
+                                       "semicolon-delineated."):
                     return
 
             # Add the saveframe
-            handler.startSaveframe(self.line_number, self.token[5:])
+            if handler.startSaveframe(self.line_number, self.token[5:]):
+                return
+
             curframe = self.token[5:]
 
             # We are in a saveframe
@@ -632,14 +641,16 @@ class _Parser(object):
 
                 if self.token == "loop_":
                     if self.delineator != " ":
-                        if not error_handler.error(self.line_number, "The loop_ keyword may not be quoted "
-                                         "or semicolon-delineated."):
+                        if error_handler.error(self.line_number,
+                                               "The loop_ keyword may not be "
+                                               "quoted or semicolon-delineated."):
                             return
 
                     curloop = Loop.from_scratch()
                     curloop.col_lines = []
                     curloop.num_col = 0
-                    handler.startLoop(self.line_number)
+                    if handler.startLoop(self.line_number):
+                        return
 
                     # We are in a loop
                     seen_data = False
@@ -649,12 +660,15 @@ class _Parser(object):
                         # Add a column
                         if self.token.startswith("_"):
                             if self.delineator != " ":
-                                if not error_handler.error(self.line_number, "Loop tags may not be quoted "
-                                                 "or semicolon-delineated."):
+                                if error_handler.error(self.line_number,
+                                                       "Loop tags may not be "
+                                                       "quoted or "
+                                                       "semicolon-delineated."):
                                     return
                             if seen_data:
-                                if not error_handler.warning(self.line_number, "Cannot have more loop tags "
-                                                 "after loop data."):
+                                if error_handler.warning(self.line_number,
+                                                         "Cannot have more loop"
+                                                         "tags after loop data."):
                                     return
                             curloop.add_column(self.token)
                             curloop.col_lines.append(self.line_number)
@@ -667,16 +681,19 @@ class _Parser(object):
                             while self.token != None:
                                 if self.token == "stop_":
                                     if self.delineator != " ":
-                                        if not error_handler.error(self.line_number, "The stop_ keyword may"
-                                                         " not be quoted or "
-                                                         "semicolon-delineated."):
+                                        if error_handler.error(self.line_number,
+                                                               "The stop_ keyword may"
+                                                               " not be quoted or "
+                                                               "semicolon-delineated."):
                                             return
                                     if curloop.num_col == 0:
-                                        if not error_handler.warning(self.line_number, "Loop with no tags."):
+                                        if error_handler.warning(self.line_number,
+                                                                 "Loop with no tags."):
                                             return
                                         curloop = None
                                     if (not seen_data):
-                                        if not error_handler.warning(self.line_number, "Loop with no data."):
+                                        if error_handler.warning(self.line_number,
+                                                                 "Loop with no data."):
                                             return
 
                                     # We've seen the end of a loop
@@ -684,27 +701,47 @@ class _Parser(object):
                                     break
                                 else:
                                     if curloop.num_col == 0:
-                                        error_handler.fatalError(self.line_number, "Data found in loop "
-                                                         "before loop tags.")
+                                        error_handler.fatalError(self.line_number,
+                                                                 "Data found in loop "
+                                                                 "before loop tags.")
                                         return
 
                                     if (self.token in self.reserved and
                                             self.delineator == " "):
-                                        error_handler.fatalError(self.line_number, "Cannot use keywords "
-                                                         "as data values unless"
-                                                         " quoted or semi-colon"
-                                                         " delineated. Perhaps "
-                                                         "this is a loop that "
-                                                         "wasn't properly "
-                                                         "terminated? Illegal "
-                                                         "value: " + self.token)
+                                        error_handler.fatalError(self.line_number,
+                                                                 "Cannot use keywords "
+                                                                 "as data values unless"
+                                                                 " quoted or semi-colon"
+                                                                 " delineated. Perhaps "
+                                                                 "this is a loop that "
+                                                                 "wasn't properly "
+                                                                 "terminated? Illegal "
+                                                                 "value: " + self.token)
                                         return
+
+
+                                    # Check for reserved keywords... SLOW!
+                                    #if self.delineator == ";":
+                                    #    for x in ["save_", "stop_", "loop_"]:
+                                    #        if x in self.token:
+                                    #            if error_handler.warning(self.line_number+1,
+                                    #                                     "Keyword in value: %s" % x):
+                                    #                return
 
                                     if self.delineator == "$":
                                         self.token = self.token[1:]
                                     if curdata == curloop.num_col - 1:
                                         self.line_number -= 1
-                                    handler.data(curloop.category + "." + curloop.columns[curdata], curloop.col_lines[curdata], self.token, self.line_number+1, conv_delin[self.delineator], True)
+
+                                    # Send the tag data and see if we need to quit
+                                    if handler.data((curloop.category + "." +
+                                                     curloop.columns[curdata]),
+                                                    curloop.col_lines[curdata],
+                                                    self.token,
+                                                    self.line_number+1,
+                                                    conv_delin[self.delineator],
+                                                    True):
+                                        return
                                     curdata = (curdata + 1) % curloop.num_col
                                     seen_data = True
 
@@ -712,39 +749,47 @@ class _Parser(object):
                                 self.get_token()
 
                     if self.token != "stop_":
-                        error_handler.fatalError(self.line_number, "Loop improperly terminated at end of"
-                                         " file.")
+                        error_handler.fatalError(self.line_number,
+                                                 "Loop improperly terminated at"
+                                                 " end of file.")
                         return
 
                     # End of a loop
-                    handler.endLoop(self.line_number)
+                    if handler.endLoop(self.line_number):
+                        return
+
                     if curdata % curloop.num_col != 0:
-                        error_handler.fatalError(self.line_number, "Loop count error.")
+                        error_handler.fatalError(self.line_number,
+                                                 "Loop count error.")
                         return
 
                 # Close saveframe
                 elif self.token == "save_":
                     if self.delineator not in " ;":
-                        if not error_handler.error(self.line_number, "The save_ keyword may not be quoted "
-                                         "or semicolon-delineated."):
+                        if error_handler.error(self.line_number,
+                                               "The save_ keyword may not be "
+                                               "quoted or semicolon-delineated."):
                             return
 
-                    handler.endSaveframe(self.line_number, curframe)
+                    if handler.endSaveframe(self.line_number, curframe):
+                        return
                     curframe = None
                     break
 
                 # Invalid content in saveframe
                 elif not self.token.startswith("_"):
-                    error_handler.fatalError(self.line_number, "Invalid token "
-                                             "found in saveframe '%s': '%s'" %
+                    error_handler.fatalError(self.line_number,
+                                             "Invalid token found in saveframe"
+                                             " '%s': '%s'" %
                                              (curframe, self.token))
                     return
 
                 # Add a tag
                 else:
                     if self.delineator != " ":
-                        if not error_handler.error(self.line_number, "Saveframe tags may not be quoted or "
-                                         "semicolon-delineated."):
+                        if error_handler.error(self.line_number,
+                                               "Saveframe tags may not be "
+                                               "quoted or semicolon-delineated."):
                             return
                     curtag = self.token
                     curline = self.line_number
@@ -753,21 +798,38 @@ class _Parser(object):
                     self.get_token()
                     if (self.token in self.reserved and
                             self.delineator == " "):
-                        if not error_handler.error(self.line_number, "Cannot use keywords as data values "
-                                         "unless quoted or semi-colon "
-                                         "delineated. Illegal value: " +
-                                         self.token):
+                        if error_handler.error(self.line_number,
+                                               "Cannot use keywords as data values "
+                                               "unless quoted or semi-colon "
+                                               "delineated. Illegal value: " +
+                                               self.token):
                             return
+
+                    # Check for reserved keywords... SLOW!
+                    #if self.delineator == ";":
+                    #    for x in ["save_", "stop_", "loop_"]:
+                    #        if x in self.token:
+                    #            if error_handler.warning(self.line_number+1,
+                    #                                     "Keyword in value: %s" % x):
+                    #                return
 
                     if self.delineator == '\'' or self.delineator == '"' or self.delineator == ";":
                         self.line_number += 1
+                    if self.delineator == ";":
+                        curline -= 1
                     if self.delineator == "$":
                         self.token = self.token[1:]
-                    handler.data(curtag, curline+1, self.token, self.line_number, conv_delin[self.delineator], False)
+
+                    # Send the tag value
+                    if handler.data(curtag, curline+1, self.token,
+                                    self.line_number,
+                                    conv_delin[self.delineator], False):
+                        return
 
             if self.token != "save_":
-                if not error_handler.error(self.line_number, "Saveframe improperly terminated at end of "
-                                 "file."):
+                if error_handler.error(self.line_number,
+                                       "Saveframe improperly terminated at end "
+                                       "of file."):
                     return
 
         # Free the memory of the original copy of the data we parsed
@@ -885,8 +947,8 @@ class _Parser(object):
                                                              "tags.", self.get_line_number())
                                         curloop = None
                                     if (not seen_data and
-                                          RAISE_PARSE_WARNINGS and
-                                          "empty-loop" not in WARNINGS_TO_IGNORE):
+                                            RAISE_PARSE_WARNINGS and
+                                            "empty-loop" not in WARNINGS_TO_IGNORE):
                                         raise ValueError("Loop with no data.",
                                                          self.get_line_number())
                                     else:
@@ -3360,6 +3422,16 @@ def called_directly():
     optparser.add_option("--validate", metavar="FILE", action="store",
                          dest="validate", default=None, type="string",
                          help="Print the validation report for an entry.")
+    optparser.add_option("--tag", metavar="FILE TAG", action="store",
+                         dest="fetch_tag", default=None, nargs=2, type="string",
+                         help="Print all of the values of the specified tags "
+                              "separated by newlines. Existing newlines in data"
+                              " are escaped. You can query multiple tags by "
+                              "comma separating them; if you do that the "
+                              "results will be truncated to the length of the "
+                              "tag with the fewest results, and the values for "
+                              "the tags will be separated with tabs.")
+
     # Options, parse 'em
     (options, cmd_input) = optparser.parse_args()
 
@@ -3367,7 +3439,61 @@ def called_directly():
         print("No arguments are allowed. Please see the options using --help.")
         sys.exit(0)
 
-    if options.validate is None and options.diff is None:
+    # Check for command misuse
+    if sum(1 for x in [options.validate,
+                       options.diff, options.fetch_tag] if x) > 1:
+        print("You can only use one of the --diff, --validate, and --tag "
+              "options at once.")
+        sys.exit(1)
+
+    # Validate an entry
+    if options.validate is not None:
+        validate(Entry.from_file(options.validate))
+
+    # Print the diff report
+    elif options.diff is not None:
+        diff(Entry.from_file(options.diff[0]), Entry.from_file(options.diff[1]))
+
+    # Fetch a tag and print it
+    elif options.fetch_tag is not None:
+
+        # Build an Entry from their file
+        entry = Entry.from_file(options.fetch_tag[0])
+
+        # Figure out if they want one or more tags
+        if "," in options.fetch_tag[1]:
+            query_tags = options.fetch_tag[1].split(",")
+        else:
+            query_tags = [options.fetch_tag[1]]
+
+        # Get the tags they queried
+        result = entry.get_tags(query_tags)
+        result = [result[tag] for tag in query_tags]
+
+        results_lengths = [len(x) for x in result]
+        max_length = max(results_lengths)
+
+        if len(set(results_lengths)) != 1:
+            sys.stderr.write("Warning! Not all queried tags had the same number"
+                             " of values. It is not recomended to combine tags "
+                             "from saveframes and loops. Please ensure that "
+                             "your script is separating columns by one tab and "
+                             "not by whitespace or this output may be "
+                             "misinterpreted.\n")
+
+        # Lengthen the short tags
+        for x, tag in enumerate(result):
+            while len(tag) < max_length:
+                tag.append("")
+
+        result = zip(*result)
+
+        for row in result:
+            print("\t".join([x.replace("\n", "\\n").replace("\t", "\\t")
+                             for x in row]))
+
+    # Run unit tests with no special mode invoked
+    else:
         print("Running unit tests...")
         try:
             #pylint: disable=relative-import,wrong-import-order
@@ -3376,13 +3502,7 @@ def called_directly():
             print("No testing module available with this installation.")
             sys.exit(0)
         bmrb_test.start_tests()
-    elif options.validate is not None and options.diff is not None:
-        print("You cannot validate and diff at the same time.")
-        sys.exit(1)
-    elif options.validate is not None:
-        validate(Entry.from_file(options.validate))
-    elif options.diff is not None:
-        diff(Entry.from_file(options.diff[0]), Entry.from_file(options.diff[1]))
+
     sys.exit(0)
 
 # Allow using diff or validate if ran directly
