@@ -582,20 +582,23 @@ class _Parser(object):
 
         # Make sure this is actually a STAR file
         if not self.token.startswith("data_"):
-            error_handler.fatalError(self.line_number, "Invalid file. NMR-STAR files must start with"
-                             " 'data_'. Did you accidentally select the wrong"
-                             " file?")
+            error_handler.fatalError(self.line_number,
+                                     "Invalid file. NMR-STAR files must start "
+                                     "with 'data_'. Did you accidentally select"
+                                     " the wrong file?")
             return
 
         # Make sure there is a data name
         elif len(self.token) < 6:
-            error_handler.fatalError(self.line_number, "'data_' must be followed by data name. Simply "
-                             "'data_' is not allowed.")
+            error_handler.fatalError(self.line_number,
+                                     "'data_' must be followed by data name. "
+                                     "Simply 'data_' is not allowed.")
             return
 
         if self.delineator != " ":
-            if error_handler.warning(self.line_number, "The data_ keyword may not be quoted or "
-                             "semicolon-delineated."):
+            if error_handler.warning(self.line_number,
+                                     "The data_ keyword may not be quoted or "
+                                     "semicolon-delineated."):
                 return
 
         # Start data
@@ -607,19 +610,24 @@ class _Parser(object):
         while self.get_token() != None:
 
             if not self.token.startswith("save_"):
-                error_handler.fatalError(self.line_number, "Only 'save_NAME' is valid in the body of a "
-                                 "NMR-STAR file. Found '" + self.token + "'.")
+                error_handler.fatalError(self.line_number,
+                                         "Only 'save_NAME' is valid in the body"
+                                         "of a NMR-STAR file. Found '" +
+                                         self.token + "'.")
                 return
 
             if len(self.token) < 6:
-                error_handler.fatalError(self.line_number, "'save_' must be followed by saveframe name. "
-                                 "You have a 'save_' tag which is illegal "
-                                 "without a specified saveframe name.")
+                error_handler.fatalError(self.line_number,
+                                         "'save_' must be followed by saveframe"
+                                         " name. You have a 'save_' tag which "
+                                         "is illegal without a specified "
+                                         "saveframe name.")
                 return
 
             if self.delineator != " ":
-                if error_handler.error(self.line_number, "The save_ keyword may not be quoted or "
-                                 "semicolon-delineated."):
+                if error_handler.error(self.line_number,
+                                       "The save_ keyword may not be quoted or "
+                                       "semicolon-delineated."):
                     return
 
             # Add the saveframe
@@ -633,8 +641,9 @@ class _Parser(object):
 
                 if self.token == "loop_":
                     if self.delineator != " ":
-                        if error_handler.error(self.line_number, "The loop_ keyword may not be quoted "
-                                         "or semicolon-delineated."):
+                        if error_handler.error(self.line_number,
+                                               "The loop_ keyword may not be "
+                                               "quoted or semicolon-delineated."):
                             return
 
                     curloop = Loop.from_scratch()
