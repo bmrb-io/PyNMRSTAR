@@ -3383,6 +3383,16 @@ def called_directly():
     optparser.add_option("--validate", metavar="FILE", action="store",
                          dest="validate", default=None, type="string",
                          help="Print the validation report for an entry.")
+    optparser.add_option("--tag", metavar="FILE TAG", action="store",
+                         dest="fetch_tag", default=None, nargs=2, type="string",
+                         help="Print all of the values of the specified tags "
+                              "separated by newlines. Existing newlines in data"
+                              " are escaped. You can query multiple tags by "
+                              "comma separating them; if you do that the "
+                              "results will be truncated to the length of the "
+                              "tag with the fewest results, and the values for "
+                              "the tags will be separated with tabs.")
+
     # Options, parse 'em
     (options, cmd_input) = optparser.parse_args()
 
@@ -3390,7 +3400,61 @@ def called_directly():
         print("No arguments are allowed. Please see the options using --help.")
         sys.exit(0)
 
-    if options.validate is None and options.diff is None:
+    # Check for command misuse
+    if sum(1 for x in [options.validate,
+                       options.diff, options.fetch_tag] if x) > 1:
+        print("You can only use one of the --diff, --validate, and --tag "
+              "options at once.")
+        sys.exit(1)
+
+    # Validate an entry
+    if options.validate is not None:
+        validate(Entry.from_file(options.validate))
+
+    # Print the diff report
+    elif options.diff is not None:
+        diff(Entry.from_file(options.diff[0]), Entry.from_file(options.diff[1]))
+
+    # Fetch a tag and print it
+    elif options.fetch_tag is not None:
+
+        # Build an Entry from their file
+        entry = Entry.from_file(options.fetch_tag[0])
+
+        # Figure out if they want one or more tags
+        if "," in options.fetch_tag[1]:
+            query_tags = options.fetch_tag[1].split(",")
+        else:
+            query_tags = [options.fetch_tag[1]]
+
+        # Get the tags they queried
+        result = entry.get_tags(query_tags)
+        result = [result[tag] for tag in query_tags]
+
+        results_lengths = [len(x) for x in result]
+        max_length = max(results_lengths)
+
+        if len(set(results_lengths)) != 1:
+            sys.stderr.write("Warning! Not all queried tags had the same number"
+                             " of values. It is not recomended to combine tags "
+                             "from saveframes and loops. Please ensure that "
+                             "your script is separating columns by one tab and "
+                             "not by whitespace or this output may be "
+                             "misinterpreted.\n")
+
+        # Lengthen the short tags
+        for x, tag in enumerate(result):
+            while len(tag) < max_length:
+                tag.append("")
+
+        result = zip(*result)
+
+        for row in result:
+            print("\t".join([x.replace("\n", "\\n").replace("\t", "\\t")
+                             for x in row]))
+
+    # Run unit tests with no special mode invoked
+    else:
         print("Running unit tests...")
         try:
             #pylint: disable=relative-import,wrong-import-order
@@ -3399,13 +3463,7 @@ def called_directly():
             print("No testing module available with this installation.")
             sys.exit(0)
         bmrb_test.start_tests()
-    elif options.validate is not None and options.diff is not None:
-        print("You cannot validate and diff at the same time.")
-        sys.exit(1)
-    elif options.validate is not None:
-        validate(Entry.from_file(options.validate))
-    elif options.diff is not None:
-        diff(Entry.from_file(options.diff[0]), Entry.from_file(options.diff[1]))
+
     sys.exit(0)
 
 # Allow using diff or validate if ran directly
