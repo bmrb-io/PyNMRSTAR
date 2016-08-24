@@ -29,7 +29,7 @@ if len(result) == 0:
     print("No polymer sequences found in file.")
     sys.exit(2)
 elif len(result) > 1:
-    sys.stderr.write("Warning: multiple chains in entry.")
+    sys.stderr.write("Warning: multiple chains in entry.\n")
 
 for polymer_sequence in result:
     print(polymer_sequence.replace("\n", ""))
