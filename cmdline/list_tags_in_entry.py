@@ -4,7 +4,12 @@ from __future__ import print_function
 
 import os
 import sys
-sys.path.append("..")
+
+# Load the bmrb.py library
+if not os.path.isfile("bmrb.py"):
+    if not os.path.isfile("../bmrb.py"):
+        raise ImportError("Could not locate bmrb.py library. Please copy to this directory.")
+    sys.path.append("..")
 import bmrb
 
 if len(sys.argv) < 2:
