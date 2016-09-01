@@ -3472,7 +3472,7 @@ def called_directly():
 
         if len(set(results_lengths)) != 1:
             sys.stderr.write("Warning! Not all queried tags had the same number"
-                             " of values. It is not recomended to combine tags "
+                             " of values. It is not recommended to combine tags "
                              "from saveframes and loops. Please ensure that "
                              "your script is separating columns by one tab and "
                              "not by whitespace or this output may be "
