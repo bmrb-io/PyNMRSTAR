@@ -40,9 +40,9 @@ Note that when there are multiple values for a tag they are separated by newline
 and when multiple tags are queried the individual tag results are separated by tabs.
 
 **WARNING** - It is possible to query tags from different saveframes or loops with
-this tool. That means that not all tags will have the same number of results. To
+this tool. That means that the tags will not always have the same number of results. To
 properly machine parse the output you *must* look for one tab character `\t` as
-the separator rather than a generic "space" regular expression like such `\S`. The
+the separator rather than a generic "space" regular expression like such `\s`. The
 following example demonstrates the potential problem for improperly written code:
 
 ```bash
@@ -93,7 +93,7 @@ No problems found during validation.
 
 #### Entry comparison
 
-To compare to NMR-STAR entries for equivalence (syntactically aware):
+To compare two NMR-STAR entries for equivalence (syntactically aware):
 
 ```bash
 
