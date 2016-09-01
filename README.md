@@ -18,6 +18,12 @@ and then use the library like normal to start taking advantage of the
 speed up! If you don't compile the C extension the module will use
 automatically use pure python implementations instead.
 
+### Command line tools
+
+We have developed several command line tools to ease certain common actions
+performed against NMR-STAR files. If you are looking for information on those
+please go [here](cmdline/REST.md).
+
 ====
 
 This module provides Entry, Saveframe, and Loop objects. Use python's
