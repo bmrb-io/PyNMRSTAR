@@ -26,7 +26,7 @@ automatically use pure python implementations instead.
 
 We have developed several command line tools to ease certain common actions
 performed against NMR-STAR files. If you are looking for information on those
-please go [here](cmdline/REST.md).
+please go [here](cmdline/README.md).
 
 ====
 
