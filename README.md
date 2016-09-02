@@ -3,6 +3,8 @@ A Python module for reading, writing, and manipulating NMR-STAR files. [![Build 
 
 Python versions supported: 2.6, 2.7, 3.3, 3.4, and 3.5
 
+====
+
 ### Want it faster?
 
 Now there is a C extension that makes parsing and printing in NMR-STAR
@@ -19,6 +21,16 @@ speed up! If you don't compile the C extension the module will use
 automatically use pure python implementations instead.
 
 ====
+
+### Command line tools
+
+We have developed several command line tools to ease certain common actions
+performed against NMR-STAR files. If you are looking for information on those
+please go [here](cmdline/README.md).
+
+====
+
+### PyNMRSTAR Overview
 
 This module provides Entry, Saveframe, and Loop objects. Use python's
 built in help function for documentation.
