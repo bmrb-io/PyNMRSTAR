@@ -147,6 +147,7 @@ _COMMENT_DICTIONARY = {}
 _API_URL = "http://webapi.bmrb.wisc.edu/current"
 _SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
+_VERSION = "2.0"
 
 #############################################
 #             Module methods                #
@@ -3407,7 +3408,7 @@ def called_directly():
 
     # Specify some basic information about our command
     optparser = optparse.OptionParser(usage="usage: %prog",
-                                      version="1.0",
+                                      version=_VERSION,
                                       description="NMR-STAR handling python "
                                                   "module. Usually you'll want "
                                                   "to import this. When ran "
