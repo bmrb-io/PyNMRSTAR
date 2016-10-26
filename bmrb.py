@@ -524,6 +524,7 @@ class _Parser(object):
                                  " old version.")
         else:
             self.real_get_token()
+            self.line_number = 0
 
         # This is just too VERBOSE
         if VERBOSE == "very":
@@ -561,15 +562,15 @@ class _Parser(object):
         """ Parses the string provided as data as an NMR-STAR entry
         and returns the parsed entry. Raises ValueError on exceptions."""
 
-        if not cnmrstar:
-            raise ValueError("You must have the C extension compiled to use the"
-                             " SANS mode.")
-
         conv_delin = {'\'':10, '"': 11, ';': 12, ' ':14, '$':13}
 
         # Fix DOS line endings
         data = data.replace("\r\n", "\n").replace("\r", "\n")
-        cnmrstar.load_string(data)
+
+        if cnmrstar != None:
+            cnmrstar.load_string(data)
+        else:
+            self.full_data = data + "\n"
 
         # Create the NMRSTAR object
         curid = None
@@ -912,7 +913,6 @@ class _Parser(object):
                                          self.get_line_number())
 
                     curloop = Loop.from_scratch(source=source)
-                    curframe.add_loop(curloop)
 
                     # We are in a loop
                     seen_data = False
@@ -932,6 +932,10 @@ class _Parser(object):
 
                         # On to data
                         else:
+
+                            # Now that we have the columns we can add the loop
+                            #  to the current saveframe
+                            curframe.add_loop(curloop)
 
                             # We are in the data block of a loop
                             while self.token != None:
