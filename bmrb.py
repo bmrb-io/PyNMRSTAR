@@ -913,7 +913,6 @@ class _Parser(object):
                                          self.get_line_number())
 
                     curloop = Loop.from_scratch(source=source)
-                    curframe.add_loop(curloop)
 
                     # We are in a loop
                     seen_data = False
@@ -933,6 +932,10 @@ class _Parser(object):
 
                         # On to data
                         else:
+
+                            # Now that we have the columns we can add the loop
+                            #  to the current saveframe
+                            curframe.add_loop(curloop)
 
                             # We are in the data block of a loop
                             while self.token != None:
