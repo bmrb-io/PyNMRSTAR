@@ -8,5 +8,5 @@ python:
   - "3.5-dev"
   - "nightly"
 # command to run tests
-script: ./bmrb.py
+script: ./bmrb.py && rm *.so && ./bmrb.py
 install: cd c; make; cd ..
