@@ -405,6 +405,13 @@ class TestPyNMRSTAR(unittest.TestCase):
         tmp.rename_saveframe('jons_frame', 'F5-Phe-cVHP')
         self.assertEqual(tmp, database_entry)
 
+    def test_duplicate_loop_detection(self):
+        one = bmrb.Loop.from_scratch(category="duplicate")
+        two = bmrb.Loop.from_scratch(category="duplicate")
+        frame = bmrb.Saveframe.from_scratch(1)
+        frame.add_loop(one)
+        self.assertRaises(ValueError, frame.add_loop, two)
+
     def test_normalize(self):
 
         tmp = copy(database_entry)
