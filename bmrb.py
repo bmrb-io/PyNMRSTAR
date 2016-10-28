@@ -1269,7 +1269,130 @@ class Schema(object):
     def __str__(self):
         """Print the schema that we are adhering to."""
 
-        return "BMRB schema loaded from: '%s'" % self.schema_file
+        return self.string_representation()
+
+    def string_representation(self, search=None):
+        """ Prints all the tags in the schema if search is not specified
+        and prints the tags that contain the search string if it is."""
+
+        # Get the longest lengths
+        lengths = [max([len(_format_tag(x)) for x in self.schema_order])]
+        values = self.schema.values()
+
+        for y in range(0, len(values[0])):
+            lengths.append(max([len(str(x[y])) for x in values]))
+
+        text = """BMRB schema from: '%s'
+%s
+  %-*s %-*s %-*s %-*s
+""" % (self.schema_file, "Tag_Prefix", lengths[0], "Tag", lengths[1]-6, "Type",
+       lengths[2], "Null_Allowed", lengths[3], "SF_Category")
+
+        last_tag = ""
+
+        for tag in self.schema_order:
+            # Skip to the next tag if there is a search and it fails
+            if search and not search in tag:
+                continue
+            st = self.schema.get(tag.lower(), None)
+            tag_cat = _format_category(tag)
+            if st:
+                if tag_cat != last_tag:
+                    last_tag = tag_cat
+                    text += "\n%-30s\n" % tag_cat
+
+                text += "  %-*s %-*s %-*s  %-*s\n" % (lengths[0], _format_tag(tag), lengths[1], st[0],
+                lengths[2], st[1], lengths[3], st[2])
+
+        return text
+
+    def add_tag(self, tag, tag_type, null_allowed, sf_category, after=None):
+        """ Adds the specified tag to the tag dictionary. You must provide:
+
+        1) The full tag as such:
+            "_Entry_interview.Sf_category"
+        2) The tag type which is one of the following:
+            "INTEGER"
+            "FLOAT"
+            "CHAR(len)"
+            "VARCHAR(len)"
+            "TEXT"
+            "DATETIME year to day"
+        3) A python True/False that indicates whether null values are allowed.
+        4) The sf_category of the parent saveframe
+        5) Optional: The tag to order this tag behind when normalizing
+           saveframes."""
+
+        # Add the underscore preceeding the tag
+        if tag[0] != "_":
+            tag = "_" + tag
+
+        # See if the tag is already in the schema
+        if tag.lower() in self.schema:
+            raise ValueError("Cannot add a tag to the schema that is already in"
+                             " the schema: %s" % tag)
+
+        # Check the tag type
+        tag_type = tag_type.upper()
+        if tag_type not in ["INTEGER", "FLOAT", "TEXT", "DATETIME year to day"]:
+            if tag_type.startswith("CHAR(") or tag_type.startswith("VARCHAR("):
+                # This will allow things through that have extra junk on the
+                #  end, but in general it is okay to be forgiving as long as we
+                #   can guess what they mean.
+                length = tag_type[tag_type.index("(")+1:tag_type.index(")")]
+                # Check the length for non-numbers and 0
+                try:
+                    1/int(length)
+                except (ValueError, ZeroDivisionError):
+                    raise ValueError("Illegal length specified in tag type: "
+                                     "%s " % length)
+
+                # Cut off anything that might be at the end
+                tag_type = tag_type[0:tag_type.index(")")+1]
+            else:
+                raise ValueError("The tag type you provided is not valid. "
+                                 "Please use a type as specified in the help "
+                                 "for this method.")
+
+        # Check the null allowed
+        if str(null_allowed).lower() == "false":
+            null_allowed = False
+        if str(null_allowed).lower() == "true":
+            null_allowed = True
+        if not (null_allowed == True or null_allowed == False):
+            raise ValueError("Please specify whether null is allowed with True/"
+                             "False")
+
+        # Check the category
+        if not sf_category:
+            raise ValueError("Please provide the sf_category of the parent "
+                             "saveframe.")
+
+        # Conditionally check the tag to insert after
+        new_tag_pos = len(self.schema_order)
+        if after != None:
+            try:
+                # See if the tag with caps exists in the order
+                new_tag_pos = self.schema_order.index(after) + 1
+            except ValueError:
+                try:
+                    # See if the tag in lowercase exists in the order
+                    new_tag_pos = [x.lower() for x in
+                                   self.schema_order].index(after.lower()) + 1
+                except ValueError:
+                    raise ValueError("The tag you specified to insert this tag "
+                                     "after does not exist in the schema.")
+        else:
+            # Determine a sensible place to put the new tag
+            search = _format_category(tag.lower())
+            for pos, stag in enumerate([x.lower() for x in self.schema_order]):
+                if stag.startswith(search):
+                    print("Setting " + str(pos))
+                    new_tag_pos = pos + 1
+
+        # Add the new tag to the tag order and tag list
+        self.schema_order.insert(new_tag_pos, tag)
+        self.schema[tag.lower()] = (tag_type, null_allowed, sf_category, tag)
 
     def convert_tag(self, tag, value, linenum=None):
         """ Converts the provided tag from string to the appropriate
