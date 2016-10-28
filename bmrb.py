@@ -1382,6 +1382,13 @@ class Schema(object):
                 except ValueError:
                     raise ValueError("The tag you specified to insert this tag "
                                      "after does not exist in the schema.")
+        else:
+            # Determine a sensible place to put the new tag
+            search = _format_category(tag.lower())
+            for pos, stag in enumerate([x.lower() for x in self.schema_order]):
+                if stag.startswith(search):
+                    print("Setting " + str(pos))
+                    new_tag_pos = pos + 1
 
         # Add the new tag to the tag order and tag list
         self.schema_order.insert(new_tag_pos, tag)
