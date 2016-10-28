@@ -1269,7 +1269,33 @@ class Schema(object):
     def __str__(self):
         """Print the schema that we are adhering to."""
 
-        return "BMRB schema loaded from: '%s'" % self.schema_file
+        # Get the longest lengths
+        lengths = [max([len(_format_tag(x)) for x in self.schema_order])]
+        values = self.schema.values()
+
+        for y in range(0, len(values[0])):
+            lengths.append(max([len(str(x[y])) for x in values]))
+
+        text = """BMRB schema from: '%s'
+%s
+  %-*s %-*s %-*s %-*s
+""" % (self.schema_file, "Tag_Prefix", lengths[0], "Tag", lengths[1]-6, "Type",
+       lengths[2], "Null_Allowed", lengths[3], "SF_Category")
+
+        last_tag = ""
+
+        for tag in self.schema_order:
+            st = self.schema.get(tag.lower(), None)
+            tag_cat = _format_category(tag)
+            if st:
+                if tag_cat != last_tag:
+                    last_tag = tag_cat
+                    text += "\n%-30s\n" % tag_cat
+
+                text += "  %-*s %-*s %-*s  %-*s\n" % (lengths[0], _format_tag(tag), lengths[1], st[0],
+                lengths[2], st[1], lengths[3], st[2])
+
+        return text
 
     def convert_tag(self, tag, value, linenum=None):
         """ Converts the provided tag from string to the appropriate
