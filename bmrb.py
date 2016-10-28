@@ -1297,6 +1297,87 @@ class Schema(object):
 
         return text
 
+    def add_tag(self, tag, tag_type, null_allowed, sf_category, after=None):
+        """ Adds the specified tag to the tag dictionary. You must provide:
+
+        1) The full tag as such:
+            "_Entry_interview.Sf_category"
+        2) The tag type which is one of the following:
+            "INTEGER"
+            "FLOAT"
+            "CHAR(len)"
+            "VARCHAR(len)"
+            "TEXT"
+            "DATETIME year to day"
+        3) A python True/False that indicates whether null values are allowed.
+        4) The sf_category of the parent saveframe
+        5) Optional: The tag to order this tag behind when normalizing
+           saveframes."""
+
+        # Add the underscore preceeding the tag
+        if tag[0] != "_":
+            tag = "_" + tag
+
+        # See if the tag is already in the schema
+        if tag.lower() in self.schema:
+            raise ValueError("Cannot add a tag to the schema that is already in"
+                             " the schema: %s" % tag)
+
+        # Check the tag type
+        tag_type = tag_type.upper()
+        if tag_type not in ["INTEGER", "FLOAT", "TEXT", "DATETIME year to day"]:
+            if tag_type.startswith("CHAR(") or tag_type.startswith("VARCHAR("):
+                # This will allow things through that have extra junk on the
+                #  end, but in general it is okay to be forgiving as long as we
+                #   can guess what they mean.
+                length = tag_type[tag_type.index("(")+1:tag_type.index(")")]
+                # Check the length for non-numbers and 0
+                try:
+                    1/int(length)
+                except (ValueError, ZeroDivisionError):
+                    raise ValueError("Illegal length specified in tag type: "
+                                     "%s " % length)
+
+                # Cut off anything that might be at the end
+                tag_type = tag_type[0:tag_type.index(")")+1]
+            else:
+                raise ValueError("The tag type you provided is not valid. "
+                                 "Please use a type as specified in the help "
+                                 "for this method.")
+
+        # Check the null allowed
+        if str(null_allowed).lower() == "false":
+            null_allowed = False
+        if str(null_allowed).lower() == "true":
+            null_allowed = True
+        if not (null_allowed == True or null_allowed == False):
+            raise ValueError("Please specify whether null is allowed with True/"
+                             "False")
+
+        # Check the category
+        if not sf_category:
+            raise ValueError("Please provide the sf_category of the parent "
+                             "saveframe.")
+
+        # Conditionally check the tag to insert after
+        new_tag_pos = len(self.schema_order)
+        if after != None:
+            try:
+                # See if the tag with caps exists in the order
+                new_tag_pos = self.schema_order.index(after) + 1
+            except ValueError:
+                try:
+                    # See if the tag in lowercase exists in the order
+                    new_tag_pos = [x.lower() for x in
+                                   self.schema_order].index(after.lower()) + 1
+                except ValueError:
+                    raise ValueError("The tag you specified to insert this tag "
+                                     "after does not exist in the schema.")
+
+        # Add the new tag to the tag order and tag list
+        self.schema_order.insert(new_tag_pos, tag)
+        self.schema[tag.lower()] = (tag_type, null_allowed, sf_category, tag)
+
     def convert_tag(self, tag, value, linenum=None):
         """ Converts the provided tag from string to the appropriate
         type as specified in this schema."""
