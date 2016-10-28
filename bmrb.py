@@ -1269,6 +1269,12 @@ class Schema(object):
     def __str__(self):
         """Print the schema that we are adhering to."""
 
+        return self.string_representation()
+
+    def string_representation(self, search=None):
+        """ Prints all the tags in the schema if search is not specified
+        and prints the tags that contain the search string if it is."""
+
         # Get the longest lengths
         lengths = [max([len(_format_tag(x)) for x in self.schema_order])]
         values = self.schema.values()
@@ -1285,6 +1291,9 @@ class Schema(object):
         last_tag = ""
 
         for tag in self.schema_order:
+            # Skip to the next tag if there is a search and it fails
+            if search and not search in tag:
+                continue
             st = self.schema.get(tag.lower(), None)
             tag_cat = _format_category(tag)
             if st:
