@@ -105,9 +105,15 @@ def build_extension():
     curdir = os.getcwd()
     try:
         os.chdir("c")
-        res = subprocess.check_output(["make"], stderr=subprocess.STDOUT)
-    except (OSError, subprocess.CalledProcessError):
-        # There was an error
+        process = subprocess.Popen(['make'], stderr=subprocess.STDOUT,
+                                   stdout=subprocess.PIPE)
+        output, unused_err = process.communicate()
+        retcode = process.poll()
+        # The make commmand exited with a non-zero status
+        if retcode:
+            return False
+    except OSError:
+        # There was an error going into the c dir
         return False
     finally:
         # Go back to the directory we were in before exiting
