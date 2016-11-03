@@ -98,11 +98,34 @@ else:
     from cStringIO import StringIO
     BytesIO = StringIO
 
+def build_extension():
+    """ Try to compile the c extension. """
+    import subprocess
+
+    curdir = os.getcwd()
+    try:
+        os.chdir("c")
+        res = subprocess.check_output(["make"], stderr=subprocess.STDOUT)
+    except (OSError, subprocess.CalledProcessError):
+        # There was an error
+        return False
+    finally:
+        # Go back to the directory we were in before exiting
+        os.chdir(curdir)
+
+    # We were able to build the extension?
+    return True
+
 # See if we can use the fast tokenizer
 try:
     import cnmrstar
 except ImportError:
     cnmrstar = None
+    if build_extension():
+        try:
+            import cnmrstar
+        except ImportError:
+            pass
 
 # See if we can import from_iterable
 try:
