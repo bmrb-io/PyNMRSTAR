@@ -98,11 +98,45 @@ else:
     from cStringIO import StringIO
     BytesIO = StringIO
 
+# This is an odd place for this, but it can't really be avoided if
+#  we want to keep the import at the top.
+def _build_extension():
+    """ Try to compile the c extension. """
+    import subprocess
+
+    curdir = os.getcwd()
+    try:
+        os.chdir("c")
+        process = subprocess.Popen(['make'], stderr=subprocess.STDOUT,
+                                   stdout=subprocess.PIPE)
+        process.communicate()
+        retcode = process.poll()
+        # The make commmand exited with a non-zero status
+        if retcode:
+            return False
+
+        # We were able to build the extension?
+        return True
+    except OSError:
+        # There was an error going into the c dir
+        return False
+    finally:
+        # Go back to the directory we were in before exiting
+        os.chdir(curdir)
+
+    # We should never make it here, but if we do the null return
+    #  prevents the attempted importing of the c module.
+
 # See if we can use the fast tokenizer
 try:
     import cnmrstar
 except ImportError:
     cnmrstar = None
+    if _build_extension():
+        try:
+            import cnmrstar
+        except ImportError:
+            pass
 
 # See if we can import from_iterable
 try:
@@ -693,7 +727,7 @@ class _Parser(object):
                                                                  "Loop with no tags."):
                                             return
                                         curloop = None
-                                    if (not seen_data):
+                                    if not seen_data:
                                         if error_handler.warning(self.line_number,
                                                                  "Loop with no data."):
                                             return
@@ -1292,7 +1326,7 @@ class Schema(object):
 
         for tag in self.schema_order:
             # Skip to the next tag if there is a search and it fails
-            if search and not search in tag:
+            if search and search not in tag:
                 continue
             st = self.schema.get(tag.lower(), None)
             tag_cat = _format_category(tag)
@@ -1301,8 +1335,9 @@ class Schema(object):
                     last_tag = tag_cat
                     text += "\n%-30s\n" % tag_cat
 
-                text += "  %-*s %-*s %-*s  %-*s\n" % (lengths[0], _format_tag(tag), lengths[1], st[0],
-                lengths[2], st[1], lengths[3], st[2])
+                text += "  %-*s %-*s %-*s  %-*s\n" % (lengths[0], _format_tag(tag),
+                                                      lengths[1], st[0], lengths[2],
+                                                      st[1], lengths[3], st[2])
 
         return text
 
