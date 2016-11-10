@@ -1,5 +1,0 @@
-include AUTHORS
-include LICENSE
-include README
-include pynmrstar/reference_files/schema
-include pynmrstar/reference_files/comments

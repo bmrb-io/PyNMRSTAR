@@ -15,4 +15,5 @@ setup(name='pynmrstar',
       keywords = ['bmrb','parser','nmr', 'nmrstar', 'biomagresbank', 'biological magnetic resonance bank'],
       url = 'https://github.com/uwbmrb/PyNMRSTAR',
       license = 'GPL',
+      package_data = {'pynmrstar': ['reference_files/schema', 'reference_files/comments']}
     )
