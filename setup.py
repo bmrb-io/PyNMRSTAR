@@ -5,7 +5,7 @@ cnmrstar = Extension('cnmrstar',
                     extra_compile_args=["-funroll-loops", "-O3"])
 
 setup(name='pynmrstar',
-      version = '2.1.6',
+      version = '2.2',
       packages = ['pynmrstar'],
       ext_modules = [cnmrstar],
       author = 'Jon Wedell',
