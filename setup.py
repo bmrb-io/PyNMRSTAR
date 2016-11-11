@@ -2,10 +2,11 @@ from distutils.core import setup, Extension
 
 cnmrstar = Extension('cnmrstar',
                     sources = ['c/cnmrstarmodule.c'],
-                    extra_compile_args=["-funroll-loops", "-O3"])
+                    extra_compile_args = ["-funroll-loops", "-O3"],
+                    optional = True)
 
 setup(name='pynmrstar',
-      version = '2.2',
+      version = '2.2.1',
       packages = ['pynmrstar'],
       ext_modules = [cnmrstar],
       author = 'Jon Wedell',
