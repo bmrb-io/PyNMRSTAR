@@ -98,11 +98,50 @@ else:
     from cStringIO import StringIO
     BytesIO = StringIO
 
+# This is an odd place for this, but it can't really be avoided if
+#  we want to keep the import at the top.
+def _build_extension():
+    """ Try to compile the c extension. """
+    import subprocess
+
+    curdir = os.getcwd()
+    try:
+        os.chdir("c")
+        process = subprocess.Popen(['make'], stderr=subprocess.STDOUT,
+                                   stdout=subprocess.PIPE)
+        process.communicate()
+        retcode = process.poll()
+        # The make commmand exited with a non-zero status
+        if retcode:
+            return False
+
+        # We were able to build the extension?
+        return True
+    except OSError:
+        # There was an error going into the c dir
+        return False
+    finally:
+        # Go back to the directory we were in before exiting
+        os.chdir(curdir)
+
+    # We should never make it here, but if we do the null return
+    #  prevents the attempted importing of the c module.
+
 # See if we can use the fast tokenizer
 try:
     import cnmrstar
 except ImportError:
     cnmrstar = None
+
+    # Check for nobuild file before continuing
+    if not os.path.isfile(os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                                   ".nocompile")):
+
+        if _build_extension():
+            try:
+                import cnmrstar
+            except ImportError:
+                pass
 
 # See if we can import from_iterable
 try:
@@ -693,7 +732,7 @@ class _Parser(object):
                                                                  "Loop with no tags."):
                                             return
                                         curloop = None
-                                    if (not seen_data):
+                                    if not seen_data:
                                         if error_handler.warning(self.line_number,
                                                                  "Loop with no data."):
                                             return
@@ -1292,7 +1331,7 @@ class Schema(object):
 
         for tag in self.schema_order:
             # Skip to the next tag if there is a search and it fails
-            if search and not search in tag:
+            if search and search not in tag:
                 continue
             st = self.schema.get(tag.lower(), None)
             tag_cat = _format_category(tag)
@@ -1301,8 +1340,9 @@ class Schema(object):
                     last_tag = tag_cat
                     text += "\n%-30s\n" % tag_cat
 
-                text += "  %-*s %-*s %-*s  %-*s\n" % (lengths[0], _format_tag(tag), lengths[1], st[0],
-                lengths[2], st[1], lengths[3], st[2])
+                text += "  %-*s %-*s %-*s  %-*s\n" % (lengths[0], _format_tag(tag),
+                                                      lengths[1], st[0], lengths[2],
+                                                      st[1], lengths[3], st[2])
 
         return text
 
@@ -3196,6 +3236,39 @@ class Loop(object):
             self.renumber_rows(index_tag)
 
         return deleted
+
+    def filter(self, tag_list, ignore_missing_tags=False):
+        """ Returns a new loop containing only the specified tags.
+        Specify ignore_missing_tags=True to bypass missing tags rather
+        than raising an error."""
+
+        result = Loop.from_scratch()
+        valid_tags = []
+        columns_lower = [x.lower() for x in self.columns]
+
+        # If they only provide one tag make it a list
+        if not isinstance(tag_list, (list, tuple)):
+            tag_list = [tag_list]
+
+        # Make sure all the tags specified exist
+        for tag in tag_list:
+
+            # Handle an invalid tag
+            if _format_tag(tag).lower() not in columns_lower:
+                if not ignore_missing_tags:
+                    raise ValueError("Cannot filter tag '%s' as it isn't "
+                                     "present in this loop." % tag)
+                continue
+
+            valid_tags.append(tag)
+            result.add_column(tag)
+
+        # Add the data for the tags to the new loop
+        for row in self.get_data_by_tag(valid_tags):
+            print("adding %s" % row)
+            result.add_data(row)
+
+        return result
 
     def get_columns(self):
         """ Return the columns for this entry with the category
