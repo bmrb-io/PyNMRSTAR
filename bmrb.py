@@ -106,7 +106,8 @@ def _build_extension():
 
     curdir = os.getcwd()
     try:
-        os.chdir("c")
+        pdir = os.path.join(os.path.dirname(os.path.realpath(__file__)))
+        os.chdir(os.path.join(pdir, "c"))
         process = subprocess.Popen(['make'], stderr=subprocess.STDOUT,
                                    stdout=subprocess.PIPE)
         process.communicate()
