@@ -3197,6 +3197,39 @@ class Loop(object):
 
         return deleted
 
+    def filter(self, tag_list, ignore_missing_tags=False):
+        """ Returns a new loop containing only the specified tags.
+        Specify ignore_missing_tags=True to bypass missing tags rather
+        than raising an error."""
+
+        result = Loop.from_scratch()
+        valid_tags = []
+        columns_lower = [x.lower() for x in self.columns]
+
+        # If they only provide one tag make it a list
+        if not isinstance(tag_list, (list, tuple)):
+            tag_list = [tag_list]
+
+        # Make sure all the tags specified exist
+        for tag in tag_list:
+
+            # Handle an invalid tag
+            if _format_tag(tag).lower() not in columns_lower:
+                if not ignore_missing_tags:
+                    raise ValueError("Cannot filter tag '%s' as it isn't "
+                                     "present in this loop." % tag)
+                continue
+
+            valid_tags.append(tag)
+            result.add_column(tag)
+
+        # Add the data for the tags to the new loop
+        for row in self.get_data_by_tag(valid_tags):
+            print("adding %s" % row)
+            result.add_data(row)
+
+        return result
+
     def get_columns(self):
         """ Return the columns for this entry with the category
         included. Throws ValueError if the category was never set."""
