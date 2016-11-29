@@ -301,6 +301,9 @@ class TestPyNMRSTAR(unittest.TestCase):
     def test_loop(self):
         test_loop = self.entry[0][0]
 
+        # Check filter
+        self.assertEqual(test_loop.filter(['_Entry_author.Ordinal', '_Entry_author.Middle_initials']),
+                         bmrb.Loop.from_string("loop_ _Entry_author.Ordinal _Entry_author.Middle_initials 1 C. 2 . 3 B. 4 H. 5 L. stop_"))
         # Check eq
         self.assertEqual(test_loop == self.entry[0][0], True)
         self.assertEqual(test_loop != self.entry[0][1], True)

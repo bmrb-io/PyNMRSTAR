@@ -106,7 +106,8 @@ def _build_extension():
 
     curdir = os.getcwd()
     try:
-        os.chdir("c")
+        pdir = os.path.join(os.path.dirname(os.path.realpath(__file__)))
+        os.chdir(os.path.join(pdir, "c"))
         process = subprocess.Popen(['make'], stderr=subprocess.STDOUT,
                                    stdout=subprocess.PIPE)
         process.communicate()
@@ -186,7 +187,7 @@ _COMMENT_DICTIONARY = {}
 _API_URL = "http://webapi.bmrb.wisc.edu/current"
 _SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
-_VERSION = "2.2.2"
+_VERSION = "2.2.3"
 
 #############################################
 #             Module methods                #
@@ -3269,7 +3270,6 @@ class Loop(object):
 
         # Add the data for the tags to the new loop
         for row in self.get_data_by_tag(valid_tags):
-            print("adding %s" % row)
             result.add_data(row)
 
         return result
