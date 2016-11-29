@@ -441,7 +441,10 @@ def _get_schema(passed_schema=None):
             _STANDARD_SCHEMA = Schema()
         except (HTTPError, URLError):
             try:
-                _STANDARD_SCHEMA = Schema(schema_file="reference_files/schema")
+                sfile = os.path.join(os.path.dirname(os.path.realpath(__file__)))
+                sfile = os.path.join(sfile, "reference_files/schema")
+
+                _STANDARD_SCHEMA = Schema(schema_file=sfile)
             except:
                 raise ValueError("Could not load a BMRB schema from the "
                                  "internet or from the local repository.")
@@ -492,7 +495,8 @@ def _load_comments(file_to_load=None):
 
     # Figure out where to load the file from
     if file_to_load is None:
-        file_to_load = "reference_files/comments"
+        file_to_load = os.path.join(os.path.dirname(os.path.realpath(__file__)))
+        file_to_load = os.path.join(file_to_load, "reference_files/comments")
 
     try:
         comment_entry = Entry.from_file(file_to_load)
