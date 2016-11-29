@@ -106,7 +106,8 @@ def _build_extension():
 
     curdir = os.getcwd()
     try:
-        os.chdir("c")
+        pdir = os.path.join(os.path.dirname(os.path.realpath(__file__)))
+        os.chdir(os.path.join(pdir, "c"))
         process = subprocess.Popen(['make'], stderr=subprocess.STDOUT,
                                    stdout=subprocess.PIPE)
         process.communicate()
@@ -132,11 +133,16 @@ try:
     import cnmrstar
 except ImportError:
     cnmrstar = None
-    if _build_extension():
-        try:
-            import cnmrstar
-        except ImportError:
-            pass
+
+    # Check for nobuild file before continuing
+    if not os.path.isfile(os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                                   ".nocompile")):
+
+        if _build_extension():
+            try:
+                import cnmrstar
+            except ImportError:
+                pass
 
 # See if we can import from_iterable
 try:
@@ -181,7 +187,7 @@ _COMMENT_DICTIONARY = {}
 _API_URL = "http://webapi.bmrb.wisc.edu/current"
 _SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
-_VERSION = "2.1"
+_VERSION = "2.2.3"
 
 #############################################
 #             Module methods                #
@@ -436,7 +442,10 @@ def _get_schema(passed_schema=None):
             _STANDARD_SCHEMA = Schema()
         except (HTTPError, URLError):
             try:
-                _STANDARD_SCHEMA = Schema(schema_file="reference_files/schema")
+                sfile = os.path.join(os.path.dirname(os.path.realpath(__file__)))
+                sfile = os.path.join(sfile, "reference_files/schema")
+
+                _STANDARD_SCHEMA = Schema(schema_file=sfile)
             except:
                 raise ValueError("Could not load a BMRB schema from the "
                                  "internet or from the local repository.")
@@ -487,7 +496,8 @@ def _load_comments(file_to_load=None):
 
     # Figure out where to load the file from
     if file_to_load is None:
-        file_to_load = "reference_files/comments"
+        file_to_load = os.path.join(os.path.dirname(os.path.realpath(__file__)))
+        file_to_load = os.path.join(file_to_load, "reference_files/comments")
 
     try:
         comment_entry = Entry.from_file(file_to_load)
@@ -3231,6 +3241,38 @@ class Loop(object):
             self.renumber_rows(index_tag)
 
         return deleted
+
+    def filter(self, tag_list, ignore_missing_tags=False):
+        """ Returns a new loop containing only the specified tags.
+        Specify ignore_missing_tags=True to bypass missing tags rather
+        than raising an error."""
+
+        result = Loop.from_scratch()
+        valid_tags = []
+        columns_lower = [x.lower() for x in self.columns]
+
+        # If they only provide one tag make it a list
+        if not isinstance(tag_list, (list, tuple)):
+            tag_list = [tag_list]
+
+        # Make sure all the tags specified exist
+        for tag in tag_list:
+
+            # Handle an invalid tag
+            if _format_tag(tag).lower() not in columns_lower:
+                if not ignore_missing_tags:
+                    raise ValueError("Cannot filter tag '%s' as it isn't "
+                                     "present in this loop." % tag)
+                continue
+
+            valid_tags.append(tag)
+            result.add_column(tag)
+
+        # Add the data for the tags to the new loop
+        for row in self.get_data_by_tag(valid_tags):
+            result.add_data(row)
+
+        return result
 
     def get_columns(self):
         """ Return the columns for this entry with the category

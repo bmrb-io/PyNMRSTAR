@@ -5,23 +5,6 @@ Python versions supported: 2.6, 2.7, 3.3, 3.4, and 3.5
 
 ====
 
-### Want it faster?
-
-Now there is a C extension that makes parsing and printing in NMR-STAR
-format significantly faster. Simply
-
-```bash
-cd c
-make
-cd ..
-```
-
-and then use the library like normal to start taking advantage of the
-speed up! If you don't compile the C extension the module will use
-automatically use pure python implementations instead.
-
-====
-
 ### Command line tools
 
 We have developed several command line tools to ease certain common actions
