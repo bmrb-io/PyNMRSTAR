@@ -3269,7 +3269,6 @@ class Loop(object):
 
         # Add the data for the tags to the new loop
         for row in self.get_data_by_tag(valid_tags):
-            print("adding %s" % row)
             result.add_data(row)
 
         return result
