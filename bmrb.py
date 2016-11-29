@@ -132,11 +132,16 @@ try:
     import cnmrstar
 except ImportError:
     cnmrstar = None
-    if _build_extension():
-        try:
-            import cnmrstar
-        except ImportError:
-            pass
+
+    # Check for nobuild file before continuing
+    if not os.path.isfile(os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                                   ".nocompile")):
+
+        if _build_extension():
+            try:
+                import cnmrstar
+            except ImportError:
+                pass
 
 # See if we can import from_iterable
 try:

@@ -8,5 +8,4 @@ python:
   - "3.5-dev"
   - "nightly"
 # command to run tests
-script: ./bmrb.py && rm *.so && ./bmrb.py
-#install: cd c; make; cd ..
+script: touch ".nocompile" && ./bmrb.py && rm .nocompile && ./bmrb.py
