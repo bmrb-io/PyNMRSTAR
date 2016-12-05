@@ -3272,6 +3272,10 @@ class Loop(object):
         for row in self.get_data_by_tag(valid_tags):
             result.add_data(row)
 
+        # Assign the category of the new loop
+        if result.category is None:
+            result.category = self.category
+
         return result
 
     def get_columns(self):
