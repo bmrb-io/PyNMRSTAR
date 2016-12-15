@@ -187,7 +187,7 @@ _COMMENT_DICTIONARY = {}
 _API_URL = "http://webapi.bmrb.wisc.edu/current"
 _SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
-_VERSION = "2.2.3"
+_VERSION = "2.2.5"
 
 #############################################
 #             Module methods                #
@@ -2371,17 +2371,8 @@ class Saveframe(object):
 
         # Insert the comment if not disabled
         if not DONT_SHOW_COMMENTS:
-            # Figure out what the entry category is
-            try:
-                our_category = self.get_tag("Sf_category")[0]
-            except IndexError:
-                try:
-                    our_category = self.get_tag("_Saveframe_category")[0]
-                except IndexError:
-                    our_category = None
-
-            if our_category in _COMMENT_DICTIONARY:
-                ret_string = _COMMENT_DICTIONARY[our_category]
+            if self.category in _COMMENT_DICTIONARY:
+                ret_string = _COMMENT_DICTIONARY[self.category]
 
         # Print the saveframe
         ret_string += "save_%s\n" % self.name
@@ -2470,7 +2461,8 @@ class Saveframe(object):
             new_tag = [name, value]
 
         # Set the category if the tag we are loading is the category
-        if name == "Sf_category":
+        tagname_lower = name.lower()
+        if tagname_lower == "sf_category" or tagname_lower == "_saveframe_category":
             self.category = value
 
         if linenum:
@@ -2733,9 +2725,8 @@ class Saveframe(object):
 
         errors = []
 
-        try:
-            my_category = self.get_tag("Sf_category")[0]
-        except IndexError:
+        my_category = self.category
+        if my_category == "unset":
             errors.append("Cannot properly validate saveframe: '" + self.name +
                           "'. No saveframe category defined.")
             my_category = None
