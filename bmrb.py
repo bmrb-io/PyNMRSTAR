@@ -73,6 +73,7 @@ from __future__ import print_function
 
 # Standard library imports
 import os
+import re
 import sys
 import json
 import decimal
@@ -890,6 +891,9 @@ class _Parser(object):
 
         # Fix DOS line endings
         data = data.replace("\r\n", "\n").replace("\r", "\n")
+
+        # Change '\n; data ' started multilines to '\n;\ndata'
+        data = re.sub(r'\n;([^\n]+?)\n', r'\n;\n\1\n', data)
 
         if cnmrstar != None:
             cnmrstar.load_string(data)
