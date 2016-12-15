@@ -109,7 +109,13 @@ def _build_extension():
     try:
         pdir = os.path.join(os.path.dirname(os.path.realpath(__file__)))
         os.chdir(os.path.join(pdir, "c"))
-        process = subprocess.Popen(['make'], stderr=subprocess.STDOUT,
+
+        # Use the appropriate build command
+        build_cmd = ['make']
+        if PY3:
+            build_cmd.append("python3")
+
+        process = subprocess.Popen(build_cmd, stderr=subprocess.STDOUT,
                                    stdout=subprocess.PIPE)
         process.communicate()
         retcode = process.poll()
