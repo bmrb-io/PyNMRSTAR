@@ -73,6 +73,7 @@ from __future__ import print_function
 
 # Standard library imports
 import os
+import re
 import sys
 import json
 import decimal
@@ -108,7 +109,13 @@ def _build_extension():
     try:
         pdir = os.path.join(os.path.dirname(os.path.realpath(__file__)))
         os.chdir(os.path.join(pdir, "c"))
-        process = subprocess.Popen(['make'], stderr=subprocess.STDOUT,
+
+        # Use the appropriate build command
+        build_cmd = ['make']
+        if PY3:
+            build_cmd.append("python3")
+
+        process = subprocess.Popen(build_cmd, stderr=subprocess.STDOUT,
                                    stdout=subprocess.PIPE)
         process.communicate()
         retcode = process.poll()
@@ -187,7 +194,7 @@ _COMMENT_DICTIONARY = {}
 _API_URL = "http://webapi.bmrb.wisc.edu/current"
 _SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
-_VERSION = "2.2.5"
+_VERSION = "2.2.6"
 
 #############################################
 #             Module methods                #
@@ -890,6 +897,9 @@ class _Parser(object):
 
         # Fix DOS line endings
         data = data.replace("\r\n", "\n").replace("\r", "\n")
+
+        # Change '\n; data ' started multilines to '\n;\ndata'
+        data = re.sub(r'\n;([^\n]+?)\n', r'\n;\n\1\n', data)
 
         if cnmrstar != None:
             cnmrstar.load_string(data)
