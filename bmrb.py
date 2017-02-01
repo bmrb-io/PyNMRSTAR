@@ -355,6 +355,14 @@ def clean_value(value):
     if not isinstance(value, str):
         value = str(value)
 
+    # If it is a STAR-format multiline comment already, we need to escape it
+    if "\n;" in value:
+        if not value.startswith("\n"):
+            value = "\n" + value
+        lines = value.splitlines(True)
+        #os.linesep
+        return "".join(["   " + line for line in lines]) + "\n"
+
     # If it's going on it's own line, don't touch it
     if "\n" in value:
         if value[-1] != "\n":
@@ -576,6 +584,18 @@ class _Parser(object):
         else:
             self.real_get_token()
             self.line_number = 0
+
+            if self.delineator == ";":
+                try:
+                    # Unindent value which contain STAR multi-line values
+                    # Only do this check if we are comma-delineated
+                    if self.token.startswith("   \n   "):
+                        self.token = self.token.replace("\n   ", "\n")[4:]
+                    # Strip extra newline from end - other code expects this!?
+                    #if self.token.endswith("\n"):
+                    #    self.token = self.token[:-1]
+                except AttributeError:
+                    pass
 
         # This is just too VERBOSE
         if VERBOSE == "very":

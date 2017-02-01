@@ -437,6 +437,19 @@ class TestPyNMRSTAR(unittest.TestCase):
         # And test they have been put back together
         self.assertEqual(tmp.frame_list, database_entry.frame_list)
 
+
+    def test_syntax_outliers(self):
+        """ Make sure the case of semi-colon delineated data in a data
+        value is properly escaped. """
+
+        ml = copy(self.entry[0][0])
+        ml[0][0] = """
+;
+This may be a problem
+;
+"""
+        self.assertEqual(ml, bmrb.Loop.from_string(str(ml)))
+
     # Parse and re-print entries to check for divergences. Only use in-house.
     def test_reparse(self):
 
