@@ -361,7 +361,10 @@ def clean_value(value):
             value = "\n" + value
         lines = value.splitlines(True)
         #os.linesep
-        return "".join(["   " + line for line in lines]) + "\n"
+        escaped = "".join(["   " + line for line in lines])
+        if escaped[-1] != "\n":
+            escaped += "\n"
+        return escaped
 
     # If it's going on it's own line, don't touch it
     if "\n" in value:
@@ -2991,6 +2994,11 @@ class Loop(object):
             title_widths = [max([len(str(x))+3 for x in col]) for
                             col in [[row[x] for row in working_data] for
                                     x in range(0, len(working_data[0]))]]
+
+            # TODO: Replace with a smarter title_widths algorithm - or in C
+            # It needs to not count the length of items that will go on their
+            # own line...
+
             # Generate the format string
             pstring = "     " + "%-*s"*len(self.columns) + " \n"
 
