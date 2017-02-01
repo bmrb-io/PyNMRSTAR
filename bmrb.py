@@ -1294,21 +1294,29 @@ class Schema(object):
             raise ValueError("Could not parse a schema from the specified "
                              "URL: %s" % schema_file)
 
+        # Figure out which columns have the data we want
+        loc = {}
+        loc['sf_cat'] = self.headers.index("SFCategory")
+        loc['tag'] = self.headers.index("Tag")
+        loc['nullable'] = self.headers.index("Nullable")
+        loc['data_type'] = self.headers.index("Data Type")
+        loc['loop_flg'] = self.headers.index("Loopflag")
+
         for line in csv_reader_instance:
 
             # Stop at the end
             if line[0] == "TBL_END":
                 break
 
-            if line[8].count(".") == 1:
-                null_allowed = False if line[28] == "NOT NULL" else True
-                self.schema[line[8].lower()] = (line[27], null_allowed,
-                                                line[1], line[8])
-                self.types[line[8][:line[8].index(".")]] = (line[1], line[42])
-                self.schema_order.append(line[8])
+            if line[loc['tag']].count(".") == 1:
+                null_allowed = False if line[loc['nullable']] == "NOT NULL" else True
+                self.schema[line[loc['tag']].lower()] = (line[loc['data_type']], null_allowed,
+                                                line[loc['sf_cat']], line[loc['tag']])
+                self.types[line[loc['tag']][:line[loc['tag']].index(".")]] = (line[loc['sf_cat']], line[loc['loop_flg']])
+                self.schema_order.append(line[loc['tag']])
 
                 # Store just the categories as well
-                formatted = _format_category(line[8])
+                formatted = _format_category(line[loc['tag']])
                 if formatted not in self.category_order:
                     self.category_order.append(formatted)
             else:
