@@ -306,6 +306,12 @@ add a tag.
 Create a saveframe by parsing a string. Specify csv=True is
 the string is in CSV format and not NMR-STAR format.
 
+#### def `filter(tag_list, ignore_missing_tags=False)`
+
+Returns a new loop containing only the specified tags. Specify
+ignore_missing_tags=True to bypass missing tags rather than
+raising an error.
+
 #### def `get_columns()`
 
 Return the columns for this entry with the category
