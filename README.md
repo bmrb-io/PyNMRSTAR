@@ -232,6 +232,121 @@ own custom schema if desired, otherwise the schema will be
 fetched from the BMRB servers. Returns a list of errors found.
 0-length list indicates no errors found.
 
+### class `Saveframe()`
+
+A saveframe. Use the classmethod from_scratch to create one.
+
+Methods:
+
+#### def `__init__()`
+
+Don't use this directly. Use the class methods to construct.
+
+#### def `add_loop(loop_to_add)`
+
+Add a loop to the saveframe loops.
+
+#### def `add_tag(name, value, linenum=None, update=False)`
+
+Add a tag to the tag list. Does a bit of validation and
+parsing. Set update to true to update a tag if it exists rather
+than raise an exception.
+
+#### def `add_tags(tag_list, update=False)`
+
+Adds multiple tags to the list. Input should be a list of
+tuples that are either [key, value] or [key]. In the latter case
+the value will be set to ".".  Set update to true to update a
+tag if it exists rather than raise an exception.
+
+#### def `compare(other)`
+
+Returns the differences between two saveframes as a list.
+Non-equal saveframes will always be detected, but specific
+differences detected depends on order of saveframes.
+
+#### def `delete_tag(tag)`
+
+Deletes a tag from the saveframe based on tag name.
+
+#### def `from_file(cls, the_file, csv=False)`
+
+Create a saveframe by loading in a file. Specify csv=True is
+the file is a CSV file. If the_file starts with http://,
+https://, or ftp:// then we will use those protocols to attempt
+to open the file.
+
+#### def `from_json(cls, json_dict)`
+
+Create a saveframe from JSON (serialized or unserialized JSON).
+
+#### def `from_scratch(cls, sf_name, tag_prefix=None, source=from_scratch())`
+
+Create an empty saveframe that you can programatically add
+to. You may also pass the tag prefix as the second argument. If
+you do not pass the tag prefix it will be set the first time you
+add a tag.
+
+#### def `from_string(cls, the_string, csv=False)`
+
+Create a saveframe by parsing a string. Specify csv=True is
+the string is in CSV format and not NMR-STAR format.
+
+#### def `get_data_as_csv(header=True, show_category=True)`
+
+Return the data contained in the loops, properly CSVd, as a
+string. Set header to False omit the header. Set show_category
+to False to omit the loop category from the headers.
+
+#### def `get_json(serialize=True)`
+
+Returns the saveframe in JSON format. If serialize is set to
+False a dictionary representation of the saveframe that is
+serializeable is returned.
+
+#### def `get_loop_by_category(name)`
+
+Return a loop based on the loop name (category).
+
+#### def `get_tag(query, whole_tag=False)`
+
+Allows fetching the value of a tag by tag name. Specify
+whole_tag=True and the [tag_name, tag_value] pair will be
+returned.
+
+#### def `loop_dict()`
+
+Returns a hash of loop category -> loop.
+
+#### def `loop_iterator()`
+
+Returns an iterator for saveframe loops.
+
+#### def `print_tree()`
+
+Prints a summary, tree style, of the loops in the saveframe.
+
+#### def `set_tag_prefix(tag_prefix)`
+
+Set the tag prefix for this saveframe.
+
+#### def `sort_tags(validation_schema=None)`
+
+Sort the tags so they are in the same order as a BMRB
+schema. Will automatically use the standard schema if none
+is provided.
+
+#### def `tag_iterator()`
+
+Returns an iterator for saveframe tags.
+
+#### def `validate(validation_schema=None)`
+
+Validate a saveframe against a STAR schema. You can pass your
+own custom schema if desired, otherwise the schema will be
+fetched from the BMRB servers. Returns a list of errors found.
+0-length list indicates no errors found.
+
 ### class `Loop()`
 
 A BMRB loop object.
@@ -375,118 +490,3 @@ Validate a loop against a STAR schema. You can pass your own
 custom schema if desired, otherwise the schema will be fetched
 from the BMRB servers. Returns a list of errors found. 0-length
 list indicates no errors found.
-
-### class `Saveframe()`
-
-A saveframe. Use the classmethod from_scratch to create one.
-
-Methods:
-
-#### def `__init__()`
-
-Don't use this directly. Use the class methods to construct.
-
-#### def `add_loop(loop_to_add)`
-
-Add a loop to the saveframe loops.
-
-#### def `add_tag(name, value, linenum=None, update=False)`
-
-Add a tag to the tag list. Does a bit of validation and
-parsing. Set update to true to update a tag if it exists rather
-than raise an exception.
-
-#### def `add_tags(tag_list, update=False)`
-
-Adds multiple tags to the list. Input should be a list of
-tuples that are either [key, value] or [key]. In the latter case
-the value will be set to ".".  Set update to true to update a
-tag if it exists rather than raise an exception.
-
-#### def `compare(other)`
-
-Returns the differences between two saveframes as a list.
-Non-equal saveframes will always be detected, but specific
-differences detected depends on order of saveframes.
-
-#### def `delete_tag(tag)`
-
-Deletes a tag from the saveframe based on tag name.
-
-#### def `from_file(cls, the_file, csv=False)`
-
-Create a saveframe by loading in a file. Specify csv=True is
-the file is a CSV file. If the_file starts with http://,
-https://, or ftp:// then we will use those protocols to attempt
-to open the file.
-
-#### def `from_json(cls, json_dict)`
-
-Create a saveframe from JSON (serialized or unserialized JSON).
-
-#### def `from_scratch(cls, sf_name, tag_prefix=None, source=from_scratch())`
-
-Create an empty saveframe that you can programatically add
-to. You may also pass the tag prefix as the second argument. If
-you do not pass the tag prefix it will be set the first time you
-add a tag.
-
-#### def `from_string(cls, the_string, csv=False)`
-
-Create a saveframe by parsing a string. Specify csv=True is
-the string is in CSV format and not NMR-STAR format.
-
-#### def `get_data_as_csv(header=True, show_category=True)`
-
-Return the data contained in the loops, properly CSVd, as a
-string. Set header to False omit the header. Set show_category
-to False to omit the loop category from the headers.
-
-#### def `get_json(serialize=True)`
-
-Returns the saveframe in JSON format. If serialize is set to
-False a dictionary representation of the saveframe that is
-serializeable is returned.
-
-#### def `get_loop_by_category(name)`
-
-Return a loop based on the loop name (category).
-
-#### def `get_tag(query, whole_tag=False)`
-
-Allows fetching the value of a tag by tag name. Specify
-whole_tag=True and the [tag_name, tag_value] pair will be
-returned.
-
-#### def `loop_dict()`
-
-Returns a hash of loop category -> loop.
-
-#### def `loop_iterator()`
-
-Returns an iterator for saveframe loops.
-
-#### def `print_tree()`
-
-Prints a summary, tree style, of the loops in the saveframe.
-
-#### def `set_tag_prefix(tag_prefix)`
-
-Set the tag prefix for this saveframe.
-
-#### def `sort_tags(validation_schema=None)`
-
-Sort the tags so they are in the same order as a BMRB
-schema. Will automatically use the standard schema if none
-is provided.
-
-#### def `tag_iterator()`
-
-Returns an iterator for saveframe tags.
-
-#### def `validate(validation_schema=None)`
-
-Validate a saveframe against a STAR schema. You can pass your
-own custom schema if desired, otherwise the schema will be
-fetched from the BMRB servers. Returns a list of errors found.
-0-length list indicates no errors found.
