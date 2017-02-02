@@ -533,8 +533,9 @@ static PyObject * clean_string(PyObject *self, PyObject *args){
             }
         }
 
+        PyObject* result = PyString_FromFormat(format, str);
         free(str);
-        return PyString_FromFormat(format, str);
+        return(result);
     }
 
     // If it's going on it's own line, don't touch it
