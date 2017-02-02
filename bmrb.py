@@ -588,23 +588,23 @@ class _Parser(object):
             self.real_get_token()
             self.line_number = 0
 
-            if self.delineator == ";":
-                try:
-                    # Unindent value which contain STAR multi-line values
-                    # Only do this check if we are comma-delineated
-                    if self.token.startswith("   \n   "):
-                        # Only remove the whitespaces if all lines have them
-                        trim = True
-                        for line in self.token.splitlines(True):
-                            if not line.startswith("   "):
-                                trim = False
-                        if trim:
-                            self.token = self.token.replace("\n   ", "\n")[4:]
-                    # Strip extra newline from end - other code expects this!?
-                    #if self.token.endswith("\n"):
-                    #    self.token = self.token[:-1]
-                except AttributeError:
-                    pass
+        if self.delineator == ";":
+            try:
+                # Unindent value which contain STAR multi-line values
+                # Only do this check if we are comma-delineated
+                if self.token.startswith("   \n   "):
+                    # Only remove the whitespaces if all lines have them
+                    trim = True
+                    for line in self.token.splitlines(True):
+                        if not line.startswith("   "):
+                            trim = False
+                    if trim:
+                        self.token = self.token.replace("\n   ", "\n")[4:]
+                # Strip extra newline from end - other code expects this!?
+                #if self.token.endswith("\n"):
+                #    self.token = self.token[:-1]
+            except AttributeError:
+                pass
 
         # This is just too VERBOSE
         if VERBOSE == "very":
