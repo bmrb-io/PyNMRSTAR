@@ -143,7 +143,7 @@ except ImportError:
 
     # Check for nobuild file before continuing
     if not os.path.isfile(os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                   ".nocompile")):
+                                       ".nocompile")):
 
         if _build_extension():
             try:
@@ -1339,9 +1339,12 @@ class Schema(object):
 
             if line[loc['tag']].count(".") == 1:
                 null_allowed = False if line[loc['nullable']] == "NOT NULL" else True
-                self.schema[line[loc['tag']].lower()] = (line[loc['data_type']], null_allowed,
-                                                line[loc['sf_cat']], line[loc['tag']])
-                self.types[line[loc['tag']][:line[loc['tag']].index(".")]] = (line[loc['sf_cat']], line[loc['loop_flg']])
+                self.schema[line[loc['tag']].lower()] = (line[loc['data_type']],
+                                                         null_allowed,
+                                                         line[loc['sf_cat']],
+                                                         line[loc['tag']])
+                self.types[line[loc['tag']][:line[loc['tag']].index(".")]] = (line[loc['sf_cat']],
+                                                                              line[loc['loop_flg']])
                 self.schema_order.append(line[loc['tag']])
 
                 # Store just the categories as well
@@ -1451,7 +1454,7 @@ class Schema(object):
             null_allowed = False
         if str(null_allowed).lower() == "true":
             null_allowed = True
-        if not (null_allowed == True or null_allowed == False):
+        if not (null_allowed is True or null_allowed is False):
             raise ValueError("Please specify whether null is allowed with True/"
                              "False")
 
