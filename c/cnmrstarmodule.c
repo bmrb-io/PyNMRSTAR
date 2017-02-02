@@ -625,16 +625,16 @@ static PyMethodDef cnmrstar_methods[] = {
      "Properly quote or encapsulate a value before printing."},
 
     {"load",  (PyCFunction)PARSE_load, METH_VARARGS,
-     "Load a file in preparation to parse."},
+     "Load a file in preparation to tokenize."},
 
      {"load_string",  (PyCFunction)PARSE_load_string, METH_VARARGS,
-     "Load a string in preparation to parse."},
+     "Load a string in preparation to tokenize."},
 
      {"get_token_full",  (PyCFunction)PARSE_get_token_full, METH_NOARGS,
      "Get one token from the file as well as the line number and delineator."},
 
      {"reset",  (PyCFunction)PARSE_reset, METH_NOARGS,
-     "Reset the parser state."},
+     "Reset the tokenizer state."},
 
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
@@ -654,7 +654,7 @@ static int myextension_clear(PyObject *m) {
 static struct PyModuleDef moduledef = {
         PyModuleDef_HEAD_INIT,
         "cnmrstar",
-        NULL,
+        "A NMR-STAR tokenizer implemented in C.",
         sizeof(struct module_state),
         cnmrstar_methods,
         NULL,
@@ -678,7 +678,7 @@ initcnmrstar(void)
 #if PY_MAJOR_VERSION >= 3
     PyObject *module = PyModule_Create(&moduledef);
 #else
-    PyObject *module = Py_InitModule3("cnmrstar", cnmrstar_methods, "A NMR-STAR parser implemented in C.");
+    PyObject *module = Py_InitModule3("cnmrstar", cnmrstar_methods, "A NMR-STAR tokenizer implemented in C.");
 #endif
 
     if (module == NULL)
