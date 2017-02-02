@@ -3076,6 +3076,17 @@ class Loop(object):
 
         return cls(the_string=the_string, csv=csv)
 
+    def _tag_index(self, tag_name):
+        """ Helper method to do a case-insensitive check for the presence
+        of a given tag in this loop. Returns the index of the tag if found
+        and None if not found."""
+
+        try:
+            lc_col = [x.lower() for x in self.columns]
+            return lc_col.index(_format_tag(str(tag_name)).lower())
+        except ValueError:
+            return None
+
     def add_column(self, name, ignore_duplicates=False):
         """Add a column to the column list. Does a bit of validation
         and parsing. Set ignore_duplicates to true to ignore attempts
@@ -3111,7 +3122,7 @@ class Loop(object):
                 name = name[1:]
 
         # Ignore duplicate tags
-        if name.lower() in [x.lower() for x in self.columns]:
+        if self._tag_index(name) is not None:
             if ignore_duplicates:
                 return
             else:
@@ -3174,12 +3185,11 @@ class Loop(object):
                                  "not match this loop's category '%s'." %
                                  (supplied_category, self.category))
 
-        column_id = _format_tag(column_id).lower()
-        if column_id not in [x.lower() for x in self.columns]:
+        pos = self._tag_index(column_id)
+        if pos is None:
             raise ValueError("The column tag '%s' to which you are attempting "
                              "to add data does not yet exist. Create the "
                              "columns before adding data." % column_id)
-        pos = [x.lower() for x in self.columns].index(column_id)
         if len(self.data) == 0:
             self.data.append([])
         if len(self.data[-1]) == len(self.columns):
@@ -3260,12 +3270,8 @@ class Loop(object):
                                  "not match this loop's category '%s'." %
                                  (supplied_category, self.category))
 
-        cleaned_tag = _format_tag(str(tag)).lower()
-        columns_lower = [x.lower() for x in self.columns]
-
-        try:
-            search_column = columns_lower.index(cleaned_tag)
-        except ValueError:
+        search_column = self._tag_index(tag)
+        if search_column is None:
             raise ValueError("The tag you provided '%s' isn't in this loop!" %
                              tag)
 
@@ -3292,7 +3298,6 @@ class Loop(object):
 
         result = Loop.from_scratch()
         valid_tags = []
-        columns_lower = [x.lower() for x in self.columns]
 
         # If they only provide one tag make it a list
         if not isinstance(tag_list, (list, tuple)):
@@ -3302,7 +3307,7 @@ class Loop(object):
         for tag in tag_list:
 
             # Handle an invalid tag
-            if _format_tag(tag).lower() not in columns_lower:
+            if self._tag_index(tag) is None:
                 if not ignore_missing_tags:
                     raise ValueError("Cannot filter tag '%s' as it isn't "
                                      "present in this loop." % tag)
@@ -3469,19 +3474,16 @@ class Loop(object):
                                  "match this loop's category '%s'." %
                                  (supplied_category, self.category))
 
-        cleaned_tag = _format_tag(str(index_tag))
-        columns_lower = [x.lower() for x in self.columns]
+        renum_col = self._tag_index(index_tag)
 
         # The column to replace in is the column they specify
-        try:
-            renum_col = columns_lower.index(cleaned_tag.lower())
-        except ValueError:
+        if renum_col is None:
             # Or, perhaps they specified an integer to represent the column?
             try:
                 renum_col = int(index_tag)
             except ValueError:
                 raise ValueError("The renumbering column you provided '%s' "
-                                 "isn't in this loop!" % cleaned_tag)
+                                 "isn't in this loop!" % index_tag)
 
         # Verify the renumbering column ID
         if renum_col >= len(self.columns) or renum_col < 0:
@@ -3563,9 +3565,6 @@ class Loop(object):
         else:
             processing_list = [tags]
 
-        # Get a lower case list of columns
-        columns_lower = [x.lower() for x in self.columns]
-
         # Process their input to determine which columns to operate on
         for cur_tag in [str(x) for x in processing_list]:
 
@@ -3577,14 +3576,11 @@ class Loop(object):
                                      "not match this loop's category '%s'." %
                                      (supplied_category, self.category))
 
-            # Get a lower case version of the tag
-            cleaned_tag = _format_tag(cur_tag)
+            renumber_column = self._tag_index(cur_tag)
 
-            # The column to replace in is the column they specify
-            try:
-                renumber_column = columns_lower.index(cleaned_tag.lower())
-            except ValueError:
-                # Or, perhaps they specified an integer to represent the column?
+            # They didn't specify a valid column
+            if renumber_column is None:
+                # Perhaps they specified an integer to represent the column?
                 try:
                     renumber_column = int(cur_tag)
                 except ValueError:
