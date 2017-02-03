@@ -139,9 +139,10 @@ def _build_extension():
 try:
     import cnmrstar
     if not "version" in dir(cnmrstar) or cnmrstar.version() < "2.2.7":
-        print("cnmrstar module recompiling due to API changes. You may see an "
-              "error immediately proceeding this but should have no issues the "
-              " next time you run your script or this program.")
+        print("Recompiling cnmrstar module due to API changes. You may "
+              "experience a segmentation fault immediately following this "
+              "message but should have no issues the next time you run your "
+              "script or this program.")
         _build_extension()
         sys.exit(0)
 
