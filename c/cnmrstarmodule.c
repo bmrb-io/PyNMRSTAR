@@ -258,7 +258,7 @@ void update_line_number(parser_data * parser, long start_pos, long length){
 }
 
 /* Returns a new token char * */
-char * update_token(parser_data * parser, long length){
+char * update_token(parser_data * parser, long length, bool comment){
 
     if (parser->token != done_parsing){
         free(parser->token);
@@ -283,9 +283,11 @@ char * update_token(parser_data * parser, long length){
         }
     }
 
-    if (parser->token[0] == '$'){
-        parser->last_delineator = '$';
-    }
+    // Check if reference
+    if (parser->token[0] == '$'){ parser->last_delineator = '$'; }
+
+    // No way to check for comments without this
+    if (comment){ parser->last_delineator = '#'; }
 
     // Update the line number
     update_line_number(parser, parser->index, length + 1);
@@ -348,9 +350,8 @@ char * get_token(parser_data * parser){
             return parser->token;
         }
 
-        // Skip to the next non-comment
-        parser->index += length;
-        return get_token(parser);
+        // Return the comment
+        return update_token(parser, length, true);
     }
 
     // See if this is a multiline value
@@ -371,7 +372,7 @@ char * get_token(parser_data * parser){
         parser->line_no++;
 
         parser->index += 2;
-        return update_token(parser, length-1);
+        return update_token(parser, length-1, false);
     }
 
     // Handle values quoted with '
@@ -411,7 +412,7 @@ char * get_token(parser_data * parser){
 
         // Move the index 1 to skip the '
         parser->index++;
-        return update_token(parser, end_quote);
+        return update_token(parser, end_quote, false);
     }
 
     // Handle values quoted with "
@@ -451,12 +452,12 @@ char * get_token(parser_data * parser){
 
         // Move the index 1 to skip the "
         parser->index++;
-        return update_token(parser, end_quote);
+        return update_token(parser, end_quote, false);
     }
 
     // Nothing special. Just get the token
     long end_pos = get_next_whitespace(parser->full_data, parser->index);
-    return update_token(parser, end_pos - parser->index);
+    return update_token(parser, end_pos - parser->index, false);
 }
 
 /* IDEA: Implementing the tokenizer following this pattern may
@@ -670,21 +671,33 @@ PARSE_load_string(PyObject *self, PyObject *args)
     return Py_None;
 }
 
+/* Helper method from:
+ * http://stackoverflow.com/questions/15515088/how-to-check-if-string-starts-with-certain-string-in-c
+ * */
+bool StartsWith(const char *a, const char *b)
+{
+   if(strncmp(a, b, strlen(b)) == 0) return 1;
+   return 0;
+}
+
 static PyObject *
 PARSE_get_token_full(PyObject *self)
 {
     char * token;
     token = get_token(&parser);
+    parser_data * my_parser = &parser;
+
+    while (my_parser->last_delineator == '#'){
+        token = get_token(&parser);
+    }
 
     // Pass errors up the chain
     if (token == NULL){
         return NULL;
     }
 
-    parser_data * my_parser = &parser;
-
     // Unwrap embedded STAR if all lines start with three spaces
-    if (my_parser->last_delineator == ';'){
+    if ((my_parser->last_delineator == ';') && (StartsWith(token, "   \n   "))){
         bool shift_over = true;
 
         size_t token_len = strlen(token);
