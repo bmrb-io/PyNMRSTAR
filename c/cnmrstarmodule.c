@@ -1,6 +1,10 @@
 #include <Python.h>
 #include <stdbool.h>
 
+// Version number. Only need to update when
+// API changes.
+#define module_version "2.2.7"
+
 // Use for returning errors
 #define err_size 500
 // Use as a special pointer value
@@ -716,6 +720,12 @@ PARSE_get_token_full(PyObject *self)
     #endif
 }
 
+static PyObject *
+version(PyObject *self)
+{
+    return PyString_FromString(module_version);
+}
+
 static PyMethodDef cnmrstar_methods[] = {
     {"clean_value",  (PyCFunction)clean_string, METH_VARARGS,
      "Properly quote or encapsulate a value before printing."},
@@ -731,6 +741,9 @@ static PyMethodDef cnmrstar_methods[] = {
 
      {"reset",  (PyCFunction)PARSE_reset, METH_NOARGS,
      "Reset the tokenizer state."},
+
+     {"version",  (PyCFunction)version, METH_NOARGS,
+     "Returns the version of the module."},
 
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };

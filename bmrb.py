@@ -138,7 +138,14 @@ def _build_extension():
 # See if we can use the fast tokenizer
 try:
     import cnmrstar
-except ImportError:
+    if not "version" in dir(cnmrstar) or cnmrstar.version() < "2.2.7":
+        print("cnmrstar module recompiling due to API changes. You may see an "
+              "error immediately proceeding this but should have no issues the "
+              " next time you run your script or this program.")
+        _build_extension()
+        sys.exit(0)
+
+except ImportError as e:
     cnmrstar = None
 
     # Check for nobuild file before continuing
@@ -194,7 +201,7 @@ _COMMENT_DICTIONARY = {}
 _API_URL = "http://webapi.bmrb.wisc.edu/current"
 _SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
-_VERSION = "2.2.6"
+_VERSION = "2.2.7"
 
 #############################################
 #             Module methods                #
@@ -579,11 +586,7 @@ class _Parser(object):
         """ Returns the next token in the parsing process."""
 
         if cnmrstar is not None:
-            try:
-                self.token, self.line_number, self.delineator = cnmrstar.get_token_full()
-            except AttributeError:
-                raise ValueError("Please recompile the c extension. You have an"
-                                 " old version.")
+            self.token, self.line_number, self.delineator = cnmrstar.get_token_full()
         else:
             self.real_get_token()
             self.line_number = 0
