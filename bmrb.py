@@ -923,10 +923,11 @@ class _Parser(object):
 
         return
 
-
-    def parse(self, data, source="unknown"):
-        """ Parses the string provided as data as an NMR-STAR entry
-        and returns the parsed entry. Raises ValueError on exceptions."""
+    def load_data(self, data, store=True):
+        """ Loads data in preparation of parsing and cleans up newlines
+        and massages the data to make parsing work properly when multiline
+        values aren't as expected. Useful for manually getting tokens from
+        the parser."""
 
         # Fix DOS line endings
         data = data.replace("\r\n", "\n").replace("\r", "\n")
@@ -938,6 +939,13 @@ class _Parser(object):
             cnmrstar.load_string(data)
         else:
             self.full_data = data + "\n"
+
+    def parse(self, data, source="unknown"):
+        """ Parses the string provided as data as an NMR-STAR entry
+        and returns the parsed entry. Raises ValueError on exceptions."""
+
+        # Prepare the data for parsing
+        self.load_data(data)
 
         # Create the NMRSTAR object
         curframe = None

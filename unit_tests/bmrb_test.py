@@ -443,12 +443,104 @@ class TestPyNMRSTAR(unittest.TestCase):
         value is properly escaped. """
 
         ml = copy(self.entry[0][0])
-        ml[0][0] = """
-;
-This may be a problem
-;
-"""
+        # Should always work once
+        ml[0][0] = str(ml)
         self.assertEqual(ml, bmrb.Loop.from_string(str(ml)))
+        # Twice could trigger bug
+        ml[0][0] = str(ml)
+        self.assertEqual(ml, bmrb.Loop.from_string(str(ml)))
+        #self.assertEqual(ml[0][0], bmrb.Loop.from_string(str(ml))[0][0])
+        # Third time is a charm
+        ml[0][0] = str(ml)
+        self.assertEqual(ml, bmrb.Loop.from_string(str(ml)))
+        # Check the data too - this should never fail (the previous test would
+        # have already failed.)
+        #self.assertEqual(ml[0][0], bmrb.Loop.from_string(str(ml))[0][0])
+
+
+    def test_parse_outliers(self):
+        """ Make sure the parser handles edge cases. """
+
+        parser = bmrb._Parser()
+        parser.load_data("""data_#pound
+save_entry_information  _Entry.Sf_category entry_information _Entry.Sf_framecode entry_information
+_Entry.sameline_comment value #ignore this all
+_Entry.ID    \".-!?\"
+_Entry.Invalid_tag            "This tag doesn't exist."
+_Entry.Title
+; Solution structure of chicken villin headpiece subdomain contain;ing a fluorinated side chain in the cores;
+;
+_Entry.Submi#ssion_date                "check inn"er "quoted vals"
+_Entry.Accession_date                 'check inner quoted vals'
+_Entry.Original_NMR_STAR_version      '_.'
+   _Entry.Experimental_method            $
+   _Entry.Details                        "1#"
+   _Entry.Experimental_method_subtype    solution
+   _Entry.BMRB_internal_directory_name   ;data;
+_Entry.pointer $it
+""")
+
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ('data_#pound', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ('save_entry_information', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ('_Entry.Sf_category', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ('entry_information', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ('_Entry.Sf_framecode', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ('entry_information', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ('_Entry.sameline_comment', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ('value', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ('_Entry.ID', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ('.-!?', '"'))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ('_Entry.Invalid_tag', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ("This tag doesn't exist.", '"'))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ('_Entry.Title', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), (""" Solution structure of chicken villin headpiece subdomain contain;ing a fluorinated side chain in the cores;
+""", ';'))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ('_Entry.Submi#ssion_date', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ('check inn"er "quoted vals', '"'))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ('_Entry.Accession_date', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ('check inner quoted vals', '\''))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ('_Entry.Original_NMR_STAR_version', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ('_.','\''))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ('_Entry.Experimental_method', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ('$', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ('_Entry.Details', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ('1#', '"'))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ('_Entry.Experimental_method_subtype', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ('solution', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ('_Entry.BMRB_internal_directory_name', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), (';data;', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ('_Entry.pointer', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delineator), ('$it', '$'))
 
     # Parse and re-print entries to check for divergences. Only use in-house.
     def test_reparse(self):
@@ -458,7 +550,7 @@ This may be a problem
         if not os.path.exists("/bmrb/linux/bin/stardiff"):
             return
 
-        start, end = 15000, 15500
+        start, end = 15000, 15000
         sys.stdout.write("\nEntry tests: %5s/%5s" % (start, end))
         for x in range(start, end):
 

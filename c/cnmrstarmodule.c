@@ -258,7 +258,7 @@ void update_line_number(parser_data * parser, long start_pos, long length){
 }
 
 /* Returns a new token char * */
-char * update_token(parser_data * parser, long length, bool comment){
+char * update_token(parser_data * parser, long length, char delineator){
 
     if (parser->token != done_parsing){
         free(parser->token);
@@ -273,21 +273,13 @@ char * update_token(parser_data * parser, long length, bool comment){
     if (parser->index == 0){
         parser->last_delineator = ' ';
     } else {
-        char ld = parser->full_data[parser->index-1];
-        if ((ld == '\n') && (parser->index > 2) && (parser->full_data[parser->index-2] == ';')){
-            parser->last_delineator = ';';
-        } else if ((ld == '"') || (ld == '\'')){
-            parser->last_delineator = ld;
-        } else {
-            parser->last_delineator = ' ';
-        }
+        parser->last_delineator = delineator;
     }
 
     // Check if reference
-    if (parser->token[0] == '$'){ parser->last_delineator = '$'; }
-
-    // No way to check for comments without this
-    if (comment){ parser->last_delineator = '#'; }
+    if ((parser->token[0] == '$') && (parser->last_delineator == ' ') && (length >1)) {
+        parser->last_delineator = '$';
+    }
 
     // Update the line number
     update_line_number(parser, parser->index, length + 1);
@@ -351,7 +343,7 @@ char * get_token(parser_data * parser){
         }
 
         // Return the comment
-        return update_token(parser, length, true);
+        return update_token(parser, length, '#');
     }
 
     // See if this is a multiline value
@@ -372,7 +364,7 @@ char * get_token(parser_data * parser){
         parser->line_no++;
 
         parser->index += 2;
-        return update_token(parser, length-1, false);
+        return update_token(parser, length-1, ';');
     }
 
     // Handle values quoted with '
@@ -412,7 +404,7 @@ char * get_token(parser_data * parser){
 
         // Move the index 1 to skip the '
         parser->index++;
-        return update_token(parser, end_quote, false);
+        return update_token(parser, end_quote, '\'');
     }
 
     // Handle values quoted with "
@@ -452,12 +444,12 @@ char * get_token(parser_data * parser){
 
         // Move the index 1 to skip the "
         parser->index++;
-        return update_token(parser, end_quote, false);
+        return update_token(parser, end_quote, '"');
     }
 
     // Nothing special. Just get the token
     long end_pos = get_next_whitespace(parser->full_data, parser->index);
-    return update_token(parser, end_pos - parser->index, false);
+    return update_token(parser, end_pos - parser->index, ' ');
 }
 
 /* IDEA: Implementing the tokenizer following this pattern may
@@ -486,6 +478,16 @@ bool starts_with(const char *a, const char *b)
 {
    if(strncmp(a, b, strlen(b)) == 0) return true;
    return false;
+}
+
+bool ends_with(const char * str, const char * suffix)
+{
+  int str_len = strlen(str);
+  int suffix_len = strlen(suffix);
+
+  return
+    (str_len >= suffix_len) &&
+    (0 == strcmp(str + (str_len-suffix_len), suffix));
 }
 
 /*
@@ -523,7 +525,7 @@ static PyObject * clean_string(PyObject *self, PyObject *args){
         str = str_replace(str, "\n", "\n   ");
 
         // But always newline terminate it
-        if (str[len-1] != '\n'){
+        if (!ends_with(str, "\n")){
             // Must start with newline too
             if (str[0] != '\n'){
                 format = "\n   %s\n";
@@ -697,6 +699,7 @@ PARSE_get_token_full(PyObject *self)
     }
 
     // Unwrap embedded STAR if all lines start with three spaces
+    /* TODO: The StartsWith check is not robust enough. */
     if ((my_parser->last_delineator == ';') && (StartsWith(token, "   \n   "))){
         bool shift_over = true;
 
