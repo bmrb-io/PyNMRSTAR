@@ -679,15 +679,30 @@ PARSE_get_token_full(PyObject *self)
 
     parser_data * my_parser = &parser;
 
+    // Unwrap embedded STAR if all lines start with three spaces
+    if (my_parser->last_delineator == ';'){
+        bool shift_over = true;
+
+        size_t token_len = strlen(token);
+        long c;
+        for (c=0; c<token_len - 3; c++){
+            if (token[c] == '\n'){
+                if (token[c+1] != ' ' || token[c+2] != ' ' || token[c+3] != ' '){
+                    shift_over = false;
+                }
+            }
+        }
+        // Actually shift the text over
+        if (shift_over == true){
+            // Remove the trailing newline
+            token[token_len-1] = '\0';
+            token = str_replace(token, "\n   ", "\n");
+        }
+    }
 
     if (token == done_parsing){
         // Return python none if done parsing
         Py_INCREF(Py_None);
-
-    // Unwrap embedded STAR
-    //if (my_parser->last_delineator == ';'){
-        //token = str_replace(token, "\n   ", "\n");
-    //}
 
     #if PY_MAJOR_VERSION >= 3
         return Py_BuildValue("OlC", Py_None, my_parser->line_no, my_parser->last_delineator);
