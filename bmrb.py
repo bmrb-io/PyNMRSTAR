@@ -571,7 +571,7 @@ class _Parser(object):
         self.index = 0
         self.token = ""
         self.source = "unknown"
-        self.delineator = " "
+        self.delimiter = " "
         self.line_number = 0
 
     def get_line_number(self):
@@ -587,12 +587,12 @@ class _Parser(object):
         """ Returns the next token in the parsing process."""
 
         if cnmrstar is not None:
-            self.token, self.line_number, self.delineator = cnmrstar.get_token_full()
+            self.token, self.line_number, self.delimiter = cnmrstar.get_token_full()
         else:
             self.real_get_token()
             self.line_number = 0
 
-            if self.delineator == ";":
+            if self.delimiter == ";":
                 try:
                     # Unindent value which contain STAR multi-line values
                     # Only do this check if we are comma-delineated
@@ -613,7 +613,7 @@ class _Parser(object):
         # This is just too VERBOSE
         if VERBOSE == "very":
             if self.token:
-                print("'%s': '%s'" % (self.delineator, self.token))
+                print("'%s': '%s'" % (self.delimiter, self.token))
             else:
                 print("No more tokens.")
 
@@ -681,7 +681,7 @@ class _Parser(object):
                                      "Simply 'data_' is not allowed.")
             return
 
-        if self.delineator != " ":
+        if self.delimiter != " ":
             if error_handler.warning(self.line_number,
                                      "The data_ keyword may not be quoted or "
                                      "semicolon-delineated."):
@@ -710,7 +710,7 @@ class _Parser(object):
                                          "saveframe name.")
                 return
 
-            if self.delineator != " ":
+            if self.delimiter != " ":
                 if error_handler.error(self.line_number,
                                        "The save_ keyword may not be quoted or "
                                        "semicolon-delineated."):
@@ -726,7 +726,7 @@ class _Parser(object):
             while self.get_token() != None:
 
                 if self.token == "loop_":
-                    if self.delineator != " ":
+                    if self.delimiter != " ":
                         if error_handler.error(self.line_number,
                                                "The loop_ keyword may not be "
                                                "quoted or semicolon-delineated."):
@@ -745,7 +745,7 @@ class _Parser(object):
 
                         # Add a column
                         if self.token.startswith("_"):
-                            if self.delineator != " ":
+                            if self.delimiter != " ":
                                 if error_handler.error(self.line_number,
                                                        "Loop tags may not be "
                                                        "quoted or "
@@ -766,7 +766,7 @@ class _Parser(object):
                             # We are in the data block of a loop
                             while self.token != None:
                                 if self.token == "stop_":
-                                    if self.delineator != " ":
+                                    if self.delimiter != " ":
                                         if error_handler.error(self.line_number,
                                                                "The stop_ keyword may"
                                                                " not be quoted or "
@@ -793,7 +793,7 @@ class _Parser(object):
                                         return
 
                                     if (self.token in self.reserved and
-                                            self.delineator == " "):
+                                            self.delimiter == " "):
                                         error_handler.fatalError(self.line_number,
                                                                  "Cannot use keywords "
                                                                  "as data values unless"
@@ -807,14 +807,14 @@ class _Parser(object):
 
 
                                     # Check for reserved keywords... SLOW!
-                                    #if self.delineator == ";":
+                                    #if self.delimiter == ";":
                                     #    for x in ["save_", "stop_", "loop_"]:
                                     #        if x in self.token:
                                     #            if error_handler.warning(self.line_number+1,
                                     #                                     "Keyword in value: %s" % x):
                                     #                return
 
-                                    if self.delineator == "$":
+                                    if self.delimiter == "$":
                                         self.token = self.token[1:]
                                     if curdata == curloop.num_col - 1:
                                         self.line_number -= 1
@@ -825,7 +825,7 @@ class _Parser(object):
                                                     curloop.col_lines[curdata],
                                                     self.token,
                                                     self.line_number+1,
-                                                    conv_delin[self.delineator],
+                                                    conv_delin[self.delimiter],
                                                     True):
                                         return
                                     curdata = (curdata + 1) % curloop.num_col
@@ -851,7 +851,7 @@ class _Parser(object):
 
                 # Close saveframe
                 elif self.token == "save_":
-                    if self.delineator not in " ;":
+                    if self.delimiter not in " ;":
                         if error_handler.error(self.line_number,
                                                "The save_ keyword may not be "
                                                "quoted or semicolon-delineated."):
@@ -872,7 +872,7 @@ class _Parser(object):
 
                 # Add a tag
                 else:
-                    if self.delineator != " ":
+                    if self.delimiter != " ":
                         if error_handler.error(self.line_number,
                                                "Saveframe tags may not be "
                                                "quoted or semicolon-delineated."):
@@ -883,7 +883,7 @@ class _Parser(object):
                     # We are in a saveframe and waiting for the saveframe tag
                     self.get_token()
                     if (self.token in self.reserved and
-                            self.delineator == " "):
+                            self.delimiter == " "):
                         if error_handler.error(self.line_number,
                                                "Cannot use keywords as data values "
                                                "unless quoted or semi-colon "
@@ -892,24 +892,24 @@ class _Parser(object):
                             return
 
                     # Check for reserved keywords... SLOW!
-                    #if self.delineator == ";":
+                    #if self.delimiter == ";":
                     #    for x in ["save_", "stop_", "loop_"]:
                     #        if x in self.token:
                     #            if error_handler.warning(self.line_number+1,
                     #                                     "Keyword in value: %s" % x):
                     #                return
 
-                    if self.delineator == '\'' or self.delineator == '"' or self.delineator == ";":
+                    if self.delimiter == '\'' or self.delimiter == '"' or self.delimiter == ";":
                         self.line_number += 1
-                    if self.delineator == ";":
+                    if self.delimiter == ";":
                         curline -= 1
-                    if self.delineator == "$":
+                    if self.delimiter == "$":
                         self.token = self.token[1:]
 
                     # Send the tag value
                     if handler.data(curtag, curline+1, self.token,
                                     self.line_number,
-                                    conv_delin[self.delineator], False):
+                                    conv_delin[self.delimiter], False):
                         return
 
             if self.token != "save_":
@@ -967,7 +967,7 @@ class _Parser(object):
             raise ValueError("'data_' must be followed by data name. Simply "
                              "'data_' is not allowed.", self.get_line_number())
 
-        if self.delineator != " ":
+        if self.delimiter != " ":
             raise ValueError("The data_ keyword may not be quoted or "
                              "semicolon-delineated.")
 
@@ -989,7 +989,7 @@ class _Parser(object):
                                  "without a specified saveframe name.",
                                  self.get_line_number())
 
-            if self.delineator != " ":
+            if self.delimiter != " ":
                 raise ValueError("The save_ keyword may not be quoted or "
                                  "semicolon-delineated.",
                                  self.get_line_number())
@@ -1002,7 +1002,7 @@ class _Parser(object):
             while self.get_token() != None:
 
                 if self.token == "loop_":
-                    if self.delineator != " ":
+                    if self.delimiter != " ":
                         raise ValueError("The loop_ keyword may not be quoted "
                                          "or semicolon-delineated.",
                                          self.get_line_number())
@@ -1016,7 +1016,7 @@ class _Parser(object):
 
                         # Add a column
                         if self.token.startswith("_"):
-                            if self.delineator != " ":
+                            if self.delimiter != " ":
                                 raise ValueError("Loop tags may not be quoted "
                                                  "or semicolon-delineated.",
                                                  self.get_line_number())
@@ -1035,7 +1035,7 @@ class _Parser(object):
                             # We are in the data block of a loop
                             while self.token != None:
                                 if self.token == "stop_":
-                                    if self.delineator != " ":
+                                    if self.delimiter != " ":
                                         raise ValueError("The stop_ keyword may"
                                                          " not be quoted or "
                                                          "semicolon-delineated.",
@@ -1068,7 +1068,7 @@ class _Parser(object):
                                                          self.get_line_number())
 
                                     if (self.token in self.reserved and
-                                            self.delineator == " "):
+                                            self.delimiter == " "):
                                         raise ValueError("Cannot use keywords "
                                                          "as data values unless"
                                                          " quoted or semi-colon"
@@ -1090,7 +1090,7 @@ class _Parser(object):
 
                 # Close saveframe
                 elif self.token == "save_":
-                    if self.delineator not in " ;":
+                    if self.delimiter not in " ;":
                         raise ValueError("The save_ keyword may not be quoted "
                                          "or semicolon-delineated.",
                                          self.get_line_number())
@@ -1115,7 +1115,7 @@ class _Parser(object):
 
                 # Add a tag
                 else:
-                    if self.delineator != " ":
+                    if self.delimiter != " ":
                         raise ValueError("Saveframe tags may not be quoted or "
                                          "semicolon-delineated.",
                                          self.get_line_number())
@@ -1124,7 +1124,7 @@ class _Parser(object):
                     # We are in a saveframe and waiting for the saveframe tag
                     self.get_token()
                     if (self.token in self.reserved and
-                            self.delineator == " "):
+                            self.delimiter == " "):
                         raise ValueError("Cannot use keywords as data values "
                                          "unless quoted or semi-colon "
                                          "delineated. Illegal value: " +
@@ -1148,8 +1148,8 @@ class _Parser(object):
         """ Actually processes the input data to find a token. get_token
         is just a wrapper around this with some exception handling."""
 
-        # Reset the delineator
-        self.delineator = " "
+        # Reset the delimiter
+        self.delimiter = " "
 
         # Nothing left
         if self.token is None:
@@ -1213,7 +1213,7 @@ class _Parser(object):
                 if valid == until:
                     self.token = tmp[0:until+1]
                     self.index += until+4
-                    self.delineator = ";"
+                    self.delimiter = ";"
                     return
 
                 # The line was terminated improperly
@@ -1230,7 +1230,7 @@ class _Parser(object):
                                              self.get_line_number())
                         self.token = tmp[0:until+1]
                         self.index += until + 4
-                        self.delineator = ";"
+                        self.delimiter = ";"
                         return
                     else:
                         raise ValueError('Invalid file. A multi-line value '
@@ -1264,7 +1264,7 @@ class _Parser(object):
 
             self.token = tmp[1:until]
             self.index += until+1
-            self.delineator = "'"
+            self.delimiter = "'"
             return
 
         # Handle values quoted with "
@@ -1286,7 +1286,7 @@ class _Parser(object):
 
             self.token = tmp[1:until]
             self.index += until+1
-            self.delineator = '"'
+            self.delimiter = '"'
             return
 
         # Figure out where this token ends
@@ -1294,11 +1294,15 @@ class _Parser(object):
         if white == len(tmp):
             self.token = tmp
             self.index += len(self.token) + 1
+            if self.token[0] == "$" and len(self.token) > 1:
+                self.delimiter = '$'
             return
 
         # The token isn't anything special, just return it
         self.index += white
         self.token = tmp[0:white]
+        if self.token[0] == "$" and len(self.token) > 1:
+            self.delimiter = '$'
         return
 
 class Schema(object):
