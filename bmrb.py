@@ -365,14 +365,12 @@ def clean_value(value):
 
     # If it is a STAR-format multiline comment already, we need to escape it
     if "\n;" in value:
-        if not value.startswith("\n"):
-            value = "\n" + value
-        lines = value.splitlines(True)
-        #os.linesep
-        escaped = "".join(["   " + line for line in lines])
-        if escaped[-1] != "\n":
-            escaped += "\n"
-        return escaped
+        value = value.replace("\n", "\n   ")
+        if value[-1] != "\n":
+            value = value + "\n"
+        if value[0] != "\n":
+            value = "\n   " + value
+        return value
 
     # If it's going on it's own line, don't touch it
     if "\n" in value:
@@ -599,27 +597,13 @@ class _Parser(object):
                     if self.token.startswith("\n   "):
                         # Only remove the whitespaces if all lines have them
                         trim = True
-                        for pos in range(0, len(self.token) - 3):
-                            print("Checking: '%s'\n" % self.token[pos:pos+10])
+                        for pos in range(1, len(self.token) - 4):
                             if self.token[pos] == "\n":
-                                if self.token[pos+1] != " ":
+                                if self.token[pos+1:pos+3] != "   ":
                                     trim = False
-                                    print("Missing 1 pos\n")
-                                if self.token[pos+2] != " ":
-                                    trim = False
-                                    print("Missing 2 pos\n")
-                                if self.token[pos+3] != " ":
-                                    trim = False
-                                    print("Missing 3 pos\n")
 
-
-                        #for line in self.token.splitlines(True)[1:]:
-                            #print("Checking: '%s'\n" % line)
-                            #if not line.startswith("   "):
-                                #print("Triggered false: '%s'\n" % line)
-                                #trim = False
                         if trim:
-                            self.token = self.token.replace("\n   ", "\n")[4:]
+                            self.token = "\n   " + self.token[:-1].replace("\n   ", "\n")[4:]
                     # Strip extra newline from end - other code expects this!?
                     #if self.token.endswith("\n"):
                     #    self.token = self.token[:-1]

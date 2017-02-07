@@ -705,7 +705,7 @@ PARSE_get_token_full(PyObject *self)
 
         size_t token_len = strlen(token);
         long c;
-        for (c=0; c<token_len - 3; c++){
+        for (c=0; c<token_len - 4; c++){
             if (token[c] == '\n'){
                 if (token[c+1] != ' ' || token[c+2] != ' ' || token[c+3] != ' '){
                     shift_over = false;
