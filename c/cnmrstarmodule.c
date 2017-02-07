@@ -714,18 +714,11 @@ PARSE_get_token_full(PyObject *self)
         }
 
         // Actually shift the text over
-        if (shift_over == true){
+        if ((shift_over == true) && (strstr(token, "\n   ;") != NULL)){
             // Remove the trailing newline
             token[token_len-1] = '\0';
             token = str_replace(token, "\n   ", "\n");
-            //printf("Shifting token:\n~\n%s\n~\n", token);
-
-            // Remove the extra whitespace newline at the end
-            //if (ends_with(token, "\n   \n")){
-             //   token[token_len-3] = '\0';
-           // }
         }
-
     }
 
     if (token == done_parsing){

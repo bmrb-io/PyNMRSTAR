@@ -602,11 +602,9 @@ class _Parser(object):
                                 if self.token[pos+1:pos+4] != "   ":
                                     trim = False
 
-                        if trim:
-                            self.token = "\n   " + self.token[:-1].replace("\n   ", "\n")[4:]
-                    # Strip extra newline from end - other code expects this!?
-                    #if self.token.endswith("\n"):
-                    #    self.token = self.token[:-1]
+                        if trim and "\n   ;" in self.token:
+                            self.token = self.token[:-1].replace("\n   ", "\n")
+
                 except AttributeError:
                     pass
 

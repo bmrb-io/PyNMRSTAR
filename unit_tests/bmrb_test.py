@@ -478,6 +478,19 @@ _Entry.Original_NMR_STAR_version      '_.'
    _Entry.Experimental_method_subtype    solution
    _Entry.BMRB_internal_directory_name   ;data;
 _Entry.pointer $it
+_Entry.multi
+;
+
+   nothing
+   to shift
+;
+_Entry.multi2
+;
+
+   ;
+   something
+   to shift
+;
 """)
 
         parser.get_token()
@@ -541,6 +554,12 @@ _Entry.pointer $it
         self.assertEqual((parser.token, parser.delimiter), ('_Entry.pointer', ' '))
         parser.get_token()
         self.assertEqual((parser.token, parser.delimiter), ('$it', '$'))
+        parser.get_token()
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ("\n   nothing\n   to shift\n", ';'))
+        parser.get_token()
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ("\n;\nsomething\nto shift", ';'))
 
     # Parse and re-print entries to check for divergences. Only use in-house.
     def test_reparse(self):
