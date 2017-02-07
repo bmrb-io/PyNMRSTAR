@@ -599,7 +599,7 @@ class _Parser(object):
                         trim = True
                         for pos in range(1, len(self.token) - 4):
                             if self.token[pos] == "\n":
-                                if self.token[pos+1:pos+3] != "   ":
+                                if self.token[pos+1:pos+4] != "   ":
                                     trim = False
 
                         if trim:
