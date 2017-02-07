@@ -596,12 +596,28 @@ class _Parser(object):
                 try:
                     # Unindent value which contain STAR multi-line values
                     # Only do this check if we are comma-delineated
-                    if self.token.startswith("   \n   "):
+                    if self.token.startswith("\n   "):
                         # Only remove the whitespaces if all lines have them
                         trim = True
-                        for line in self.token.splitlines(True):
-                            if not line.startswith("   "):
-                                trim = False
+                        for pos in range(0, len(self.token) - 3):
+                            print("Checking: '%s'\n" % self.token[pos:pos+10])
+                            if self.token[pos] == "\n":
+                                if self.token[pos+1] != " ":
+                                    trim = False
+                                    print("Missing 1 pos\n")
+                                if self.token[pos+2] != " ":
+                                    trim = False
+                                    print("Missing 2 pos\n")
+                                if self.token[pos+3] != " ":
+                                    trim = False
+                                    print("Missing 3 pos\n")
+
+
+                        #for line in self.token.splitlines(True)[1:]:
+                            #print("Checking: '%s'\n" % line)
+                            #if not line.startswith("   "):
+                                #print("Triggered false: '%s'\n" % line)
+                                #trim = False
                         if trim:
                             self.token = self.token.replace("\n   ", "\n")[4:]
                     # Strip extra newline from end - other code expects this!?

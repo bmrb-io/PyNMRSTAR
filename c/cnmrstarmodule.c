@@ -689,6 +689,7 @@ PARSE_get_token_full(PyObject *self)
     token = get_token(&parser);
     parser_data * my_parser = &parser;
 
+    // Skip comments
     while (my_parser->last_delineator == '#'){
         token = get_token(&parser);
     }
@@ -699,8 +700,7 @@ PARSE_get_token_full(PyObject *self)
     }
 
     // Unwrap embedded STAR if all lines start with three spaces
-    /* TODO: The StartsWith check is not robust enough. */
-    if ((my_parser->last_delineator == ';') && (StartsWith(token, "   \n   "))){
+    if ((my_parser->last_delineator == ';') && (starts_with(token, "\n   "))){
         bool shift_over = true;
 
         size_t token_len = strlen(token);
@@ -712,12 +712,20 @@ PARSE_get_token_full(PyObject *self)
                 }
             }
         }
+
         // Actually shift the text over
         if (shift_over == true){
             // Remove the trailing newline
             token[token_len-1] = '\0';
             token = str_replace(token, "\n   ", "\n");
+            //printf("Shifting token:\n~\n%s\n~\n", token);
+
+            // Remove the extra whitespace newline at the end
+            //if (ends_with(token, "\n   \n")){
+             //   token[token_len-3] = '\0';
+           // }
         }
+
     }
 
     if (token == done_parsing){

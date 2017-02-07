@@ -449,13 +449,13 @@ class TestPyNMRSTAR(unittest.TestCase):
         # Twice could trigger bug
         ml[0][0] = str(ml)
         self.assertEqual(ml, bmrb.Loop.from_string(str(ml)))
-        #self.assertEqual(ml[0][0], bmrb.Loop.from_string(str(ml))[0][0])
+        self.assertEqual(ml[0][0], bmrb.Loop.from_string(str(ml))[0][0])
         # Third time is a charm
         ml[0][0] = str(ml)
         self.assertEqual(ml, bmrb.Loop.from_string(str(ml)))
         # Check the data too - this should never fail (the previous test would
         # have already failed.)
-        #self.assertEqual(ml[0][0], bmrb.Loop.from_string(str(ml))[0][0])
+        self.assertEqual(ml[0][0], bmrb.Loop.from_string(str(ml))[0][0])
 
 
     def test_parse_outliers(self):
@@ -550,7 +550,7 @@ _Entry.pointer $it
         if not os.path.exists("/bmrb/linux/bin/stardiff"):
             return
 
-        start, end = 15000, 15500
+        start, end = 15000, 15000
         sys.stdout.write("\nEntry tests: %5s/%5s" % (start, end))
         for x in range(start, end):
 
