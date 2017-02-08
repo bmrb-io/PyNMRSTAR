@@ -3694,8 +3694,8 @@ def called_directly():
                               " are escaped. You can query multiple tags by "
                               "comma separating them; if you do that the "
                               "results will be truncated to the length of the "
-                              "tag with the fewest results, and the values for "
-                              "the tags will be separated with tabs.")
+                              "tag with the fewest results, and the values for"
+                              " the tags will be separated with tabs.")
 
     # Options, parse 'em
     (options, cmd_input) = optparser.parse_args()
