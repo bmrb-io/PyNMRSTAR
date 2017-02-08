@@ -114,7 +114,7 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertEqual(default.schema, loaded.schema)
         self.assertEqual(default.types, loaded.types)
         self.assertEqual(default.headers, loaded.headers)
-        self.assertEqual(default.headers, ['Dictionary sequence', 'SFCategory', 'ADIT category mandatory', 'ADIT category view type', 'ADIT super category ID', 'ADIT super category', 'ADIT category group ID', 'ADIT category view name', 'Tag', 'BMRB current', 'Query prompt', 'Query interface', 'SG Mandatory', '', 'ADIT exists', 'User full view', 'User structure view', 'User non-structure view', 'User NMR param. View', 'Annotator full view', 'Item enumerated', 'Item enumeration closed', 'Enum parent SFcategory', 'Enum parent tag', 'Derived enumeration mantable', 'Derived enumeration', 'ADIT item view name', 'Data Type', 'Nullable', 'Non-public', 'ManDBTableName', 'ManDBColumnName', 'Row Index Key', 'Saveframe ID tag', 'Source Key', 'Table Primary Key', 'Foreign Key Group', 'Foreign Table', 'Foreign Column', 'Secondary index', 'Sub category', 'Units', 'Loopflag', 'Seq', 'Adit initial rows', 'Enumeration ties', 'Mandatory code overides', 'Overide value', 'Overide view value', 'ADIT auto insert', 'Example', 'Prompt', 'Interface', 'bmrbPdbMatchID', 'bmrbPdbTransFunc', 'STAR flag', 'DB flag', 'SfNamelFlg', 'Sf category flag', 'Sf pointer', 'Natural primary key', 'Natural foreign key', 'Redundant keys', 'Parent tag', 'public', 'internal', 'small molecule', 'small molecule', 'metabolomics', 'Entry completeness', 'Overide public', 'internal', 'small molecule', 'small molecule', 'metabolomic', 'metabolomic', 'default value', 'Adit form code', 'Tag category', 'Tag field', 'Local key', 'Datum count flag', 'pdbx D&A insertion flag', 'mmCIF equivalent', 'Meta data', 'Tag delete', 'BMRB data type', 'STAR vs Curated DB', 'Key group', 'Reference table', 'Reference column', 'Dictionary description', 'variableTypeMatch', 'entryIdFlg', 'outputMapExistsFlg', 'lclSfIdFlg', 'Met ADIT category view name', 'Met Example', 'Met Prompt', 'Met Description', 'SM Struct ADIT-NMR category view name', 'SM Struct Example', 'SM Struct Prompt', 'SM Struct Description', 'Met default value', 'SM default value'])
+        self.assertEqual(default.headers, ['Dictionary sequence', 'SFCategory', 'ADIT category mandatory', 'ADIT category view type', 'ADIT super category ID', 'ADIT super category', 'ADIT category group ID', 'ADIT category view name', 'Tag', 'BMRB current', 'Query prompt', 'Query interface', 'SG Mandatory', '', 'ADIT exists', 'User full view', 'User structure view', 'User non-structure view', 'User NMR param. View', 'Annotator full view', 'Item enumerated', 'Item enumeration closed', 'Enum parent SFcategory', 'Enum parent tag', 'Derived enumeration mantable', 'Derived enumeration', 'ADIT item view name', 'Data Type', 'Nullable', 'Non-public', 'ManDBTableName', 'ManDBColumnName', 'Row Index Key', 'Saveframe ID tag', 'Source Key', 'Table Primary Key', 'Foreign Key Group', 'Foreign Table', 'Foreign Column', 'Secondary index', 'Sub category', 'Units', 'Loopflag', 'Seq', 'Adit initial rows', 'Enumeration ties', 'Mandatory code overides', 'Overide value', 'Overide view value', 'ADIT auto insert', 'Example', 'Prompt', 'Interface', 'bmrbPdbMatchID', 'bmrbPdbTransFunc', 'STAR flag', 'DB flag', 'SfNamelFlg', 'Sf category flag', 'Sf pointer', 'Natural primary key', 'Natural foreign key', 'Redundant keys', 'Parent tag', 'public', 'internal', 'small molecule', 'small molecule', 'metabolomics', 'Entry completeness', 'Overide public', 'internal', 'small molecule', 'small molecule', 'metabolomic', 'metabolomic', 'default value', 'Adit form code', 'Tag category', 'Tag field', 'Local key', 'Datum count flag', 'NEF equivalent', 'mmCIF equivalent', 'Meta data', 'Tag delete', 'BMRB data type', 'STAR vs Curated DB', 'Key group', 'Reference table', 'Reference column', 'Dictionary description', 'variableTypeMatch', 'entryIdFlg', 'outputMapExistsFlg', 'lclSfIdFlg', 'Met ADIT category view name', 'Met Example', 'Met Prompt', 'Met Description', 'SM Struct ADIT-NMR category view name', 'SM Struct Example', 'SM Struct Prompt', 'SM Struct Description', 'Met default value', 'SM default value'])
 
         self.assertEqual(default.val_type("_Entity.ID", 1), [])
         self.assertEqual(default.val_type("_Entity.ID", "test"), ["Value is not of type INTEGER.:'_Entity.ID':'test' on line 'None'."])
@@ -436,6 +436,130 @@ class TestPyNMRSTAR(unittest.TestCase):
         tmp.normalize()
         # And test they have been put back together
         self.assertEqual(tmp.frame_list, database_entry.frame_list)
+
+
+    def test_syntax_outliers(self):
+        """ Make sure the case of semi-colon delineated data in a data
+        value is properly escaped. """
+
+        ml = copy(self.entry[0][0])
+        # Should always work once
+        ml[0][0] = str(ml)
+        self.assertEqual(ml, bmrb.Loop.from_string(str(ml)))
+        # Twice could trigger bug
+        ml[0][0] = str(ml)
+        self.assertEqual(ml, bmrb.Loop.from_string(str(ml)))
+        self.assertEqual(ml[0][0], bmrb.Loop.from_string(str(ml))[0][0])
+        # Third time is a charm
+        ml[0][0] = str(ml)
+        self.assertEqual(ml, bmrb.Loop.from_string(str(ml)))
+        # Check the data too - this should never fail (the previous test would
+        # have already failed.)
+        self.assertEqual(ml[0][0], bmrb.Loop.from_string(str(ml))[0][0])
+
+
+    def test_parse_outliers(self):
+        """ Make sure the parser handles edge cases. """
+
+        parser = bmrb._Parser()
+        parser.load_data("""data_#pound
+save_entry_information  _Entry.Sf_category entry_information _Entry.Sf_framecode entry_information
+_Entry.sameline_comment value #ignore this all
+_Entry.ID    \".-!?\"
+_Entry.Invalid_tag            "This tag doesn't exist."
+_Entry.Title
+; Solution structure of chicken villin headpiece subdomain contain;ing a fluorinated side chain in the cores;
+;
+_Entry.Submi#ssion_date                "check inn"er "quoted vals"
+_Entry.Accession_date                 'check inner quoted vals'
+_Entry.Original_NMR_STAR_version      '_.'
+   _Entry.Experimental_method            $
+   _Entry.Details                        "1#"
+   _Entry.Experimental_method_subtype    solution
+   _Entry.BMRB_internal_directory_name   ;data;
+_Entry.pointer $it
+_Entry.multi
+;
+
+   nothing
+   to shift
+;
+_Entry.multi2
+;
+
+   ;
+   something
+   to shift
+;
+""")
+
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('data_#pound', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('save_entry_information', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('_Entry.Sf_category', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('entry_information', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('_Entry.Sf_framecode', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('entry_information', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('_Entry.sameline_comment', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('value', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('_Entry.ID', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('.-!?', '"'))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('_Entry.Invalid_tag', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ("This tag doesn't exist.", '"'))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('_Entry.Title', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), (""" Solution structure of chicken villin headpiece subdomain contain;ing a fluorinated side chain in the cores;
+""", ';'))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('_Entry.Submi#ssion_date', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('check inn"er "quoted vals', '"'))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('_Entry.Accession_date', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('check inner quoted vals', '\''))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('_Entry.Original_NMR_STAR_version', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('_.','\''))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('_Entry.Experimental_method', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('$', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('_Entry.Details', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('1#', '"'))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('_Entry.Experimental_method_subtype', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('solution', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('_Entry.BMRB_internal_directory_name', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), (';data;', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('_Entry.pointer', ' '))
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('$it', '$'))
+        parser.get_token()
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ("\n   nothing\n   to shift\n", ';'))
+        parser.get_token()
+        parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ("\n;\nsomething\nto shift", ';'))
 
     # Parse and re-print entries to check for divergences. Only use in-house.
     def test_reparse(self):
