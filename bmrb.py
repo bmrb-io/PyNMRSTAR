@@ -138,12 +138,20 @@ def _build_extension():
 # See if we can use the fast tokenizer
 try:
     import cnmrstar
-except ImportError:
+    if not "version" in dir(cnmrstar) or cnmrstar.version() < "2.2.7":
+        print("Recompiling cnmrstar module due to API changes. You may "
+              "experience a segmentation fault immediately following this "
+              "message but should have no issues the next time you run your "
+              "script or this program.")
+        _build_extension()
+        sys.exit(0)
+
+except ImportError as e:
     cnmrstar = None
 
     # Check for nobuild file before continuing
     if not os.path.isfile(os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                   ".nocompile")):
+                                       ".nocompile")):
 
         if _build_extension():
             try:
@@ -194,7 +202,7 @@ _COMMENT_DICTIONARY = {}
 _API_URL = "http://webapi.bmrb.wisc.edu/current"
 _SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
-_VERSION = "2.2.6"
+_VERSION = "2.2.7"
 
 #############################################
 #             Module methods                #
@@ -354,6 +362,15 @@ def clean_value(value):
     # Convert non-string types to string
     if not isinstance(value, str):
         value = str(value)
+
+    # If it is a STAR-format multiline comment already, we need to escape it
+    if "\n;" in value:
+        value = value.replace("\n", "\n   ")
+        if value[-1] != "\n":
+            value = value + "\n"
+        if value[0] != "\n":
+            value = "\n   " + value
+        return value
 
     # If it's going on it's own line, don't touch it
     if "\n" in value:
@@ -552,7 +569,7 @@ class _Parser(object):
         self.index = 0
         self.token = ""
         self.source = "unknown"
-        self.delineator = " "
+        self.delimiter = " "
         self.line_number = 0
 
     def get_line_number(self):
@@ -568,19 +585,33 @@ class _Parser(object):
         """ Returns the next token in the parsing process."""
 
         if cnmrstar is not None:
-            try:
-                self.token, self.line_number, self.delineator = cnmrstar.get_token_full()
-            except AttributeError:
-                raise ValueError("Please recompile the c extension. You have an"
-                                 " old version.")
+            self.token, self.line_number, self.delimiter = cnmrstar.get_token_full()
         else:
             self.real_get_token()
             self.line_number = 0
 
+            if self.delimiter == ";":
+                try:
+                    # Unindent value which contain STAR multi-line values
+                    # Only do this check if we are comma-delineated
+                    if self.token.startswith("\n   "):
+                        # Only remove the whitespaces if all lines have them
+                        trim = True
+                        for pos in range(1, len(self.token) - 4):
+                            if self.token[pos] == "\n":
+                                if self.token[pos+1:pos+4] != "   ":
+                                    trim = False
+
+                        if trim and "\n   ;" in self.token:
+                            self.token = self.token[:-1].replace("\n   ", "\n")
+
+                except AttributeError:
+                    pass
+
         # This is just too VERBOSE
         if VERBOSE == "very":
             if self.token:
-                print("'%s': '%s'" % (self.delineator, self.token))
+                print("'%s': '%s'" % (self.delimiter, self.token))
             else:
                 print("No more tokens.")
 
@@ -648,7 +679,7 @@ class _Parser(object):
                                      "Simply 'data_' is not allowed.")
             return
 
-        if self.delineator != " ":
+        if self.delimiter != " ":
             if error_handler.warning(self.line_number,
                                      "The data_ keyword may not be quoted or "
                                      "semicolon-delineated."):
@@ -677,7 +708,7 @@ class _Parser(object):
                                          "saveframe name.")
                 return
 
-            if self.delineator != " ":
+            if self.delimiter != " ":
                 if error_handler.error(self.line_number,
                                        "The save_ keyword may not be quoted or "
                                        "semicolon-delineated."):
@@ -693,7 +724,7 @@ class _Parser(object):
             while self.get_token() != None:
 
                 if self.token == "loop_":
-                    if self.delineator != " ":
+                    if self.delimiter != " ":
                         if error_handler.error(self.line_number,
                                                "The loop_ keyword may not be "
                                                "quoted or semicolon-delineated."):
@@ -712,7 +743,7 @@ class _Parser(object):
 
                         # Add a column
                         if self.token.startswith("_"):
-                            if self.delineator != " ":
+                            if self.delimiter != " ":
                                 if error_handler.error(self.line_number,
                                                        "Loop tags may not be "
                                                        "quoted or "
@@ -733,7 +764,7 @@ class _Parser(object):
                             # We are in the data block of a loop
                             while self.token != None:
                                 if self.token == "stop_":
-                                    if self.delineator != " ":
+                                    if self.delimiter != " ":
                                         if error_handler.error(self.line_number,
                                                                "The stop_ keyword may"
                                                                " not be quoted or "
@@ -760,7 +791,7 @@ class _Parser(object):
                                         return
 
                                     if (self.token in self.reserved and
-                                            self.delineator == " "):
+                                            self.delimiter == " "):
                                         error_handler.fatalError(self.line_number,
                                                                  "Cannot use keywords "
                                                                  "as data values unless"
@@ -774,14 +805,14 @@ class _Parser(object):
 
 
                                     # Check for reserved keywords... SLOW!
-                                    #if self.delineator == ";":
+                                    #if self.delimiter == ";":
                                     #    for x in ["save_", "stop_", "loop_"]:
                                     #        if x in self.token:
                                     #            if error_handler.warning(self.line_number+1,
                                     #                                     "Keyword in value: %s" % x):
                                     #                return
 
-                                    if self.delineator == "$":
+                                    if self.delimiter == "$":
                                         self.token = self.token[1:]
                                     if curdata == curloop.num_col - 1:
                                         self.line_number -= 1
@@ -792,7 +823,7 @@ class _Parser(object):
                                                     curloop.col_lines[curdata],
                                                     self.token,
                                                     self.line_number+1,
-                                                    conv_delin[self.delineator],
+                                                    conv_delin[self.delimiter],
                                                     True):
                                         return
                                     curdata = (curdata + 1) % curloop.num_col
@@ -818,7 +849,7 @@ class _Parser(object):
 
                 # Close saveframe
                 elif self.token == "save_":
-                    if self.delineator not in " ;":
+                    if self.delimiter not in " ;":
                         if error_handler.error(self.line_number,
                                                "The save_ keyword may not be "
                                                "quoted or semicolon-delineated."):
@@ -839,7 +870,7 @@ class _Parser(object):
 
                 # Add a tag
                 else:
-                    if self.delineator != " ":
+                    if self.delimiter != " ":
                         if error_handler.error(self.line_number,
                                                "Saveframe tags may not be "
                                                "quoted or semicolon-delineated."):
@@ -850,7 +881,7 @@ class _Parser(object):
                     # We are in a saveframe and waiting for the saveframe tag
                     self.get_token()
                     if (self.token in self.reserved and
-                            self.delineator == " "):
+                            self.delimiter == " "):
                         if error_handler.error(self.line_number,
                                                "Cannot use keywords as data values "
                                                "unless quoted or semi-colon "
@@ -859,24 +890,24 @@ class _Parser(object):
                             return
 
                     # Check for reserved keywords... SLOW!
-                    #if self.delineator == ";":
+                    #if self.delimiter == ";":
                     #    for x in ["save_", "stop_", "loop_"]:
                     #        if x in self.token:
                     #            if error_handler.warning(self.line_number+1,
                     #                                     "Keyword in value: %s" % x):
                     #                return
 
-                    if self.delineator == '\'' or self.delineator == '"' or self.delineator == ";":
+                    if self.delimiter == '\'' or self.delimiter == '"' or self.delimiter == ";":
                         self.line_number += 1
-                    if self.delineator == ";":
+                    if self.delimiter == ";":
                         curline -= 1
-                    if self.delineator == "$":
+                    if self.delimiter == "$":
                         self.token = self.token[1:]
 
                     # Send the tag value
                     if handler.data(curtag, curline+1, self.token,
                                     self.line_number,
-                                    conv_delin[self.delineator], False):
+                                    conv_delin[self.delimiter], False):
                         return
 
             if self.token != "save_":
@@ -890,10 +921,11 @@ class _Parser(object):
 
         return
 
-
-    def parse(self, data, source="unknown"):
-        """ Parses the string provided as data as an NMR-STAR entry
-        and returns the parsed entry. Raises ValueError on exceptions."""
+    def load_data(self, data, store=True):
+        """ Loads data in preparation of parsing and cleans up newlines
+        and massages the data to make parsing work properly when multiline
+        values aren't as expected. Useful for manually getting tokens from
+        the parser."""
 
         # Fix DOS line endings
         data = data.replace("\r\n", "\n").replace("\r", "\n")
@@ -905,6 +937,13 @@ class _Parser(object):
             cnmrstar.load_string(data)
         else:
             self.full_data = data + "\n"
+
+    def parse(self, data, source="unknown"):
+        """ Parses the string provided as data as an NMR-STAR entry
+        and returns the parsed entry. Raises ValueError on exceptions."""
+
+        # Prepare the data for parsing
+        self.load_data(data)
 
         # Create the NMRSTAR object
         curframe = None
@@ -926,7 +965,7 @@ class _Parser(object):
             raise ValueError("'data_' must be followed by data name. Simply "
                              "'data_' is not allowed.", self.get_line_number())
 
-        if self.delineator != " ":
+        if self.delimiter != " ":
             raise ValueError("The data_ keyword may not be quoted or "
                              "semicolon-delineated.")
 
@@ -948,7 +987,7 @@ class _Parser(object):
                                  "without a specified saveframe name.",
                                  self.get_line_number())
 
-            if self.delineator != " ":
+            if self.delimiter != " ":
                 raise ValueError("The save_ keyword may not be quoted or "
                                  "semicolon-delineated.",
                                  self.get_line_number())
@@ -961,7 +1000,7 @@ class _Parser(object):
             while self.get_token() != None:
 
                 if self.token == "loop_":
-                    if self.delineator != " ":
+                    if self.delimiter != " ":
                         raise ValueError("The loop_ keyword may not be quoted "
                                          "or semicolon-delineated.",
                                          self.get_line_number())
@@ -975,7 +1014,7 @@ class _Parser(object):
 
                         # Add a column
                         if self.token.startswith("_"):
-                            if self.delineator != " ":
+                            if self.delimiter != " ":
                                 raise ValueError("Loop tags may not be quoted "
                                                  "or semicolon-delineated.",
                                                  self.get_line_number())
@@ -994,7 +1033,7 @@ class _Parser(object):
                             # We are in the data block of a loop
                             while self.token != None:
                                 if self.token == "stop_":
-                                    if self.delineator != " ":
+                                    if self.delimiter != " ":
                                         raise ValueError("The stop_ keyword may"
                                                          " not be quoted or "
                                                          "semicolon-delineated.",
@@ -1027,7 +1066,7 @@ class _Parser(object):
                                                          self.get_line_number())
 
                                     if (self.token in self.reserved and
-                                            self.delineator == " "):
+                                            self.delimiter == " "):
                                         raise ValueError("Cannot use keywords "
                                                          "as data values unless"
                                                          " quoted or semi-colon"
@@ -1049,7 +1088,7 @@ class _Parser(object):
 
                 # Close saveframe
                 elif self.token == "save_":
-                    if self.delineator not in " ;":
+                    if self.delimiter not in " ;":
                         raise ValueError("The save_ keyword may not be quoted "
                                          "or semicolon-delineated.",
                                          self.get_line_number())
@@ -1074,7 +1113,7 @@ class _Parser(object):
 
                 # Add a tag
                 else:
-                    if self.delineator != " ":
+                    if self.delimiter != " ":
                         raise ValueError("Saveframe tags may not be quoted or "
                                          "semicolon-delineated.",
                                          self.get_line_number())
@@ -1083,7 +1122,7 @@ class _Parser(object):
                     # We are in a saveframe and waiting for the saveframe tag
                     self.get_token()
                     if (self.token in self.reserved and
-                            self.delineator == " "):
+                            self.delimiter == " "):
                         raise ValueError("Cannot use keywords as data values "
                                          "unless quoted or semi-colon "
                                          "delineated. Illegal value: " +
@@ -1107,8 +1146,8 @@ class _Parser(object):
         """ Actually processes the input data to find a token. get_token
         is just a wrapper around this with some exception handling."""
 
-        # Reset the delineator
-        self.delineator = " "
+        # Reset the delimiter
+        self.delimiter = " "
 
         # Nothing left
         if self.token is None:
@@ -1172,7 +1211,7 @@ class _Parser(object):
                 if valid == until:
                     self.token = tmp[0:until+1]
                     self.index += until+4
-                    self.delineator = ";"
+                    self.delimiter = ";"
                     return
 
                 # The line was terminated improperly
@@ -1189,7 +1228,7 @@ class _Parser(object):
                                              self.get_line_number())
                         self.token = tmp[0:until+1]
                         self.index += until + 4
-                        self.delineator = ";"
+                        self.delimiter = ";"
                         return
                     else:
                         raise ValueError('Invalid file. A multi-line value '
@@ -1223,7 +1262,7 @@ class _Parser(object):
 
             self.token = tmp[1:until]
             self.index += until+1
-            self.delineator = "'"
+            self.delimiter = "'"
             return
 
         # Handle values quoted with "
@@ -1245,7 +1284,7 @@ class _Parser(object):
 
             self.token = tmp[1:until]
             self.index += until+1
-            self.delineator = '"'
+            self.delimiter = '"'
             return
 
         # Figure out where this token ends
@@ -1253,11 +1292,15 @@ class _Parser(object):
         if white == len(tmp):
             self.token = tmp
             self.index += len(self.token) + 1
+            if self.token[0] == "$" and len(self.token) > 1:
+                self.delimiter = '$'
             return
 
         # The token isn't anything special, just return it
         self.index += white
         self.token = tmp[0:white]
+        if self.token[0] == "$" and len(self.token) > 1:
+            self.delimiter = '$'
         return
 
 class Schema(object):
@@ -1294,21 +1337,32 @@ class Schema(object):
             raise ValueError("Could not parse a schema from the specified "
                              "URL: %s" % schema_file)
 
+        # Figure out which columns have the data we want
+        loc = {}
+        loc['sf_cat'] = self.headers.index("SFCategory")
+        loc['tag'] = self.headers.index("Tag")
+        loc['nullable'] = self.headers.index("Nullable")
+        loc['data_type'] = self.headers.index("Data Type")
+        loc['loop_flg'] = self.headers.index("Loopflag")
+
         for line in csv_reader_instance:
 
             # Stop at the end
             if line[0] == "TBL_END":
                 break
 
-            if line[8].count(".") == 1:
-                null_allowed = False if line[28] == "NOT NULL" else True
-                self.schema[line[8].lower()] = (line[27], null_allowed,
-                                                line[1], line[8])
-                self.types[line[8][:line[8].index(".")]] = (line[1], line[42])
-                self.schema_order.append(line[8])
+            if line[loc['tag']].count(".") == 1:
+                null_allowed = False if line[loc['nullable']] == "NOT NULL" else True
+                self.schema[line[loc['tag']].lower()] = (line[loc['data_type']],
+                                                         null_allowed,
+                                                         line[loc['sf_cat']],
+                                                         line[loc['tag']])
+                self.types[line[loc['tag']][:line[loc['tag']].index(".")]] = (line[loc['sf_cat']],
+                                                                              line[loc['loop_flg']])
+                self.schema_order.append(line[loc['tag']])
 
                 # Store just the categories as well
-                formatted = _format_category(line[8])
+                formatted = _format_category(line[loc['tag']])
                 if formatted not in self.category_order:
                     self.category_order.append(formatted)
             else:
@@ -1414,7 +1468,7 @@ class Schema(object):
             null_allowed = False
         if str(null_allowed).lower() == "true":
             null_allowed = True
-        if not (null_allowed == True or null_allowed == False):
+        if not (null_allowed is True or null_allowed is False):
             raise ValueError("Please specify whether null is allowed with True/"
                              "False")
 
@@ -2963,6 +3017,11 @@ class Loop(object):
             title_widths = [max([len(str(x))+3 for x in col]) for
                             col in [[row[x] for row in working_data] for
                                     x in range(0, len(working_data[0]))]]
+
+            # TODO: Replace with a smarter title_widths algorithm - or in C
+            # It needs to not count the length of items that will go on their
+            # own line...
+
             # Generate the format string
             pstring = "     " + "%-*s"*len(self.columns) + " \n"
 
@@ -3034,6 +3093,17 @@ class Loop(object):
 
         return cls(the_string=the_string, csv=csv)
 
+    def _tag_index(self, tag_name):
+        """ Helper method to do a case-insensitive check for the presence
+        of a given tag in this loop. Returns the index of the tag if found
+        and None if not found."""
+
+        try:
+            lc_col = [x.lower() for x in self.columns]
+            return lc_col.index(_format_tag(str(tag_name)).lower())
+        except ValueError:
+            return None
+
     def add_column(self, name, ignore_duplicates=False):
         """Add a column to the column list. Does a bit of validation
         and parsing. Set ignore_duplicates to true to ignore attempts
@@ -3069,7 +3139,7 @@ class Loop(object):
                 name = name[1:]
 
         # Ignore duplicate tags
-        if name.lower() in [x.lower() for x in self.columns]:
+        if self._tag_index(name) is not None:
             if ignore_duplicates:
                 return
             else:
@@ -3132,12 +3202,11 @@ class Loop(object):
                                  "not match this loop's category '%s'." %
                                  (supplied_category, self.category))
 
-        column_id = _format_tag(column_id).lower()
-        if column_id not in [x.lower() for x in self.columns]:
+        pos = self._tag_index(column_id)
+        if pos is None:
             raise ValueError("The column tag '%s' to which you are attempting "
                              "to add data does not yet exist. Create the "
                              "columns before adding data." % column_id)
-        pos = [x.lower() for x in self.columns].index(column_id)
         if len(self.data) == 0:
             self.data.append([])
         if len(self.data[-1]) == len(self.columns):
@@ -3218,12 +3287,8 @@ class Loop(object):
                                  "not match this loop's category '%s'." %
                                  (supplied_category, self.category))
 
-        cleaned_tag = _format_tag(str(tag)).lower()
-        columns_lower = [x.lower() for x in self.columns]
-
-        try:
-            search_column = columns_lower.index(cleaned_tag)
-        except ValueError:
+        search_column = self._tag_index(tag)
+        if search_column is None:
             raise ValueError("The tag you provided '%s' isn't in this loop!" %
                              tag)
 
@@ -3250,7 +3315,6 @@ class Loop(object):
 
         result = Loop.from_scratch()
         valid_tags = []
-        columns_lower = [x.lower() for x in self.columns]
 
         # If they only provide one tag make it a list
         if not isinstance(tag_list, (list, tuple)):
@@ -3260,7 +3324,7 @@ class Loop(object):
         for tag in tag_list:
 
             # Handle an invalid tag
-            if _format_tag(tag).lower() not in columns_lower:
+            if self._tag_index(tag) is None:
                 if not ignore_missing_tags:
                     raise ValueError("Cannot filter tag '%s' as it isn't "
                                      "present in this loop." % tag)
@@ -3427,19 +3491,16 @@ class Loop(object):
                                  "match this loop's category '%s'." %
                                  (supplied_category, self.category))
 
-        cleaned_tag = _format_tag(str(index_tag))
-        columns_lower = [x.lower() for x in self.columns]
+        renum_col = self._tag_index(index_tag)
 
         # The column to replace in is the column they specify
-        try:
-            renum_col = columns_lower.index(cleaned_tag.lower())
-        except ValueError:
+        if renum_col is None:
             # Or, perhaps they specified an integer to represent the column?
             try:
                 renum_col = int(index_tag)
             except ValueError:
                 raise ValueError("The renumbering column you provided '%s' "
-                                 "isn't in this loop!" % cleaned_tag)
+                                 "isn't in this loop!" % index_tag)
 
         # Verify the renumbering column ID
         if renum_col >= len(self.columns) or renum_col < 0:
@@ -3521,9 +3582,6 @@ class Loop(object):
         else:
             processing_list = [tags]
 
-        # Get a lower case list of columns
-        columns_lower = [x.lower() for x in self.columns]
-
         # Process their input to determine which columns to operate on
         for cur_tag in [str(x) for x in processing_list]:
 
@@ -3535,14 +3593,11 @@ class Loop(object):
                                      "not match this loop's category '%s'." %
                                      (supplied_category, self.category))
 
-            # Get a lower case version of the tag
-            cleaned_tag = _format_tag(cur_tag)
+            renumber_column = self._tag_index(cur_tag)
 
-            # The column to replace in is the column they specify
-            try:
-                renumber_column = columns_lower.index(cleaned_tag.lower())
-            except ValueError:
-                # Or, perhaps they specified an integer to represent the column?
+            # They didn't specify a valid column
+            if renumber_column is None:
+                # Perhaps they specified an integer to represent the column?
                 try:
                     renumber_column = int(cur_tag)
                 except ValueError:
@@ -3639,8 +3694,8 @@ def called_directly():
                               " are escaped. You can query multiple tags by "
                               "comma separating them; if you do that the "
                               "results will be truncated to the length of the "
-                              "tag with the fewest results, and the values for "
-                              "the tags will be separated with tabs.")
+                              "tag with the fewest results, and the values for"
+                              " the tags will be separated with tabs.")
 
     # Options, parse 'em
     (options, cmd_input) = optparser.parse_args()

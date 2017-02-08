@@ -1,7 +1,7 @@
 # PyNMRSTAR
 A Python module for reading, writing, and manipulating NMR-STAR files. [![Build Status](https://travis-ci.org/uwbmrb/PyNMRSTAR.svg?branch=v2)](https://travis-ci.org/uwbmrb/PyNMRSTAR)
 
-Python versions supported: 2.6, 2.7, 3.3, 3.4, and 3.5
+Python versions supported: 2.6, 2.7, 3.3, 3.4, 3.5, and 3.6
 
 ====
 
@@ -232,144 +232,6 @@ own custom schema if desired, otherwise the schema will be
 fetched from the BMRB servers. Returns a list of errors found.
 0-length list indicates no errors found.
 
-### class `Loop()`
-
-A BMRB loop object.
-
-Methods:
-
-#### def `__init__()`
-
-Use the classmethods to initialize.
-
-#### def `add_column(name, ignore_duplicates=False)`
-
-Add a column to the column list. Does a bit of validation
-and parsing. Set ignore_duplicates to true to ignore attempts
-to add the same tag more than once rather than raise an
-exception.
-
-You can also pass a list of column names to add more than one
-column at a time.
-
-#### def `add_data(the_list, rearrange=False)`
-
-Add a list to the data field. Items in list can be any type,
-they will be converted to string and formatted correctly. The
-list must have the same cardinality as the column names or you
-must set the rearrange variable to true and have already set all
-the columns in the loop. Rearrange will break a longer list into
-rows based on the number of columns.
-
-#### def `add_data_by_column(column_id, value)`
-
-Add data to the loop one element at a time, based on column.
-Useful when adding data from SANS parsers.
-
-#### def `clear_data()`
-
-Erases all data in this loop. Does not erase the data columns
-or loop category.
-
-#### def `compare(other)`
-
-Returns the differences between two loops as a list. Order of
-loops being compared does not make a difference on the specific
-errors detected.
-
-#### def `delete_data_by_tag_value(tag, value, index_tag=None)`
-
-Deletes all rows which contain the provided value in the
-provided column. If index_tag is provided, that column is
-renumbered starting with 1. Returns the deleted rows.
-
-#### def `from_file(cls, the_file, csv=False)`
-
-Create a saveframe by loading in a file. Specify csv=True if
-the file is a CSV file. If the_file starts with http://,
-https://, or ftp:// then we will use those protocols to attempt
-to open the file.
-
-#### def `from_json(cls, json_dict)`
-
-Create a loop from JSON (serialized or unserialized JSON).
-
-#### def `from_scratch(cls, category=None, source=from_scratch())`
-
-Create an empty saveframe that you can programatically add
-to. You may also pass the tag prefix as the second argument. If
-you do not pass the tag prefix it will be set the first time you
-add a tag.
-
-#### def `from_string(cls, the_string, csv=False)`
-
-Create a saveframe by parsing a string. Specify csv=True is
-the string is in CSV format and not NMR-STAR format.
-
-#### def `get_columns()`
-
-Return the columns for this entry with the category
-included. Throws ValueError if the category was never set.
-
-#### def `get_data_as_csv(header=True, show_category=True)`
-
-Return the data contained in the loops, properly CSVd, as a
-string. Set header to False to omit the header. Set
-show_category to false to omit the loop category from the
-headers.
-
-#### def `get_data_by_tag(tags=None)`
-
-Identical to getTag but wraps the results in a list even if
-only fetching one tag. Primarily exists for legacy code.
-
-#### def `get_json(serialize=True)`
-
-Returns the loop in JSON format. If serialize is set to
-False a dictionary representation of the loop that is
-serializeable is returned.
-
-#### def `get_tag(tags=None, whole_tag=False)`
-
-Provided a tag name (or a list of tag names), or ordinals
-corresponding to columns, return the selected tags by row as
-a list of lists.
-
-#### def `print_tree()`
-
-Prints a summary, tree style, of the loop.
-
-#### def `renumber_rows(index_tag, start_value=1, maintain_ordering=False)`
-
-Renumber a given column incrementally. Set start_value to
-initial value if 1 is not acceptable. Set maintain_ordering to
-preserve sequence with offset.
-
-E.g. 2,3,3,5 would become 1,2,2,4.
-
-#### def `set_category(category)`
-
-Set the category of the loop. Useful if you didn't know the
-category at loop creation time.
-
-#### def `sort_rows(tags, key=None)`
-
-Sort the data in the rows by their values for a given column
-or columns. Specify the columns using their names or ordinals.
-Accepts a list or an int/float. By default we will sort
-numerically. If that fails we do a string sort. Supply a
-function as key_func and we will order the elements based on the
-keys it provides. See the help for sorted() for more details. If
-you provide multiple columns to sort by, they are interpreted as
-increasing order of sort priority.
-
-#### def `validate(validation_schema=None, category=None)`
-
-Validate a loop against a STAR schema. You can pass your own
-custom schema if desired, otherwise the schema will be fetched
-from the BMRB servers. Returns a list of errors found. 0-length
-list indicates no errors found.
-
 ### class `Saveframe()`
 
 A saveframe. Use the classmethod from_scratch to create one.
@@ -484,3 +346,147 @@ Validate a saveframe against a STAR schema. You can pass your
 own custom schema if desired, otherwise the schema will be
 fetched from the BMRB servers. Returns a list of errors found.
 0-length list indicates no errors found.
+
+### class `Loop()`
+
+A BMRB loop object.
+
+Methods:
+
+#### def `__init__()`
+
+Use the classmethods to initialize.
+
+#### def `add_column(name, ignore_duplicates=False)`
+
+Add a column to the column list. Does a bit of validation
+and parsing. Set ignore_duplicates to true to ignore attempts
+to add the same tag more than once rather than raise an
+exception.
+
+You can also pass a list of column names to add more than one
+column at a time.
+
+#### def `add_data(the_list, rearrange=False)`
+
+Add a list to the data field. Items in list can be any type,
+they will be converted to string and formatted correctly. The
+list must have the same cardinality as the column names or you
+must set the rearrange variable to true and have already set all
+the columns in the loop. Rearrange will break a longer list into
+rows based on the number of columns.
+
+#### def `add_data_by_column(column_id, value)`
+
+Add data to the loop one element at a time, based on column.
+Useful when adding data from SANS parsers.
+
+#### def `clear_data()`
+
+Erases all data in this loop. Does not erase the data columns
+or loop category.
+
+#### def `compare(other)`
+
+Returns the differences between two loops as a list. Order of
+loops being compared does not make a difference on the specific
+errors detected.
+
+#### def `delete_data_by_tag_value(tag, value, index_tag=None)`
+
+Deletes all rows which contain the provided value in the
+provided column. If index_tag is provided, that column is
+renumbered starting with 1. Returns the deleted rows.
+
+#### def `from_file(cls, the_file, csv=False)`
+
+Create a saveframe by loading in a file. Specify csv=True if
+the file is a CSV file. If the_file starts with http://,
+https://, or ftp:// then we will use those protocols to attempt
+to open the file.
+
+#### def `from_json(cls, json_dict)`
+
+Create a loop from JSON (serialized or unserialized JSON).
+
+#### def `from_scratch(cls, category=None, source=from_scratch())`
+
+Create an empty saveframe that you can programatically add
+to. You may also pass the tag prefix as the second argument. If
+you do not pass the tag prefix it will be set the first time you
+add a tag.
+
+#### def `from_string(cls, the_string, csv=False)`
+
+Create a saveframe by parsing a string. Specify csv=True is
+the string is in CSV format and not NMR-STAR format.
+
+#### def `filter(tag_list, ignore_missing_tags=False)`
+
+Returns a new loop containing only the specified tags. Specify
+ignore_missing_tags=True to bypass missing tags rather than
+raising an error.
+
+#### def `get_columns()`
+
+Return the columns for this entry with the category
+included. Throws ValueError if the category was never set.
+
+#### def `get_data_as_csv(header=True, show_category=True)`
+
+Return the data contained in the loops, properly CSVd, as a
+string. Set header to False to omit the header. Set
+show_category to false to omit the loop category from the
+headers.
+
+#### def `get_data_by_tag(tags=None)`
+
+Identical to getTag but wraps the results in a list even if
+only fetching one tag. Primarily exists for legacy code.
+
+#### def `get_json(serialize=True)`
+
+Returns the loop in JSON format. If serialize is set to
+False a dictionary representation of the loop that is
+serializeable is returned.
+
+#### def `get_tag(tags=None, whole_tag=False)`
+
+Provided a tag name (or a list of tag names), or ordinals
+corresponding to columns, return the selected tags by row as
+a list of lists.
+
+#### def `print_tree()`
+
+Prints a summary, tree style, of the loop.
+
+#### def `renumber_rows(index_tag, start_value=1, maintain_ordering=False)`
+
+Renumber a given column incrementally. Set start_value to
+initial value if 1 is not acceptable. Set maintain_ordering to
+preserve sequence with offset.
+
+E.g. 2,3,3,5 would become 1,2,2,4.
+
+#### def `set_category(category)`
+
+Set the category of the loop. Useful if you didn't know the
+category at loop creation time.
+
+#### def `sort_rows(tags, key=None)`
+
+Sort the data in the rows by their values for a given column
+or columns. Specify the columns using their names or ordinals.
+Accepts a list or an int/float. By default we will sort
+numerically. If that fails we do a string sort. Supply a
+function as key_func and we will order the elements based on the
+keys it provides. See the help for sorted() for more details. If
+you provide multiple columns to sort by, they are interpreted as
+increasing order of sort priority.
+
+#### def `validate(validation_schema=None, category=None)`
+
+Validate a loop against a STAR schema. You can pass your own
+custom schema if desired, otherwise the schema will be fetched
+from the BMRB servers. Returns a list of errors found. 0-length
+list indicates no errors found.

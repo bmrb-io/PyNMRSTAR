@@ -1,6 +1,10 @@
 #include <Python.h>
 #include <stdbool.h>
 
+// Version number. Only need to update when
+// API changes.
+#define module_version "2.2.7"
+
 // Use for returning errors
 #define err_size 500
 // Use as a special pointer value
@@ -82,6 +86,54 @@ long get_index(char * haystack, char * needle, long start_pos){
     // Calculate the length into start is the new word
     long diff = start - haystack;
     return diff;
+}
+
+/* From: http://stackoverflow.com/questions/779875/what-is-the-function-to-replace-string-in-c#answer-779960 */
+// You must free the result if result is non-NULL.
+char *str_replace(char *orig, char *rep, char *with) {
+    char *result; // the return string
+    char *ins;    // the next insert point
+    char *tmp;    // varies
+    int len_rep;  // length of rep (the string to remove)
+    int len_with; // length of with (the string to replace rep with)
+    int len_front; // distance between rep and end of last rep
+    int count;    // number of replacements
+
+    // sanity checks and initialization
+    if (!orig || !rep)
+        return NULL;
+    len_rep = strlen(rep);
+    if (len_rep == 0)
+        return NULL; // empty rep causes infinite loop during count
+    if (!with)
+        with = "";
+    len_with = strlen(with);
+
+    // count the number of replacements needed
+    ins = orig;
+    for (count = 0; (tmp = strstr(ins, rep)); ++count) {
+        ins = tmp + len_rep;
+    }
+
+    tmp = result = malloc(strlen(orig) + (len_with - len_rep) * count + 1);
+
+    if (!result)
+        return NULL;
+
+    // first time through the loop, all the variable are set correctly
+    // from here on,
+    //    tmp points to the end of the result string
+    //    ins points to the next occurrence of rep in orig
+    //    orig points to the remainder of orig after "end of rep"
+    while (count--) {
+        ins = strstr(orig, rep);
+        len_front = ins - orig;
+        tmp = strncpy(tmp, orig, len_front) + len_front;
+        tmp = strcpy(tmp, with) + len_with;
+        orig += len_front + len_rep; // move to next "end of rep"
+    }
+    strcpy(tmp, orig);
+    return result;
 }
 
 /* Use to look for common unset bits between strings.
@@ -206,7 +258,7 @@ void update_line_number(parser_data * parser, long start_pos, long length){
 }
 
 /* Returns a new token char * */
-char * update_token(parser_data * parser, long length){
+char * update_token(parser_data * parser, long length, char delineator){
 
     if (parser->token != done_parsing){
         free(parser->token);
@@ -221,17 +273,11 @@ char * update_token(parser_data * parser, long length){
     if (parser->index == 0){
         parser->last_delineator = ' ';
     } else {
-        char ld = parser->full_data[parser->index-1];
-        if ((ld == '\n') && (parser->index > 2) && (parser->full_data[parser->index-2] == ';')){
-            parser->last_delineator = ';';
-        } else if ((ld == '"') || (ld == '\'')){
-            parser->last_delineator = ld;
-        } else {
-            parser->last_delineator = ' ';
-        }
+        parser->last_delineator = delineator;
     }
 
-    if (parser->token[0] == '$'){
+    // Check if reference
+    if ((parser->token[0] == '$') && (parser->last_delineator == ' ') && (length >1)) {
         parser->last_delineator = '$';
     }
 
@@ -296,9 +342,8 @@ char * get_token(parser_data * parser){
             return parser->token;
         }
 
-        // Skip to the next non-comment
-        parser->index += length;
-        return get_token(parser);
+        // Return the comment
+        return update_token(parser, length, '#');
     }
 
     // See if this is a multiline value
@@ -319,7 +364,7 @@ char * get_token(parser_data * parser){
         parser->line_no++;
 
         parser->index += 2;
-        return update_token(parser, length-1);
+        return update_token(parser, length-1, ';');
     }
 
     // Handle values quoted with '
@@ -359,7 +404,7 @@ char * get_token(parser_data * parser){
 
         // Move the index 1 to skip the '
         parser->index++;
-        return update_token(parser, end_quote);
+        return update_token(parser, end_quote, '\'');
     }
 
     // Handle values quoted with "
@@ -399,12 +444,12 @@ char * get_token(parser_data * parser){
 
         // Move the index 1 to skip the "
         parser->index++;
-        return update_token(parser, end_quote);
+        return update_token(parser, end_quote, '"');
     }
 
     // Nothing special. Just get the token
     long end_pos = get_next_whitespace(parser->full_data, parser->index);
-    return update_token(parser, end_pos - parser->index);
+    return update_token(parser, end_pos - parser->index, ' ');
 }
 
 /* IDEA: Implementing the tokenizer following this pattern may
@@ -435,6 +480,16 @@ bool starts_with(const char *a, const char *b)
    return false;
 }
 
+bool ends_with(const char * str, const char * suffix)
+{
+  int str_len = strlen(str);
+  int suffix_len = strlen(suffix);
+
+  return
+    (str_len >= suffix_len) &&
+    (0 == strcmp(str + (str_len-suffix_len), suffix));
+}
+
 /*
     Automatically quotes the value in the appropriate way. Don't
     quote values you send to this method or they will show up in
@@ -448,6 +503,7 @@ bool starts_with(const char *a, const char *b)
 */
 static PyObject * clean_string(PyObject *self, PyObject *args){
     char * str;
+    char * format;
 
     // Get the string to clean
     if (!PyArg_ParseTuple(args, "s", &str))
@@ -460,6 +516,33 @@ static PyObject * clean_string(PyObject *self, PyObject *args){
     if (len == 0){
         PyErr_SetString(PyExc_ValueError, "Empty strings are not allowed as values. Use a '.' or a '?' if needed.");
         return NULL;
+    }
+
+    // If it is a STAR-format multiline comment already, we need to escape it
+    if (strstr(str, "\n;") != NULL){
+
+        // Insert the spaces
+        str = str_replace(str, "\n", "\n   ");
+
+        // But always newline terminate it
+        if (!ends_with(str, "\n")){
+            // Must start with newline too
+            if (str[0] != '\n'){
+                format = "\n   %s\n";
+            } else {
+                format = "%s\n";
+            }
+        } else {
+            if (str[0] != '\n'){
+                format = "\n   %s";
+            } else {
+                format = "%s";
+            }
+        }
+
+        PyObject* result = PyString_FromFormat(format, str);
+        free(str);
+        return(result);
     }
 
     // If it's going on it's own line, don't touch it
@@ -590,19 +673,53 @@ PARSE_load_string(PyObject *self, PyObject *args)
     return Py_None;
 }
 
+/* Helper method from:
+ * http://stackoverflow.com/questions/15515088/how-to-check-if-string-starts-with-certain-string-in-c
+ * */
+bool StartsWith(const char *a, const char *b)
+{
+   if(strncmp(a, b, strlen(b)) == 0) return 1;
+   return 0;
+}
+
 static PyObject *
 PARSE_get_token_full(PyObject *self)
 {
     char * token;
     token = get_token(&parser);
+    parser_data * my_parser = &parser;
+
+    // Skip comments
+    while (my_parser->last_delineator == '#'){
+        token = get_token(&parser);
+    }
 
     // Pass errors up the chain
     if (token == NULL){
         return NULL;
     }
 
-    parser_data * my_parser = &parser;
+    // Unwrap embedded STAR if all lines start with three spaces
+    if ((my_parser->last_delineator == ';') && (starts_with(token, "\n   "))){
+        bool shift_over = true;
 
+        size_t token_len = strlen(token);
+        long c;
+        for (c=0; c<token_len - 4; c++){
+            if (token[c] == '\n'){
+                if (token[c+1] != ' ' || token[c+2] != ' ' || token[c+3] != ' '){
+                    shift_over = false;
+                }
+            }
+        }
+
+        // Actually shift the text over
+        if ((shift_over == true) && (strstr(token, "\n   ;") != NULL)){
+            // Remove the trailing newline
+            token[token_len-1] = '\0';
+            token = str_replace(token, "\n   ", "\n");
+        }
+    }
 
     if (token == done_parsing){
         // Return python none if done parsing
@@ -620,21 +737,30 @@ PARSE_get_token_full(PyObject *self)
     #endif
 }
 
+static PyObject *
+version(PyObject *self)
+{
+    return PyString_FromString(module_version);
+}
+
 static PyMethodDef cnmrstar_methods[] = {
     {"clean_value",  (PyCFunction)clean_string, METH_VARARGS,
      "Properly quote or encapsulate a value before printing."},
 
     {"load",  (PyCFunction)PARSE_load, METH_VARARGS,
-     "Load a file in preparation to parse."},
+     "Load a file in preparation to tokenize."},
 
      {"load_string",  (PyCFunction)PARSE_load_string, METH_VARARGS,
-     "Load a string in preparation to parse."},
+     "Load a string in preparation to tokenize."},
 
      {"get_token_full",  (PyCFunction)PARSE_get_token_full, METH_NOARGS,
      "Get one token from the file as well as the line number and delineator."},
 
      {"reset",  (PyCFunction)PARSE_reset, METH_NOARGS,
-     "Reset the parser state."},
+     "Reset the tokenizer state."},
+
+     {"version",  (PyCFunction)version, METH_NOARGS,
+     "Returns the version of the module."},
 
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
@@ -654,7 +780,7 @@ static int myextension_clear(PyObject *m) {
 static struct PyModuleDef moduledef = {
         PyModuleDef_HEAD_INIT,
         "cnmrstar",
-        NULL,
+        "A NMR-STAR tokenizer implemented in C.",
         sizeof(struct module_state),
         cnmrstar_methods,
         NULL,
@@ -678,7 +804,7 @@ initcnmrstar(void)
 #if PY_MAJOR_VERSION >= 3
     PyObject *module = PyModule_Create(&moduledef);
 #else
-    PyObject *module = Py_InitModule3("cnmrstar", cnmrstar_methods, "A NMR-STAR parser implemented in C.");
+    PyObject *module = Py_InitModule3("cnmrstar", cnmrstar_methods, "A NMR-STAR tokenizer implemented in C.");
 #endif
 
     if (module == NULL)
