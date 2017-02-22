@@ -200,7 +200,7 @@ STR_CONVERSION_DICT = {None:"."}
 # Used internally
 _STANDARD_SCHEMA = None
 _COMMENT_DICTIONARY = {}
-_API_URL = "http://webapi.bmrb.wisc.edu/current"
+_API_URL = "http://webapi.bmrb.wisc.edu/v1"
 _SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
 _VERSION = "2.2.7"
