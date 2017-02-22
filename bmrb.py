@@ -2863,13 +2863,39 @@ class Loop(object):
         if len(kargs) == 0:
             raise ValueError("Use the class methods to initialize.")
 
+        # Parsing from a string
         if 'the_string' in kargs:
             # Parse from a string by wrapping it in StringIO
             star_buffer = StringIO(kargs['the_string'])
             self.source = "from_string()"
+        # Parsing from a file
         elif 'file_name' in kargs:
             star_buffer = _interpret_file(kargs['file_name'])
             self.source = "from_file('%s')" % kargs['file_name']
+        # Creating from template (schema)
+        elif 'tag_prefix' in kargs:
+            schema = _get_schema()
+
+            # Put the _ on the front for them if necessary
+            if not kargs['tag_prefix'].startswith("_"):
+                kargs['tag_prefix'] = "_" + kargs['tag_prefix']
+
+            for item in schema.schema_order:
+                # The tag is in the loop
+                if item.lower().startswith(kargs['tag_prefix'].lower()):
+
+                    # Unconditional add
+                    if kargs['all_tags']:
+                        self.add_column(item)
+                    # Conditional add
+                    else:
+                        if schema.schema[item.lower()][1]:
+                            self.add_column(item)
+            if len(self.columns) == 0:
+                raise ValueError("The tag prefix '%s' has no corresponding tags"
+                                 " in the dictionary." % kargs['tag_prefix'])
+            return
+
         # If we are reading from a CSV file, go ahead and parse it
         if 'csv' in kargs and kargs['csv']:
             csvreader = csv_reader(star_buffer)
@@ -3092,6 +3118,13 @@ class Loop(object):
         the string is in CSV format and not NMR-STAR format."""
 
         return cls(the_string=the_string, csv=csv)
+
+    @classmethod
+    def from_template(cls, tag_prefix, all_tags=False):
+        """ Create a loop that has all of the tags from the schema present.
+        No values will be assigned."""
+
+        return cls(tag_prefix=tag_prefix, all_tags=all_tags, source="from_template()")
 
     def _tag_index(self, tag_name):
         """ Helper method to do a case-insensitive check for the presence
