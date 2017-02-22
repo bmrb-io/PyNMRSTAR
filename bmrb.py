@@ -3248,8 +3248,8 @@ class Loop(object):
                              " does not match the number of columns!")
 
         # Auto convert datatypes if option set
-        tschem = _get_schema()
         if CONVERT_DATATYPES:
+            tschem = _get_schema()
             for row in processed_data:
                 for column, datum in enumerate(row):
                     row[column] = tschem.convert_tag(self.category + "." +
