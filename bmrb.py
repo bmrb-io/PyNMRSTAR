@@ -1685,6 +1685,28 @@ class Entry(object):
         elif 'file_name' in kargs:
             star_buffer = _interpret_file(kargs['file_name'])
             self.source = "from_file('%s')" % kargs['file_name']
+        # Creating from template (schema)
+        elif 'all_tags' in kargs:
+            schema = _get_schema()
+            self.category = kargs['category']
+
+
+
+            for item in schema.schema_order:
+                # The tag is in the loop
+                if item.lower().startswith(kargs['tag_prefix'].lower()):
+
+                    # Unconditional add
+                    if kargs['all_tags']:
+                        self.add_column(item)
+                    # Conditional add
+                    else:
+                        if schema.schema[item.lower()][1]:
+                            self.add_column(item)
+            if len(self.columns) == 0:
+                raise ValueError("The tag prefix '%s' has no corresponding tags"
+                                 " in the dictionary." % kargs['tag_prefix'])
+            return
         elif 'entry_num' in kargs:
             self.source = "from_database(%s)" % kargs['entry_num']
 
@@ -1884,6 +1906,17 @@ class Entry(object):
         (The unique identifier "xxx" from "data_xxx".)"""
 
         return cls(entry_id=entry_id)
+
+    @classmethod
+    def from_template(cls, category, all_tags=False):
+        """ Create a saveframe that has all of the tags and loops from the
+        schema present. No values will be assigned. Specify the category
+        when calling this method.
+
+        The optional argument all_tags forces all tags to be included
+        rather than just the mandatory tags."""
+
+        return cls(category=category, all_tags=all_tags, source="from_template()")
 
     def add_saveframe(self, frame):
         """Add a saveframe to the entry."""
@@ -3123,7 +3156,10 @@ class Loop(object):
     @classmethod
     def from_template(cls, tag_prefix, all_tags=False):
         """ Create a loop that has all of the tags from the schema present.
-        No values will be assigned."""
+        No values will be assigned. Specify the tag prefix of the loop.
+
+        The optional argument all_tags forces all tags to be included
+        rather than just the mandatory tags."""
 
         return cls(tag_prefix=tag_prefix, all_tags=all_tags, source="from_template()")
 
