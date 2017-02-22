@@ -23,6 +23,8 @@ import bmrb
 if bmrb.cnmrstar:
     print("Using C library...")
 
+quick_test = False
+
 # We will use this for our tests
 our_path = os.path.dirname(os.path.realpath(__file__))
 database_entry = bmrb.Entry.from_database(15000)
@@ -577,6 +579,11 @@ _Entry.multi2
             return
 
         start, end = 15000, 15500
+
+        # Allow for quick tests
+        if quick_test:
+            end = 15005
+
         sys.stdout.write("\nEntry tests: %5s/%5s" % (start, end))
         for x in range(start, end):
 

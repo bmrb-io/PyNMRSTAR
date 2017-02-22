@@ -79,6 +79,7 @@ import json
 import decimal
 import optparse
 
+from optparse import SUPPRESS_HELP
 from copy import deepcopy
 from csv import reader as csv_reader, writer as csv_writer
 from datetime import date
@@ -3729,6 +3730,8 @@ def called_directly():
                               "results will be truncated to the length of the "
                               "tag with the fewest results, and the values for"
                               " the tags will be separated with tabs.")
+    optparser.add_option("--quick", action="store_true", default=False,
+                         dest="quick_test", help=SUPPRESS_HELP)
 
     # Options, parse 'em
     (options, cmd_input) = optparser.parse_args()
@@ -3799,6 +3802,12 @@ def called_directly():
         except ImportError:
             print("No testing module available with this installation.")
             sys.exit(0)
+
+        # Only do a quick test
+        if options.quick_test:
+            bmrb_test.quick_test = True
+            sys.argv.pop()
+
         bmrb_test.start_tests()
 
     sys.exit(0)
