@@ -462,16 +462,18 @@ def _get_schema(passed_schema=None):
     if passed_schema is None:
         passed_schema = _STANDARD_SCHEMA
     if passed_schema is None:
-        # If we fail to get the schema don't do anything
-        try:
-            _STANDARD_SCHEMA = Schema()
-        except (HTTPError, URLError):
-            try:
-                sfile = os.path.join(os.path.dirname(os.path.realpath(__file__)))
-                sfile = os.path.join(sfile, "reference_files/schema")
 
-                _STANDARD_SCHEMA = Schema(schema_file=sfile)
-            except:
+        # Try to load the local file first
+        try:
+            sfile = os.path.join(os.path.dirname(os.path.realpath(__file__)))
+            sfile = os.path.join(sfile, "reference_files/schema")
+
+            _STANDARD_SCHEMA = Schema(schema_file=sfile)
+        except:
+            # Try to load from the internet
+            try:
+                _STANDARD_SCHEMA = Schema()
+            except (HTTPError, URLError):
                 raise ValueError("Could not load a BMRB schema from the "
                                  "internet or from the local repository.")
         passed_schema = _STANDARD_SCHEMA
