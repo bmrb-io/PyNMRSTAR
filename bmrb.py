@@ -1517,6 +1517,7 @@ class Schema(object):
 
         # Add the new tag to the tag order and tag list
         self.schema_order.insert(new_tag_pos, tag)
+        self.category_order.insert(new_tag_pos, "_" + _format_tag(tag))
 
         # Calculate up the 'Dictionary Sequence' based on the tag position
         new_tag_pos = (new_tag_pos - 1) * 10
@@ -2337,7 +2338,8 @@ class Saveframe(object):
             return
                 # Creating from template (schema)
         elif 'all_tags' in kargs:
-            schema = _get_schema(kargs['schema']).schema
+            schema_obj = _get_schema(kargs['schema'])
+            schema = schema_obj.schema
             self.category = kargs['category']
             self.name = self.category
 
@@ -2376,7 +2378,8 @@ class Saveframe(object):
                         if cat_formatted not in loops_added:
                             loops_added.append(cat_formatted)
                             nl = Loop.from_template(cat_formatted,
-                                                    all_tags=kargs['all_tags'])
+                                                    all_tags=kargs['all_tags'],
+                                                    schema=schema_obj)
                             self.add_loop(nl)
 
             return
