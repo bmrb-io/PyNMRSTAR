@@ -1400,11 +1400,12 @@ class Schema(object):
         for y in range(0, len(values[0])):
             lengths.append(max([len(str(x[y])) for x in values]))
 
-        text = """BMRB schema from: '%s'
+        text = """BMRB schema from: '%s' version '%s'
 %s
   %-*s %-*s %-*s %-*s
-""" % (self.schema_file, "Tag_Prefix", lengths[0], "Tag", lengths[1]-6, "Type",
-       lengths[2], "Null_Allowed", lengths[3], "SF_Category")
+""" % (self.schema_file, self.version, "Tag_Prefix", lengths[0], "Tag",
+       lengths[1]-6, "Type", lengths[2], "Null_Allowed", lengths[3],
+       "SF_Category")
 
         last_tag = ""
 
