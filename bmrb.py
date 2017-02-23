@@ -203,7 +203,7 @@ _COMMENT_DICTIONARY = {}
 _API_URL = "http://webapi.bmrb.wisc.edu/v1"
 _SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
-_VERSION = "2.2.7"
+_VERSION = "2.3"
 
 #############################################
 #             Module methods                #
@@ -1315,11 +1315,11 @@ class Schema(object):
         Otherwise pass a URL or a file to load a schema from using the
         schema_file keyword argument."""
 
-        self.schema_order = []
         self.headers = []
         self.schema = {}
-        self.types = {}
+        self.schema_order = []
         self.category_order = []
+        self.version = "unknown"
 
         if schema_file is None:
             schema_file = _SCHEMA_URL
@@ -1333,49 +1333,51 @@ class Schema(object):
 
         # Skip the header descriptions and header index values and anything
         #  else before the real data starts
+        tmp_line = next(csv_reader_instance)
         try:
-            while next(csv_reader_instance)[0] != "TBL_BEGIN":
-                pass
+            while tmp_line[0] != "TBL_BEGIN":
+                tmp_line = next(csv_reader_instance)
         except IndexError:
             raise ValueError("Could not parse a schema from the specified "
                              "URL: %s" % schema_file)
+        self.version = tmp_line[3]
 
-        # Figure out which columns have the data we want
-        loc = {}
-        loc['sf_cat'] = self.headers.index("SFCategory")
-        loc['tag'] = self.headers.index("Tag")
-        loc['nullable'] = self.headers.index("Nullable")
-        loc['data_type'] = self.headers.index("Data Type")
-        loc['loop_flg'] = self.headers.index("Loopflag")
+        # Determine the primary key field
+        tag_field = self.headers.index("Tag")
+        nullable = self.headers.index("Nullable")
 
         for line in csv_reader_instance:
 
-            # Stop at the end
             if line[0] == "TBL_END":
                 break
 
-            if line[loc['tag']].count(".") == 1:
-                null_allowed = False if line[loc['nullable']] == "NOT NULL" else True
-                self.schema[line[loc['tag']].lower()] = (line[loc['data_type']],
-                                                         null_allowed,
-                                                         line[loc['sf_cat']],
-                                                         line[loc['tag']])
-                self.types[line[loc['tag']][:line[loc['tag']].index(".")]] = (line[loc['sf_cat']],
-                                                                              line[loc['loop_flg']])
-                self.schema_order.append(line[loc['tag']])
-
-                # Store just the categories as well
-                formatted = _format_category(line[loc['tag']])
-                if formatted not in self.category_order:
-                    self.category_order.append(formatted)
+            # Convert nulls
+            if line[nullable] == "NOT NULL":
+                line[nullable] = False
             else:
-                if VERBOSE:
-                    print("Detected invalid tag in schema: %s" % line)
+                line[nullable] = True
+
+            self.schema[line[tag_field].lower()] = dict(zip(self.headers, line))
+
+            self.schema_order.append(line[tag_field])
+            formatted = _format_category(line[tag_field])
+            if formatted not in self.category_order:
+                self.category_order.append(formatted)
+
+        # Figure out which columns have the data we want
+        #loc['sf_cat'] = self.headers.index("SFCategory")
+        #loc['tag'] = self.headers.index("Tag")
+        #loc['nullable'] = self.headers.index("Nullable")
+        #loc['data_type'] = self.headers.index("Data Type")
+        #loc['loop_flg'] = self.headers.index("Loopflag")
+
+        #"Data Type", "Nullable", "SFCategory", "Tag"
 
     def __repr__(self):
         """Return how we can be initialized."""
 
-        return "bmrb.Schema(schema_file='%s')" % self.schema_file
+        return "bmrb.Schema(schema_file='%s') version %s" % (self.schema_file,
+                                                             self.version)
 
     def __str__(self):
         """Print the schema that we are adhering to."""
@@ -1388,7 +1390,12 @@ class Schema(object):
 
         # Get the longest lengths
         lengths = [max([len(_format_tag(x)) for x in self.schema_order])]
-        values = self.schema.values()
+
+        values = []
+        for key in self.schema.keys():
+            sc = self.schema[key]
+            values.append((sc["Data Type"], sc["Nullable"], sc["SFCategory"],
+                           sc["Tag"]))
 
         for y in range(0, len(values[0])):
             lengths.append(max([len(str(x[y])) for x in values]))
@@ -1413,8 +1420,9 @@ class Schema(object):
                     text += "\n%-30s\n" % tag_cat
 
                 text += "  %-*s %-*s %-*s  %-*s\n" % (lengths[0], _format_tag(tag),
-                                                      lengths[1], st[0], lengths[2],
-                                                      st[1], lengths[3], st[2])
+                                                      lengths[1], st["Data Type"],
+                                                      lengths[2], st["Nullable"],
+                                                      lengths[3], st["SFCategory"])
 
         return text
 
@@ -1504,7 +1512,10 @@ class Schema(object):
 
         # Add the new tag to the tag order and tag list
         self.schema_order.insert(new_tag_pos, tag)
-        self.schema[tag.lower()] = (tag_type, null_allowed, sf_category, tag)
+
+        self.schema[tag.lower()] = {"Data Type":tag_type,
+                                    "Nullable":null_allowed,
+                                    "SFCategory":sf_category, "Tag":tag}
 
     def convert_tag(self, tag, value, linenum=None):
         """ Converts the provided tag from string to the appropriate
@@ -1522,8 +1533,10 @@ class Schema(object):
                           "dictionary: " + tag)
                 return value
 
+        full_tag = self.schema[tag.lower()]
+
         # Get the type
-        valtype, null_allowed = self.schema[tag.lower()][0:2]
+        valtype, null_allowed = full_tag["Data Type"], full_tag["Nullable"]
 
         # Check for null
         if value == "." or value == "?":
@@ -1581,8 +1594,12 @@ class Schema(object):
             return ["Tag '%s' not found in schema. Line '%s'." %
                     (tag, linenum)]
 
-        (valtype, null_allowed, allowed_category,
-         capitalized_tag) = self.schema[tag.lower()]
+        # Make local copies of the fields we care about
+        full_tag = self.schema[tag.lower()]
+        valtype = full_tag["Data Type"]
+        null_allowed = full_tag["Nullable"]
+        allowed_category = full_tag["SFCategory"]
+        capitalized_tag = full_tag["Tag"]
 
         if category != None:
             if category != allowed_category:
@@ -1692,8 +1709,6 @@ class Entry(object):
             schema = _get_schema()
             self.category = kargs['category']
 
-
-
             for item in schema.schema_order:
                 # The tag is in the loop
                 if item.lower().startswith(kargs['tag_prefix'].lower()):
@@ -1703,7 +1718,7 @@ class Entry(object):
                         self.add_column(item)
                     # Conditional add
                     else:
-                        if schema.schema[item.lower()][1]:
+                        if schema.schema[item.lower()]["Nullable"]:
                             self.add_column(item)
             if len(self.columns) == 0:
                 raise ValueError("The tag prefix '%s' has no corresponding tags"
@@ -2925,7 +2940,7 @@ class Loop(object):
                         self.add_column(item)
                     # Conditional add
                     else:
-                        if schema.schema[item.lower()][1]:
+                        if schema.schema[item.lower()]["Nullable"]:
                             self.add_column(item)
             if len(self.columns) == 0:
                 raise ValueError("The tag prefix '%s' has no corresponding tags"
