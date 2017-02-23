@@ -1704,26 +1704,6 @@ class Entry(object):
         elif 'file_name' in kargs:
             star_buffer = _interpret_file(kargs['file_name'])
             self.source = "from_file('%s')" % kargs['file_name']
-        # Creating from template (schema)
-        elif 'all_tags' in kargs:
-            schema = _get_schema()
-            self.category = kargs['category']
-
-            for item in schema.schema_order:
-                # The tag is in the loop
-                if item.lower().startswith(kargs['tag_prefix'].lower()):
-
-                    # Unconditional add
-                    if kargs['all_tags']:
-                        self.add_column(item)
-                    # Conditional add
-                    else:
-                        if schema.schema[item.lower()]["Nullable"]:
-                            self.add_column(item)
-            if len(self.columns) == 0:
-                raise ValueError("The tag prefix '%s' has no corresponding tags"
-                                 " in the dictionary." % kargs['tag_prefix'])
-            return
         elif 'entry_num' in kargs:
             self.source = "from_database(%s)" % kargs['entry_num']
 
@@ -1923,17 +1903,6 @@ class Entry(object):
         (The unique identifier "xxx" from "data_xxx".)"""
 
         return cls(entry_id=entry_id)
-
-    @classmethod
-    def from_template(cls, category, all_tags=False):
-        """ Create a saveframe that has all of the tags and loops from the
-        schema present. No values will be assigned. Specify the category
-        when calling this method.
-
-        The optional argument all_tags forces all tags to be included
-        rather than just the mandatory tags."""
-
-        return cls(category=category, all_tags=all_tags, source="from_template()")
 
     def add_saveframe(self, frame):
         """Add a saveframe to the entry."""
@@ -2349,6 +2318,43 @@ class Saveframe(object):
             if 'tag_prefix' in kargs:
                 self.tag_prefix = _format_category(kargs['tag_prefix'])
             return
+                # Creating from template (schema)
+        elif 'all_tags' in kargs:
+            schema = _get_schema().schema
+            self.category = kargs['category']
+
+            # Make sure it is a valid category
+            if self.category not in [x["SFCategory"] for x in schema.values()]:
+                raise ValueError("The saveframe category '%s' was not found "
+                                 "in the dictionary." % self.category)
+
+            s = sorted(schema.values(), key=lambda x:x["Dictionary sequence"])
+
+            loops_added = []
+
+            for item in s:
+                if item["SFCategory"] == self.category:
+
+                    # It is a tag in this saveframe
+                    if item["Loopflag"] == "N":
+                        # Unconditional add
+                        if kargs['all_tags']:
+                            self.add_tag(item["Tag"], None)
+                        # Conditional add
+                        else:
+                            if item["public"] != "I":
+                                self.add_tag(item["Tag"], None)
+
+                    # It is a contained loop tag
+                    else:
+                        cat_formatted = _format_category(item["Tag"])
+                        if cat_formatted not in loops_added:
+                            loops_added.append(cat_formatted)
+                            nl = Loop.from_template(cat_formatted,
+                                                    all_tags=kargs['all_tags'])
+                            self.add_loop(nl)
+
+            return
 
         # If we are reading from a CSV file, go ahead and parse it
         if 'csv' in kargs and kargs['csv']:
@@ -2437,6 +2443,17 @@ class Saveframe(object):
         the string is in CSV format and not NMR-STAR format."""
 
         return cls(the_string=the_string, csv=csv)
+
+    @classmethod
+    def from_template(cls, category, all_tags=False):
+        """ Create a saveframe that has all of the tags and loops from the
+        schema present. No values will be assigned. Specify the category
+        when calling this method.
+
+        The optional argument all_tags forces all tags to be included
+        rather than just the mandatory tags."""
+
+        return cls(category=category, all_tags=all_tags, source="from_template()")
 
     def __repr__(self):
         """Returns a description of the saveframe."""
@@ -2578,7 +2595,8 @@ class Saveframe(object):
         # Set the category if the tag we are loading is the category
         tagname_lower = name.lower()
         if tagname_lower == "sf_category" or tagname_lower == "_saveframe_category":
-            self.category = value
+            if self.category == "unset":
+                self.category = value
 
         if linenum:
             new_tag.append(linenum)
@@ -2926,25 +2944,28 @@ class Loop(object):
         # Creating from template (schema)
         elif 'tag_prefix' in kargs:
             schema = _get_schema()
+            clean_tp = kargs['tag_prefix']
 
             # Put the _ on the front for them if necessary
-            if not kargs['tag_prefix'].startswith("_"):
-                kargs['tag_prefix'] = "_" + kargs['tag_prefix']
+            if not clean_tp.startswith("_"):
+                clean_tp = "_" + clean_tp
+            if not clean_tp.endswith("."):
+                clean_tp = clean_tp + "."
 
             for item in schema.schema_order:
                 # The tag is in the loop
-                if item.lower().startswith(kargs['tag_prefix'].lower()):
+                if item.lower().startswith(clean_tp.lower()):
 
                     # Unconditional add
                     if kargs['all_tags']:
                         self.add_column(item)
                     # Conditional add
                     else:
-                        if schema.schema[item.lower()]["Nullable"]:
+                        if schema.schema[item.lower()]["public"] != "I":
                             self.add_column(item)
             if len(self.columns) == 0:
                 raise ValueError("The tag prefix '%s' has no corresponding tags"
-                                 " in the dictionary." % kargs['tag_prefix'])
+                                 " in the dictionary." % clean_tp)
             return
 
         # If we are reading from a CSV file, go ahead and parse it
