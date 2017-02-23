@@ -1364,15 +1364,6 @@ class Schema(object):
             if formatted not in self.category_order:
                 self.category_order.append(formatted)
 
-        # Figure out which columns have the data we want
-        #loc['sf_cat'] = self.headers.index("SFCategory")
-        #loc['tag'] = self.headers.index("Tag")
-        #loc['nullable'] = self.headers.index("Nullable")
-        #loc['data_type'] = self.headers.index("Data Type")
-        #loc['loop_flg'] = self.headers.index("Loopflag")
-
-        #"Data Type", "Nullable", "SFCategory", "Tag"
-
     def __repr__(self):
         """Return how we can be initialized."""
 
