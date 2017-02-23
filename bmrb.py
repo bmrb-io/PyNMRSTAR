@@ -1426,7 +1426,8 @@ class Schema(object):
 
         return text
 
-    def add_tag(self, tag, tag_type, null_allowed, sf_category, after=None):
+    def add_tag(self, tag, tag_type, null_allowed, sf_category, loop_flag,
+                after=None):
         """ Adds the specified tag to the tag dictionary. You must provide:
 
         1) The full tag as such:
@@ -1439,8 +1440,9 @@ class Schema(object):
             "TEXT"
             "DATETIME year to day"
         3) A python True/False that indicates whether null values are allowed.
-        4) The sf_category of the parent saveframe
-        5) Optional: The tag to order this tag behind when normalizing
+        4) The sf_category of the parent saveframe.
+        5) A True/False value which indicates if this tag is a loop tag.
+        6) Optional: The tag to order this tag behind when normalizing
            saveframes."""
 
         # Add the underscore preceeding the tag
@@ -1488,6 +1490,10 @@ class Schema(object):
             raise ValueError("Please provide the sf_category of the parent "
                              "saveframe.")
 
+        # Check the loop flag
+        if loop_flag != True and loop_flag != False:
+            raise ValueError("Invalid loop_flag. Please specify True or False.")
+
         # Conditionally check the tag to insert after
         new_tag_pos = len(self.schema_order)
         if after != None:
@@ -1507,15 +1513,26 @@ class Schema(object):
             search = _format_category(tag.lower())
             for pos, stag in enumerate([x.lower() for x in self.schema_order]):
                 if stag.startswith(search):
-                    print("Setting " + str(pos))
                     new_tag_pos = pos + 1
 
         # Add the new tag to the tag order and tag list
         self.schema_order.insert(new_tag_pos, tag)
 
-        self.schema[tag.lower()] = {"Data Type":tag_type,
-                                    "Nullable":null_allowed,
-                                    "SFCategory":sf_category, "Tag":tag}
+        # Calculate up the 'Dictionary Sequence' based on the tag position
+        new_tag_pos = (new_tag_pos - 1) * 10
+
+        def test_pos(position, schema):
+            for item in schema.schema.values():
+                if float(item["Dictionary sequence"]) == position:
+                    return test_pos(position + 1, schema)
+            return position
+
+        new_tag_pos = test_pos(new_tag_pos, self)
+
+        self.schema[tag.lower()] = {"Data Type":tag_type, "Loopflag": loop_flag,
+                                    "Nullable":null_allowed, "public": "Y",
+                                    "SFCategory":sf_category, "Tag":tag,
+                                    "Dictionary sequence": new_tag_pos}
 
     def convert_tag(self, tag, value, linenum=None):
         """ Converts the provided tag from string to the appropriate
@@ -2320,15 +2337,17 @@ class Saveframe(object):
             return
                 # Creating from template (schema)
         elif 'all_tags' in kargs:
-            schema = _get_schema().schema
+            schema = _get_schema(kargs['schema']).schema
             self.category = kargs['category']
+            self.name = self.category
 
             # Make sure it is a valid category
             if self.category not in [x["SFCategory"] for x in schema.values()]:
                 raise ValueError("The saveframe category '%s' was not found "
                                  "in the dictionary." % self.category)
 
-            s = sorted(schema.values(), key=lambda x:x["Dictionary sequence"])
+            s = sorted(schema.values(),
+                       key=lambda x:float(x["Dictionary sequence"]))
 
             loops_added = []
 
@@ -2337,13 +2356,19 @@ class Saveframe(object):
 
                     # It is a tag in this saveframe
                     if item["Loopflag"] == "N":
-                        # Unconditional add
-                        if kargs['all_tags']:
-                            self.add_tag(item["Tag"], None)
-                        # Conditional add
+
+                        ft = _format_tag(item["Tag"])
+                        # Set the value for sf_category and sf_framecode
+                        if ft == "Sf_category" or ft == "Sf_framecode":
+                            self.add_tag(item["Tag"], self.category)
                         else:
-                            if item["public"] != "I":
+                            # Unconditional add
+                            if kargs['all_tags']:
                                 self.add_tag(item["Tag"], None)
+                            # Conditional add
+                            else:
+                                if item["public"] != "I":
+                                    self.add_tag(item["Tag"], None)
 
                     # It is a contained loop tag
                     else:
@@ -2445,7 +2470,7 @@ class Saveframe(object):
         return cls(the_string=the_string, csv=csv)
 
     @classmethod
-    def from_template(cls, category, all_tags=False):
+    def from_template(cls, category, all_tags=False, schema=None):
         """ Create a saveframe that has all of the tags and loops from the
         schema present. No values will be assigned. Specify the category
         when calling this method.
@@ -2453,7 +2478,8 @@ class Saveframe(object):
         The optional argument all_tags forces all tags to be included
         rather than just the mandatory tags."""
 
-        return cls(category=category, all_tags=all_tags, source="from_template()")
+        return cls(category=category, all_tags=all_tags,
+                   schema=schema, source="from_template()")
 
     def __repr__(self):
         """Returns a description of the saveframe."""
@@ -2943,7 +2969,7 @@ class Loop(object):
             self.source = "from_file('%s')" % kargs['file_name']
         # Creating from template (schema)
         elif 'tag_prefix' in kargs:
-            schema = _get_schema()
+            schema = _get_schema(kargs['schema'])
             clean_tp = kargs['tag_prefix']
 
             # Put the _ on the front for them if necessary
@@ -3192,14 +3218,15 @@ class Loop(object):
         return cls(the_string=the_string, csv=csv)
 
     @classmethod
-    def from_template(cls, tag_prefix, all_tags=False):
+    def from_template(cls, tag_prefix, all_tags=False, schema=None):
         """ Create a loop that has all of the tags from the schema present.
         No values will be assigned. Specify the tag prefix of the loop.
 
         The optional argument all_tags forces all tags to be included
         rather than just the mandatory tags."""
 
-        return cls(tag_prefix=tag_prefix, all_tags=all_tags, source="from_template()")
+        return cls(tag_prefix=tag_prefix, all_tags=all_tags,
+                   schema=schema, source="from_template()")
 
     def _tag_index(self, tag_name):
         """ Helper method to do a case-insensitive check for the presence
