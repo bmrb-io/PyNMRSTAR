@@ -1320,11 +1320,15 @@ class Schema(object):
         self.schema_order = []
         self.category_order = []
         self.version = "unknown"
+        self.data_types = {}
 
+        # Try loading from the internet first
         if schema_file is None:
             schema_file = _SCHEMA_URL
         self.schema_file = schema_file
 
+        # Get the schema from the internet, wrap in StringIO and pass that
+        #  to the csv reader
         schem_stream = _interpret_file(schema_file)
         fix_newlines = StringIO('\n'.join(schem_stream.read().splitlines()))
 
@@ -1363,6 +1367,16 @@ class Schema(object):
             formatted = _format_category(line[tag_field])
             if formatted not in self.category_order:
                 self.category_order.append(formatted)
+
+        # Read in the data types
+        types_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                                  "reference_files/data_types.csv")
+
+        with open(types_file, "rb") as types_file:
+            csv_reader_instance = csv_reader(types_file)
+
+            for item in csv_reader_instance:
+                self.data_types[item[0]] = item[1]
 
     def __repr__(self):
         """Return how we can be initialized."""
@@ -1606,6 +1620,7 @@ class Schema(object):
 
         # Make local copies of the fields we care about
         full_tag = self.schema[tag.lower()]
+        bmrb_type = full_tag["BMRB data type"]
         valtype = full_tag["Data Type"]
         null_allowed = full_tag["Nullable"]
         allowed_category = full_tag["SFCategory"]
@@ -1634,19 +1649,15 @@ class Schema(object):
                 return ["Length of value '%d' is too long for CHAR(%d): "
                         "'%s':'%s' on line '%s'." %
                         (len(value), length, capitalized_tag, value, linenum)]
-        elif "FLOAT" in valtype:
-            try:
-                float(value)
-            except ValueError:
-                return ["Value is not of type FLOAT.:'%s':'%s' on line '%s'." %
-                        (capitalized_tag, value, linenum)]
-        elif "INTEGER" in valtype:
-            try:
-                int(value)
-            except ValueError:
-                return ["Value is not of type INTEGER.:'%s':'%s' on line '%s'."
-                        % (capitalized_tag, value, linenum)]
 
+        # Check that the value matches the regular expression for the type
+        if not was_none and not re.match(self.data_types[bmrb_type], str(value)):
+            return ["Value does not match specification: '%s':'%s' on line '%s'"
+                    ".\n   Type specified: %s\n   Regular expression for type: "
+                    "'%s'" % (capitalized_tag, value, linenum, bmrb_type,
+                              self.data_types[bmrb_type])]
+
+        # Check the tag capitalization
         if tag != capitalized_tag:
             return ["The tag '%s' is improperly capitalized but otherwise "
                     "valid. Should be '%s'." % (tag, capitalized_tag)]
