@@ -247,8 +247,8 @@ def validate(entry_to_validate, schema=None):
     validation = entry_to_validate.validate(schema=schema)
     if len(validation) == 0:
         print("No problems found during validation.")
-    for err in validation:
-        print(err)
+    for pos, err in enumerate(validation):
+        print("%d: %s" % (pos + 1, err))
 
 class _ErrorHandler(object):
     def fatalError(self, line, msg):
@@ -1649,24 +1649,18 @@ class Schema(object):
                         % (capitalized_tag, value, linenum)]
             return []
 
-        if "VARCHAR" in valtype:
+        if "CHAR" in valtype:
             length = int(valtype[valtype.index("(")+1:valtype.index(")")])
             if len(str(value)) > length:
-                return ["Length of value '%d' is too long for VARCHAR(%d): "
+                return ["Length of '%d' is too long for %s: "
                         "'%s':'%s' on line '%s'." %
-                        (len(value), length, capitalized_tag, value, linenum)]
-        elif "CHAR" in valtype:
-            length = int(valtype[valtype.index("(")+1:valtype.index(")")])
-            if len(str(value)) > length:
-                return ["Length of value '%d' is too long for CHAR(%d): "
-                        "'%s':'%s' on line '%s'." %
-                        (len(value), length, capitalized_tag, value, linenum)]
+                        (len(value), valtype, capitalized_tag, value, linenum)]
 
         # Check that the value matches the regular expression for the type
         if not was_none and not re.match(self.data_types[bmrb_type], str(value)):
             return ["Value does not match specification: '%s':'%s' on line '%s'"
-                    ".\n   Type specified: %s\n   Regular expression for type: "
-                    "'%s'" % (capitalized_tag, value, linenum, bmrb_type,
+                    ".\n     Type specified: %s\n     Regular expression for "
+                    "type: '%s'" % (capitalized_tag, value, linenum, bmrb_type,
                               self.data_types[bmrb_type])]
 
         # Check the tag capitalization
