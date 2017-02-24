@@ -29,7 +29,7 @@ setup(name='pynmrstar',
       keywords = ['bmrb','parser','nmr', 'nmrstar', 'biomagresbank', 'biological magnetic resonance bank'],
       url = 'https://github.com/uwbmrb/PyNMRSTAR',
       license = 'GPL',
-      package_data = {'pynmrstar': ['reference_files/schema', 'reference_files/comments', '.nocompile']},
+      package_data = {'pynmrstar': ['reference_files/schema.csv', 'reference_files/comments.str', 'reference_files/data_types.csv', '.nocompile']},
       classifiers = [
             'Development Status :: 5 - Production/Stable',
             'Environment :: Console',
