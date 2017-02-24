@@ -23,6 +23,8 @@ import bmrb
 if bmrb.cnmrstar:
     print("Using C library...")
 
+quick_test = False
+
 # We will use this for our tests
 our_path = os.path.dirname(os.path.realpath(__file__))
 database_entry = bmrb.Entry.from_database(15000)
@@ -112,17 +114,17 @@ class TestPyNMRSTAR(unittest.TestCase):
         loaded = bmrb.Schema(bmrb._SCHEMA_URL)
 
         self.assertEqual(default.schema, loaded.schema)
-        self.assertEqual(default.types, loaded.types)
         self.assertEqual(default.headers, loaded.headers)
+        self.assertEqual(default.category_order, loaded.category_order)
         self.assertEqual(default.headers, ['Dictionary sequence', 'SFCategory', 'ADIT category mandatory', 'ADIT category view type', 'ADIT super category ID', 'ADIT super category', 'ADIT category group ID', 'ADIT category view name', 'Tag', 'BMRB current', 'Query prompt', 'Query interface', 'SG Mandatory', '', 'ADIT exists', 'User full view', 'User structure view', 'User non-structure view', 'User NMR param. View', 'Annotator full view', 'Item enumerated', 'Item enumeration closed', 'Enum parent SFcategory', 'Enum parent tag', 'Derived enumeration mantable', 'Derived enumeration', 'ADIT item view name', 'Data Type', 'Nullable', 'Non-public', 'ManDBTableName', 'ManDBColumnName', 'Row Index Key', 'Saveframe ID tag', 'Source Key', 'Table Primary Key', 'Foreign Key Group', 'Foreign Table', 'Foreign Column', 'Secondary index', 'Sub category', 'Units', 'Loopflag', 'Seq', 'Adit initial rows', 'Enumeration ties', 'Mandatory code overides', 'Overide value', 'Overide view value', 'ADIT auto insert', 'Example', 'Prompt', 'Interface', 'bmrbPdbMatchID', 'bmrbPdbTransFunc', 'STAR flag', 'DB flag', 'SfNamelFlg', 'Sf category flag', 'Sf pointer', 'Natural primary key', 'Natural foreign key', 'Redundant keys', 'Parent tag', 'public', 'internal', 'small molecule', 'small molecule', 'metabolomics', 'Entry completeness', 'Overide public', 'internal', 'small molecule', 'small molecule', 'metabolomic', 'metabolomic', 'default value', 'Adit form code', 'Tag category', 'Tag field', 'Local key', 'Datum count flag', 'NEF equivalent', 'mmCIF equivalent', 'Meta data', 'Tag delete', 'BMRB data type', 'STAR vs Curated DB', 'Key group', 'Reference table', 'Reference column', 'Dictionary description', 'variableTypeMatch', 'entryIdFlg', 'outputMapExistsFlg', 'lclSfIdFlg', 'Met ADIT category view name', 'Met Example', 'Met Prompt', 'Met Description', 'SM Struct ADIT-NMR category view name', 'SM Struct Example', 'SM Struct Prompt', 'SM Struct Description', 'Met default value', 'SM default value'])
 
         self.assertEqual(default.val_type("_Entity.ID", 1), [])
-        self.assertEqual(default.val_type("_Entity.ID", "test"), ["Value is not of type INTEGER.:'_Entity.ID':'test' on line 'None'."])
+        self.assertEqual(default.val_type("_Entity.ID", "test"), ["Value does not match specification: '_Entity.ID':'test' on line 'None'.\n     Type specified: int\n     Regular expression for type: '-?[0-9]+'"])
         self.assertEqual(default.val_type("_Atom_chem_shift.Val", float(1.2)), [])
-        self.assertEqual(default.val_type("_Atom_chem_shift.Val", "invalid"), ["Value is not of type FLOAT.:'_Atom_chem_shift.Val':'invalid' on line 'None'."])
+        self.assertEqual(default.val_type("_Atom_chem_shift.Val", "invalid"), ["Value does not match specification: '_Atom_chem_shift.Val':'invalid' on line 'None'.\n     Type specified: float\n     Regular expression for type: '-?(([0-9]+)[.]?|([0-9]*[.][0-9]+))([(][0-9]+[)])?([eE][+-]?[0-9]+)?'"])
 
-        self.assertEqual(default.val_type("_Entry.ID", "this should be far too long - much too long"), ["Length of value '43' is too long for CHAR(12): '_Entry.ID':'this should be far too long - much too long' on line 'None'."])
-        self.assertEqual(default.val_type("_Assembly.Ambiguous_chem_comp_sites", "this should be far too long - much too long"), ["Length of value '43' is too long for VARCHAR(3): '_Assembly.Ambiguous_chem_comp_sites':'this should be far too long - much too long' on line 'None'."])
+        self.assertEqual(default.val_type("_Entry.ID", "this should be far too long - much too long"), ["Length of '43' is too long for CHAR(12): '_Entry.ID':'this should be far too long - much too long' on line 'None'."])
+        self.assertEqual(default.val_type("_Assembly.Ambiguous_chem_comp_sites", "this should be far too long - much too long"), ["Length of '43' is too long for VARCHAR(3): '_Assembly.Ambiguous_chem_comp_sites':'this should be far too long - much too long' on line 'None'."])
 
     def test_entry_delitem(self):
         del(self.entry[0])
@@ -188,6 +190,10 @@ class TestPyNMRSTAR(unittest.TestCase):
     def test_validate(self):
         validation = [u"Value cannot be NULL but is: '_Chem_comp.Provenance':'.' on line 'None'."]
         self.assertEqual(self.entry.validate(), validation)
+        self.entry[-1][-1][0][0] = 'a'
+        validation.append("Value does not match specification: '_Atom_chem_shift.ID':'a' on line '0 column 0 of loop'.\n     Type specified: int\n     Regular expression for type: '-?[0-9]+'")
+        self.assertEqual(self.entry.validate(), validation)
+        self.entry[-1][-1][0][0] = '1'
 
     def test_saveframe(self):
         frame = self.entry[0]
@@ -402,6 +408,19 @@ class TestPyNMRSTAR(unittest.TestCase):
 
         bmrb.SKIP_EMPTY_LOOPS = False
 
+        # Test that the from_template method works
+        self.assertEqual(bmrb.Loop.from_template("atom_chem_shift", all_tags=False),
+                         bmrb.Loop.from_string("loop_ _Atom_chem_shift.ID _Atom_chem_shift.Assembly_atom_ID _Atom_chem_shift.Entity_assembly_ID _Atom_chem_shift.Entity_ID _Atom_chem_shift.Comp_index_ID _Atom_chem_shift.Seq_ID _Atom_chem_shift.Comp_ID _Atom_chem_shift.Atom_ID _Atom_chem_shift.Atom_type _Atom_chem_shift.Atom_isotope_number _Atom_chem_shift.Val _Atom_chem_shift.Val_err _Atom_chem_shift.Assign_fig_of_merit _Atom_chem_shift.Ambiguity_code _Atom_chem_shift.Ambiguity_set_ID _Atom_chem_shift.Occupancy _Atom_chem_shift.Resonance_ID _Atom_chem_shift.NEF_atom_name _Atom_chem_shift.Auth_entity_assembly_ID _Atom_chem_shift.Auth_asym_ID _Atom_chem_shift.Auth_seq_ID _Atom_chem_shift.Auth_comp_ID _Atom_chem_shift.Auth_atom_ID _Atom_chem_shift.Details _Atom_chem_shift.Entry_ID _Atom_chem_shift.Assigned_chem_shift_list_ID stop_"))
+
+        self.assertEqual(bmrb.Loop.from_template("atom_chem_shift", all_tags=True),
+                         bmrb.Loop.from_string("loop_ _Atom_chem_shift.ID _Atom_chem_shift.Assembly_atom_ID _Atom_chem_shift.Entity_assembly_ID _Atom_chem_shift.Entity_ID _Atom_chem_shift.Comp_index_ID _Atom_chem_shift.Seq_ID _Atom_chem_shift.Comp_ID _Atom_chem_shift.Atom_ID _Atom_chem_shift.Atom_type _Atom_chem_shift.Atom_isotope_number _Atom_chem_shift.Val _Atom_chem_shift.Val_err _Atom_chem_shift.Assign_fig_of_merit _Atom_chem_shift.Ambiguity_code _Atom_chem_shift.Ambiguity_set_ID _Atom_chem_shift.Occupancy _Atom_chem_shift.Resonance_ID _Atom_chem_shift.NEF_atom_name _Atom_chem_shift.Auth_entity_assembly_ID _Atom_chem_shift.Auth_asym_ID _Atom_chem_shift.Auth_seq_ID _Atom_chem_shift.Auth_comp_ID _Atom_chem_shift.Auth_atom_ID _Atom_chem_shift.PDB_record_ID _Atom_chem_shift.PDB_model_num _Atom_chem_shift.PDB_strand_ID _Atom_chem_shift.PDB_ins_code _Atom_chem_shift.PDB_residue_no _Atom_chem_shift.PDB_residue_name _Atom_chem_shift.PDB_atom_name _Atom_chem_shift.Original_PDB_strand_ID _Atom_chem_shift.Original_PDB_residue_no _Atom_chem_shift.Original_PDB_residue_name _Atom_chem_shift.Original_PDB_atom_name _Atom_chem_shift.Details _Atom_chem_shift.Sf_ID _Atom_chem_shift.Entry_ID _Atom_chem_shift.Assigned_chem_shift_list_ID stop_"))
+
+        # Test adding a tag to the schema
+        my_schem = bmrb.Schema()
+        my_schem.add_tag("_Atom_chem_shift.New_Tag", "VARCHAR(100)", True, "assigned_chemical_shifts", True, "_Atom_chem_shift.Atom_ID")
+        self.assertEqual(bmrb.Loop.from_template("atom_chem_shift", all_tags=True, schema=my_schem),
+                         bmrb.Loop.from_string("loop_ _Atom_chem_shift.ID _Atom_chem_shift.Assembly_atom_ID _Atom_chem_shift.Entity_assembly_ID _Atom_chem_shift.Entity_ID _Atom_chem_shift.Comp_index_ID _Atom_chem_shift.Seq_ID _Atom_chem_shift.Comp_ID _Atom_chem_shift.Atom_ID _Atom_chem_shift.New_Tag _Atom_chem_shift.Atom_type _Atom_chem_shift.Atom_isotope_number _Atom_chem_shift.Val _Atom_chem_shift.Val_err _Atom_chem_shift.Assign_fig_of_merit _Atom_chem_shift.Ambiguity_code _Atom_chem_shift.Ambiguity_set_ID _Atom_chem_shift.Occupancy _Atom_chem_shift.Resonance_ID _Atom_chem_shift.NEF_atom_name _Atom_chem_shift.Auth_entity_assembly_ID _Atom_chem_shift.Auth_asym_ID _Atom_chem_shift.Auth_seq_ID _Atom_chem_shift.Auth_comp_ID _Atom_chem_shift.Auth_atom_ID _Atom_chem_shift.PDB_record_ID _Atom_chem_shift.PDB_model_num _Atom_chem_shift.PDB_strand_ID _Atom_chem_shift.PDB_ins_code _Atom_chem_shift.PDB_residue_no _Atom_chem_shift.PDB_residue_name _Atom_chem_shift.PDB_atom_name _Atom_chem_shift.Original_PDB_strand_ID _Atom_chem_shift.Original_PDB_residue_no _Atom_chem_shift.Original_PDB_residue_name _Atom_chem_shift.Original_PDB_atom_name _Atom_chem_shift.Details _Atom_chem_shift.Sf_ID _Atom_chem_shift.Entry_ID _Atom_chem_shift.Assigned_chem_shift_list_ID stop_"))
+
     def test_rename_saveframe(self):
         tmp = copy(database_entry)
         tmp.rename_saveframe('F5-Phe-cVHP', 'jons_frame')
@@ -570,6 +589,11 @@ _Entry.multi2
             return
 
         start, end = 15000, 15500
+
+        # Allow for quick tests
+        if quick_test:
+            end = 15005
+
         sys.stdout.write("\nEntry tests: %5s/%5s" % (start, end))
         for x in range(start, end):
 
