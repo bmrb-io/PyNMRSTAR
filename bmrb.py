@@ -242,9 +242,9 @@ def diff(entry1, entry2):
         print(difference)
 
 def validate(entry_to_validate, schema=None):
-    """Prints a validation report of an entry."""
+    """Prints a validation report of an object."""
 
-    validation = entry_to_validate.validate(schema)
+    validation = entry_to_validate.validate(schema=schema)
     if len(validation) == 0:
         print("No problems found during validation.")
     for err in validation:
