@@ -1618,6 +1618,18 @@ class Schema(object):
             return ["Tag '%s' not found in schema. Line '%s'." %
                     (tag, linenum)]
 
+        # We will skip type checks for None's
+        was_none = value is None
+
+        # Allow manual specification of conversions for booleans, Nones, etc.
+        if value in STR_CONVERSION_DICT:
+            if any(isinstance(value, type(x)) for x in STR_CONVERSION_DICT):
+                value = STR_CONVERSION_DICT[value]
+
+        # Value should always be string
+        if not isinstance(value, str):
+            value = str(value)
+
         # Make local copies of the fields we care about
         full_tag = self.schema[tag.lower()]
         bmrb_type = full_tag["BMRB data type"]
@@ -2221,8 +2233,9 @@ class Entry(object):
             for each_frame in self:
                 # Iterate through the tags
                 for each_tag in each_frame.tags:
-                    if (each_tag[1].startswith("$")
-                            and each_tag[1][1:] not in fdict):
+                    tag_copy = str(each_tag[1])
+                    if (tag_copy.startswith("$")
+                            and tag_copy[1:] not in fdict):
                         errors.append("Dangling saveframe reference '%s' in "
                                       "tag '%s.%s'" % (each_tag[1],
                                                        each_frame.tag_prefix,
@@ -2232,6 +2245,7 @@ class Entry(object):
                 for each_loop in each_frame:
                     for each_row in each_loop:
                         for pos, val in enumerate(each_row):
+                            val = str(val)
                             if val.startswith("$") and val[1:] not in fdict:
                                 errors.append("Dangling saveframe reference "
                                               "'%s' in tag '%s.%s'" %
