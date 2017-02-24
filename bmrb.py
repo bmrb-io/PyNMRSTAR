@@ -1372,7 +1372,7 @@ class Schema(object):
         types_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                   "reference_files/data_types.csv")
 
-        with open(types_file, "rb") as types_file:
+        with open(types_file, "rt") as types_file:
             csv_reader_instance = csv_reader(types_file)
 
             for item in csv_reader_instance:
