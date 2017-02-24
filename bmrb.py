@@ -139,7 +139,7 @@ def _build_extension():
 # See if we can use the fast tokenizer
 try:
     import cnmrstar
-    if not "version" in dir(cnmrstar) or cnmrstar.version() < "2.2.7":
+    if "version" not in dir(cnmrstar) or cnmrstar.version() < "2.2.7":
         print("Recompiling cnmrstar module due to API changes. You may "
               "experience a segmentation fault immediately following this "
               "message but should have no issues the next time you run your "
@@ -924,7 +924,7 @@ class _Parser(object):
 
         return
 
-    def load_data(self, data, store=True):
+    def load_data(self, data):
         """ Loads data in preparation of parsing and cleans up newlines
         and massages the data to make parsing work properly when multiline
         values aren't as expected. Useful for manually getting tokens from
@@ -1528,13 +1528,13 @@ class Schema(object):
         # Calculate up the 'Dictionary Sequence' based on the tag position
         new_tag_pos = (new_tag_pos - 1) * 10
 
-        def test_pos(position, schema):
+        def _test_pos(position, schema):
             for item in schema.schema.values():
                 if float(item["Dictionary sequence"]) == position:
-                    return test_pos(position + 1, schema)
+                    return _test_pos(position + 1, schema)
             return position
 
-        new_tag_pos = test_pos(new_tag_pos, self)
+        new_tag_pos = _test_pos(new_tag_pos, self)
 
         self.schema[tag.lower()] = {"Data Type":tag_type, "Loopflag": loop_flag,
                                     "Nullable":null_allowed, "public": "Y",
@@ -2366,7 +2366,7 @@ class Saveframe(object):
                                  "in the dictionary." % self.category)
 
             s = sorted(schema.values(),
-                       key=lambda x:float(x["Dictionary sequence"]))
+                       key=lambda x: float(x["Dictionary sequence"]))
 
             loops_added = []
 
