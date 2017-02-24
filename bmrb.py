@@ -466,7 +466,7 @@ def _get_schema(passed_schema=None):
         # Try to load the local file first
         try:
             sfile = os.path.join(os.path.dirname(os.path.realpath(__file__)))
-            sfile = os.path.join(sfile, "reference_files/schema")
+            sfile = os.path.join(sfile, "reference_files/schema.csv")
 
             _STANDARD_SCHEMA = Schema(schema_file=sfile)
         except:
@@ -524,7 +524,7 @@ def _load_comments(file_to_load=None):
     # Figure out where to load the file from
     if file_to_load is None:
         file_to_load = os.path.join(os.path.dirname(os.path.realpath(__file__)))
-        file_to_load = os.path.join(file_to_load, "reference_files/comments")
+        file_to_load = os.path.join(file_to_load, "reference_files/comments.str")
 
     try:
         comment_entry = Entry.from_file(file_to_load)
