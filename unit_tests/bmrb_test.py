@@ -108,6 +108,7 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertRaises(ValueError, bmrb.Entry.from_string, "data_1\n'save_1'\nloop_\n_tag.tag\ndata_\nstop_\nsave_\n")
         self.assertRaises(ValueError, bmrb.Entry.from_string, 'data_1\nsave_1\n"loop"_\n_tag.tag\ndata_\nstop_\nsave_\n')
         self.assertRaises(ValueError, bmrb.Entry.from_string, "data_1\nsave_1\nloop_\n_tag.tag\ndata_\n;\nstop_\n;\nsave_\n")
+        self.assertRaises(ValueError, bmrb.Saveframe.from_string, "save_1\n_tag.1 _tag.2")
 
     def test_Schema(self):
         default = bmrb.Schema()

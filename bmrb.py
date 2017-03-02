@@ -1124,12 +1124,19 @@ class _Parser(object):
 
                     # We are in a saveframe and waiting for the saveframe tag
                     self.get_token()
-                    if (self.token in self.reserved and
-                            self.delimiter == " "):
-                        raise ValueError("Cannot use keywords as data values "
-                                         "unless quoted or semi-colon "
-                                         "delineated. Illegal value: " +
-                                         self.token, self.get_line_number())
+                    if self.delimiter == " ":
+                        if self.token in self.reserved:
+                            raise ValueError("Cannot use keywords as data values"
+                                             " unless quoted or semi-colon "
+                                             "delineated. Illegal value: " +
+                                             self.token, self.get_line_number())
+                        if self.token.startswith("_"):
+                            raise ValueError("Cannot have a tag value start "
+                                             "with an underscore unless the "
+                                             "entire value is quoted. You may "
+                                             "be missing a data value on the "
+                                             "previous line. Illegal value: " +
+                                             self.token, self.get_line_number())
                     curframe.add_tag(curtag, self.token, self.get_line_number())
 
             if self.token != "save_":
