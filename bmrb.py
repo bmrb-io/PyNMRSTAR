@@ -241,6 +241,44 @@ def diff(entry1, entry2):
     for difference in diffs:
         print(difference)
 
+def delete_empty_saveframes(entry_object,
+                            tags_to_ignore=["sf_category","sf_framecode"],
+                            allowed_null_values=[".","?",None]):
+    """ This method will delete all empty saveframes in an entry
+    (the loops in the saveframe must also have be empty for the saveframe
+    to be deleted). "Empty" means no values in tags, not no tags present."""
+
+    to_delete_list = []
+
+    # Go through the saveframes
+    for pos, frame in enumerate(entry_object):
+        to_delete = True
+
+        # Go through the tags
+        for tag in frame.tag_iterator():
+
+            # Check if the tag is one to ignore
+            if tag[0].lower() not in tags_to_ignore:
+                # Check if the value is not null
+                if tag[1] not in allowed_null_values:
+                    to_delete = False
+                    break
+
+        # Now check the loops
+        for loop in frame:
+            if loop.data != []:
+                to_delete = False
+                break
+
+        # Now we know if we can delete
+        if to_delete:
+            to_delete_list.append(pos)
+
+    # Delete the frames
+    for pos in reversed(to_delete_list):
+        del entry_object[pos]
+
+
 def validate(entry_to_validate, schema=None):
     """Prints a validation report of an object."""
 
