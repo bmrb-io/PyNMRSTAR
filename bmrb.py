@@ -1982,6 +1982,13 @@ class Entry(object):
             raise ValueError("You can only add instances of saveframes "
                              "using this method.")
 
+        # Do not allow the addition of saveframes with the same name
+        #  as a saveframe which already exists in the entry
+        if frame.name in self.frame_dict():
+            raise ValueError("Cannot add a saveframe with name '%s' since a "
+                             "saveframe with that name already exists in the "
+                             "entry." % frame.name)
+
         self.frame_list.append(frame)
 
     def compare(self, other):
@@ -2026,7 +2033,21 @@ class Entry(object):
     def frame_dict(self):
         """Returns a dictionary of saveframe name -> saveframe object"""
 
-        return dict((frame.name, frame) for frame in self.frame_list)
+        fast_dict = dict((frame.name, frame) for frame in self.frame_list)
+
+        # If there are no duplicates then continue
+        if len(fast_dict) == len(self.frame_list):
+            return fast_dict
+
+        # Figure out where the duplicate is
+        frame_dict = {}
+
+        for frame in self.frame_list:
+            if frame.name in frame_dict:
+                raise ValueError("The entry has multiple saveframes with the "
+                                 "same name. That is illegal. Please remove or "
+                                 "rename one. Duplicate name: %s" % frame.name)
+            frame_dict[frame.name] = True
 
     def get_json(self, serialize=True):
         """ Returns the entry in JSON format. If serialize is set to
