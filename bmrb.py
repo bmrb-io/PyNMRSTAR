@@ -230,17 +230,6 @@ def enable_nmrstar_defaults():
     SKIP_EMPTY_LOOPS = False
     DONT_SHOW_COMMENTS = False
 
-def diff(entry1, entry2):
-    """Prints the differences between two entries. Non-equal entries
-    will always be detected, but specific differences detected depends
-    on order of entries."""
-
-    diffs = entry1.compare(entry2)
-    if len(diffs) == 0:
-        print("Identical entries.")
-    for difference in diffs:
-        print(difference)
-
 def delete_empty_saveframes(entry_object,
                             tags_to_ignore=["sf_category","sf_framecode"],
                             allowed_null_values=[".","?",None]):
@@ -278,6 +267,16 @@ def delete_empty_saveframes(entry_object,
     for pos in reversed(to_delete_list):
         del entry_object[pos]
 
+def diff(entry1, entry2):
+    """Prints the differences between two entries. Non-equal entries
+    will always be detected, but specific differences detected depends
+    on order of entries."""
+
+    diffs = entry1.compare(entry2)
+    if len(diffs) == 0:
+        print("Identical entries.")
+    for difference in diffs:
+        print(difference)
 
 def validate(entry_to_validate, schema=None):
     """Prints a validation report of an object."""
