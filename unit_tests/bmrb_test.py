@@ -133,6 +133,12 @@ class TestPyNMRSTAR(unittest.TestCase):
         tmp_entry.frame_list.pop(0)
         self.assertEqual(self.entry, tmp_entry)
 
+    def test_duplicate_saveframe_errors(self):
+        tmp_entry = copy(database_entry)
+        self.assertRaises(ValueError, tmp_entry.add_saveframe, tmp_entry[0])
+        tmp_entry.frame_list.append(tmp_entry[0])
+        self.assertRaises(ValueError, tmp_entry.frame_dict)
+
     def test_entry_eq(self):
         self.assertEqual(file_entry, database_entry)
 
