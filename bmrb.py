@@ -1523,18 +1523,21 @@ class Entry(object):
             # Download the entry
             try:
                 url_request = urlopen(entry_url)
+
+                if url_request.getcode() == 404:
+                    raise IOError("Entry '%s' does not exist in the public "
+                                  "database." % entry_num)
+                else:
+                    serialized_ent =  url_request.read()
+
+                url_request.close()
+
             except HTTPError as e:
                 if e.code == 404:
                     raise IOError("Entry '%s' does not exist in the public "
                                   "database." % entry_num)
                 else:
                     raise HTTPError()
-
-            if url_request.getcode() == 404:
-                raise IOError("Entry '%s' does not exist in the public "
-                              "database." % entry_num)
-            else:
-                serialized_ent =  url_request.read()
 
             # If we have zlib decompress
             if zlib:
