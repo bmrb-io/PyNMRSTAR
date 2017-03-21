@@ -85,6 +85,12 @@ from csv import reader as csv_reader, writer as csv_writer
 from datetime import date
 from gzip import GzipFile
 
+# See if we have zlib
+try:
+    import zlib
+except ImportError:
+    zlib = None
+
 # Determine if we are running in python3
 PY3 = (sys.version_info[0] == 3)
 
@@ -203,7 +209,7 @@ _COMMENT_DICTIONARY = {}
 _API_URL = "http://webapi.bmrb.wisc.edu/v1"
 _SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
-_VERSION = "2.3.2"
+_VERSION = "2.3.3"
 
 #############################################
 #             Module methods                #
@@ -231,10 +237,10 @@ def enable_nmrstar_defaults():
     DONT_SHOW_COMMENTS = False
 
 def delete_empty_saveframes(entry_object,
-                            tags_to_ignore=["sf_category","sf_framecode"],
-                            allowed_null_values=[".","?",None]):
+                            tags_to_ignore=["sf_category", "sf_framecode"],
+                            allowed_null_values=[".", "?", None]):
     """ This method will delete all empty saveframes in an entry
-    (the loops in the saveframe must also have be empty for the saveframe
+    (the loops in the saveframe must also be empty for the saveframe
     to be deleted). "Empty" means no values in tags, not no tags present."""
 
     to_delete_list = []
@@ -1354,7 +1360,7 @@ class Schema(object):
             return ["Value does not match specification: '%s':'%s' on line '%s'"
                     ".\n     Type specified: %s\n     Regular expression for "
                     "type: '%s'" % (capitalized_tag, value, linenum, bmrb_type,
-                              self.data_types[bmrb_type])]
+                                    self.data_types[bmrb_type])]
 
         # Check the tag capitalization
         if tag != capitalized_tag:
@@ -1510,21 +1516,49 @@ class Entry(object):
             entry_url = _API_URL + "/rest/entry/%s/"
             entry_url = entry_url % entry_num
 
+            # If we have zlib get the compressed entry
+            if zlib:
+                entry_url += "zlib/"
+
+            # Download the entry
+            try:
+                url_request = urlopen(entry_url)
+
+                if url_request.getcode() == 404:
+                    raise IOError("Entry '%s' does not exist in the public "
+                                  "database." % entry_num)
+                else:
+                    serialized_ent =  url_request.read()
+
+                url_request.close()
+
+            except HTTPError as e:
+                if e.code == 404:
+                    raise IOError("Entry '%s' does not exist in the public "
+                                  "database." % entry_num)
+                else:
+                    raise HTTPError()
+
+            # If we have zlib decompress
+            if zlib:
+                serialized_ent = zlib.decompress(serialized_ent)
+
             # Convert bytes to string if python3
-            serialized_ent = urlopen(entry_url).read()
             if PY3:
                 serialized_ent = serialized_ent.decode()
 
             # Parse JSON string to dictionary
             json_data = json.loads(serialized_ent)
             if "error" in json_data:
-                if "does not exist" in json_data["error"]:
-                    raise IOError("Entry '%s' does not exist in the public "
-                                  "database." % entry_num)
-                else:
-                    raise ValueError("An error occured while fetching the entry"
-                                     ": %s" % json_data["error"])
-            entry_dictionary = json_data[str(entry_num)]
+                # Something up with the API server, try the FTP site
+                return cls(entry_num=entry_num)
+
+            # If pure zlib there is no wrapping
+            if zlib:
+                entry_dictionary = json_data
+            else:
+                entry_dictionary = json_data[str(entry_num)]
+
             ent = Entry.from_json(entry_dictionary)
 
             # Update the entry source
@@ -1558,7 +1592,7 @@ class Entry(object):
         except KeyError:
             raise IOError("Entry '%s' does not exist in the public database." %
                           entry_num)
-        except (HTTPError, URLError):
+        except (URLError):
             if VERBOSE:
                 print("BMRB API server appears to be down. Attempting to load "
                       "from FTP site.")
