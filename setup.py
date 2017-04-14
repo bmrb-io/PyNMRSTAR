@@ -9,7 +9,7 @@ cnmrstar = Extension('cnmrstar',
                     extra_compile_args = ["-funroll-loops", "-O3"],
                     optional = True)
 
-from pynmrstar import _VERSION
+from pynmrstar import __version__
 
 if os.path.isfile("README.rst"):
     long_des = open('README.rst', 'r').read()
@@ -19,7 +19,7 @@ else:
     long_des = "Missing"
 
 setup(name='pynmrstar',
-      version = _VERSION,
+      version = __version__,
       packages = ['pynmrstar'],
       ext_modules = [cnmrstar],
       author = 'Jon Wedell',
