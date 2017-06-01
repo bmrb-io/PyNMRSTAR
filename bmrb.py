@@ -3017,7 +3017,12 @@ class Loop(object):
         exception.
 
         You can also pass a list of column names to add more than one
-        column at a time."""
+        column at a time.
+
+        Note that adding a column only adds a new tag to the list of
+        tags present in this loop. It does not automatically add a column
+        of None values to the data array if the loop is already populated
+        with data."""
 
         # If they have passed multiple columns to add, call ourself
         #  on each of them in succession
