@@ -209,7 +209,7 @@ _COMMENT_DICTIONARY = {}
 _API_URL = "http://webapi.bmrb.wisc.edu/v1"
 _SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
-_VERSION = "2.3.3"
+__version__ = "2.3.4"
 
 #############################################
 #             Module methods                #
@@ -2855,14 +2855,8 @@ class Loop(object):
             raise ValueError("Impossible to print data if there are no "
                              "associated tags. Loop: '%s'." % self.category)
 
-        # Make sure that if there is data, it is the same width as the
-        #  column tags
-        if len(self.data) > 0:
-            for row in self.data:
-                if len(self.columns) != len(row):
-                    raise ValueError("The number of column tags must match"
-                                     "width of the data. Loop: '%s'." %
-                                     self.category)
+        # Make sure the columns and data match
+        self._check_columns_match_data()
 
         # Start the loop
         ret_string = "\n   loop_\n"
@@ -3000,6 +2994,21 @@ class Loop(object):
             return lc_col.index(_format_tag(str(tag_name)).lower())
         except ValueError:
             return None
+
+    def _check_columns_match_data(self):
+        """ Ensures that each row of the data has the same number of
+        elements as there are columns for the loop. This is necessary to
+        print or do some other operations on loops that count on the values
+        matching. """
+
+        # Make sure that if there is data, it is the same width as the
+        #  column tags
+        if len(self.data) > 0:
+            for row in self.data:
+                if len(self.columns) != len(row):
+                    raise ValueError("The number of column tags must match the "
+                                     "width of the data. Loop: '%s'." %
+                                     self.category)
 
     def add_column(self, name, ignore_duplicates=False):
         """Add a column to the column list. Does a bit of validation
@@ -3388,6 +3397,7 @@ class Loop(object):
                                  "match this loop's category '%s'." %
                                  (supplied_category, self.category))
 
+        # Determine which column ID to renumber
         renum_col = self._tag_index(index_tag)
 
         # The column to replace in is the column they specify
@@ -3408,6 +3418,9 @@ class Loop(object):
         # Do nothing if we have no data
         if len(self.data) == 0:
             return
+
+        # Make sure the columns and data match
+        self._check_columns_match_data()
 
         if maintain_ordering:
             # If they have a string buried somewhere in the row, we'll
@@ -3572,7 +3585,7 @@ def called_directly():
 
     # Specify some basic information about our command
     optparser = optparse.OptionParser(usage="usage: %prog",
-                                      version=_VERSION,
+                                      version=__version__,
                                       description="NMR-STAR handling python "
                                                   "module. Usually you'll want "
                                                   "to import this. When ran "
