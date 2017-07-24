@@ -98,11 +98,11 @@ PY3 = (sys.version_info[0] == 3)
 #pylint: disable=import-error,wrong-import-order
 # Python version dependent loads
 if PY3:
-    from urllib.request import urlopen
+    from urllib.request import urlopen, Request as urllib_request
     from urllib.error import HTTPError, URLError
     from io import StringIO, BytesIO
 else:
-    from urllib2 import urlopen, HTTPError, URLError
+    from urllib2 import urlopen, HTTPError, URLError, Request as urllib_request
     from cStringIO import StringIO
     BytesIO = StringIO
 
@@ -144,7 +144,13 @@ def _build_extension():
 
 # See if we can use the fast tokenizer
 try:
-    import cnmrstar
+    if PY3:
+        try:
+            from . import cnmrstar
+        except SystemError:
+            import cnmrstar
+    else:
+        import cnmrstar
     if "version" not in dir(cnmrstar) or cnmrstar.version() < "2.2.7":
         print("Recompiling cnmrstar module due to API changes. You may "
               "experience a segmentation fault immediately following this "
@@ -162,7 +168,13 @@ except ImportError as e:
 
         if _build_extension():
             try:
-                import cnmrstar
+                if PY3:
+                    try:
+                        from . import cnmrstar
+                    except SystemError:
+                        import cnmrstar
+                else:
+                    import cnmrstar
             except ImportError:
                 pass
 
@@ -206,10 +218,10 @@ STR_CONVERSION_DICT = {None:"."}
 # Used internally
 _STANDARD_SCHEMA = None
 _COMMENT_DICTIONARY = {}
-_API_URL = "http://webapi.bmrb.wisc.edu/v1"
+_API_URL = "http://webapi.bmrb.wisc.edu/v2"
 _SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
-__version__ = "2.3.4"
+__version__ = "2.3.5"
 
 #############################################
 #             Module methods                #
@@ -1513,16 +1525,18 @@ class Entry(object):
 
         # Try to load the entry using JSON
         try:
-            entry_url = _API_URL + "/rest/entry/%s/"
+            entry_url = _API_URL + "/entry/%s"
             entry_url = entry_url % entry_num
 
             # If we have zlib get the compressed entry
             if zlib:
-                entry_url += "zlib/"
+                entry_url += "?format=zlib"
 
             # Download the entry
             try:
-                url_request = urlopen(entry_url)
+                req = urllib_request(entry_url)
+                req.add_header('Application', 'PyNMRSTAR %s' % __version__)
+                url_request = urlopen(req)
 
                 if url_request.getcode() == 404:
                     raise IOError("Entry '%s' does not exist in the public "
@@ -2089,18 +2103,15 @@ class Saveframe(object):
         elif 'file_name' in kargs:
             star_buffer = _interpret_file(kargs['file_name'])
             self.source = "from_file('%s')" % kargs['file_name']
-        elif 'saveframe_name' in kargs:
-            # If they are creating from scratch, just get the saveframe name
-            self.name = kargs['saveframe_name']
-            if 'tag_prefix' in kargs:
-                self.tag_prefix = _format_category(kargs['tag_prefix'])
-            return
-                # Creating from template (schema)
+        # Creating from template (schema)
         elif 'all_tags' in kargs:
             schema_obj = _get_schema(kargs['schema'])
             schema = schema_obj.schema
             self.category = kargs['category']
+
             self.name = self.category
+            if 'saveframe_name' in kargs and kargs['saveframe_name']:
+                self.name = kargs['saveframe_name']
 
             # Make sure it is a valid category
             if self.category not in [x["SFCategory"] for x in schema.values()]:
@@ -2120,8 +2131,10 @@ class Saveframe(object):
 
                         ft = _format_tag(item["Tag"])
                         # Set the value for sf_category and sf_framecode
-                        if ft == "Sf_category" or ft == "Sf_framecode":
-                            self.add_tag(item["Tag"], self.category)
+                        if ft == "Sf_category":
+                            self.add_tag(ft, self.category)
+                        elif ft == "Sf_framecode":
+                            self.add_tag(ft, self.name)
                         else:
                             # Unconditional add
                             if kargs['all_tags']:
@@ -2141,6 +2154,12 @@ class Saveframe(object):
                                                     schema=schema_obj)
                             self.add_loop(nl)
 
+            return
+        elif 'saveframe_name' in kargs:
+            # If they are creating from scratch, just get the saveframe name
+            self.name = kargs['saveframe_name']
+            if 'tag_prefix' in kargs:
+                self.tag_prefix = _format_category(kargs['tag_prefix'])
             return
 
         # If we are reading from a CSV file, go ahead and parse it
@@ -2232,15 +2251,16 @@ class Saveframe(object):
         return cls(the_string=the_string, csv=csv)
 
     @classmethod
-    def from_template(cls, category, all_tags=False, schema=None):
+    def from_template(cls, category, name=None, all_tags=False, schema=None):
         """ Create a saveframe that has all of the tags and loops from the
         schema present. No values will be assigned. Specify the category
-        when calling this method.
+        when calling this method. Optionally also provide the name of the
+        saveframe as the 'name' argument.
 
-        The optional argument all_tags forces all tags to be included
+        The optional argument 'all_tags' forces all tags to be included
         rather than just the mandatory tags."""
 
-        return cls(category=category, all_tags=all_tags,
+        return cls(category=category, saveframe_name=name, all_tags=all_tags,
                    schema=schema, source="from_template()")
 
     def __repr__(self):
@@ -3017,7 +3037,12 @@ class Loop(object):
         exception.
 
         You can also pass a list of column names to add more than one
-        column at a time."""
+        column at a time.
+
+        Note that adding a column only adds a new tag to the list of
+        tags present in this loop. It does not automatically add a column
+        of None values to the data array if the loop is already populated
+        with data."""
 
         # If they have passed multiple columns to add, call ourself
         #  on each of them in succession
