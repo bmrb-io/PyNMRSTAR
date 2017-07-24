@@ -168,7 +168,13 @@ except ImportError as e:
 
         if _build_extension():
             try:
-                import cnmrstar
+                if PY3:
+                    try:
+                        from . import cnmrstar
+                    except SystemError:
+                        import cnmrstar
+                else:
+                    import cnmrstar
             except ImportError:
                 pass
 
