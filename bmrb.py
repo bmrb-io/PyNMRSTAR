@@ -144,7 +144,13 @@ def _build_extension():
 
 # See if we can use the fast tokenizer
 try:
-    import cnmrstar
+    if PY3:
+        try:
+            from . import cnmrstar
+        except SystemError:
+            import cnmrstar
+    else:
+        import cnmrstar
     if "version" not in dir(cnmrstar) or cnmrstar.version() < "2.2.7":
         print("Recompiling cnmrstar module due to API changes. You may "
               "experience a segmentation fault immediately following this "
@@ -162,7 +168,13 @@ except ImportError as e:
 
         if _build_extension():
             try:
-                import cnmrstar
+                if PY3:
+                    try:
+                        from . import cnmrstar
+                    except SystemError:
+                        import cnmrstar
+                else:
+                    import cnmrstar
             except ImportError:
                 pass
 
@@ -3017,7 +3029,12 @@ class Loop(object):
         exception.
 
         You can also pass a list of column names to add more than one
-        column at a time."""
+        column at a time.
+
+        Note that adding a column only adds a new tag to the list of
+        tags present in this loop. It does not automatically add a column
+        of None values to the data array if the loop is already populated
+        with data."""
 
         # If they have passed multiple columns to add, call ourself
         #  on each of them in succession
