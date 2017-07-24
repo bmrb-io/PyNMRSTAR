@@ -218,7 +218,7 @@ STR_CONVERSION_DICT = {None:"."}
 # Used internally
 _STANDARD_SCHEMA = None
 _COMMENT_DICTIONARY = {}
-_API_URL = "http://webapi.bmrb.wisc.edu/v1"
+_API_URL = "http://webapi.bmrb.wisc.edu/v2"
 _SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
 __version__ = "2.3.4"
@@ -1525,12 +1525,12 @@ class Entry(object):
 
         # Try to load the entry using JSON
         try:
-            entry_url = _API_URL + "/rest/entry/%s/"
+            entry_url = _API_URL + "/entry/%s"
             entry_url = entry_url % entry_num
 
             # If we have zlib get the compressed entry
             if zlib:
-                entry_url += "zlib/"
+                entry_url += "?format=zlib"
 
             # Download the entry
             try:
