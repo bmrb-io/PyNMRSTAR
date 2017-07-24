@@ -144,13 +144,7 @@ def _build_extension():
 
 # See if we can use the fast tokenizer
 try:
-    if PY3:
-        try:
-            from . import cnmrstar
-        except SystemError:
-            import cnmrstar
-    else:
-        import cnmrstar
+    import cnmrstar
     if "version" not in dir(cnmrstar) or cnmrstar.version() < "2.2.7":
         print("Recompiling cnmrstar module due to API changes. You may "
               "experience a segmentation fault immediately following this "
@@ -168,13 +162,7 @@ except ImportError as e:
 
         if _build_extension():
             try:
-                if PY3:
-                    try:
-                        from . import cnmrstar
-                    except SystemError:
-                        import cnmrstar
-                else:
-                    import cnmrstar
+                import cnmrstar
             except ImportError:
                 pass
 
