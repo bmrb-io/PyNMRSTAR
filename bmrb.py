@@ -144,13 +144,7 @@ def _build_extension():
 
 # See if we can use the fast tokenizer
 try:
-    if PY3:
-        try:
-            from . import cnmrstar
-        except SystemError:
-            import cnmrstar
-    else:
-        import cnmrstar
+    import cnmrstar
     if "version" not in dir(cnmrstar) or cnmrstar.version() < "2.2.7":
         print("Recompiling cnmrstar module due to API changes. You may "
               "experience a segmentation fault immediately following this "
@@ -168,13 +162,7 @@ except ImportError as e:
 
         if _build_extension():
             try:
-                if PY3:
-                    try:
-                        from . import cnmrstar
-                    except SystemError:
-                        import cnmrstar
-                else:
-                    import cnmrstar
+                import cnmrstar
             except ImportError:
                 pass
 
@@ -221,7 +209,7 @@ _COMMENT_DICTIONARY = {}
 _API_URL = "http://webapi.bmrb.wisc.edu/v2"
 _SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
-__version__ = "2.3.5"
+__version__ = "2.4"
 
 #############################################
 #             Module methods                #
