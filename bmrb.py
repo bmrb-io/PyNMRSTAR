@@ -2101,18 +2101,15 @@ class Saveframe(object):
         elif 'file_name' in kargs:
             star_buffer = _interpret_file(kargs['file_name'])
             self.source = "from_file('%s')" % kargs['file_name']
-        elif 'saveframe_name' in kargs:
-            # If they are creating from scratch, just get the saveframe name
-            self.name = kargs['saveframe_name']
-            if 'tag_prefix' in kargs:
-                self.tag_prefix = _format_category(kargs['tag_prefix'])
-            return
-                # Creating from template (schema)
+        # Creating from template (schema)
         elif 'all_tags' in kargs:
             schema_obj = _get_schema(kargs['schema'])
             schema = schema_obj.schema
             self.category = kargs['category']
+
             self.name = self.category
+            if 'saveframe_name' in kargs and kargs['saveframe_name']:
+                self.name = kargs['saveframe_name']
 
             # Make sure it is a valid category
             if self.category not in [x["SFCategory"] for x in schema.values()]:
@@ -2132,8 +2129,10 @@ class Saveframe(object):
 
                         ft = _format_tag(item["Tag"])
                         # Set the value for sf_category and sf_framecode
-                        if ft == "Sf_category" or ft == "Sf_framecode":
-                            self.add_tag(item["Tag"], self.category)
+                        if ft == "Sf_category":
+                            self.add_tag(ft, self.category)
+                        elif ft == "Sf_framecode":
+                            self.add_tag(ft, self.name)
                         else:
                             # Unconditional add
                             if kargs['all_tags']:
@@ -2153,6 +2152,12 @@ class Saveframe(object):
                                                     schema=schema_obj)
                             self.add_loop(nl)
 
+            return
+        elif 'saveframe_name' in kargs:
+            # If they are creating from scratch, just get the saveframe name
+            self.name = kargs['saveframe_name']
+            if 'tag_prefix' in kargs:
+                self.tag_prefix = _format_category(kargs['tag_prefix'])
             return
 
         # If we are reading from a CSV file, go ahead and parse it
@@ -2244,15 +2249,16 @@ class Saveframe(object):
         return cls(the_string=the_string, csv=csv)
 
     @classmethod
-    def from_template(cls, category, all_tags=False, schema=None):
+    def from_template(cls, category, name=None, all_tags=False, schema=None):
         """ Create a saveframe that has all of the tags and loops from the
         schema present. No values will be assigned. Specify the category
-        when calling this method.
+        when calling this method. Optionally also provide the name of the
+        saveframe as the 'name' argument.
 
-        The optional argument all_tags forces all tags to be included
+        The optional argument 'all_tags' forces all tags to be included
         rather than just the mandatory tags."""
 
-        return cls(category=category, all_tags=all_tags,
+        return cls(category=category, saveframe_name=name, all_tags=all_tags,
                    schema=schema, source="from_template()")
 
     def __repr__(self):
