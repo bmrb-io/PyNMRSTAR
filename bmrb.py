@@ -103,6 +103,7 @@ if PY3:
     from io import StringIO, BytesIO
 else:
     from urllib2 import urlopen, HTTPError, URLError
+    from urllib2 import Request as urllib_request
     from cStringIO import StringIO
     BytesIO = StringIO
 
@@ -1534,7 +1535,9 @@ class Entry(object):
 
             # Download the entry
             try:
-                url_request = urlopen(entry_url)
+                req = urllib_request(entry_url)
+                req.add_header('Application', 'PyNMRSTAR %s' % __version__)
+                url_request = urlopen(req)
 
                 if url_request.getcode() == 404:
                     raise IOError("Entry '%s' does not exist in the public "
