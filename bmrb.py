@@ -98,12 +98,11 @@ PY3 = (sys.version_info[0] == 3)
 #pylint: disable=import-error,wrong-import-order
 # Python version dependent loads
 if PY3:
-    from urllib.request import urlopen
+    from urllib.request import urlopen, Request as urllib_request
     from urllib.error import HTTPError, URLError
     from io import StringIO, BytesIO
 else:
-    from urllib2 import urlopen, HTTPError, URLError
-    from urllib2 import Request as urllib_request
+    from urllib2 import urlopen, HTTPError, URLError, Request as urllib_request
     from cStringIO import StringIO
     BytesIO = StringIO
 
