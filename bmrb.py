@@ -144,7 +144,10 @@ def _build_extension():
 
 # See if we can use the fast tokenizer
 try:
-    import cnmrstar
+    if PY3:
+        from . import cnmrstar
+    else:
+        import cnmrstar
     if "version" not in dir(cnmrstar) or cnmrstar.version() < "2.2.7":
         print("Recompiling cnmrstar module due to API changes. You may "
               "experience a segmentation fault immediately following this "
