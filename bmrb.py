@@ -145,7 +145,10 @@ def _build_extension():
 # See if we can use the fast tokenizer
 try:
     if PY3:
-        from . import cnmrstar
+        try:
+            from . import cnmrstar
+        except SystemError:
+            import cnmrstar
     else:
         import cnmrstar
     if "version" not in dir(cnmrstar) or cnmrstar.version() < "2.2.7":
