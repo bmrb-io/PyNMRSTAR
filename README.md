@@ -33,13 +33,26 @@ to the "WARNINGS_TO_IGNORE" list.
 
 Here are descriptions of the parse warnings that can be suppressed:
 
- * "tag-only-loop": A loop with no data was found.
- * "empty-loop": A loop with no tags or values was found.
- * "tag-not-in-schema": A tag was found in the entry that was not present
+* "tag-only-loop": A loop with no data was found.
+* "empty-loop": A loop with no tags or values was found.
+* "tag-not-in-schema": A tag was found in the entry that was not present
 in the schema.
- * "invalid-null-value": A tag for which the schema disallows null values
+* "invalid-null-value": A tag for which the schema disallows null values
 had a null value.
- * "bad-multiline": A tag with an improper multi-line value was found.
+* "bad-multiline": A tag with an improper multi-line value was found.
+Multiline values should look like this:
+
+;
+The multi-line
+value here.
+;
+
+but the tag looked like this:
+
+; The multi-line
+value here.
+;
+
 
 * Setting SKIP_EMPTY_LOOPS to True will suppress the printing of empty
 loops when calling __str__ methods.
@@ -107,22 +120,30 @@ method (so don't call it before inserting values into tags or loops).
 
 Be mindful of the value of STR_CONVERSION_DICT as it will effect the
 way the value is converted to a string.
+
+### def `delete_empty_saveframes(entry_object, tags_to_ignore=['sf_category', 'sf_framecode'], allowed_null_values=['.', '?', None])`
+
+This method will delete all empty saveframes in an entry
+(the loops in the saveframe must also be empty for the saveframe
+to be deleted). "Empty" means no values in tags, not no tags present.
+
 ### def `diff(entry1, entry2)`
 
 Prints the differences between two entries. Non-equal entries
 will always be detected, but specific differences detected depends
 on order of entries.
-### def `enable_bmrb_defaults()`
-
-Sets the module variables such that our behavior matches the
-BMRB standard. This is the default behavior of this module. This
-method only exists to revert after calling enable_nef_defaults().
 ### def `enable_nef_defaults()`
 
 Sets the module variables such that our behavior matches the NEF
 standard. Specifically, suppress printing empty loops by default and
 convert True -> "true" and False -> "false" when printing.
-### def `validate(entry_to_validate, validation_schema=None)`
+### def `enable_nmrstar_defaults()`
+
+Sets the module variables such that our behavior matches the
+BMRB standard (NMR-STAR). This is the default behavior of this module.
+This method only exists to revert after calling enable_nef_defaults().
+
+### def `validate(entry_to_validate, schema=None)`
 
 Prints a validation report of an entry.
 
@@ -133,14 +154,19 @@ Classes
 
 An OO representation of a BMRB entry. You can initialize this
 object several ways; (e.g. from a file, from the official database,
-from scratch) see the classmethods.
+from scratch) see the class methods below.
 
 Methods:
 
 #### def `__init__()`
 
-Don't use this directly, use from_file, from_scratch,
-from_string, or from_database to construct.
+You should not directly instantiate an Entry using this method.
+Instead use the class methods:"
+Entry.from_database()
+Entry.from_file()
+Entry.from_string()
+Entry.from_scratch()
+Entry.from_json()
 
 #### def `add_saveframe(frame)`
 
@@ -177,6 +203,7 @@ Create an entry from JSON (serialized or unserialized JSON).
 
 Create an empty entry that you can programatically add to.
 You must pass a value corresponding to the Entry ID.
+(The unique identifier "xxx" from "data_xxx".)
 
 #### def `from_string(cls, the_string)`
 
@@ -220,27 +247,53 @@ results in a dictionary.
 
 Returns a string representation of the entry in NEF.
 
+#### def `normalize(schema=None)`
+
+Sorts saveframes, loops, and tags according to the schema
+provided (or BMRB default if none provided) and according
+to the assigned ID.
+
 #### def `print_tree()`
 
 Prints a summary, tree style, of the frames and loops in
 the entry.
 
-#### def `validate(validation_schema=None)`
+#### def `rename_saveframe(original_name, new_name)`
 
-Validate an entry against a STAR schema. You can pass your
-own custom schema if desired, otherwise the schema will be
-fetched from the BMRB servers. Returns a list of errors found.
-0-length list indicates no errors found.
+Renames a saveframe and updates all pointers to that
+saveframe in the entry with the new name.
+
+#### def `validate(validate_schema=True, schema=None, validate_star=True)`
+
+Validate an entry in a variety of ways. Returns a list of
+errors found. 0-length list indicates no errors found. By
+default all validation modes are enabled.
+
+validate_schema - Determines if the entry is validated against
+the NMR-STAR schema. You can pass your own custom schema if desired,
+otherwise the schema will be fetched from the BMRB servers.
+
+validate_star - Determines if the STAR syntax checks are ran.
+
+
+
+
+
 
 ### class `Saveframe()`
 
-A saveframe. Use the classmethod from_scratch to create one.
+A saveframe object. Create using the class methods, see below.
 
 Methods:
 
 #### def `__init__()`
 
-Don't use this directly. Use the class methods to construct.
+Don't use this directly. Use the class methods to construct:
+Saveframe.from_scratch()
+Saveframe.from_string()
+Saveframe.from_template()
+Saveframe.from_file()
+and Saveframe.from_json()
 
 #### def `add_loop(loop_to_add)`
 
@@ -292,6 +345,16 @@ add a tag.
 Create a saveframe by parsing a string. Specify csv=True is
 the string is in CSV format and not NMR-STAR format.
 
+#### def `from_template(cls, category, name=None, all_tags=False, schema=None)`
+
+Create a saveframe that has all of the tags and loops from the
+schema present. No values will be assigned. Specify the category
+when calling this method. Optionally also provide the name of the
+saveframe as the 'name' argument.
+
+The optional argument 'all_tags' forces all tags to be included
+rather than just the mandatory tags.
+
 #### def `get_data_as_csv(header=True, show_category=True)`
 
 Return the data contained in the loops, properly CSVd, as a
@@ -330,7 +393,7 @@ Prints a summary, tree style, of the loops in the saveframe.
 
 Set the tag prefix for this saveframe.
 
-#### def `sort_tags(validation_schema=None)`
+#### def `sort_tags(schema=None)`
 
 Sort the tags so they are in the same order as a BMRB
 schema. Will automatically use the standard schema if none
@@ -340,22 +403,80 @@ is provided.
 
 Returns an iterator for saveframe tags.
 
-#### def `validate(validation_schema=None)`
+#### def `validate(validate_schema=True, schema=None, validate_star=True)`
 
-Validate a saveframe against a STAR schema. You can pass your
-own custom schema if desired, otherwise the schema will be
-fetched from the BMRB servers. Returns a list of errors found.
-0-length list indicates no errors found.
+Validate a saveframe in a variety of ways. Returns a list of
+errors found. 0-length list indicates no errors found. By
+default all validation modes are enabled.
+
+validate_schema - Determines if the entry is validated against
+the NMR-STAR schema. You can pass your own custom schema if desired,
+otherwise the schema will be fetched from the BMRB servers.
+
+validate_star - Determines if the STAR syntax checks are ran.
+
+### class `Schema()`
+
+A BMRB schema. Used to validate STAR files.
+
+Methods:
+
+#### def `__init__(schema_file=None)`
+
+Initialize a BMRB schema. With no arguments the most
+up-to-date schema will be fetched from the BMRB FTP site.
+Otherwise pass a URL or a file to load a schema from using the
+schema_file keyword argument.
+
+#### def `add_tag(tag, tag_type, null_allowed, sf_category, loop_flag, after=None)`
+
+Adds the specified tag to the tag dictionary. You must provide:
+
+1) The full tag as such:
+"_Entry_interview.Sf_category"
+2) The tag type which is one of the following:
+"INTEGER"
+"FLOAT"
+"CHAR(len)"
+"VARCHAR(len)"
+"TEXT"
+"DATETIME year to day"
+3) A python True/False that indicates whether null values are allowed.
+4) The sf_category of the parent saveframe.
+5) A True/False value which indicates if this tag is a loop tag.
+6) Optional: The tag to order this tag behind when normalizing
+saveframes.
+
+#### def `convert_tag(tag, value, linenum=None)`
+
+Converts the provided tag from string to the appropriate
+type as specified in this schema.
+
+#### def `string_representation(search=None)`
+
+Prints all the tags in the schema if search is not specified
+and prints the tags that contain the search string if it is.
+
+#### def `val_type(tag, value, category=None, linenum=None)`
+
+Validates that a tag matches the type it should have
+according to this schema.
 
 ### class `Loop()`
 
-A BMRB loop object.
+A BMRB loop object. Create using the class methods, see below.
 
 Methods:
 
 #### def `__init__()`
 
-Use the classmethods to initialize.
+You should not directly instantiate a Loop using this method.
+Instead use the class methods:
+Loop.from_scratch()
+Loop.from_string()
+Loop.from_template()
+Loop.from_file()
+Loop.from_json()
 
 #### def `add_column(name, ignore_duplicates=False)`
 
@@ -366,6 +487,11 @@ exception.
 
 You can also pass a list of column names to add more than one
 column at a time.
+
+Note that adding a column only adds a new tag to the list of
+tags present in this loop. It does not automatically add a column
+of None values to the data array if the loop is already populated
+with data.
 
 #### def `add_data(the_list, rearrange=False)`
 
@@ -398,6 +524,12 @@ Deletes all rows which contain the provided value in the
 provided column. If index_tag is provided, that column is
 renumbered starting with 1. Returns the deleted rows.
 
+#### def `filter(tag_list, ignore_missing_tags=False)`
+
+Returns a new loop containing only the specified tags.
+Specify ignore_missing_tags=True to bypass missing tags rather
+than raising an error.
+
 #### def `from_file(cls, the_file, csv=False)`
 
 Create a saveframe by loading in a file. Specify csv=True if
@@ -421,11 +553,13 @@ add a tag.
 Create a saveframe by parsing a string. Specify csv=True is
 the string is in CSV format and not NMR-STAR format.
 
-#### def `filter(tag_list, ignore_missing_tags=False)`
+#### def `from_template(cls, tag_prefix, all_tags=False, schema=None)`
 
-Returns a new loop containing only the specified tags. Specify
-ignore_missing_tags=True to bypass missing tags rather than
-raising an error.
+Create a loop that has all of the tags from the schema present.
+No values will be assigned. Specify the tag prefix of the loop.
+
+The optional argument all_tags forces all tags to be included
+rather than just the mandatory tags.
 
 #### def `get_columns()`
 
@@ -441,7 +575,7 @@ headers.
 
 #### def `get_data_by_tag(tags=None)`
 
-Identical to getTag but wraps the results in a list even if
+Identical to get_tag but wraps the results in a list even if
 only fetching one tag. Primarily exists for legacy code.
 
 #### def `get_json(serialize=True)`
@@ -479,14 +613,24 @@ Sort the data in the rows by their values for a given column
 or columns. Specify the columns using their names or ordinals.
 Accepts a list or an int/float. By default we will sort
 numerically. If that fails we do a string sort. Supply a
-function as key_func and we will order the elements based on the
+function as key and we will order the elements based on the
 keys it provides. See the help for sorted() for more details. If
 you provide multiple columns to sort by, they are interpreted as
 increasing order of sort priority.
 
-#### def `validate(validation_schema=None, category=None)`
+#### def `sort_tags(schema=None)`
 
-Validate a loop against a STAR schema. You can pass your own
-custom schema if desired, otherwise the schema will be fetched
-from the BMRB servers. Returns a list of errors found. 0-length
-list indicates no errors found.
+Rearranges the columns and data in the loop to match the order
+from the schema. Uses the BMRB schema unless one is provided.
+
+#### def `validate(validate_schema=True, schema=None, validate_star=True, category=None)`
+
+Validate a loop in a variety of ways. Returns a list of
+errors found. 0-length list indicates no errors found. By
+default all validation modes are enabled.
+
+validate_schema - Determines if the entry is validated against
+the NMR-STAR schema. You can pass your own custom schema if desired,
+otherwise the schema will be fetched from the BMRB servers.
+
+validate_star - Determines if the STAR syntax checks are ran.
