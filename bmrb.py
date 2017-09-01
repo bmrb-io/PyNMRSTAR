@@ -3619,7 +3619,7 @@ class Loop(object):
 
         return errors
 
-def called_directly():
+def _called_directly():
     """ Figure out what to do if we were called on the command line
     rather than imported as a module."""
 
@@ -3730,7 +3730,7 @@ def called_directly():
 
 # Allow using diff or validate if ran directly
 if __name__ == '__main__':
-    called_directly()
+    _called_directly()
 else:
     #############################################
     #          Module initializations           #
