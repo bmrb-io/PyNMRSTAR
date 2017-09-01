@@ -209,7 +209,7 @@ _COMMENT_DICTIONARY = {}
 _API_URL = "http://webapi.bmrb.wisc.edu/v2"
 _SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
-__version__ = "2.4.2"
+__version__ = "2.4.3"
 
 #############################################
 #             Module methods                #
@@ -2079,7 +2079,7 @@ class Saveframe(object):
              Saveframe.from_string()
              Saveframe.from_template()
              Saveframe.from_file()
-             and Saveframe.from_json()"""
+             Saveframe.from_json()"""
 
         # They initialized us wrong
         if len(kargs) == 0:
@@ -3119,9 +3119,9 @@ class Loop(object):
         processed_data = [the_list[x:x + len(self.columns)] for
                           x in range(0, len(the_list), len(self.columns))]
         if len(processed_data[-1]) != len(self.columns):
-            raise ValueError("The number of data elements in the loop " +
-                             self.category +
-                             " does not match the number of columns!")
+            raise ValueError("The number of data elements in the loop %s"
+                             " does not match the number of columns!" %
+                             self.category)
 
         # Auto convert datatypes if option set
         if CONVERT_DATATYPES:
