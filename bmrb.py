@@ -2079,7 +2079,7 @@ class Saveframe(object):
              Saveframe.from_string()
              Saveframe.from_template()
              Saveframe.from_file()
-             and Saveframe.from_json()"""
+             Saveframe.from_json()"""
 
         # They initialized us wrong
         if len(kargs) == 0:
