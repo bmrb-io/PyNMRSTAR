@@ -42,6 +42,7 @@ had a null value.
 * "bad-multiline": A tag with an improper multi-line value was found.
 Multiline values should look like this:
 
+```code
 ;
 The multi-line
 value here.
@@ -52,7 +53,7 @@ but the tag looked like this:
 ; The multi-line
 value here.
 ;
-
+```
 
 * Setting SKIP_EMPTY_LOOPS to True will suppress the printing of empty
 loops when calling __str__ methods.
