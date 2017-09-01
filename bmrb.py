@@ -1376,7 +1376,7 @@ class Schema(object):
 class Entry(object):
     """An OO representation of a BMRB entry. You can initialize this
     object several ways; (e.g. from a file, from the official database,
-    from scratch) see the class methods."""
+    from scratch) see the class methods below."""
 
     def __delitem__(self, item):
         """Remove the indicated saveframe."""
@@ -2014,7 +2014,7 @@ class Entry(object):
         return errors
 
 class Saveframe(object):
-    """A saveframe. Use the classmethod from_scratch to create one."""
+    """A saveframe object. Create using the class methods, see below."""
 
     def __delitem__(self, item):
         """Remove the indicated tag or loop."""
@@ -2700,7 +2700,7 @@ class Saveframe(object):
         return errors
 
 class Loop(object):
-    """A BMRB loop object."""
+    """A BMRB loop object. Create using the class methods, see below."""
 
     def __eq__(self, other):
         """Returns True if this loop is equal to another loop, False if
