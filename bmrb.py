@@ -1376,7 +1376,7 @@ class Schema(object):
 class Entry(object):
     """An OO representation of a BMRB entry. You can initialize this
     object several ways; (e.g. from a file, from the official database,
-    from scratch) see the classmethods."""
+    from scratch) see the class methods."""
 
     def __delitem__(self, item):
         """Remove the indicated saveframe."""
@@ -1407,8 +1407,13 @@ class Entry(object):
             return self.get_saveframe_by_name(item)
 
     def __init__(self, **kargs):
-        """Don't use this directly, use from_file, from_scratch,
-        from_string, or from_database to construct."""
+        """ You should not directly instantiate an Entry using this method.
+            Instead use the class methods:"
+              Entry.from_database()
+              Entry.from_file()
+              Entry.from_string()
+              Entry.from_scratch()
+              Entry.from_json()"""
 
         # Default initializations
         self.entry_id = 0
@@ -1416,14 +1421,12 @@ class Entry(object):
         self.source = None
 
         # They initialized us wrong
-        if len(kargs) == 0:
-            raise ValueError("You must provide either a Entry ID, a file name, "
-                             "an entry number, or a string to initialize. Use "
-                             "the class methods.")
-        elif len(kargs) > 1:
-            raise ValueError("You cannot provide multiple optional arguments. "
-                             "Use the class methods instead of initializing "
-                             "directly.")
+        if len(kargs) == 0 or len(kargs) > 1:
+            raise ValueError("You should not directly instantiate an Entry "
+                             "using this method. Instead use the class methods:"
+                             " Entry.from_database(), Entry.from_file(), "
+                             "Entry.from_string(), Entry.from_scratch(), and "
+                             "Entry.from_json()." )
 
         # Initialize our local variables
         self.frame_list = []
@@ -2071,11 +2074,20 @@ class Saveframe(object):
         return self.tag_prefix < other.tag_prefix
 
     def __init__(self, **kargs):
-        """Don't use this directly. Use the class methods to construct."""
+        """Don't use this directly. Use the class methods to construct:
+             Saveframe.from_scratch()
+             Saveframe.from_string()
+             Saveframe.from_template()
+             Saveframe.from_file()
+             and Saveframe.from_json()"""
 
         # They initialized us wrong
         if len(kargs) == 0:
-            raise ValueError("Use the class methods to initialize.")
+            raise ValueError("You should not directly instantiate a Saveframe "
+                             "using this method. Instead use the class methods:"
+                             " Saveframe.from_scratch(), Saveframe.from_string()"
+                             ", Saveframe.from_template(), Saveframe.from_file()"
+                             ", and Saveframe.from_json().")
 
         # Initialize our local variables
         self.tags = []
@@ -2712,7 +2724,13 @@ class Loop(object):
             return self.get_tag(tags=item)
 
     def __init__(self, **kargs):
-        """Use the classmethods to initialize."""
+        """ You should not directly instantiate a Loop using this method.
+            Instead use the class methods:
+              Loop.from_scratch()
+              Loop.from_string()
+              Loop.from_template()
+              Loop.from_file()
+              Loop.from_json()"""
 
         # Initialize our local variables
         self.columns = []
@@ -2731,7 +2749,11 @@ class Loop(object):
 
         # They initialized us wrong
         if len(kargs) == 0:
-            raise ValueError("Use the class methods to initialize.")
+            raise ValueError("You should not directly instantiate a Loop using "
+                             "this method. Instead use the class methods: "
+                             "Loop.from_scratch(), Loop.from_string(), "
+                             "Loop.from_template(), Loop.from_file(), and "
+                             "Loop.from_json().")
 
         # Parsing from a string
         if 'the_string' in kargs:
