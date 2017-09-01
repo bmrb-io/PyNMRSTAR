@@ -1318,7 +1318,7 @@ class Schema(object):
                     (tag, linenum)]
 
         # We will skip type checks for None's
-        was_none = value is None
+        is_none = value is None
 
         # Allow manual specification of conversions for booleans, Nones, etc.
         if value in STR_CONVERSION_DICT:
@@ -1328,6 +1328,10 @@ class Schema(object):
         # Value should always be string
         if not isinstance(value, str):
             value = str(value)
+
+        # Check that it isn't a string None
+        if value == "." or value == "?":
+            is_none = True
 
         # Make local copies of the fields we care about
         full_tag = self.schema[tag.lower()]
@@ -1342,25 +1346,26 @@ class Schema(object):
                 return ["The tag '%s' in category '%s' should be in category "
                         "'%s'." % (capitalized_tag, category, allowed_category)]
 
-        if value == ".":
+        if is_none:
             if not null_allowed:
                 return ["Value cannot be NULL but is: '%s':'%s' on line '%s'."
                         % (capitalized_tag, value, linenum)]
             return []
+        else:
+            # Don't run these checks on unassigned tags
+            if "CHAR" in valtype:
+                length = int(valtype[valtype.index("(")+1:valtype.index(")")])
+                if len(str(value)) > length:
+                    return ["Length of '%d' is too long for %s: "
+                            "'%s':'%s' on line '%s'." %
+                            (len(value), valtype, capitalized_tag, value, linenum)]
 
-        if "CHAR" in valtype:
-            length = int(valtype[valtype.index("(")+1:valtype.index(")")])
-            if len(str(value)) > length:
-                return ["Length of '%d' is too long for %s: "
-                        "'%s':'%s' on line '%s'." %
-                        (len(value), valtype, capitalized_tag, value, linenum)]
-
-        # Check that the value matches the regular expression for the type
-        if not was_none and not re.match(self.data_types[bmrb_type], str(value)):
-            return ["Value does not match specification: '%s':'%s' on line '%s'"
-                    ".\n     Type specified: %s\n     Regular expression for "
-                    "type: '%s'" % (capitalized_tag, value, linenum, bmrb_type,
-                                    self.data_types[bmrb_type])]
+            # Check that the value matches the regular expression for the type
+            if not re.match(self.data_types[bmrb_type], str(value)):
+                return ["Value does not match specification: '%s':'%s' on line '%s'"
+                        ".\n     Type specified: %s\n     Regular expression for "
+                        "type: '%s'" % (capitalized_tag, value, linenum, bmrb_type,
+                                        self.data_types[bmrb_type])]
 
         # Check the tag capitalization
         if tag != capitalized_tag:
