@@ -522,7 +522,7 @@ def _tag_key(x, schema=None):
         # Generate an arbitrary sort order for tags that aren't in the
         #  schema but make sure that they always come after tags in the
         #   schema
-        return len(_get_schema(schema).schema_order) + hash(x)
+        return len(_get_schema(schema).schema_order) + abs(hash(x))
 
 #############################################
 #                Classes                    #
