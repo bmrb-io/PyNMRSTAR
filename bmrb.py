@@ -3119,9 +3119,9 @@ class Loop(object):
         processed_data = [the_list[x:x + len(self.columns)] for
                           x in range(0, len(the_list), len(self.columns))]
         if len(processed_data[-1]) != len(self.columns):
-            raise ValueError("The number of data elements in the loop " +
-                             self.category +
-                             " does not match the number of columns!")
+            raise ValueError("The number of data elements in the loop %s"
+                             " does not match the number of columns!" %
+                             self.category)
 
         # Auto convert datatypes if option set
         if CONVERT_DATATYPES:
