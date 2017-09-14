@@ -353,7 +353,7 @@ class TestPyNMRSTAR(unittest.TestCase):
         tmp_loop.add_column("column3")
         self.assertRaises(ValueError, tmp_loop.__str__)
         tmp_loop.set_category("test")
-        self.assertEqual(str(tmp_loop), "\n   loop_\n      _test.column1\n      _test.column2\n      _test.column3\n\n     1   2   3    \n   stop_\n")
+        self.assertEqual(str(tmp_loop), "\n   loop_\n      _test.column1\n      _test.column2\n      _test.column3\n\n     1   2   3    \n\n   stop_\n")
         self.assertEqual(tmp_loop.category, "_test")
         # Check different category
         self.assertRaises(ValueError, tmp_loop.add_column, "invalid.column")

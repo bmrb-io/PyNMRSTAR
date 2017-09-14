@@ -209,7 +209,7 @@ _COMMENT_DICTIONARY = {}
 _API_URL = "http://webapi.bmrb.wisc.edu/v2"
 _SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
-__version__ = "2.4.3"
+__version__ = "2.4.4"
 
 #############################################
 #             Module methods                #
@@ -2345,7 +2345,7 @@ class Saveframe(object):
             ret_string += str(each_loop)
 
         # Close the saveframe
-        ret_string += "save_\n"
+        ret_string += "\nsave_\n"
         return ret_string
 
     def add_loop(self, loop_to_add):
@@ -2951,7 +2951,7 @@ class Loop(object):
                 row_strings.append(pstring % tuple(_from_iterable(column_width_list)))
 
         # Close the loop
-        ret_string += "".join(row_strings) + "   stop_\n"
+        ret_string += "".join(row_strings) + "\n   stop_\n"
         return ret_string
 
     @classmethod
