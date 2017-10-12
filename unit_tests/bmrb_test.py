@@ -435,6 +435,11 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertEqual(tmp_loop.data, [[1, None]])
         self.assertEqual(tmp_loop.columns, ["ID", "Assembly_atom_ID"])
 
+        # Make sure the add missing tags loop is working
+        tmp_loop = bmrb.Loop.from_string("loop_ _Atom_chem_shift.ID stop_")
+        tmp_loop.add_missing_tags()
+        self.assertEqual(tmp_loop, bmrb.Loop.from_template("atom_chem_shift"))
+
     def test_rename_saveframe(self):
         tmp = copy(database_entry)
         tmp.rename_saveframe('F5-Phe-cVHP', 'jons_frame')

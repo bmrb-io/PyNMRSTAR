@@ -3440,6 +3440,31 @@ class Loop(object):
                 return [[row[col_id] for col_id in column_ids] for
                         row in self.data]
 
+    def add_missing_tags(self, schema=None):
+        """ Automatically adds any missing tags (according to the schema),
+        sorts the tags, and renumbers the columns by ordinal. """
+
+        self.add_column(Loop._get_columns_from_schema(self.category),
+                        ignore_duplicates=True, update_data=True)
+        self.sort_tags()
+
+        # See if we can sort the rows (in addition to columns)
+        try:
+            self.sort_rows("Ordinal")
+        except ValueError:
+            pass
+        except TypeError:
+            ordinal_idx = self._tag_index("Ordinal")
+
+            # If the first ordinal is unassigned, assign it
+            if self.data[0][ordinal_idx] == "." or self.data[0][ordinal_idx] == None:
+                self.data[0][ordinal_idx] = 1
+
+            # If we are in another row, assign to the previous row
+            for row in self.data:
+                if row[ordinal_idx] == "." or row[ordinal_idx] == None:
+                    row[ordinal_idx] = row[ordinal_idx-1] + 1
+
     def print_tree(self):
         """Prints a summary, tree style, of the loop."""
 
