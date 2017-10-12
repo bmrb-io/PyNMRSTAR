@@ -209,7 +209,7 @@ _COMMENT_DICTIONARY = {}
 _API_URL = "http://webapi.bmrb.wisc.edu/v2"
 _SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
-__version__ = "2.4.4"
+__version__ = "2.5"
 
 #############################################
 #             Module methods                #
@@ -2766,29 +2766,13 @@ class Loop(object):
             self.source = "from_file('%s')" % kargs['file_name']
         # Creating from template (schema)
         elif 'tag_prefix' in kargs:
-            schema = _get_schema(kargs['schema'])
-            clean_tp = kargs['tag_prefix']
 
-            # Put the _ on the front for them if necessary
-            if not clean_tp.startswith("_"):
-                clean_tp = "_" + clean_tp
-            if not clean_tp.endswith("."):
-                clean_tp = clean_tp + "."
+            columns = Loop._get_columns_from_schema(kargs['tag_prefix'],
+                                                    all_tags=kargs['all_tags'],
+                                                    schema=kargs['schema'])
+            for column in columns:
+                self.add_column(column)
 
-            for item in schema.schema_order:
-                # The tag is in the loop
-                if item.lower().startswith(clean_tp.lower()):
-
-                    # Unconditional add
-                    if kargs['all_tags']:
-                        self.add_column(item)
-                    # Conditional add
-                    else:
-                        if schema.schema[item.lower()]["public"] != "I":
-                            self.add_column(item)
-            if len(self.columns) == 0:
-                raise ValueError("The tag prefix '%s' has no corresponding tags"
-                                 " in the dictionary." % clean_tp)
             return
 
         # If we are reading from a CSV file, go ahead and parse it
@@ -3019,6 +3003,38 @@ class Loop(object):
         return cls(tag_prefix=tag_prefix, all_tags=all_tags,
                    schema=schema, source="from_template()")
 
+    @staticmethod
+    def _get_columns_from_schema(category, schema=None, all_tags=False):
+        """ Returns the columns from the schema for the category of this
+        loop. """
+
+        schema = _get_schema(schema)
+
+        # Put the _ on the front for them if necessary
+        if not category.startswith("_"):
+            category = "_" + category
+        if not category.endswith("."):
+            category = category + "."
+
+        columns = []
+
+        for item in schema.schema_order:
+            # The tag is in the loop
+            if item.lower().startswith(category.lower()):
+
+                # Unconditional add
+                if all_tags:
+                    columns.append(item)
+                # Conditional add
+                else:
+                    if schema.schema[item.lower()]["public"] != "I":
+                        columns.append(item)
+        if len(columns) == 0:
+            raise ValueError("The tag prefix '%s' has no corresponding tags"
+                             " in the dictionary." % category)
+
+        return columns
+
     def _tag_index(self, tag_name):
         """ Helper method to do a case-insensitive check for the presence
         of a given tag in this loop. Returns the index of the tag if found
@@ -3045,7 +3061,7 @@ class Loop(object):
                                      "width of the data. Loop: '%s'." %
                                      self.category)
 
-    def add_column(self, name, ignore_duplicates=False):
+    def add_column(self, name, ignore_duplicates=False, update_data=False):
         """Add a column to the column list. Does a bit of validation
         and parsing. Set ignore_duplicates to true to ignore attempts
         to add the same tag more than once rather than raise an
@@ -3054,16 +3070,15 @@ class Loop(object):
         You can also pass a list of column names to add more than one
         column at a time.
 
-        Note that adding a column only adds a new tag to the list of
-        tags present in this loop. It does not automatically add a column
-        of None values to the data array if the loop is already populated
-        with data."""
+        Adding a column will update the data array to match by adding
+        None values to the rows if you specify update_data=True."""
 
         # If they have passed multiple columns to add, call ourself
         #  on each of them in succession
         if isinstance(name, (list, tuple)):
             for item in name:
-                self.add_column(item, ignore_duplicates=ignore_duplicates)
+                self.add_column(item, ignore_duplicates=ignore_duplicates,
+                                update_data=update_data)
             return
 
         name = name.strip()
@@ -3095,7 +3110,15 @@ class Loop(object):
             raise ValueError("There cannot be more than one '.' in a tag name.")
         if " " in name:
             raise ValueError("Column names can not contain spaces.")
+
+        # Add the column
         self.columns.append(name)
+
+        # Add None's to the rows of data
+        if update_data:
+
+            for row in self.data:
+                row.append(None)
 
     def add_data(self, the_list, rearrange=False):
         """Add a list to the data field. Items in list can be any type,
@@ -3416,6 +3439,31 @@ class Loop(object):
             else:
                 return [[row[col_id] for col_id in column_ids] for
                         row in self.data]
+
+    def add_missing_tags(self, schema=None):
+        """ Automatically adds any missing tags (according to the schema),
+        sorts the tags, and renumbers the columns by ordinal. """
+
+        self.add_column(Loop._get_columns_from_schema(self.category),
+                        ignore_duplicates=True, update_data=True)
+        self.sort_tags()
+
+        # See if we can sort the rows (in addition to columns)
+        try:
+            self.sort_rows("Ordinal")
+        except ValueError:
+            pass
+        except TypeError:
+            ordinal_idx = self._tag_index("Ordinal")
+
+            # If the first ordinal is unassigned, assign it
+            if self.data[0][ordinal_idx] == "." or self.data[0][ordinal_idx] == None:
+                self.data[0][ordinal_idx] = 1
+
+            # If we are in another row, assign to the previous row
+            for row in self.data:
+                if row[ordinal_idx] == "." or row[ordinal_idx] == None:
+                    row[ordinal_idx] = row[ordinal_idx-1] + 1
 
     def print_tree(self):
         """Prints a summary, tree style, of the loop."""
