@@ -2766,29 +2766,13 @@ class Loop(object):
             self.source = "from_file('%s')" % kargs['file_name']
         # Creating from template (schema)
         elif 'tag_prefix' in kargs:
-            schema = _get_schema(kargs['schema'])
-            clean_tp = kargs['tag_prefix']
 
-            # Put the _ on the front for them if necessary
-            if not clean_tp.startswith("_"):
-                clean_tp = "_" + clean_tp
-            if not clean_tp.endswith("."):
-                clean_tp = clean_tp + "."
+            columns = Loop._get_columns_from_schema(kargs['tag_prefix'],
+                                                    all_tags=kargs['all_tags'],
+                                                    schema=kargs['schema'])
+            for column in columns:
+                self.add_column(column)
 
-            for item in schema.schema_order:
-                # The tag is in the loop
-                if item.lower().startswith(clean_tp.lower()):
-
-                    # Unconditional add
-                    if kargs['all_tags']:
-                        self.add_column(item)
-                    # Conditional add
-                    else:
-                        if schema.schema[item.lower()]["public"] != "I":
-                            self.add_column(item)
-            if len(self.columns) == 0:
-                raise ValueError("The tag prefix '%s' has no corresponding tags"
-                                 " in the dictionary." % clean_tp)
             return
 
         # If we are reading from a CSV file, go ahead and parse it
@@ -3018,6 +3002,38 @@ class Loop(object):
 
         return cls(tag_prefix=tag_prefix, all_tags=all_tags,
                    schema=schema, source="from_template()")
+
+    @staticmethod
+    def _get_columns_from_schema(category, schema=None, all_tags=False):
+        """ Returns the columns from the schema for the category of this
+        loop. """
+
+        schema = _get_schema(schema)
+
+        # Put the _ on the front for them if necessary
+        if not category.startswith("_"):
+            category = "_" + category
+        if not category.endswith("."):
+            category = category + "."
+
+        columns = []
+
+        for item in schema.schema_order:
+            # The tag is in the loop
+            if item.lower().startswith(category.lower()):
+
+                # Unconditional add
+                if all_tags:
+                    columns.append(item)
+                # Conditional add
+                else:
+                    if schema.schema[item.lower()]["public"] != "I":
+                        columns.append(item)
+        if len(columns) == 0:
+            raise ValueError("The tag prefix '%s' has no corresponding tags"
+                             " in the dictionary." % category)
+
+        return columns
 
     def _tag_index(self, tag_name):
         """ Helper method to do a case-insensitive check for the presence
