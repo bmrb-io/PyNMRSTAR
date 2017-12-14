@@ -3378,10 +3378,13 @@ class Loop(object):
         else:
             return loop_dict
 
-    def get_tag(self, tags=None, whole_tag=False):
+    def get_tag(self, tags=None, whole_tag=False, dict_result=False):
         """Provided a tag name (or a list of tag names), or ordinals
         corresponding to columns, return the selected tags by row as
-        a list of lists."""
+        a list of lists.
+
+        If dict_result=True, return the tags as a list of dictionaries
+        in which the tag value points to the tag."""
 
         # All tags
         if tags is None:
@@ -3426,19 +3429,33 @@ class Loop(object):
                                      " or ID: '%s' in loop '%s'." %
                                      (query, str(self.category)))
 
-        # Use a list comprehension to pull the correct tags out of the rows
-        if whole_tag:
-            return [[self.category + "." + self.columns[col_id], row[col_id]]
-                    for col_id in column_ids for row in self.data]
-        else:
-            # If only returning one tag (the usual behavior) then don't wrap
-            # the results in a list
-            if len(lower_tags) == 1:
-                return [row[col_id] for col_id in column_ids for
-                        row in self.data]
+        # First build the tags as a list
+        if not dict_result:
+
+            # Use a list comprehension to pull the correct tags out of the rows
+            if whole_tag:
+                result = [[[self.category + "." + self.columns[col_id], row[col_id]]
+                          for col_id in column_ids] for row in self.data]
             else:
-                return [[row[col_id] for col_id in column_ids] for
-                        row in self.data]
+                result = [[row[col_id] for col_id in column_ids] for
+                          row in self.data]
+
+            # Strip the extra list if only one tag
+            if len(lower_tags) == 1:
+                return [x[0] for x in result]
+            else:
+                return result
+        # Make a dictionary
+        else:
+            if whole_tag:
+                result = [[{self.category + "." + self.columns[col_id]: row[col_id]}
+                          for col_id in column_ids] for row in self.data]
+            else:
+                result = [{self.columns[col_id]: row[col_id]
+                          for col_id in column_ids} for row in self.data]
+
+
+        return result
 
     def add_missing_tags(self, schema=None):
         """ Automatically adds any missing tags (according to the schema),
