@@ -2582,7 +2582,7 @@ class Saveframe(object):
                 return each_loop
         raise KeyError("No loop with category '%s'." % name)
 
-    def get_tag(self, query, whole_tag=False):
+    def get_tag(self, query, whole_tag=False, dict_result=False):
         """Allows fetching the value of a tag by tag name. Specify
         whole_tag=True and the [tag_name, tag_value] pair will be
         returned."""
@@ -3382,6 +3382,9 @@ class Loop(object):
         """Provided a tag name (or a list of tag names), or ordinals
         corresponding to columns, return the selected tags by row as
         a list of lists.
+
+        If whole_tag=True return the full tag name along with the tag
+        value, or if dict_result=True, as the tag key.
 
         If dict_result=True, return the tags as a list of dictionaries
         in which the tag value points to the tag."""

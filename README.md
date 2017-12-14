@@ -594,6 +594,12 @@ Provided a tag name (or a list of tag names), or ordinals
 corresponding to columns, return the selected tags by row as
 a list of lists.
 
+If whole_tag=True return the full tag name along with the tag
+value, or if dict_result=True, as the tag key.
+
+If dict_result=True, return the tags as a list of dictionaries
+in which the tag value points to the tag."""
+
 #### def `print_tree()`
 
 Prints a summary, tree style, of the loop.
