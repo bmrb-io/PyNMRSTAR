@@ -543,7 +543,7 @@ save_chem_comp_PHF
    _Chem_comp.Number_atoms_nh                   .
    _Chem_comp.PubChem_code                      .
    _Chem_comp.Subcomponent_list                 .
-   _Chem_comp.InCHi_code                        .
+   _Chem_comp.InChI_code                        .
    _Chem_comp.Mon_nstd_flag                     .
    _Chem_comp.Mon_nstd_class                    .
    _Chem_comp.Mon_nstd_details                  .
