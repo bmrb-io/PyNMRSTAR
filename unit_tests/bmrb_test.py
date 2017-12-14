@@ -400,6 +400,12 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertEqual(tmp_loop.get_tag(["COLUmN1", "Column2"]), [[1, 5], [2, 8]])
         self.assertEqual(tmp_loop.get_tag("COLUmN1", whole_tag=True), [['_test.column1', 1], ['_test.column1', 2]])
 
+        self.assertEqual(test_loop.get_tag(['_Entry_author.Ordinal', '_Entry_author.Middle_initials'], dict_result=True),
+                         [{'Middle_initials': 'C.', 'Ordinal': '1'},{'Middle_initials': '.', 'Ordinal': '2'},{'Middle_initials': 'B.', 'Ordinal': '3'},{'Middle_initials': 'H.', 'Ordinal': '4'},{'Middle_initials': 'L.', 'Ordinal': '5'}])
+
+        self.assertEqual(test_loop.get_tag(['_Entry_author.Ordinal', '_Entry_author.Middle_initials'], dict_result=True, whole_tag=True),
+                         [{'_Entry_author.Middle_initials': 'C.', '_Entry_author.Ordinal': '1'},{'_Entry_author.Middle_initials': '.', '_Entry_author.Ordinal': '2'},{'_Entry_author.Middle_initials': 'B.', '_Entry_author.Ordinal': '3'},{'_Entry_author.Middle_initials': 'H.', '_Entry_author.Ordinal': '4'},{'_Entry_author.Middle_initials': 'L.', '_Entry_author.Ordinal': '5'}])
+
         def simple_key(x):
             return -int(x[2])
 

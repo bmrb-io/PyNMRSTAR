@@ -2582,7 +2582,7 @@ class Saveframe(object):
                 return each_loop
         raise KeyError("No loop with category '%s'." % name)
 
-    def get_tag(self, query, whole_tag=False, dict_result=False):
+    def get_tag(self, query, whole_tag=False):
         """Allows fetching the value of a tag by tag name. Specify
         whole_tag=True and the [tag_name, tag_value] pair will be
         returned."""
@@ -3451,12 +3451,9 @@ class Loop(object):
         # Make a dictionary
         else:
             if whole_tag:
-                result = [[{self.category + "." + self.columns[col_id]: row[col_id]}
-                          for col_id in column_ids] for row in self.data]
+                result = [dict((self.category + "." + self.columns[col_id], row[col_id]) for col_id in column_ids) for row in self.data]
             else:
-                result = [{self.columns[col_id]: row[col_id]
-                          for col_id in column_ids} for row in self.data]
-
+                result = [dict((self.columns[col_id], row[col_id]) for col_id in column_ids) for row in self.data]
 
         return result
 
