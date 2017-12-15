@@ -503,7 +503,12 @@ def _load_comments(file_to_load=None):
     try:
         comment_entry = Entry.from_file(file_to_load)
     except IOError:
-        return
+        # Load the comments from Github if we can't find them locally
+        try:
+            comment_entry = Entry.from_file(_interpret_file("https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v2/reference_files/comments.str"))
+        except Exception:
+            # No comments will be printed
+            return
 
     # Load the comments
     categories = comment_entry.get_tag("_comment.category")
@@ -1067,15 +1072,20 @@ class Schema(object):
             if formatted not in self.category_order:
                 self.category_order.append(formatted)
 
-        # Read in the data types
-        types_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                  "reference_files/data_types.csv")
+        try:
+            # Read in the data types
+            types_file = _interpret_file(os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                                         "reference_files/data_types.csv"))
+        except IOError:
+            # Load the data types from Github if we can't find them locally
+            try:
+                types_file = _interpret_file("https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v2/reference_files/data_types.csv")
+            except Exception:
+                raise ValueError("Could not load the data type definition file from disk or the internet!")
 
-        with open(types_file, "rt") as types_file:
-            csv_reader_instance = csv_reader(types_file)
-
-            for item in csv_reader_instance:
-                self.data_types[item[0]] = item[1]
+        csv_reader_instance = csv_reader(types_file)
+        for item in csv_reader_instance:
+            self.data_types[item[0]] = item[1]
 
     def __repr__(self):
         """Return how we can be initialized."""
