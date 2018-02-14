@@ -1,1 +1,1 @@
-__all__ = ['bmrb']
+__all__ = ['pynmrstar']

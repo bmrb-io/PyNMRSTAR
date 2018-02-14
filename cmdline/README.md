@@ -3,23 +3,23 @@
 ## About
 
 These scripts are developed to ease certain common tasks performed against
-NMR-STAR files. To run, they must be able to find a copy of `bmrb.py`
+NMR-STAR files. To run, they must be able to find a copy of `pynmrstar.py`
 either in the same directory as them, or in the directory above them. Therefore
-if you copy the script elsewhere make sure to copy `bmrb.py` as well.
+if you copy the script elsewhere make sure to copy `pynmrstar.py` as well.
 
 Most of the tools' functions are clear from their names, but they are described
 in detail here for reference. If you want to use the bmrb python library but
 are intimidated looking at these scripts will provide you with an idea of how
 to read data from NMR-STAR files using the library.
 
-### bmrb.py
+### pynmrstar.py
 
 The python module itself has several command line flags that allow it to perform
 useful functions on the command line. Those are:
 
 #### Tag fetching
 
-Run `bmrb.py --tag` and then a filename followed by a list of comma separated
+Run `pynmrstar.py --tag` and then a filename followed by a list of comma separated
 tag names in order to extract the specified tags from the file and print
 them in a tabular format.
 
@@ -27,7 +27,7 @@ For example:
 
 ```bash
 
-./bmrb.py --tag bmr15000_3.str "_Citation_author.Given_name,_Citation_author.Family_name"
+./pynmrstar.py --tag bmr15000_3.str "_Citation_author.Given_name,_Citation_author.Family_name"
 Gabriel Cornilescu
 Erik    Hadley
 Matthew Woll
@@ -47,7 +47,7 @@ following example demonstrates the potential problem for improperly written code
 
 ```bash
 
-./bmrb.py --tag bmr15000_3.str "_Citation.Year,_Citation_author.Given_name,_Citation_author.Family_name"
+./pynmrstar.py --tag bmr15000_3.str "_Citation.Year,_Citation_author.Given_name,_Citation_author.Family_name"
 
 2007    Gabriel Cornilescu
     Erik    Hadley
@@ -71,7 +71,7 @@ from the above query:
 
 ```bash
 
-./bmrb.py --tag bmr15000_3.str "_Citation.Year,_Citation_author.Given_name,_Citation_author.Family_name" | cut -f3
+./pynmrstar.py --tag bmr15000_3.str "_Citation.Year,_Citation_author.Given_name,_Citation_author.Family_name" | cut -f3
 
 Cornilescu
 Hadley
@@ -87,7 +87,7 @@ To validate a NMR-STAR file against the NMR-STAR schema run:
 
 ```bash
 
-./bmrb.py --validate bmr15000_3.str
+./pynmrstar.py --validate bmr15000_3.str
 No problems found during validation.
 ```
 
@@ -97,7 +97,7 @@ To compare two NMR-STAR entries for equivalence (syntactically aware):
 
 ```bash
 
-./bmrb.py --diff entry_1.str entry_2.str
+./pynmrstar.py --diff entry_1.str entry_2.str
 Identical entries.
 ```
 
