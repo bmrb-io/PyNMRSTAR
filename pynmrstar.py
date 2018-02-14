@@ -5,10 +5,10 @@ built in help function for documentation.
 
 There are eight module variables you can set to control our behavior.
 
-* Setting bmrb.VERBOSE to True will print some of what is going on to
+* Setting VERBOSE to True will print some of what is going on to
 the terminal.
 
-* Setting bmrb.RAISE_PARSE_WARNINGS to True will raise an exception if
+* Setting RAISE_PARSE_WARNINGS to True will raise an exception if
 the parser encounters something problematic. Normally warnings are
 suppressed.
 
@@ -38,17 +38,17 @@ convert tags whose value matches "key" to the string "value" when
 printing. This allows you to set the default conversion value for
 Booleans or other objects.
 
-* Setting bmrb.ALLOW_V2_ENTRIES will allow parsing of NMR-STAR version
+* Setting ALLOW_V2_ENTRIES will allow parsing of NMR-STAR version
 2.1 entries. Most other methods will not operate correctly on parsed
 2.1 entries. This is only to allow you parse and access the data in
 these entries - nothing else. Only set this if you have a really good
 reason to. Attempting to print a 2.1 entry will 'work' but tags that
 were after loops will be moved to before loops.
 
-* Setting bmrb.DONT_SHOW_COMMENTS to True will supress the printing of
+* Setting DONT_SHOW_COMMENTS to True will supress the printing of
 comments before saveframes.
 
-* Setting bmrb.CONVERT_DATATYPES to True will automatically convert
+* Setting CONVERT_DATATYPES to True will automatically convert
 the data loaded from the file into the corresponding python type as
 determined by loading the standard BMRB schema. This would mean that
 all floats will be represented as decimal.Decimal objects, all integers
@@ -1090,7 +1090,7 @@ class Schema(object):
     def __repr__(self):
         """Return how we can be initialized."""
 
-        return "bmrb.Schema(schema_file='%s') version %s" % (self.schema_file,
+        return "pynmrstar.Schema(schema_file='%s') version %s" % (self.schema_file,
                                                              self.version)
 
     def __str__(self):
@@ -1490,7 +1490,7 @@ class Entry(object):
     def __repr__(self):
         """Returns a description of the entry."""
 
-        return "<bmrb.Entry '%s' %s>" % (self.entry_id, self.source)
+        return "<pynmrstar.Entry '%s' %s>" % (self.entry_id, self.source)
 
     def __setitem__(self, key, item):
         """Set the indicated saveframe."""
@@ -2281,7 +2281,7 @@ class Saveframe(object):
     def __repr__(self):
         """Returns a description of the saveframe."""
 
-        return "<bmrb.Saveframe '%s'>" % self.name
+        return "<pynmrstar.Saveframe '%s'>" % self.name
 
     def __setitem__(self, key, item):
         """Set the indicated loop or tag."""
@@ -2836,9 +2836,9 @@ class Loop(object):
                 common = common[:-1]
             if common == "":
                 common = "Unknown"
-            return "<bmrb.Loop '%s'>" % common
+            return "<pynmrstar.Loop '%s'>" % common
         else:
-            return "<bmrb.Loop '%s'>" % self.category
+            return "<pynmrstar.Loop '%s'>" % self.category
 
     def __setitem__(self, key, item):
         """Set all of the instances of a tag to the provided value.
