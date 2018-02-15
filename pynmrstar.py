@@ -1901,6 +1901,16 @@ class Entry(object):
         DONT_SHOW_COMMENTS = tmp_dont_show_comments
         return result
 
+    def print_tree(self):
+        """Prints a summary, tree style, of the frames and loops in
+        the entry."""
+
+        print(repr(self))
+        for pos, frame in enumerate(self):
+            print("\t[%d] %s" % (pos, repr(frame)))
+            for pos2, one_loop in enumerate(frame):
+                print("\t\t[%d] %s" % (pos2, repr(one_loop)))
+
     def rename_saveframe(self, original_name, new_name):
         """ Renames a saveframe and updates all pointers to that
         saveframe in the entry with the new name."""
@@ -1950,16 +1960,6 @@ class Entry(object):
                     for pos, val in enumerate(each_row):
                         if val == old_reference:
                             each_row[pos] = new_reference
-
-    def print_tree(self):
-        """Prints a summary, tree style, of the frames and loops in
-        the entry."""
-
-        print(repr(self))
-        for pos, frame in enumerate(self):
-            print("\t[%d] %s" % (pos, repr(frame)))
-            for pos2, one_loop in enumerate(frame):
-                print("\t\t[%d] %s" % (pos2, repr(one_loop)))
 
     def validate(self, validate_schema=True, schema=None,
                  validate_star=True):
