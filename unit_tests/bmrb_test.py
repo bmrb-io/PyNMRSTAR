@@ -201,7 +201,7 @@ class TestPyNMRSTAR(unittest.TestCase):
         validation = [u"Value cannot be NULL but is: '_Chem_comp.Provenance':'.' on line 'None'."]
         self.assertEqual(self.entry.validate(), validation)
         self.entry[-1][-1][0][0] = 'a'
-        validation.append("Value does not match specification: '_Atom_chem_shift.ID':'a' on line '0 column 0 of loop'.\n     Type specified: int\n     Regular expression for type: '-?[0-9]+'")
+        validation.append("Value does not match specification: '_Atom_chem_shift.ID':'a' on line '0 tag 0 of loop'.\n     Type specified: int\n     Regular expression for type: '-?[0-9]+'")
         self.assertEqual(self.entry.validate(), validation)
         self.entry[-1][-1][0][0] = '1'
 
@@ -350,58 +350,58 @@ class TestPyNMRSTAR(unittest.TestCase):
         tmp_loop = pynmrstar.Loop.from_scratch()
         tmp_loop.data = [[1, 2, 3]]
         self.assertRaises(ValueError, tmp_loop.__str__)
-        tmp_loop.add_column("column1")
+        tmp_loop.add_tag("tag1")
         self.assertRaises(ValueError, tmp_loop.__str__)
-        tmp_loop.add_column("column2")
-        tmp_loop.add_column("column3")
+        tmp_loop.add_tag("tag2")
+        tmp_loop.add_tag("tag3")
         self.assertRaises(ValueError, tmp_loop.__str__)
         tmp_loop.set_category("test")
-        self.assertEqual(str(tmp_loop), "\n   loop_\n      _test.column1\n      _test.column2\n      _test.column3\n\n     1   2   3    \n\n   stop_\n")
+        self.assertEqual(str(tmp_loop), "\n   loop_\n      _test.tag1\n      _test.tag2\n      _test.tag3\n\n     1   2   3    \n\n   stop_\n")
         self.assertEqual(tmp_loop.category, "_test")
         # Check different category
-        self.assertRaises(ValueError, tmp_loop.add_column, "invalid.column")
+        self.assertRaises(ValueError, tmp_loop.add_tag, "invalid.tag")
         # Check duplicate tag
-        self.assertRaises(ValueError, tmp_loop.add_column, "test.column3")
-        self.assertEqual(tmp_loop.add_column("test.column3", ignore_duplicates=True), None)
+        self.assertRaises(ValueError, tmp_loop.add_tag, "test.tag3")
+        self.assertEqual(tmp_loop.add_tag("test.tag3", ignore_duplicates=True), None)
         # Check space and period in tag
-        self.assertRaises(ValueError, tmp_loop.add_column, "test. column")
-        self.assertRaises(ValueError, tmp_loop.add_column, "test.column.test")
+        self.assertRaises(ValueError, tmp_loop.add_tag, "test. tag")
+        self.assertRaises(ValueError, tmp_loop.add_tag, "test.tag.test")
 
         # Check add_data
         self.assertRaises(ValueError, tmp_loop.add_data, [1, 2, 3, 4])
         tmp_loop.add_data([4, 5, 6])
         self.assertEqual(tmp_loop.data, [[1, 2, 3], [4, 5, 6]])
 
-        # Check add_data_by_column
-        # Wrong column order
-        self.assertRaises(ValueError, tmp_loop.add_data_by_column, "column2", "data")
+        # Check add_data_by_tag
+        # Wrong tag order
+        self.assertRaises(ValueError, tmp_loop.add_data_by_tag, "tag2", "data")
         # Invalid tag_prefix
-        self.assertRaises(ValueError, tmp_loop.add_data_by_column, "invalid.column2", "data")
-        # Column doesn't exist
-        self.assertRaises(ValueError, tmp_loop.add_data_by_column, "column4", "data")
+        self.assertRaises(ValueError, tmp_loop.add_data_by_tag, "invalid.tag2", "data")
+        # tag doesn't exist
+        self.assertRaises(ValueError, tmp_loop.add_data_by_tag, "tag4", "data")
         # Valid adds
-        tmp_loop.add_data_by_column("column1", 7)
-        tmp_loop.add_data_by_column("test.column2", 8)
-        tmp_loop.add_data_by_column("COLumn3", 9)
+        tmp_loop.add_data_by_tag("tag1", 7)
+        tmp_loop.add_data_by_tag("test.tag2", 8)
+        tmp_loop.add_data_by_tag("tag3", 9)
         self.assertEqual(tmp_loop.data, [[1, 2, 3], [4, 5, 6], [7, 8, 9]])
 
         # Test delete_data_by_tag_value
-        self.assertEqual(tmp_loop.delete_data_by_tag_value("COLUMn1", 1, index_tag=0), [[1, 2, 3]])
-        self.assertRaises(ValueError, tmp_loop.delete_data_by_tag_value, "column4", "data")
+        self.assertEqual(tmp_loop.delete_data_by_tag_value("tag1", 1, index_tag=0), [[1, 2, 3]])
+        self.assertRaises(ValueError, tmp_loop.delete_data_by_tag_value, "tag4", "data")
         self.assertEqual(tmp_loop.data, [[1, 5, 6], [2, 8, 9]])
 
         # Test get_data_as_csv()
-        self.assertEqual(tmp_loop.get_data_as_csv(), "_test.column1,_test.column2,_test.column3\n1,5,6\n2,8,9\n")
-        self.assertEqual(tmp_loop.get_data_as_csv(show_category=False), "column1,column2,column3\n1,5,6\n2,8,9\n")
+        self.assertEqual(tmp_loop.get_data_as_csv(), "_test.tag1,_test.tag2,_test.tag3\n1,5,6\n2,8,9\n")
+        self.assertEqual(tmp_loop.get_data_as_csv(show_category=False), "tag1,tag2,tag3\n1,5,6\n2,8,9\n")
         self.assertEqual(tmp_loop.get_data_as_csv(header=False), "1,5,6\n2,8,9\n")
         self.assertEqual(tmp_loop.get_data_as_csv(show_category=False, header=False), "1,5,6\n2,8,9\n")
 
         # Test get_tag
-        self.assertEqual(tmp_loop.get_data_by_tag("COLUmN1"), [[1, 2]])
-        self.assertRaises(ValueError, tmp_loop.get_tag, "invalid.COLUmN1")
-        self.assertEqual(tmp_loop.get_tag("COLUmN1"), [1, 2])
-        self.assertEqual(tmp_loop.get_tag(["COLUmN1", "Column2"]), [[1, 5], [2, 8]])
-        self.assertEqual(tmp_loop.get_tag("COLUmN1", whole_tag=True), [['_test.column1', 1], ['_test.column1', 2]])
+        self.assertEqual(tmp_loop.get_data_by_tag("tag1"), [[1, 2]])
+        self.assertRaises(ValueError, tmp_loop.get_tag, "invalid.tag1")
+        self.assertEqual(tmp_loop.get_tag("tag1"), [1, 2])
+        self.assertEqual(tmp_loop.get_tag(["tag1", "tag2"]), [[1, 5], [2, 8]])
+        self.assertEqual(tmp_loop.get_tag("tag1", whole_tag=True), [['_test.tag1', 1], ['_test.tag1', 2]])
 
         self.assertEqual(test_loop.get_tag(['_Entry_author.Ordinal', '_Entry_author.Middle_initials'], dict_result=True),
                          [{'Middle_initials': 'C.', 'Ordinal': '1'},{'Middle_initials': '.', 'Ordinal': '2'},{'Middle_initials': 'B.', 'Ordinal': '3'},{'Middle_initials': 'H.', 'Ordinal': '4'},{'Middle_initials': 'L.', 'Ordinal': '5'}])
@@ -413,9 +413,9 @@ class TestPyNMRSTAR(unittest.TestCase):
             return -int(x[2])
 
         # Test sort_rows
-        tmp_loop.sort_rows(["Column2"], key=simple_key)
+        tmp_loop.sort_rows(["tag2"], key=simple_key)
         self.assertEqual(tmp_loop.data, [[2, 8, 9], [1, 5, 6]])
-        tmp_loop.sort_rows(["Column2"])
+        tmp_loop.sort_rows(["tag2"])
         self.assertEqual(tmp_loop.data, [[1, 5, 6], [2, 8, 9]])
 
         # Test clear data
@@ -437,12 +437,12 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertEqual(pynmrstar.Loop.from_template("atom_chem_shift", all_tags=True, schema=my_schem),
                          pynmrstar.Loop.from_string("loop_ _Atom_chem_shift.ID _Atom_chem_shift.Assembly_atom_ID _Atom_chem_shift.Entity_assembly_ID _Atom_chem_shift.Entity_ID _Atom_chem_shift.Comp_index_ID _Atom_chem_shift.Seq_ID _Atom_chem_shift.Comp_ID _Atom_chem_shift.Atom_ID _Atom_chem_shift.New_Tag _Atom_chem_shift.Atom_type _Atom_chem_shift.Atom_isotope_number _Atom_chem_shift.Val _Atom_chem_shift.Val_err _Atom_chem_shift.Assign_fig_of_merit _Atom_chem_shift.Ambiguity_code _Atom_chem_shift.Ambiguity_set_ID _Atom_chem_shift.Occupancy _Atom_chem_shift.Resonance_ID _Atom_chem_shift.Auth_entity_assembly_ID _Atom_chem_shift.Auth_asym_ID _Atom_chem_shift.Auth_seq_ID _Atom_chem_shift.Auth_comp_ID _Atom_chem_shift.Auth_atom_ID _Atom_chem_shift.PDB_record_ID _Atom_chem_shift.PDB_model_num _Atom_chem_shift.PDB_strand_ID _Atom_chem_shift.PDB_ins_code _Atom_chem_shift.PDB_residue_no _Atom_chem_shift.PDB_residue_name _Atom_chem_shift.PDB_atom_name _Atom_chem_shift.Original_PDB_strand_ID _Atom_chem_shift.Original_PDB_residue_no _Atom_chem_shift.Original_PDB_residue_name _Atom_chem_shift.Original_PDB_atom_name _Atom_chem_shift.Details _Atom_chem_shift.Sf_ID _Atom_chem_shift.Entry_ID _Atom_chem_shift.Assigned_chem_shift_list_ID stop_ "))
 
-        # Make sure adding data with a column works
+        # Make sure adding data with a tag works
         tmp_loop = pynmrstar.Loop.from_string("loop_ _Atom_chem_shift.ID stop_")
         tmp_loop.data = [[1]]
-        tmp_loop.add_column("Assembly_atom_ID", update_data=True)
+        tmp_loop.add_tag("Assembly_atom_ID", update_data=True)
         self.assertEqual(tmp_loop.data, [[1, None]])
-        self.assertEqual(tmp_loop.columns, ["ID", "Assembly_atom_ID"])
+        self.assertEqual(tmp_loop.tags, ["ID", "Assembly_atom_ID"])
 
         # Make sure the add missing tags loop is working
         tmp_loop = pynmrstar.Loop.from_string("loop_ _Atom_chem_shift.ID stop_")
