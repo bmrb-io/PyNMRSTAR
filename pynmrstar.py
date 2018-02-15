@@ -2023,6 +2023,22 @@ class Entry(object):
 
         return errors
 
+    def write_to_file(self, file_name, format_="nmrstar"):
+        """ Writes the entry to the specified file in NMR-STAR format.
+
+        Optionally specify format_=json to write to the file in JSON format."""
+
+        if format_ not in ["nmrstar", "json"]:
+            raise ValueError("Invalid output format.")
+
+        out_file = open(file_name, "w")
+        if format_ == "nmrstar":
+            out_file.write(str(self))
+        elif format_ == "json":
+            out_file.write(self.get_json())
+
+        out_file.close()
+
 class Saveframe(object):
     """A saveframe object. Create using the class methods, see below."""
 
@@ -2708,6 +2724,22 @@ class Saveframe(object):
                                    category=my_category))
 
         return errors
+
+    def write_to_file(self, file_name, format_="nmrstar"):
+        """ Writes the saveframe to the specified file in NMR-STAR format.
+
+        Optionally specify format_=json to write to the file in JSON format."""
+
+        if format_ not in ["nmrstar", "json"]:
+            raise ValueError("Invalid output format.")
+
+        out_file = open(file_name, "w")
+        if format_ == "nmrstar":
+            out_file.write(str(self))
+        elif format_ == "json":
+            out_file.write(self.get_json())
+
+        out_file.close()
 
 class Loop(object):
     """A BMRB loop object. Create using the class methods, see below."""

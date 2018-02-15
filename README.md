@@ -280,7 +280,11 @@ otherwise the schema will be fetched from the BMRB servers.
 validate_star - Determines if the STAR syntax checks are ran.
 
 
+#### def `write_to_file(file_name, format_="nmrstar")`
 
+Writes the entry to the specified file in NMR-STAR format.
+
+Optionally specify format_=json to write to the file in JSON format.
 
 
 
@@ -418,6 +422,12 @@ the NMR-STAR schema. You can pass your own custom schema if desired,
 otherwise the schema will be fetched from the BMRB servers.
 
 validate_star - Determines if the STAR syntax checks are ran.
+
+#### def `write_to_file(file_name, format_="nmrstar")`
+
+Writes the saveframe to the specified file in NMR-STAR format.
+
+Optionally specify format_=json to write to the file in JSON format.
 
 ### class `Schema()`
 
