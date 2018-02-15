@@ -20,10 +20,10 @@ built in help function for documentation.
 
 There are eight module variables you can set to control our behavior.
 
-* Setting bmrb.VERBOSE to True will print some of what is going on to
+* Setting pynmrstar.VERBOSE to True will print some of what is going on to
 the terminal.
 
-* Setting bmrb.RAISE_PARSE_WARNINGS to True will raise an exception if
+* Setting pynmrstar.RAISE_PARSE_WARNINGS to True will raise an exception if
 the parser encounters something problematic. Normally warnings are
 suppressed.
 
@@ -58,25 +58,25 @@ value here.
 ;
 ```
 
-* Setting SKIP_EMPTY_LOOPS to True will suppress the printing of empty
+* Setting pynmrstar.SKIP_EMPTY_LOOPS to True will suppress the printing of empty
 loops when calling __str__ methods.
 
-* Adding key->value pairs to STR_CONVERSION_DICT will automatically
+* Adding key->value pairs to pynmrstar.STR_CONVERSION_DICT will automatically
 convert tags whose value matches "key" to the string "value" when
 printing. This allows you to set the default conversion value for
 Booleans or other objects.
 
-* Setting bmrb.ALLOW_V2_ENTRIES will allow parsing of NMR-STAR version
+* Setting pynmrstar.ALLOW_V2_ENTRIES will allow parsing of NMR-STAR version
 2.1 entries. Most other methods will not operate correctly on parsed
 2.1 entries. This is only to allow you parse and access the data in
 these entries - nothing else. Only set this if you have a really good
 reason to. Attempting to print a 2.1 entry will 'work' but tags that
 were after loops will be moved to before loops.
 
-* Setting bmrb.DONT_SHOW_COMMENTS to True will supress the printing of
+* Setting pynmrstar.DONT_SHOW_COMMENTS to True will supress the printing of
 comments before saveframes.
 
-* Setting bmrb.CONVERT_DATATYPES to True will automatically convert
+* Setting pynmrstar.CONVERT_DATATYPES to True will automatically convert
 the data loaded from the file into the corresponding python type as
 determined by loading the standard BMRB schema. This would mean that
 all floats will be represented as decimal.Decimal objects, all integers
