@@ -2777,9 +2777,9 @@ class Loop(object):
         # Creating from template (schema)
         elif 'tag_prefix' in kargs:
 
-            columns = Loop._get_columns_from_schema(kargs['tag_prefix'],
-                                                    all_tags=kargs['all_tags'],
-                                                    schema=kargs['schema'])
+            columns = Loop._get_tags_from_schema(kargs['tag_prefix'],
+                                                 all_tags=kargs['all_tags'],
+                                                 schema=kargs['schema'])
             for column in columns:
                 self.add_column(column)
 
@@ -3014,7 +3014,7 @@ class Loop(object):
                    schema=schema, source="from_template()")
 
     @staticmethod
-    def _get_columns_from_schema(category, schema=None, all_tags=False):
+    def _get_tags_from_schema(category, schema=None, all_tags=False):
         """ Returns the columns from the schema for the category of this
         loop. """
 
@@ -3323,13 +3323,11 @@ class Loop(object):
         return result
 
     def get_columns(self):
-        """ Return the columns for this entry with the category
-        included. Throws ValueError if the category was never set."""
+        """ Depreciated alias for get_tags() """
 
-        if not self.category:
-            raise ValueError("You never set the category of this loop.")
-
-        return [self.category + "." + x for x in self.columns]
+        sys.stderr.write("NOTICE: get_columns() is depreciated. Please use"
+                         " get_tag_names() instead.\n")
+        return self.get_tag_names()
 
     def get_data_as_csv(self, header=True, show_category=True):
         """Return the data contained in the loops, properly CSVd, as a
@@ -3387,6 +3385,17 @@ class Loop(object):
             return json.dumps(loop_dict, default=_json_serialize)
         else:
             return loop_dict
+
+    def get_tag_names(self):
+        """ Return the tag names for this entry with the category
+        included. Throws ValueError if the category was never set.
+
+        To fetch tag values use get_tag()."""
+
+        if not self.category:
+            raise ValueError("You never set the category of this loop.")
+
+        return [self.category + "." + x for x in self.columns]
 
     def get_tag(self, tags=None, whole_tag=False, dict_result=False):
         """Provided a tag name (or a list of tag names), or ordinals
@@ -3471,7 +3480,7 @@ class Loop(object):
         """ Automatically adds any missing tags (according to the schema),
         sorts the tags, and renumbers the columns by ordinal. """
 
-        self.add_column(Loop._get_columns_from_schema(self.category),
+        self.add_column(Loop._get_tags_from_schema(self.category),
                         ignore_duplicates=True, update_data=True)
         self.sort_tags()
 
@@ -3571,7 +3580,7 @@ class Loop(object):
         """ Rearranges the columns and data in the loop to match the order
         from the schema. Uses the BMRB schema unless one is provided."""
 
-        current_order = self.get_columns()
+        current_order = self.get_tag_names()
 
         # Sort the tags
         loc_key = lambda x: _tag_key(x, schema=schema)
