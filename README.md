@@ -12,7 +12,7 @@ Finally, there are several command-line based tools developed to enable simple q
 
 ## Introduction to NMR-STAR
 
-To understand how the library works, you first need to understand the NMR-STAR terminology and file format. If you are already familiar with NMR-STAR, feel free to [jump ahead](#Quick-Start-to-PyNMRSTAR) to the section on this library.
+To understand how the library works, you first need to understand the NMR-STAR terminology and file format. If you are already familiar with NMR-STAR, feel free to [jump ahead](#quick-start-to-pynmrstar) to the section on this library.
 
 A NMR-STAR entry/file is componsed of one or more saveframes (conceptually you should think of a saveframe as a data block), each of which contain tags and loops. There can only be one of each tag in a saveframe. If a tag has multiple values, the only way to represent it is to place it inside a loop. A loop is simply a set of tags with multiple values.
 
@@ -66,66 +66,66 @@ To see the overall structure of the entry, use the `print_tree()` method.
 ```python
 >>> entry15000.print_tree()
 <pynmrstar.Entry '15000' from_database(15000)>
-	[0] <pynmrstar.Saveframe 'entry_information'>
-		[0] <pynmrstar.Loop '_Entry_author'>
-		[1] <pynmrstar.Loop '_SG_project'>
-		[2] <pynmrstar.Loop '_Struct_keywords'>
-		[3] <pynmrstar.Loop '_Data_set'>
-		[4] <pynmrstar.Loop '_Datum'>
-		[5] <pynmrstar.Loop '_Release'>
-		[6] <pynmrstar.Loop '_Related_entries'>
-	[1] <pynmrstar.Saveframe 'citation_1'>
-		[0] <pynmrstar.Loop '_Citation_author'>
-	[2] <pynmrstar.Saveframe 'assembly'>
-		[0] <pynmrstar.Loop '_Entity_assembly'>
-	[3] <pynmrstar.Saveframe 'F5-Phe-cVHP'>
-		[0] <pynmrstar.Loop '_Entity_db_link'>
-		[1] <pynmrstar.Loop '_Entity_comp_index'>
-		[2] <pynmrstar.Loop '_Entity_poly_seq'>
-	[4] <pynmrstar.Saveframe 'natural_source'>
-		[0] <pynmrstar.Loop '_Entity_natural_src'>
-	[5] <pynmrstar.Saveframe 'experimental_source'>
-		[0] <pynmrstar.Loop '_Entity_experimental_src'>
-	[6] <pynmrstar.Saveframe 'chem_comp_PHF'>
-		[0] <pynmrstar.Loop '_Chem_comp_descriptor'>
-		[1] <pynmrstar.Loop '_Chem_comp_atom'>
-		[2] <pynmrstar.Loop '_Chem_comp_bond'>
-	[7] <pynmrstar.Saveframe 'unlabeled_sample'>
-		[0] <pynmrstar.Loop '_Sample_component'>
-	[8] <pynmrstar.Saveframe 'selectively_labeled_sample'>
-		[0] <pynmrstar.Loop '_Sample_component'>
-	[9] <pynmrstar.Saveframe 'sample_conditions'>
-		[0] <pynmrstar.Loop '_Sample_condition_variable'>
-	[10] <pynmrstar.Saveframe 'NMRPipe'>
-		[0] <pynmrstar.Loop '_Vendor'>
-		[1] <pynmrstar.Loop '_Task'>
-	[11] <pynmrstar.Saveframe 'PIPP'>
-		[0] <pynmrstar.Loop '_Vendor'>
-		[1] <pynmrstar.Loop '_Task'>
-	[12] <pynmrstar.Saveframe 'SPARKY'>
-		[0] <pynmrstar.Loop '_Vendor'>
-		[1] <pynmrstar.Loop '_Task'>
-	[13] <pynmrstar.Saveframe 'CYANA'>
-		[0] <pynmrstar.Loop '_Vendor'>
-		[1] <pynmrstar.Loop '_Task'>
-	[14] <pynmrstar.Saveframe 'X-PLOR_NIH'>
-		[0] <pynmrstar.Loop '_Vendor'>
-		[1] <pynmrstar.Loop '_Task'>
-	[15] <pynmrstar.Saveframe 'spectrometer_1'>
-	[16] <pynmrstar.Saveframe 'spectrometer_2'>
-	[17] <pynmrstar.Saveframe 'spectrometer_3'>
-	[18] <pynmrstar.Saveframe 'spectrometer_4'>
-	[19] <pynmrstar.Saveframe 'spectrometer_5'>
-	[20] <pynmrstar.Saveframe 'spectrometer_6'>
-	[21] <pynmrstar.Saveframe 'NMR_spectrometer_list'>
-		[0] <pynmrstar.Loop '_NMR_spectrometer_view'>
-	[22] <pynmrstar.Saveframe 'experiment_list'>
-		[0] <pynmrstar.Loop '_Experiment'>
-	[23] <pynmrstar.Saveframe 'chemical_shift_reference_1'>
-		[0] <pynmrstar.Loop '_Chem_shift_ref'>
-	[24] <pynmrstar.Saveframe 'assigned_chem_shift_list_1'>
-		[0] <pynmrstar.Loop '_Chem_shift_experiment'>
-		[1] <pynmrstar.Loop '_Atom_chem_shift'>
+    [0] <pynmrstar.Saveframe 'entry_information'>
+        [0] <pynmrstar.Loop '_Entry_author'>
+        [1] <pynmrstar.Loop '_SG_project'>
+        [2] <pynmrstar.Loop '_Struct_keywords'>
+        [3] <pynmrstar.Loop '_Data_set'>
+        [4] <pynmrstar.Loop '_Datum'>
+        [5] <pynmrstar.Loop '_Release'>
+        [6] <pynmrstar.Loop '_Related_entries'>
+    [1] <pynmrstar.Saveframe 'citation_1'>
+        [0] <pynmrstar.Loop '_Citation_author'>
+    [2] <pynmrstar.Saveframe 'assembly'>
+        [0] <pynmrstar.Loop '_Entity_assembly'>
+    [3] <pynmrstar.Saveframe 'F5-Phe-cVHP'>
+        [0] <pynmrstar.Loop '_Entity_db_link'>
+        [1] <pynmrstar.Loop '_Entity_comp_index'>
+        [2] <pynmrstar.Loop '_Entity_poly_seq'>
+    [4] <pynmrstar.Saveframe 'natural_source'>
+        [0] <pynmrstar.Loop '_Entity_natural_src'>
+    [5] <pynmrstar.Saveframe 'experimental_source'>
+        [0] <pynmrstar.Loop '_Entity_experimental_src'>
+    [6] <pynmrstar.Saveframe 'chem_comp_PHF'>
+        [0] <pynmrstar.Loop '_Chem_comp_descriptor'>
+        [1] <pynmrstar.Loop '_Chem_comp_atom'>
+        [2] <pynmrstar.Loop '_Chem_comp_bond'>
+    [7] <pynmrstar.Saveframe 'unlabeled_sample'>
+        [0] <pynmrstar.Loop '_Sample_component'>
+    [8] <pynmrstar.Saveframe 'selectively_labeled_sample'>
+        [0] <pynmrstar.Loop '_Sample_component'>
+    [9] <pynmrstar.Saveframe 'sample_conditions'>
+        [0] <pynmrstar.Loop '_Sample_condition_variable'>
+    [10] <pynmrstar.Saveframe 'NMRPipe'>
+        [0] <pynmrstar.Loop '_Vendor'>
+        [1] <pynmrstar.Loop '_Task'>
+    [11] <pynmrstar.Saveframe 'PIPP'>
+        [0] <pynmrstar.Loop '_Vendor'>
+        [1] <pynmrstar.Loop '_Task'>
+    [12] <pynmrstar.Saveframe 'SPARKY'>
+        [0] <pynmrstar.Loop '_Vendor'>
+        [1] <pynmrstar.Loop '_Task'>
+    [13] <pynmrstar.Saveframe 'CYANA'>
+        [0] <pynmrstar.Loop '_Vendor'>
+        [1] <pynmrstar.Loop '_Task'>
+    [14] <pynmrstar.Saveframe 'X-PLOR_NIH'>
+        [0] <pynmrstar.Loop '_Vendor'>
+        [1] <pynmrstar.Loop '_Task'>
+    [15] <pynmrstar.Saveframe 'spectrometer_1'>
+    [16] <pynmrstar.Saveframe 'spectrometer_2'>
+    [17] <pynmrstar.Saveframe 'spectrometer_3'>
+    [18] <pynmrstar.Saveframe 'spectrometer_4'>
+    [19] <pynmrstar.Saveframe 'spectrometer_5'>
+    [20] <pynmrstar.Saveframe 'spectrometer_6'>
+    [21] <pynmrstar.Saveframe 'NMR_spectrometer_list'>
+        [0] <pynmrstar.Loop '_NMR_spectrometer_view'>
+    [22] <pynmrstar.Saveframe 'experiment_list'>
+        [0] <pynmrstar.Loop '_Experiment'>
+    [23] <pynmrstar.Saveframe 'chemical_shift_reference_1'>
+        [0] <pynmrstar.Loop '_Chem_shift_ref'>
+    [24] <pynmrstar.Saveframe 'assigned_chem_shift_list_1'>
+        [0] <pynmrstar.Loop '_Chem_shift_experiment'>
+        [1] <pynmrstar.Loop '_Atom_chem_shift'>
 ```
 
 You can see that there are 24 saveframes, and each saveframe contains some number of loops.
@@ -154,7 +154,7 @@ You can do the same for loops within a saveframe, but for loops you must use the
       _Vendor.Entry_ID
       _Vendor.Software_ID
 
-     'CD Schwieters, JJ Kuszewski, N Tjandra and GM Clore'   .   .   15000   5    
+     'CD Schwieters, JJ Kuszewski, N Tjandra and GM Clore'   .   .   15000   5
 
    stop_
 
@@ -189,7 +189,7 @@ save_X-PLOR_NIH
       _Vendor.Entry_ID
       _Vendor.Software_ID
 
-     'CD Schwieters, JJ Kuszewski, N Tjandra and GM Clore'   .   .   15000   5    
+     'CD Schwieters, JJ Kuszewski, N Tjandra and GM Clore'   .   .   15000   5
 
    stop_
 
@@ -198,8 +198,8 @@ save_X-PLOR_NIH
       _Task.Entry_ID
       _Task.Software_ID
 
-     refinement             15000   5    
-     'structure solution'   15000   5    
+     refinement             15000   5
+     'structure solution'   15000   5
 
    stop_
 
@@ -213,8 +213,8 @@ This saveframe also has two loops, a vendor loop and a task loop. These are loop
 #### Reading the software packages
 The more robust way to access the data in the software saveframes is by iterating over all of the software saveframes in the entry and pulling out the data we want. To do this for software, we would write the following:
 ```python
-software_saveframes = entry15000.get_saveframes_by_category('software')
-software_saveframes
+>>> software_saveframes = entry15000.get_saveframes_by_category('software')
+>>> software_saveframes
 [<pynmrstar.Saveframe 'NMRPipe'>,
  <pynmrstar.Saveframe 'PIPP'>,
  <pynmrstar.Saveframe 'SPARKY'>,
@@ -226,24 +226,23 @@ You can see that this method, `get_saveframes_by_category` returned all of the s
 
 The following will combine all the task loops in the entry into CSV format.
 ```python
-csv_data = ""
-for software_sf in software_saveframes:
-    print_header = True
-    # Wrap this in try/catch because it is not gauranteed a software saveframe will have a task loop
-    try:
-        csv_data += software_sf['_Task'].get_data_as_csv(header=print_header)
-        print_header = False
-    except KeyError:
-        continue
-
-csv_data
+>>> csv_data = ""
+>>> for software_sf in software_saveframes:
+>>>     print_header = True
+>>>    # Wrap this in try/catch because it is not gauranteed a software saveframe will have a task loop
+>>>    try:
+>>>        csv_data += software_sf['_Task'].get_data_as_csv(header=print_header)
+>>>        print_header = False
+>>>    except KeyError:
+>>>        continue
+>>> csv_data
 '_Task.Task,_Task.Entry_ID,_Task.Software_ID\nprocessing,15000,1\n_Task.Task,_Task.Entry_ID,_Task.Software_ID\nchemical shift assignment,15000,2\ndata analysis,15000,2\npeak picking,15000,2\n_Task.Task,_Task.Entry_ID,_Task.Software_ID\nchemical shift assignment,15000,3\n_Task.Task,_Task.Entry_ID,_Task.Software_ID\nstructure solution,15000,4\n_Task.Task,_Task.Entry_ID,_Task.Software_ID\nrefinement,15000,5\nstructure solution,15000,5\n'
 ```
 
 #### Using get_tag to pull tags directly from an entry
 Another way to access data in by using the full tag name. Keep in mind that a full tag contains a category first, a period, and then a tag name. So if we wanted to see all of the various `_Task.Task` that the software packages associated with this entry performed, a simple way to do so is with the get_tag() method of the entry:
 ```python
-print entry15000.get_tag('Task.Task')
+>>> entry15000.get_tag('Task.Task')
 [u'processing',
  u'chemical shift assignment',
  u'data analysis',
@@ -255,7 +254,7 @@ print entry15000.get_tag('Task.Task')
 ```
 Or to get all of the spectrometer information - get_tags() accepts a list of tags to fetch and returns a dictionary pointing to all the values of each tag, with the order preserved:
 ```python
-entry15000.get_tags(['_NMR_spectrometer.Manufacturer', '_NMR_spectrometer.Model', '_NMR_spectrometer.Field_strength'])
+>>> entry15000.get_tags(['_NMR_spectrometer.Manufacturer', '_NMR_spectrometer.Model', '_NMR_spectrometer.Field_strength'])
 {'_NMR_spectrometer.Field_strength': [u'500',
   u'500',
   u'750',
@@ -280,13 +279,13 @@ To view all of the tags in the NMR-STAR schema and their meanings, please go [he
 
 *"I just want to get the chemical shift data as an array - how do I do that?"*
 
-Keep in mind that an entry may have multiple sets of assigned chemical shifts. (For examples, there made be two sets of assignements that were made under two differerent sample conditions.) So to get the chemical shifts it is best to iterate through all the assigned chemical shift loops:
+Keep in mind that an entry may have multiple sets of assigned chemical shifts. (For examples, there made be two sets of assignments that were made under two differerent sample conditions.) So to get the chemical shifts it is best to iterate through all the assigned chemical shift loops:
 
 ```python
-cs_result_sets = []
-for chemical_shift_loop in entry15000.get_loops_by_category("Atom_chem_shift"):
-    cs_result_sets.append(chemical_shift_loop.get_tag(['Comp_index_ID', 'Comp_ID', 'Atom_ID', 'Atom_type', 'Val', 'Val_err']))
-cs_result_sets
+>>> cs_result_sets = []
+>>> for chemical_shift_loop in entry15000.get_loops_by_category("Atom_chem_shift"):
+>>>     cs_result_sets.append(chemical_shift_loop.get_tag(['Comp_index_ID', 'Comp_ID', 'Atom_ID', 'Atom_type', 'Val', 'Val_err']))
+>>> cs_result_sets
 [[[u'2', u'SER', u'H', u'H', u'9.3070', u'0.01'],
   [u'2', u'SER', u'HA', u'H', u'4.5970', u'0.01'],
   [u'2', u'SER', u'HB2', u'H', u'4.3010', u'0.01'],
@@ -299,19 +298,53 @@ cs_result_sets
   ...
 ```
 
-Note that we used the get_tag() method of the loop to only pull out the tags we were concerned with. get_tag() accepts an array of tags in addition to a single tag.
+Note that we used the get_tag() method of the loop to only pull out the tags we were concerned with. get_tag() accepts an array of tags in addition to a single tag. The full assigned chemical saveframe loop will contain extra tags you may not need. For example:
+
+```python
+>>> print entry15000.get_loops_by_category("Atom_chem_shift")[0]
+   loop_
+      _Atom_chem_shift.ID
+      _Atom_chem_shift.Assembly_atom_ID
+      _Atom_chem_shift.Entity_assembly_ID
+      _Atom_chem_shift.Entity_ID
+      _Atom_chem_shift.Comp_index_ID
+      _Atom_chem_shift.Seq_ID
+      _Atom_chem_shift.Comp_ID
+      _Atom_chem_shift.Atom_ID
+      _Atom_chem_shift.Atom_type
+      _Atom_chem_shift.Atom_isotope_number
+      _Atom_chem_shift.Val
+      _Atom_chem_shift.Val_err
+      _Atom_chem_shift.Assign_fig_of_merit
+      _Atom_chem_shift.Ambiguity_code
+      _Atom_chem_shift.Occupancy
+      _Atom_chem_shift.Resonance_ID
+      _Atom_chem_shift.Auth_entity_assembly_ID
+      _Atom_chem_shift.Auth_asym_ID
+      _Atom_chem_shift.Auth_seq_ID
+      _Atom_chem_shift.Auth_comp_ID
+      _Atom_chem_shift.Auth_atom_ID
+      _Atom_chem_shift.Details
+      _Atom_chem_shift.Entry_ID
+      _Atom_chem_shift.Assigned_chem_shift_list_ID
+
+     1     .   1   1   2    2    SER   H      H   1    9.3070     0.01   .   .   .   .   .   .   2    SER   H     .   15000   1
+     2     .   1   1   2    2    SER   HA     H   1    4.5970     0.01   .   .   .   .   .   .   2    SER   HA    .   15000   1
+     3     .   1   1   2    2    SER   HB2    H   1    4.3010     0.01   .   .   .   .   .   .   2    SER   HB2   .   15000   1
+    ...
+```
 
 *"But I want to access the chemical shifts as numbers, not strings!"*
 
 That is easy to do. When you first load an entry it is by default loaded with all values as strings. To instead load it such that the values match the schema, simply turn on CONVERT_DATATYPES prior to loading it.
 
 ```python
-pynmrstar.CONVERT_DATATYPES = True
-ent15000 = pynmrstar.Entry.from_database(15000)
-cs_result_sets = []
-for chemical_shift_loop in entry15000.get_loops_by_category("Atom_chem_shift"):
-    cs_result_sets.append(chemical_shift_loop.get_tag(['Comp_index_ID', 'Comp_ID', 'Atom_ID', 'Atom_type', 'Val', 'Val_err']))
-cs_result_sets
+>>> pynmrstar.CONVERT_DATATYPES = True
+>>> ent15000 = pynmrstar.Entry.from_database(15000)
+>>> cs_result_sets = []
+>>> for chemical_shift_loop in entry15000.get_loops_by_category("Atom_chem_shift"):
+>>>     cs_result_sets.append(chemical_shift_loop.get_tag(['Comp_index_ID', 'Comp_ID', 'Atom_ID', 'Atom_type', 'Val', 'Val_err']))
+>>> cs_result_sets
 [[[2, u'SER', u'H', u'H', Decimal('9.3070'), Decimal('0.01')],
   [2, u'SER', u'HA', u'H', Decimal('4.5970'), Decimal('0.01')],
   [2, u'SER', u'HB2', u'H', Decimal('4.3010'), Decimal('0.01')],
@@ -327,7 +360,7 @@ cs_result_sets
    ...
 ```
 
-This is a great opportunity to point out that if all you want is the chemical shifts, or one or two tags, you may find it significantly easier to use the [BMRB API](https://github.com/uwbmrb/BMRB-API#bmrb-api) ([chemical shift example](https://github.com/uwbmrb/BMRB-API#get-assigned-chemical-shift-list-get)) to fetch that data directly and on-demand rather than dealing directly with NMR-STAR at all.
+This is a great opportunity to point out that if all you want is the chemical shifts, or one or two tags, you may find it significantly easier to use the [BMRB API](https://github.com/uwbmrb/BMRB-API#bmrb-api) ([chemical shift endpoint](https://github.com/uwbmrb/BMRB-API#get-assigned-chemical-shift-list-get)) to fetch that data directly and on-demand rather than dealing directly with NMR-STAR at all.
 
 
 For more examples of PyNMRSTAR library usage, please look [here](documentation/examples.md).
