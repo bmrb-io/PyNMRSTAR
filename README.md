@@ -364,3 +364,6 @@ This is a great opportunity to point out that if all you want is the chemical sh
 
 
 For more examples of PyNMRSTAR library usage, please look [here](documentation/examples.md).
+For the full documentation of all available methods and classes, please look [here](documentation/full.md).
+
+For any questions or suggestions, please create an issue on the GitHub page.
