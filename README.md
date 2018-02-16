@@ -240,7 +240,7 @@ The following will combine all the task loops in the entry into CSV format.
 ```
 
 #### Using get_tag to pull tags directly from an entry
-Another way to access data in by using the full tag name. Keep in mind that a full tag contains a category first, a period, and then a tag name. So if we wanted to see all of the various `_Task.Task` that the software packages associated with this entry performed, a simple way to do so is with the get_tag() method of the entry:
+Another way to access data in by using the full tag name. Keep in mind that a full tag contains a category first, a period, and then a tag name. So if we wanted to see all of the various `_Task.Task` that the software packages associated with this entry performed, a simple way to do so is with the `get_tag()` method of the entry:
 ```python
 >>> entry15000.get_tag('Task.Task')
 [u'processing',
@@ -252,7 +252,7 @@ Another way to access data in by using the full tag name. Keep in mind that a fu
  u'refinement',
  u'structure solution']
 ```
-Or to get all of the spectrometer information - get_tags() accepts a list of tags to fetch and returns a dictionary pointing to all the values of each tag, with the order preserved:
+Or to get all of the spectrometer information - `get_tags()` accepts a list of tags to fetch and returns a dictionary pointing to all the values of each tag, with the order preserved:
 ```python
 >>> entry15000.get_tags(['_NMR_spectrometer.Manufacturer', '_NMR_spectrometer.Model', '_NMR_spectrometer.Field_strength'])
 {'_NMR_spectrometer.Field_strength': [u'500',
@@ -298,7 +298,7 @@ Keep in mind that an entry may have multiple sets of assigned chemical shifts. (
   ...
 ```
 
-Note that we used the get_tag() method of the loop to only pull out the tags we were concerned with. get_tag() accepts an array of tags in addition to a single tag. The full assigned chemical saveframe loop will contain extra tags you may not need. For example:
+Note that we used the `get_tag()` method of the loop to only pull out the tags we were concerned with. `get_tag()` accepts an array of tags in addition to a single tag. The full assigned chemical saveframe loop will contain extra tags you may not need. For example:
 
 ```python
 >>> print entry15000.get_loops_by_category("Atom_chem_shift")[0]
