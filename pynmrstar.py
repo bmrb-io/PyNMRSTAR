@@ -1387,7 +1387,11 @@ class Schema(object):
         """ Returns the schema in JSON format. """
 
         s = {'data_types': self.data_types,
-             'schema': self.schema}
+             'category_order': self.category_order,
+             'schema_order': self.schema_order,
+             'schema': self.schema,
+             'headers': self.headers,
+             'version': self.version}
 
         if serialize:
             return json.dumps(s, default=_json_serialize)
