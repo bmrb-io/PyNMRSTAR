@@ -1,646 +1,786 @@
 # PyNMRSTAR
-A Python module for reading, writing, and manipulating NMR-STAR files. [![Build Status](https://travis-ci.org/uwbmrb/PyNMRSTAR.svg?branch=v2)](https://travis-ci.org/uwbmrb/PyNMRSTAR)
+A Python module for reading, writing, and manipulating NMR-STAR files. [![BuildStatus](https://travis-ci.org/uwbmrb/PyNMRSTAR.svg?branch=v2)](https://travis-ci.org/uwbmrb/PyNMRSTAR)
 
 Python versions supported: 2.6, 2.7, 3.3, 3.4, 3.5, and 3.6
 
-====
+## Overview
 
-### Command line tools
+This library was developed by the BMRB to give the Python-using NMR community tools to work with the NMR-STAR data format. It is used internally and is actively maintained. The library is thoroughly documented such that calling  `help(object_or_method)` from an interactive python session will print the documentation for the object or method.
 
-We have developed several command line tools to ease certain common actions
-performed against NMR-STAR files. If you are looking for information on those
-please go [here](cmdline/README.md).
+That same documentation, as well as some notes on module-level variables is located [here](documentation/full.md).
+Finally, there are several command-line based tools developed to enable simple queries to pull data out of an NMR-STAR file. Those tools also serve as great examples of how to use the library. You can view those [here](cmdline).
 
-====
+## Introduction to NMR-STAR
 
-### PyNMRSTAR Overview
+To understand how the library works, you first need to understand the NMR-STAR terminology and file format. If you are already familiar with NMR-STAR, feel free to [jump ahead](#quick-start-to-pynmrstar) to the section on this library.
 
-This module provides Entry, Saveframe, and Loop objects. Use python's
-built in help function for documentation.
+A NMR-STAR entry/file is componsed of one or more saveframes (conceptually you should think of a saveframe as a data block), each of which contain tags and loops. There can only be one of each tag in a saveframe. If a tag has multiple values, the only way to represent it is to place it inside a loop. A loop is simply a set of tags with multiple values.
 
-There are eight module variables you can set to control our behavior.
+Therefore, hierarchically, you can picture a NMR-STAR file as a tree where the entry is the trunk, the large branches are the saveframes, and each saveframe may contain one or more loops - the branches.
 
-* Setting bmrb.VERBOSE to True will print some of what is going on to
-the terminal.
+Here is a very simple example of a NMR-STAR file:
 
-* Setting bmrb.RAISE_PARSE_WARNINGS to True will raise an exception if
-the parser encounters something problematic. Normally warnings are
-suppressed.
+```
+data_dates
+    save_special_dates_saveframe_1
+        _Special_Dates.Type     Holidays
+        loop_
+            _Events.Date
+            _Events.Desciption
+            12/31/2017 "New Year's Eve"
+            01/01/2018 "New Year's Day"
+        stop_
+    save_
+```
 
-* In addition, if you want to ignore some parse warnings but allow the
-rest, you can specify warnings to ignore by adding the warning to ignore
-to the "WARNINGS_TO_IGNORE" list.
+In the previous example, the entry name is `dates` because that is what follows the `data_` tag. Next, there is one saveframe, with a name of `special_dates_saveframe_1` and a tag prefix (which corresponds to the saveframe category) of `Special_Dates`. There is one tag in the saveframe, with a tag name of `Type` and a value of `Holidays`. There is also one loop of category `events` that has information about two different events (though an unlimited number of events could be present).
 
-Here are descriptions of the parse warnings that can be suppressed:
+The first datum in each row corresponds to the first tag, `Date`, and the second corresponds to the second tag, `Description`.
 
-* "tag-only-loop": A loop with no data was found.
-* "empty-loop": A loop with no tags or values was found.
-* "tag-not-in-schema": A tag was found in the entry that was not present
-in the schema.
-* "invalid-null-value": A tag for which the schema disallows null values
-had a null value.
-* "bad-multiline": A tag with an improper multi-line value was found.
-Multiline values should look like this:
+Values in NMR-STAR format need to be quoted if they contain a space, tab, vertical tab, or newline in the value. This library takes care of that for you, but it is worth knowing. That is why in the example the dates are not quoted, but the event descriptions are.
 
-```code
-;
-The multi-line
-value here.
-;
+# Quick Start to PyNMRSTAR
+
+First, pull up an interactive python session and import the module:
+```python
+>>> import pynmrstar
+```
+
+There are many ways to load an NMR-STAR entry, but lets focus on the most common two.
+
+From the BMRB API (loads the most up to date version of an entry from the BMRB API):
+```python
+>>> entry15000 = pynmrstar.Entry.from_database(15000)
+```
+
+From a file:
+
+```python
+>>> entry = pynmrstar.Entry.from_file("/location/of/the/file.str")
+```
+
+Continuing on we will assume you have loaded entry 15000 from the API using the from_database command.
+
+Writing out a modified entry or saveframe to file is just as easy:
+
+```python
+>>> entry15000.write_to_file("output_file_name.str")
+```
+
+### Viewing the structure of the entry
+To see the overall structure of the entry, use the `print_tree()` method.
+```python
+>>> entry15000.print_tree()
+<pynmrstar.Entry '15000' from_database(15000)>
+    [0] <pynmrstar.Saveframe 'entry_information'>
+        [0] <pynmrstar.Loop '_Entry_author'>
+        [1] <pynmrstar.Loop '_SG_project'>
+        [2] <pynmrstar.Loop '_Struct_keywords'>
+        [3] <pynmrstar.Loop '_Data_set'>
+        [4] <pynmrstar.Loop '_Datum'>
+        [5] <pynmrstar.Loop '_Release'>
+        [6] <pynmrstar.Loop '_Related_entries'>
+    [1] <pynmrstar.Saveframe 'citation_1'>
+        [0] <pynmrstar.Loop '_Citation_author'>
+    [2] <pynmrstar.Saveframe 'assembly'>
+        [0] <pynmrstar.Loop '_Entity_assembly'>
+    [3] <pynmrstar.Saveframe 'F5-Phe-cVHP'>
+        [0] <pynmrstar.Loop '_Entity_db_link'>
+        [1] <pynmrstar.Loop '_Entity_comp_index'>
+        [2] <pynmrstar.Loop '_Entity_poly_seq'>
+    [4] <pynmrstar.Saveframe 'natural_source'>
+        [0] <pynmrstar.Loop '_Entity_natural_src'>
+    [5] <pynmrstar.Saveframe 'experimental_source'>
+        [0] <pynmrstar.Loop '_Entity_experimental_src'>
+    [6] <pynmrstar.Saveframe 'chem_comp_PHF'>
+        [0] <pynmrstar.Loop '_Chem_comp_descriptor'>
+        [1] <pynmrstar.Loop '_Chem_comp_atom'>
+        [2] <pynmrstar.Loop '_Chem_comp_bond'>
+    [7] <pynmrstar.Saveframe 'unlabeled_sample'>
+        [0] <pynmrstar.Loop '_Sample_component'>
+    [8] <pynmrstar.Saveframe 'selectively_labeled_sample'>
+        [0] <pynmrstar.Loop '_Sample_component'>
+    [9] <pynmrstar.Saveframe 'sample_conditions'>
+        [0] <pynmrstar.Loop '_Sample_condition_variable'>
+    [10] <pynmrstar.Saveframe 'NMRPipe'>
+        [0] <pynmrstar.Loop '_Vendor'>
+        [1] <pynmrstar.Loop '_Task'>
+    [11] <pynmrstar.Saveframe 'PIPP'>
+        [0] <pynmrstar.Loop '_Vendor'>
+        [1] <pynmrstar.Loop '_Task'>
+    [12] <pynmrstar.Saveframe 'SPARKY'>
+        [0] <pynmrstar.Loop '_Vendor'>
+        [1] <pynmrstar.Loop '_Task'>
+    [13] <pynmrstar.Saveframe 'CYANA'>
+        [0] <pynmrstar.Loop '_Vendor'>
+        [1] <pynmrstar.Loop '_Task'>
+    [14] <pynmrstar.Saveframe 'X-PLOR_NIH'>
+        [0] <pynmrstar.Loop '_Vendor'>
+        [1] <pynmrstar.Loop '_Task'>
+    [15] <pynmrstar.Saveframe 'spectrometer_1'>
+    [16] <pynmrstar.Saveframe 'spectrometer_2'>
+    [17] <pynmrstar.Saveframe 'spectrometer_3'>
+    [18] <pynmrstar.Saveframe 'spectrometer_4'>
+    [19] <pynmrstar.Saveframe 'spectrometer_5'>
+    [20] <pynmrstar.Saveframe 'spectrometer_6'>
+    [21] <pynmrstar.Saveframe 'NMR_spectrometer_list'>
+        [0] <pynmrstar.Loop '_NMR_spectrometer_view'>
+    [22] <pynmrstar.Saveframe 'experiment_list'>
+        [0] <pynmrstar.Loop '_Experiment'>
+    [23] <pynmrstar.Saveframe 'chemical_shift_reference_1'>
+        [0] <pynmrstar.Loop '_Chem_shift_ref'>
+    [24] <pynmrstar.Saveframe 'assigned_chem_shift_list_1'>
+        [0] <pynmrstar.Loop '_Chem_shift_experiment'>
+        [1] <pynmrstar.Loop '_Atom_chem_shift'>
+```
+
+You can see that there are 24 saveframes, and each saveframe contains some number of loops.
+
+### Accessing saveframes and loops
+
+There are several ways to access saveframes and loops depending on what you hope to accomplish.
+
+#### The interactive session way
+When playing with the library, debugging, or learning about NMR-STAR you will most likely find the following method most convenient. Note that it is not the correct pattern to use if you want to iterate all of the data in an entry (for reasons that will be explained below).
+
+You can access the saveframes in an entry directly using their *names*. For example, to get a reference to the spectrometer saveframe named `spectrometer_1` you can simply do the following:
+```python
+>>> a_spectrometer = entry15000['spectrometer_1']
+```
+Note that you can see the saveframe names in the tree printout above.
+
+You can do the same for loops within a saveframe, but for loops you must use their tag category (the part before the period) to access them (note that to get to the `Vendor` loop we first had to go through its parent saveframe, named `X-PLOR_NIH` (the `X-PLOR_NIH` saveframe is of the category `software` - you'll see where you access the category later and why accessing by category is preferrable).
+```python
+>>> explor_nih_vendor = entry15000['X-PLOR_NIH']['_Vendor']
+>>> print explor_nih_vendor
+   loop_
+      _Vendor.Name
+      _Vendor.Address
+      _Vendor.Electronic_address
+      _Vendor.Entry_ID
+      _Vendor.Software_ID
+
+     'CD Schwieters, JJ Kuszewski, N Tjandra and GM Clore'   .   .   15000   5
+
+   stop_
+
+```
+
+These shortcuts are there for your convenience when writing code. The reason you shouldn't use them in production code is because the saveframe names - what you use as a reference - can actually have any arbitrary value. They are fairly consistent, and for certain saveframes are always the same, but for other saveframes users can set them to whatever value they want during the deposition. Therefore the much better way to access data is via the *category*. Note that only one saveframe in an entry can have a given name, but multiple saveframes may be of the same category.
+
+The `_` prior to the `Vendor` loop category is to make it clear you want to access the loop and not a saveframe tag with the name `Vendor`.
+
+#### The robust (and recommended) way
+
+A better way to access data is via the category of the data you want to read, or by searching for it with a full tag name. Before going into detail, take a look at what one saveframe from the entry above looks like:
+
+```data
+############################
+#  Computer software used  #
+############################
+
+save_X-PLOR_NIH
+   _Software.Sf_category   software
+   _Software.Sf_framecode  X-PLOR_NIH
+   _Software.Entry_ID      15000
+   _Software.ID            5
+   _Software.Name          'X-PLOR NIH'
+   _Software.Version       .
+   _Software.Details       .
+
+   loop_
+      _Vendor.Name
+      _Vendor.Address
+      _Vendor.Electronic_address
+      _Vendor.Entry_ID
+      _Vendor.Software_ID
+
+     'CD Schwieters, JJ Kuszewski, N Tjandra and GM Clore'   .   .   15000   5
+
+   stop_
+
+   loop_
+      _Task.Task
+      _Task.Entry_ID
+      _Task.Software_ID
+
+     refinement             15000   5
+     'structure solution'   15000   5
+
+   stop_
+
+save_
+```
+
+This is a saveframe describing software that was used during an NMR study. You can see from the saveframe tags that the name of this software package is X-PLOR-NIH. You can see from the tag `ID` that it is the fifth software saveframe in this entry. The category of this saveframe is "software" which you can see in the `Sf_category` (short for saveframe category) tag.
+
+This saveframe also has two loops, a vendor loop and a task loop. These are loops rather than free tags as a given software package can have more than one vendor and more than one task it performs.
+
+#### Reading the software packages
+The more robust way to access the data in the software saveframes is by iterating over all of the software saveframes in the entry and pulling out the data we want. To do this for software, we would write the following:
+```python
+>>> software_saveframes = entry15000.get_saveframes_by_category('software')
+>>> software_saveframes
+[<pynmrstar.Saveframe 'NMRPipe'>,
+ <pynmrstar.Saveframe 'PIPP'>,
+ <pynmrstar.Saveframe 'SPARKY'>,
+ <pynmrstar.Saveframe 'CYANA'>,
+ <pynmrstar.Saveframe 'X-PLOR_NIH'>]
+```
+
+You can see that this method, `get_saveframes_by_category` returned all of the software saveframes in the entry. Now we can iterate through them to either pull out data, modify data, or remove data. (One note, each loop category - the text before the period in the loop tags - is unique to its parent saveframe. Therefore you will never find a `Task` loop in a saveframe with a category of anything other than `software`. Furthermore, a saveframe can only have one loop of a given category. This means that accessing loops within a saveframe using the category notation is robust and will not lead to you missing a loop.)
+
+The following will combine all the task loops in the entry into CSV format.
+```python
+>>> csv_data = ""
+>>> for software_sf in software_saveframes:
+>>>     print_header = True
+>>>    # Wrap this in try/catch because it is not gauranteed a software saveframe will have a task loop
+>>>    try:
+>>>        csv_data += software_sf['_Task'].get_data_as_csv(header=print_header)
+>>>        print_header = False
+>>>    except KeyError:
+>>>        continue
+>>> csv_data
+'_Task.Task,_Task.Entry_ID,_Task.Software_ID\nprocessing,15000,1\n_Task.Task,_Task.Entry_ID,_Task.Software_ID\nchemical shift assignment,15000,2\ndata analysis,15000,2\npeak picking,15000,2\n_Task.Task,_Task.Entry_ID,_Task.Software_ID\nchemical shift assignment,15000,3\n_Task.Task,_Task.Entry_ID,_Task.Software_ID\nstructure solution,15000,4\n_Task.Task,_Task.Entry_ID,_Task.Software_ID\nrefinement,15000,5\nstructure solution,15000,5\n'
+```
+
+#### Using get_tag to pull tags directly from an entry
+Another way to access data in by using the full tag name. Keep in mind that a full tag contains a category first, a period, and then a tag name. So if we wanted to see all of the various `_Task.Task` that the software packages associated with this entry performed, a simple way to do so is with the `get_tag()` method of the entry:
+```python
+>>> entry15000.get_tag('Task.Task')
+[u'processing',
+ u'chemical shift assignment',
+ u'data analysis',
+ u'peak picking',
+ u'chemical shift assignment',
+ u'structure solution',
+ u'refinement',
+ u'structure solution']
+```
+Or to get all of the spectrometer information - `get_tags()` accepts a list of tags to fetch and returns a dictionary pointing to all the values of each tag, with the order preserved:
+```python
+>>> entry15000.get_tags(['_NMR_spectrometer.Manufacturer', '_NMR_spectrometer.Model', '_NMR_spectrometer.Field_strength'])
+{'_NMR_spectrometer.Field_strength': [u'500',
+  u'500',
+  u'750',
+  u'600',
+  u'800',
+  u'900'],
+ '_NMR_spectrometer.Manufacturer': [u'Bruker',
+  u'Bruker',
+  u'Bruker',
+  u'Varian',
+  u'Varian',
+  u'Varian'],
+ '_NMR_spectrometer.Model': [u'Avance',
+  u'Avance',
+  u'Avance',
+  u'INOVA',
+  u'INOVA',
+  u'INOVA']}
+```
+To view all of the tags in the NMR-STAR schema and their meanings, please go [here](http://www.bmrb.wisc.edu/dictionary/tag.php).
+# Assigned Chemical Shifts
+
+*"I just want to get the chemical shift data as an array - how do I do that?"*
+
+Keep in mind that an entry may have multiple sets of assigned chemical shifts. (For examples, there made be two sets of assignments that were made under two differerent sample conditions.) So to get the chemical shifts it is best to iterate through all the assigned chemical shift loops:
+
+```python
+>>> cs_result_sets = []
+>>> for chemical_shift_loop in entry15000.get_loops_by_category("Atom_chem_shift"):
+>>>     cs_result_sets.append(chemical_shift_loop.get_tag(['Comp_index_ID', 'Comp_ID', 'Atom_ID', 'Atom_type', 'Val', 'Val_err']))
+>>> cs_result_sets
+[[[u'2', u'SER', u'H', u'H', u'9.3070', u'0.01'],
+  [u'2', u'SER', u'HA', u'H', u'4.5970', u'0.01'],
+  [u'2', u'SER', u'HB2', u'H', u'4.3010', u'0.01'],
+  [u'2', u'SER', u'HB3', u'H', u'4.0550', u'0.01'],
+  [u'2', u'SER', u'CB', u'C', u'64.6000', u'0.1'],
+  [u'2', u'SER', u'N', u'N', u'121.5800', u'0.1'],
+  [u'3', u'ASP', u'H', u'H', u'8.0740', u'0.01'],
+  [u'3', u'ASP', u'HA', u'H', u'4.5580', u'0.01'],
+  [u'3', u'ASP', u'HB2', u'H', u'2.835', u'0.01'],
+  ...
+```
+
+Note that we used the `get_tag()` method of the loop to only pull out the tags we were concerned with. `get_tag()` accepts an array of tags in addition to a single tag. The full assigned chemical saveframe loop will contain extra tags you may not need. For example:
+
+```python
+>>> print entry15000.get_loops_by_category("Atom_chem_shift")[0]
+   loop_
+      _Atom_chem_shift.ID
+      _Atom_chem_shift.Assembly_atom_ID
+      _Atom_chem_shift.Entity_assembly_ID
+      _Atom_chem_shift.Entity_ID
+      _Atom_chem_shift.Comp_index_ID
+      _Atom_chem_shift.Seq_ID
+      _Atom_chem_shift.Comp_ID
+      _Atom_chem_shift.Atom_ID
+      _Atom_chem_shift.Atom_type
+      _Atom_chem_shift.Atom_isotope_number
+      _Atom_chem_shift.Val
+      _Atom_chem_shift.Val_err
+      _Atom_chem_shift.Assign_fig_of_merit
+      _Atom_chem_shift.Ambiguity_code
+      _Atom_chem_shift.Occupancy
+      _Atom_chem_shift.Resonance_ID
+      _Atom_chem_shift.Auth_entity_assembly_ID
+      _Atom_chem_shift.Auth_asym_ID
+      _Atom_chem_shift.Auth_seq_ID
+      _Atom_chem_shift.Auth_comp_ID
+      _Atom_chem_shift.Auth_atom_ID
+      _Atom_chem_shift.Details
+      _Atom_chem_shift.Entry_ID
+      _Atom_chem_shift.Assigned_chem_shift_list_ID
+
+     1     .   1   1   2    2    SER   H      H   1    9.3070     0.01   .   .   .   .   .   .   2    SER   H     .   15000   1
+     2     .   1   1   2    2    SER   HA     H   1    4.5970     0.01   .   .   .   .   .   .   2    SER   HA    .   15000   1
+     3     .   1   1   2    2    SER   HB2    H   1    4.3010     0.01   .   .   .   .   .   .   2    SER   HB2   .   15000   1
+    ...
+```
+
+*"But I want to access the chemical shifts as numbers, not strings!"*
+
+That is easy to do. When you first load an entry it is by default loaded with all values as strings. To instead load it such that the values match the schema, simply turn on CONVERT_DATATYPES prior to loading it.
+
+```python
+>>> pynmrstar.CONVERT_DATATYPES = True
+>>> ent15000 = pynmrstar.Entry.from_database(15000)
+>>> cs_result_sets = []
+>>> for chemical_shift_loop in entry15000.get_loops_by_category("Atom_chem_shift"):
+>>>     cs_result_sets.append(chemical_shift_loop.get_tag(['Comp_index_ID', 'Comp_ID', 'Atom_ID', 'Atom_type', 'Val', 'Val_err']))
+>>> cs_result_sets
+[[[2, u'SER', u'H', u'H', Decimal('9.3070'), Decimal('0.01')],
+  [2, u'SER', u'HA', u'H', Decimal('4.5970'), Decimal('0.01')],
+  [2, u'SER', u'HB2', u'H', Decimal('4.3010'), Decimal('0.01')],
+  [2, u'SER', u'HB3', u'H', Decimal('4.0550'), Decimal('0.01')],
+  [2, u'SER', u'CB', u'C', Decimal('64.6000'), Decimal('0.1')],
+  [2, u'SER', u'N', u'N', Decimal('121.5800'), Decimal('0.1')],
+  [3, u'ASP', u'H', u'H', Decimal('8.0740'), Decimal('0.01')],
+  [3, u'ASP', u'HA', u'H', Decimal('4.5580'), Decimal('0.01')],
+  [3, u'ASP', u'HB2', u'H', Decimal('2.835'), Decimal('0.01')],
+  [3, u'ASP', u'HB3', u'H', Decimal('2.754'), Decimal('0.01')],
+  [3, u'ASP', u'CA', u'C', Decimal('57.6400'), Decimal('0.1')],
+  [3, u'ASP', u'N', u'N', Decimal('121.1040'), Decimal('0.1')],
+   ...
+```
+
+This is a great opportunity to point out that if all you want is the chemical shifts, or one or two tags, you may find it significantly easier to use the [BMRB API](https://github.com/uwbmrb/BMRB-API#bmrb-api) ([chemical shift endpoint](https://github.com/uwbmrb/BMRB-API#get-assigned-chemical-shift-list-get)) to fetch that data directly and on-demand rather than dealing directly with NMR-STAR at all.
+
+# Creating new loops and saveframes
+
+This tutorial has so far focused on how to read and access data. This section will focus on how to create new loop and saveframe objects.
+
+## Loops
+
+There are five ways to make a new loop: `from_file()`, `from_json()`, `from_scratch()`, `from_string()`, and `from_template()`. All of these are classmethods. `from_scratch()` makes a new loop, `from_string()` parses an NMR-STAR loop from a python string containing NMR-STAR data, `from_json()` parses a JSON object (reversely, `get_json()` will get a JSON representation of the loop), `from_scratch()` makes a completely empty loop, and `from_template()` makes a loop with the tags prefilled from the BMRB schema based on the provided category. `from_file`, `from_json`, and `from_string` are fairly self-explanatory - see the full documentation if needed for usage.
+
+#### `from_scratch()`
+
+```python
+>>> lp = pynmrstar.Loop.from_scratch()
+>>> print lp
+
+   loop_
+
+   stop_
+
+>>> lp.add_tag(['loop_category.tag1', 'loop_category.tag2', 'loop_category.tag3'])
+>>> print lp
+
+   loop_
+      _loop_category.tag1
+      _loop_category.tag2
+      _loop_category.tag3
+
+
+   stop_
+
+# Note that when calling add_data the length of the array must match the number of tags in the loop
+>>> lp.add_data(['value_1', 2, 'value 3'])
+>>> print lp
+   loop_
+      _loop_category.tag1
+      _loop_category.tag2
+      _loop_category.tag3
+
+     value_1   2   'value 3'
+
+   stop_
+
+# Alternatively, you can (with caution) directly modify the array corresponding to the loop data
+>>> lp.data = [[1,2,3],[4,5,6]]
+>>> print lp
+   loop_
+      _loop_category.tag1
+      _loop_category.tag2
+      _loop_category.tag3
+
+     1   2   3
+     4   5   6
+
+   stop_
+```
+
+Note that the loop category was set automatically when the tag `loop_category.tag1` was added. You could have also provided the tag when creating the loop by providing it as an argument to the optional `category` argument to the constructor.
+
+#### `from_template()`
+
+This method will create a new loop ready for data with the tags from the BMRB schema corresponding to that loop category.
+
+```python
+>>> chemical_shifts = pynmrstar.Loop.from_template('atom_chem_shift_list')
+>>> print chemical_shifts
+   loop_
+      _Atom_chem_shift.ID
+      _Atom_chem_shift.Assembly_atom_ID
+      _Atom_chem_shift.Entity_assembly_ID
+      _Atom_chem_shift.Entity_ID
+      _Atom_chem_shift.Comp_index_ID
+      _Atom_chem_shift.Seq_ID
+      _Atom_chem_shift.Comp_ID
+      _Atom_chem_shift.Atom_ID
+      _Atom_chem_shift.Atom_type
+      _Atom_chem_shift.Atom_isotope_number
+      _Atom_chem_shift.Val
+      _Atom_chem_shift.Val_err
+      _Atom_chem_shift.Assign_fig_of_merit
+      _Atom_chem_shift.Ambiguity_code
+      _Atom_chem_shift.Ambiguity_set_ID
+      _Atom_chem_shift.Occupancy
+      _Atom_chem_shift.Resonance_ID
+      _Atom_chem_shift.Auth_entity_assembly_ID
+      _Atom_chem_shift.Auth_asym_ID
+      _Atom_chem_shift.Auth_seq_ID
+      _Atom_chem_shift.Auth_comp_ID
+      _Atom_chem_shift.Auth_atom_ID
+      _Atom_chem_shift.Details
+      _Atom_chem_shift.Entry_ID
+      _Atom_chem_shift.Assigned_chem_shift_list_ID
+
+
+   stop_
+```
+
+## Saveframes
+
+There are five ways to make a new loop: `from_file()`, `from_json()`, `from_scratch()`, `from_string()`, and `from_template()`. All of these are classmethods. `from_scratch()` makes a new saveframe, `from_string()` parses an NMR-STAR saveframe from a python string containing NMR-STAR data, `from_json()` parses a JSON object (reversely, `get_json()` will get a JSON representation of the saveframe), `from_scratch()` makes a completely empty saveframe, and `from_template()` makes a saveframe with the tags prefilled from the BMRB schema based on the provided category. `from_file`, `from_json`, and `from_string` are fairly self-explanatory - see the full documentation if needed for usage.
+
+#### `from_scratch()`
+```python
+# You must provide the saveframe name (the value that comes after "save_" at the start of the saveframe and saveframe tag prefix (the value before the "." in a tag name) when creating a saveframe this way
+>>> my_sf = pynmrstar.Saveframe.from_scratch("sf_name", "example_sf_category")
+>>> print my_sf
+save_sf_name
+
+save_
+
+# Add a tag using the add_tag() method. Update=True will override existing tag with the same name. Update=False will raise an exception if the tag already exists
+>>> my_sf.add_tag("tagName1", "tagValue1")
+>>> print my_sf
+save_sf_name
+   _example_sf_category.tagName1  tagValue1
+
+save_
+
+>>> my_sf.add_tag("tagName1", "tagValue2", update=False)
+ValueError: There is already a tag with the name 'tagName1'.
+>>> my_sf.add_tag("tagName1", "tagValue2", update=True)
+>>> print my_sf
+save_sf_name
+   _example_sf_category.tagName1  tagValue1
+
+save_
+# Alternatively, you can access or write tag values using direct subset access:
+>>> my_sf['tagName1']
+['tagValue2']
+>>> my_sf['tagName2'] = "some value"
+>>> print my_sf
+save_sf_name
+   _example_sf_category.tagName1  tagValue2
+   _example_sf_category.tagName2  'some value'
+
+save_
+
+# Now add the loop we created before
+>>> my_sf.add_loop(lp)
+>>> print my_sf
+save_sf_name
+   _example_sf_category.tagName1  tagValue2
+   _example_sf_category.tagName2  'some value'
+
+   loop_
+      _loop_category.tag1
+      _loop_category.tag2
+      _loop_category.tag3
+
+     1   2   3
+     4   5   6
+
+   stop_
+
+save_
+
+# Now write out our saveframe to a file. Optionally specify format="json" to write in JSON format.
+>>> my_sf.write_to_file("file_name.str")
+>>> my_sf.write_to_file("file_name.json", format_="json")
+```
+
+#### `from_template()`
+```python
+
+>>> my_sf = pynmrstar.Saveframe.from_template("assigned_chemical_shifts")
+>>> print my_sf
+print my_sf
+     ###################################
+     #  Assigned chemical shift lists  #
+     ###################################
+
+###################################################################
+#       Chemical Shift Ambiguity Index Value Definitions          #
+#                                                                 #
+# The values other than 1 are used for those atoms with different #
+# chemical shifts that cannot be assigned to stereospecific atoms #
+# or to specific residues or chains.                              #
+#                                                                 #
+#   Index Value            Definition                             #
+#                                                                 #
+#      1             Unique (including isolated methyl protons,   #
+#                         geminal atoms, and geminal methyl       #
+#                         groups with identical chemical shifts)  #
+#                         (e.g. ILE HD11, HD12, HD13 protons)     #
+#      2             Ambiguity of geminal atoms or geminal methyl #
+#                         proton groups (e.g. ASP HB2 and HB3     #
+#                         protons, LEU CD1 and CD2 carbons, or    #
+#                         LEU HD11, HD12, HD13 and HD21, HD22,    #
+#                         HD23 methyl protons)                    #
+#      3             Aromatic atoms on opposite sides of          #
+#                         symmetrical rings (e.g. TYR HE1 and HE2 #
+#                         protons)                                #
+#      4             Intraresidue ambiguities (e.g. LYS HG and    #
+#                         HD protons or TRP HZ2 and HZ3 protons)  #
+#      5             Interresidue ambiguities (LYS 12 vs. LYS 27) #
+#      6             Intermolecular ambiguities (e.g. ASP 31 CA   #
+#                         in monomer 1 and ASP 31 CA in monomer 2 #
+#                         of an asymmetrical homodimer, duplex    #
+#                         DNA assignments, or other assignments   #
+#                         that may apply to atoms in one or more  #
+#                         molecule in the molecular assembly)     #
+#      9             Ambiguous, specific ambiguity not defined    #
+#                                                                 #
+###################################################################
+
+save_assigned_chemical_shifts
+   _Assigned_chem_shift_list.Sf_category                  assigned_chemical_shifts
+   _Assigned_chem_shift_list.Sf_framecode                 assigned_chemical_shifts
+   _Assigned_chem_shift_list.Entry_ID                     .
+   _Assigned_chem_shift_list.ID                           .
+   _Assigned_chem_shift_list.Sample_condition_list_ID     .
+   _Assigned_chem_shift_list.Sample_condition_list_label  .
+   _Assigned_chem_shift_list.Chem_shift_reference_ID      .
+   _Assigned_chem_shift_list.Chem_shift_reference_label   .
+   _Assigned_chem_shift_list.Chem_shift_1H_err            .
+   _Assigned_chem_shift_list.Chem_shift_13C_err           .
+   _Assigned_chem_shift_list.Chem_shift_15N_err           .
+   _Assigned_chem_shift_list.Chem_shift_31P_err           .
+   _Assigned_chem_shift_list.Chem_shift_2H_err            .
+   _Assigned_chem_shift_list.Chem_shift_19F_err           .
+   _Assigned_chem_shift_list.Error_derivation_method      .
+   _Assigned_chem_shift_list.Details                      .
+   _Assigned_chem_shift_list.Text_data_format             .
+   _Assigned_chem_shift_list.Text_data                    .
+
+   loop_
+      _Chem_shift_experiment.Experiment_ID
+      _Chem_shift_experiment.Experiment_name
+      _Chem_shift_experiment.Sample_ID
+      _Chem_shift_experiment.Sample_label
+      _Chem_shift_experiment.Sample_state
+      _Chem_shift_experiment.Entry_ID
+      _Chem_shift_experiment.Assigned_chem_shift_list_ID
+
+
+   stop_
+
+   loop_
+      _Systematic_chem_shift_offset.Type
+      _Systematic_chem_shift_offset.Atom_type
+      _Systematic_chem_shift_offset.Atom_isotope_number
+      _Systematic_chem_shift_offset.Val
+      _Systematic_chem_shift_offset.Val_err
+      _Systematic_chem_shift_offset.Entry_ID
+      _Systematic_chem_shift_offset.Assigned_chem_shift_list_ID
+
+
+   stop_
+
+   loop_
+      _Chem_shift_software.Software_ID
+      _Chem_shift_software.Software_label
+      _Chem_shift_software.Method_ID
+      _Chem_shift_software.Method_label
+      _Chem_shift_software.Entry_ID
+      _Chem_shift_software.Assigned_chem_shift_list_ID
+
+
+   stop_
+
+   loop_
+      _Atom_chem_shift.ID
+      _Atom_chem_shift.Assembly_atom_ID
+      _Atom_chem_shift.Entity_assembly_ID
+      _Atom_chem_shift.Entity_ID
+      _Atom_chem_shift.Comp_index_ID
+      _Atom_chem_shift.Seq_ID
+      _Atom_chem_shift.Comp_ID
+      _Atom_chem_shift.Atom_ID
+      _Atom_chem_shift.Atom_type
+      _Atom_chem_shift.Atom_isotope_number
+      _Atom_chem_shift.Val
+      _Atom_chem_shift.Val_err
+      _Atom_chem_shift.Assign_fig_of_merit
+      _Atom_chem_shift.Ambiguity_code
+      _Atom_chem_shift.Ambiguity_set_ID
+      _Atom_chem_shift.Occupancy
+      _Atom_chem_shift.Resonance_ID
+      _Atom_chem_shift.Auth_entity_assembly_ID
+      _Atom_chem_shift.Auth_asym_ID
+      _Atom_chem_shift.Auth_seq_ID
+      _Atom_chem_shift.Auth_comp_ID
+      _Atom_chem_shift.Auth_atom_ID
+      _Atom_chem_shift.Details
+      _Atom_chem_shift.Entry_ID
+      _Atom_chem_shift.Assigned_chem_shift_list_ID
+
+
+   stop_
+
+   loop_
+      _Ambiguous_atom_chem_shift.Ambiguous_shift_set_ID
+      _Ambiguous_atom_chem_shift.Atom_chem_shift_ID
+      _Ambiguous_atom_chem_shift.Entry_ID
+      _Ambiguous_atom_chem_shift.Assigned_chem_shift_list_ID
+
+
+   stop_
+
+save_
+
+```
+
+# Schema methods
+
+The library makes it easy to add missing tags, sort the tags according to the BMRB schema, and validate the data against the schema. Let's do a simple example of creating a chemical shift loop, adding any missing tags, ordering the tags in the standard order (not required), and then checking for errors.
+
+```python
+# Create the loop with the proper category
+>>> my_cs_loop = pynmrstar.Loop.from_scratch("Atom_chem_shift")
+# Add the tags we will fill
+>>> my_cs_loop.add_tag(['Comp_ID', 'Atom_ID', 'Comp_index_ID', 'Atom_type', 'Val', 'Val_err'])
+   loop_
+      _Atom_chem_shift.Comp_ID
+      _Atom_chem_shift.Atom_ID
+      _Atom_chem_shift.Comp_Index_ID
+      _Atom_chem_shift.Atom_type
+      _Atom_chem_shift.Val
+      _Atom_chem_shift.Val_err
+
+
+   stop_
+# Populate the data array
+>>> my_cs_loop.data = [['SER', 'H',  '2', 'H', '9.3070', '0.01'],
+                       ['SER', 'HA', '2', 'H', '4.5970', '0.01'],
+                       ['SER', 'HB2', '2', 'H', '4.3010', '0.01']]
+>>> print my_cs_loop
+   loop_
+      _Atom_chem_shift.Comp_ID
+      _Atom_chem_shift.Atom_ID
+      _Atom_chem_shift.Comp_Index_ID
+      _Atom_chem_shift.Atom_type
+      _Atom_chem_shift.Val
+      _Atom_chem_shift.Val_err
+
+     SER   H     2   H   9.3070   0.01
+     SER   HA    2   H   4.5970   0.01
+     SER   HB2   2   H   4.3010   0.01
+
+   stop_
+
+# Now lets sort the tags to match the BMRB schema
+>>> my_cs_loop.sort_tags()
+# You can see that the Comp_index_ID tag has been moved to the front to match the BMRB standard
+>>> print my_cs_loop
+   loop_
+      _Atom_chem_shift.Comp_index_ID
+      _Atom_chem_shift.Comp_ID
+      _Atom_chem_shift.Atom_ID
+      _Atom_chem_shift.Atom_type
+      _Atom_chem_shift.Val
+      _Atom_chem_shift.Val_err
+
+     2   SER   H     H   9.3070   0.01
+     2   SER   HA    H   4.5970   0.01
+     2   SER   HB2   H   4.3010   0.01
+
+   stop_
+
+# Check for any errors - returns a list of errors. No errors here:
+>>> print my_cs_loop.validate()
+[]
+# Let us now set 'Comp_index_ID' to have an invalid value
+>>> my_cs_loop.data[0][0] = "invalid"
+# You can see that there is now a validation error - the data doesn't match the specified type
+>>> print my_cs_loop.validate()
+["Value does not match specification: '_Atom_chem_shift.Comp_index_ID':'invalid' on line '0 tag 0 of loop'.\n     Type specified: int\n     Regular expression for type: '-?[0-9]+'"]
+# If you use the pynmrstar.validate(object) function, it will print the report in a human-readable format
+>>> pynmrstar.validate(my_cs_loop)
+1: Value does not match specification: '_Atom_chem_shift.Comp_index_ID':'invalid' on line '0 tag 0 of loop'.
+     Type specified: int
+     Regular expression for type: '-?[0-9]+'
+
+# Finally, add in any tags that you didn't have a value for
+>>> my_cs_loop.add_missing_tags()
+# You can see that all the standard "Atom_chem_shift" loop tags have been added, and their values all set to a logical null value - "."
+>>> print my_cs_loop
+
+   loop_
+      _Atom_chem_shift.ID
+      _Atom_chem_shift.Assembly_atom_ID
+      _Atom_chem_shift.Entity_assembly_ID
+      _Atom_chem_shift.Entity_ID
+      _Atom_chem_shift.Comp_index_ID
+      _Atom_chem_shift.Seq_ID
+      _Atom_chem_shift.Comp_ID
+      _Atom_chem_shift.Atom_ID
+      _Atom_chem_shift.Atom_type
+      _Atom_chem_shift.Atom_isotope_number
+      _Atom_chem_shift.Val
+      _Atom_chem_shift.Val_err
+      _Atom_chem_shift.Assign_fig_of_merit
+      _Atom_chem_shift.Ambiguity_code
+      _Atom_chem_shift.Ambiguity_set_ID
+      _Atom_chem_shift.Occupancy
+      _Atom_chem_shift.Resonance_ID
+      _Atom_chem_shift.Auth_entity_assembly_ID
+      _Atom_chem_shift.Auth_asym_ID
+      _Atom_chem_shift.Auth_seq_ID
+      _Atom_chem_shift.Auth_comp_ID
+      _Atom_chem_shift.Auth_atom_ID
+      _Atom_chem_shift.Details
+      _Atom_chem_shift.Entry_ID
+      _Atom_chem_shift.Assigned_chem_shift_list_ID
+
+     .   .   .   .   invalid   .   SER   H     H   .   9.3070   0.01   .   .   .   .   .   .   .   .   .   .   .   .   .
+     .   .   .   .   2         .   SER   HA    H   .   4.5970   0.01   .   .   .   .   .   .   .   .   .   .   .   .   .
+     .   .   .   .   2         .   SER   HB2   H   .   4.3010   0.01   .   .   .   .   .   .   .   .   .   .   .   .   .
+
+   stop_
 ```
 
 
-but the tag looked like this:
+For more examples of PyNMRSTAR library usage, please look [here](documentation/examples.md).
+For the full documentation of all available methods and classes, please look [here](documentation/full.md).
 
-```code
-; The multi-line
-value here.
-;
-```
+For any questions or suggestions, please create an issue on the GitHub page.
 
-* Setting SKIP_EMPTY_LOOPS to True will suppress the printing of empty
-loops when calling __str__ methods.
-
-* Adding key->value pairs to STR_CONVERSION_DICT will automatically
-convert tags whose value matches "key" to the string "value" when
-printing. This allows you to set the default conversion value for
-Booleans or other objects.
-
-* Setting bmrb.ALLOW_V2_ENTRIES will allow parsing of NMR-STAR version
-2.1 entries. Most other methods will not operate correctly on parsed
-2.1 entries. This is only to allow you parse and access the data in
-these entries - nothing else. Only set this if you have a really good
-reason to. Attempting to print a 2.1 entry will 'work' but tags that
-were after loops will be moved to before loops.
-
-* Setting bmrb.DONT_SHOW_COMMENTS to True will supress the printing of
-comments before saveframes.
-
-* Setting bmrb.CONVERT_DATATYPES to True will automatically convert
-the data loaded from the file into the corresponding python type as
-determined by loading the standard BMRB schema. This would mean that
-all floats will be represented as decimal.Decimal objects, all integers
-will be python int objects, strings and vars will remain strings, and
-dates will become datetime.date objects. When printing str() is called
-on all objects. Other that converting uppercase "E"s in scientific
-notation floats to lowercase "e"s this should not cause any change in
-the way re-printed NMR-STAR objects are displayed.
-
-Some errors will be detected and exceptions raised, but this does not
-implement a full validator (at least at present).
-
-Call directly (rather than importing) to run a self-test.
-
-
-Variables
-----------
-
-* `ALLOW_V2_ENTRIES`: False
-* `CONVERT_DATATYPES`: False
-* `DONT_SHOW_COMMENTS`: False
-* `RAISE_PARSE_WARNINGS`: False
-* `SKIP_EMPTY_LOOPS`: False
-* `STR_CONVERSION_DICT`: {None: '.'}
-* `VERBOSE`: False
-* `WARNINGS_TO_IGNORE`: []
-
-Functions
-----------
-
-### def `clean_value(value)`
-
-Automatically quotes the value in the appropriate way. Don't
-quote values you send to this method or they will show up in
-another set of quotes as part of the actual data. E.g.:
-
-clean_value('"e. coli"') returns ''"e. coli"''
-
-while
-
-clean_value("e. coli") returns "'e. coli'"
-
-This will automatically be called on all values when you use a str()
-method (so don't call it before inserting values into tags or loops).
-
-Be mindful of the value of STR_CONVERSION_DICT as it will effect the
-way the value is converted to a string.
-
-### def `delete_empty_saveframes(entry_object, tags_to_ignore=['sf_category', 'sf_framecode'], allowed_null_values=['.', '?', None])`
-
-This method will delete all empty saveframes in an entry
-(the loops in the saveframe must also be empty for the saveframe
-to be deleted). "Empty" means no values in tags, not no tags present.
-
-### def `diff(entry1, entry2)`
-
-Prints the differences between two entries. Non-equal entries
-will always be detected, but specific differences detected depends
-on order of entries.
-### def `enable_nef_defaults()`
-
-Sets the module variables such that our behavior matches the NEF
-standard. Specifically, suppress printing empty loops by default and
-convert True -> "true" and False -> "false" when printing.
-### def `enable_nmrstar_defaults()`
-
-Sets the module variables such that our behavior matches the
-BMRB standard (NMR-STAR). This is the default behavior of this module.
-This method only exists to revert after calling enable_nef_defaults().
-
-### def `validate(entry_to_validate, schema=None)`
-
-Prints a validation report of an entry.
-
-Classes
-----------
-
-### class `Entry()`
-
-An OO representation of a BMRB entry. You can initialize this
-object several ways; (e.g. from a file, from the official database,
-from scratch) see the class methods below.
-
-Methods:
-
-#### def `__init__()`
-
-You should not directly instantiate an Entry using this method.
-Instead use the class methods:"
-Entry.from_database()
-Entry.from_file()
-Entry.from_string()
-Entry.from_scratch()
-Entry.from_json()
-
-#### def `add_saveframe(frame)`
-
-Add a saveframe to the entry.
-
-#### def `compare(other)`
-
-Returns the differences between two entries as a list.
-Otherwise returns 1 if different and 0 if equal. Non-equal
-entries will always be detected, but specific differences
-detected depends on order of entries.
-
-#### def `frame_dict()`
-
-Returns a dictionary of saveframe name -> saveframe object
-
-#### def `from_database(cls, entry_num)`
-
-Create an entry corresponding to the most up to date entry on
-the public BMRB server. (Requires ability to initiate outbound
-HTTP connections.)
-
-#### def `from_file(cls, the_file)`
-
-Create an entry by loading in a file. If the_file starts with
-http://, https://, or ftp:// then we will use those protocols to
-attempt to open the file.
-
-#### def `from_json(cls, json_dict)`
-
-Create an entry from JSON (serialized or unserialized JSON).
-
-#### def `from_scratch(cls, entry_id)`
-
-Create an empty entry that you can programatically add to.
-You must pass a value corresponding to the Entry ID.
-(The unique identifier "xxx" from "data_xxx".)
-
-#### def `from_string(cls, the_string)`
-
-Create an entry by parsing a string.
-
-#### def `get_json(serialize=True)`
-
-Returns the entry in JSON format. If serialize is set to
-False a dictionary representation of the entry that is
-serializeable is returned.
-
-#### def `get_loops_by_category(value)`
-
-Allows fetching loops by category.
-
-#### def `get_saveframe_by_name(frame)`
-
-Allows fetching a saveframe by name.
-
-#### def `get_saveframes_by_category(value)`
-
-Allows fetching saveframes by category.
-
-#### def `get_saveframes_by_tag_and_value(tag_name, value)`
-
-Allows fetching saveframe(s) by tag and tag value.
-
-#### def `get_tag(tag, whole_tag=False)`
-
-Given a tag (E.g. _Assigned_chem_shift_list.Data_file_name)
-return a list of all values for that tag. Specify whole_tag=True
-and the [tag_name, tag_value (,tag_linenumber)] pair will be
-returned.
-
-#### def `get_tags(tags)`
-
-Given a list of tags, get all of the tags and return the
-results in a dictionary.
-
-#### def `nef_string()`
-
-Returns a string representation of the entry in NEF.
-
-#### def `normalize(schema=None)`
-
-Sorts saveframes, loops, and tags according to the schema
-provided (or BMRB default if none provided) and according
-to the assigned ID.
-
-#### def `print_tree()`
-
-Prints a summary, tree style, of the frames and loops in
-the entry.
-
-#### def `rename_saveframe(original_name, new_name)`
-
-Renames a saveframe and updates all pointers to that
-saveframe in the entry with the new name.
-
-#### def `validate(validate_schema=True, schema=None, validate_star=True)`
-
-Validate an entry in a variety of ways. Returns a list of
-errors found. 0-length list indicates no errors found. By
-default all validation modes are enabled.
-
-validate_schema - Determines if the entry is validated against
-the NMR-STAR schema. You can pass your own custom schema if desired,
-otherwise the schema will be fetched from the BMRB servers.
-
-validate_star - Determines if the STAR syntax checks are ran.
-
-
-
-
-
-
-### class `Saveframe()`
-
-A saveframe object. Create using the class methods, see below.
-
-Methods:
-
-#### def `__init__()`
-
-Don't use this directly. Use the class methods to construct:
-Saveframe.from_scratch()
-Saveframe.from_string()
-Saveframe.from_template()
-Saveframe.from_file()
-and Saveframe.from_json()
-
-#### def `add_loop(loop_to_add)`
-
-Add a loop to the saveframe loops.
-
-#### def `add_tag(name, value, linenum=None, update=False)`
-
-Add a tag to the tag list. Does a bit of validation and
-parsing. Set update to true to update a tag if it exists rather
-than raise an exception.
-
-#### def `add_tags(tag_list, update=False)`
-
-Adds multiple tags to the list. Input should be a list of
-tuples that are either [key, value] or [key]. In the latter case
-the value will be set to ".".  Set update to true to update a
-tag if it exists rather than raise an exception.
-
-#### def `compare(other)`
-
-Returns the differences between two saveframes as a list.
-Non-equal saveframes will always be detected, but specific
-differences detected depends on order of saveframes.
-
-#### def `delete_tag(tag)`
-
-Deletes a tag from the saveframe based on tag name.
-
-#### def `from_file(cls, the_file, csv=False)`
-
-Create a saveframe by loading in a file. Specify csv=True is
-the file is a CSV file. If the_file starts with http://,
-https://, or ftp:// then we will use those protocols to attempt
-to open the file.
-
-#### def `from_json(cls, json_dict)`
-
-Create a saveframe from JSON (serialized or unserialized JSON).
-
-#### def `from_scratch(cls, sf_name, tag_prefix=None, source=from_scratch())`
-
-Create an empty saveframe that you can programatically add
-to. You may also pass the tag prefix as the second argument. If
-you do not pass the tag prefix it will be set the first time you
-add a tag.
-
-#### def `from_string(cls, the_string, csv=False)`
-
-Create a saveframe by parsing a string. Specify csv=True is
-the string is in CSV format and not NMR-STAR format.
-
-#### def `from_template(cls, category, name=None, all_tags=False, schema=None)`
-
-Create a saveframe that has all of the tags and loops from the
-schema present. No values will be assigned. Specify the category
-when calling this method. Optionally also provide the name of the
-saveframe as the 'name' argument.
-
-The optional argument 'all_tags' forces all tags to be included
-rather than just the mandatory tags.
-
-#### def `get_data_as_csv(header=True, show_category=True)`
-
-Return the data contained in the loops, properly CSVd, as a
-string. Set header to False omit the header. Set show_category
-to False to omit the loop category from the headers.
-
-#### def `get_json(serialize=True)`
-
-Returns the saveframe in JSON format. If serialize is set to
-False a dictionary representation of the saveframe that is
-serializeable is returned.
-
-#### def `get_loop_by_category(name)`
-
-Return a loop based on the loop name (category).
-
-#### def `get_tag(query, whole_tag=False)`
-
-Allows fetching the value of a tag by tag name. Specify
-whole_tag=True and the [tag_name, tag_value] pair will be
-returned.
-
-#### def `loop_dict()`
-
-Returns a hash of loop category -> loop.
-
-#### def `loop_iterator()`
-
-Returns an iterator for saveframe loops.
-
-#### def `print_tree()`
-
-Prints a summary, tree style, of the loops in the saveframe.
-
-#### def `set_tag_prefix(tag_prefix)`
-
-Set the tag prefix for this saveframe.
-
-#### def `sort_tags(schema=None)`
-
-Sort the tags so they are in the same order as a BMRB
-schema. Will automatically use the standard schema if none
-is provided.
-
-#### def `tag_iterator()`
-
-Returns an iterator for saveframe tags.
-
-#### def `validate(validate_schema=True, schema=None, validate_star=True)`
-
-Validate a saveframe in a variety of ways. Returns a list of
-errors found. 0-length list indicates no errors found. By
-default all validation modes are enabled.
-
-validate_schema - Determines if the entry is validated against
-the NMR-STAR schema. You can pass your own custom schema if desired,
-otherwise the schema will be fetched from the BMRB servers.
-
-validate_star - Determines if the STAR syntax checks are ran.
-
-### class `Schema()`
-
-A BMRB schema. Used to validate STAR files.
-
-Methods:
-
-#### def `__init__(schema_file=None)`
-
-Initialize a BMRB schema. With no arguments the most
-up-to-date schema will be fetched from the BMRB FTP site.
-Otherwise pass a URL or a file to load a schema from using the
-schema_file keyword argument.
-
-#### def `add_tag(tag, tag_type, null_allowed, sf_category, loop_flag, after=None)`
-
-Adds the specified tag to the tag dictionary. You must provide:
-
-1) The full tag as such:
-"_Entry_interview.Sf_category"
-2) The tag type which is one of the following:
-"INTEGER"
-"FLOAT"
-"CHAR(len)"
-"VARCHAR(len)"
-"TEXT"
-"DATETIME year to day"
-3) A python True/False that indicates whether null values are allowed.
-4) The sf_category of the parent saveframe.
-5) A True/False value which indicates if this tag is a loop tag.
-6) Optional: The tag to order this tag behind when normalizing
-saveframes.
-
-#### def `convert_tag(tag, value, linenum=None)`
-
-Converts the provided tag from string to the appropriate
-type as specified in this schema.
-
-#### def `string_representation(search=None)`
-
-Prints all the tags in the schema if search is not specified
-and prints the tags that contain the search string if it is.
-
-#### def `val_type(tag, value, category=None, linenum=None)`
-
-Validates that a tag matches the type it should have
-according to this schema.
-
-### class `Loop()`
-
-A BMRB loop object. Create using the class methods, see below.
-
-Methods:
-
-#### def `__init__()`
-
-You should not directly instantiate a Loop using this method.
-Instead use the class methods:
-Loop.from_scratch()
-Loop.from_string()
-Loop.from_template()
-Loop.from_file()
-Loop.from_json()
-
-#### def `add_column(name, ignore_duplicates=False)`
-
-Add a column to the column list. Does a bit of validation
-and parsing. Set ignore_duplicates to true to ignore attempts
-to add the same tag more than once rather than raise an
-exception.
-
-You can also pass a list of column names to add more than one
-column at a time.
-
-Note that adding a column only adds a new tag to the list of
-tags present in this loop. It does not automatically add a column
-of None values to the data array if the loop is already populated
-with data.
-
-#### def `add_data(the_list, rearrange=False)`
-
-Add a list to the data field. Items in list can be any type,
-they will be converted to string and formatted correctly. The
-list must have the same cardinality as the column names or you
-must set the rearrange variable to true and have already set all
-the columns in the loop. Rearrange will break a longer list into
-rows based on the number of columns.
-
-#### def `add_data_by_column(column_id, value)`
-
-Add data to the loop one element at a time, based on column.
-Useful when adding data from SANS parsers.
-
-#### def `clear_data()`
-
-Erases all data in this loop. Does not erase the data columns
-or loop category.
-
-#### def `compare(other)`
-
-Returns the differences between two loops as a list. Order of
-loops being compared does not make a difference on the specific
-errors detected.
-
-#### def `delete_data_by_tag_value(tag, value, index_tag=None)`
-
-Deletes all rows which contain the provided value in the
-provided column. If index_tag is provided, that column is
-renumbered starting with 1. Returns the deleted rows.
-
-#### def `filter(tag_list, ignore_missing_tags=False)`
-
-Returns a new loop containing only the specified tags.
-Specify ignore_missing_tags=True to bypass missing tags rather
-than raising an error.
-
-#### def `from_file(cls, the_file, csv=False)`
-
-Create a saveframe by loading in a file. Specify csv=True if
-the file is a CSV file. If the_file starts with http://,
-https://, or ftp:// then we will use those protocols to attempt
-to open the file.
-
-#### def `from_json(cls, json_dict)`
-
-Create a loop from JSON (serialized or unserialized JSON).
-
-#### def `from_scratch(cls, category=None, source=from_scratch())`
-
-Create an empty saveframe that you can programatically add
-to. You may also pass the tag prefix as the second argument. If
-you do not pass the tag prefix it will be set the first time you
-add a tag.
-
-#### def `from_string(cls, the_string, csv=False)`
-
-Create a saveframe by parsing a string. Specify csv=True is
-the string is in CSV format and not NMR-STAR format.
-
-#### def `from_template(cls, tag_prefix, all_tags=False, schema=None)`
-
-Create a loop that has all of the tags from the schema present.
-No values will be assigned. Specify the tag prefix of the loop.
-
-The optional argument all_tags forces all tags to be included
-rather than just the mandatory tags.
-
-#### def `get_columns()`
-
-Return the columns for this entry with the category
-included. Throws ValueError if the category was never set.
-
-#### def `get_data_as_csv(header=True, show_category=True)`
-
-Return the data contained in the loops, properly CSVd, as a
-string. Set header to False to omit the header. Set
-show_category to false to omit the loop category from the
-headers.
-
-#### def `get_data_by_tag(tags=None)`
-
-Identical to get_tag but wraps the results in a list even if
-only fetching one tag. Primarily exists for legacy code.
-
-#### def `get_json(serialize=True)`
-
-Returns the loop in JSON format. If serialize is set to
-False a dictionary representation of the loop that is
-serializeable is returned.
-
-#### def `get_tag(tags=None, whole_tag=False)`
-
-Provided a tag name (or a list of tag names), or ordinals
-corresponding to columns, return the selected tags by row as
-a list of lists.
-
-If whole_tag=True return the full tag name along with the tag
-value, or if dict_result=True, as the tag key.
-
-If dict_result=True, return the tags as a list of dictionaries
-in which the tag value points to the tag."""
-
-#### def `print_tree()`
-
-Prints a summary, tree style, of the loop.
-
-#### def `renumber_rows(index_tag, start_value=1, maintain_ordering=False)`
-
-Renumber a given column incrementally. Set start_value to
-initial value if 1 is not acceptable. Set maintain_ordering to
-preserve sequence with offset.
-
-E.g. 2,3,3,5 would become 1,2,2,4.
-
-#### def `set_category(category)`
-
-Set the category of the loop. Useful if you didn't know the
-category at loop creation time.
-
-#### def `sort_rows(tags, key=None)`
-
-Sort the data in the rows by their values for a given column
-or columns. Specify the columns using their names or ordinals.
-Accepts a list or an int/float. By default we will sort
-numerically. If that fails we do a string sort. Supply a
-function as key and we will order the elements based on the
-keys it provides. See the help for sorted() for more details. If
-you provide multiple columns to sort by, they are interpreted as
-increasing order of sort priority.
-
-#### def `sort_tags(schema=None)`
-
-Rearranges the columns and data in the loop to match the order
-from the schema. Uses the BMRB schema unless one is provided.
-
-#### def `validate(validate_schema=True, schema=None, validate_star=True, category=None)`
-
-Validate a loop in a variety of ways. Returns a list of
-errors found. 0-length list indicates no errors found. By
-default all validation modes are enabled.
-
-validate_schema - Determines if the entry is validated against
-the NMR-STAR schema. You can pass your own custom schema if desired,
-otherwise the schema will be fetched from the BMRB servers.
-
-validate_star - Determines if the STAR syntax checks are ran.
