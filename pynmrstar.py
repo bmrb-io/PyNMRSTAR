@@ -209,7 +209,7 @@ _COMMENT_DICTIONARY = {}
 _API_URL = "http://webapi.bmrb.wisc.edu/v2"
 _SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
-__version__ = "2.5.1"
+__version__ = "2.6"
 
 #############################################
 #             Module methods                #
@@ -1382,6 +1382,18 @@ class Schema(object):
             return ["The tag '%s' is improperly capitalized but otherwise "
                     "valid. Should be '%s'." % (tag, capitalized_tag)]
         return []
+
+    def get_json(self, serialize=True):
+        """ Returns the schema in JSON format. """
+
+        s = {'data_types': self.data_types,
+             'schema': self.schema}
+
+        if serialize:
+            return json.dumps(s, default=_json_serialize)
+        else:
+            return s
+
 
 class Entry(object):
     """An OO representation of a BMRB entry. You can initialize this
