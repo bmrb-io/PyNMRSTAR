@@ -61,6 +61,12 @@ From a file:
 
 Continuing on we will assume you have loaded entry 15000 from the API using the from_database command.
 
+Writing out a modified entry or saveframe to file is just as easy:
+
+```python
+>>> entry15000.write_to_file("output_file_name.str")
+```
+
 ### Viewing the structure of the entry
 To see the overall structure of the entry, use the `print_tree()` method.
 ```python
@@ -362,8 +368,419 @@ That is easy to do. When you first load an entry it is by default loaded with al
 
 This is a great opportunity to point out that if all you want is the chemical shifts, or one or two tags, you may find it significantly easier to use the [BMRB API](https://github.com/uwbmrb/BMRB-API#bmrb-api) ([chemical shift endpoint](https://github.com/uwbmrb/BMRB-API#get-assigned-chemical-shift-list-get)) to fetch that data directly and on-demand rather than dealing directly with NMR-STAR at all.
 
+# Creating new loops and saveframes
+
+This tutorial has so far focused on how to read and access data. This section will focus on how to create new loop and saveframe objects.
+
+## Loops
+
+There are five ways to make a new loop: `from_file()`, `from_json()`, `from_scratch()`, `from_string()`, and `from_template()`. All of these are classmethods. `from_scratch()` makes a new loop, `from_string()` parses an NMR-STAR loop from a python string containing NMR-STAR data, `from_json()` parses a JSON object (reversely, `get_json()` will get a JSON representation of the loop), `from_scratch()` makes a completely empty loop, and `from_template()` makes a loop with the tags prefilled from the BMRB schema based on the provided category. `from_file`, `from_json`, and `from_string` are fairly self-explanatory - see the full documentation if needed for usage.
+
+#### `from_scratch()`
+
+```python
+>>> lp = pynmrstar.Loop.from_scratch()
+>>> print lp
+
+   loop_
+
+   stop_
+
+>>> lp.add_tag(['loop_category.tag1', 'loop_category.tag2', 'loop_category.tag3'])
+>>> print lp
+
+   loop_
+      _loop_category.tag1
+      _loop_category.tag2
+      _loop_category.tag3
+
+
+   stop_
+
+# Note that when calling add_data the length of the array must match the number of tags in the loop
+>>> lp.add_data(['value_1', 2, 'value 3'])
+>>> print lp
+   loop_
+      _loop_category.tag1
+      _loop_category.tag2
+      _loop_category.tag3
+
+     value_1   2   'value 3'
+
+   stop_
+
+# Alternatively, you can (with caution) directly modify the array corresponding to the loop data
+>>> lp.data = [[1,2,3],[4,5,6]]
+>>> print lp
+   loop_
+      _loop_category.tag1
+      _loop_category.tag2
+      _loop_category.tag3
+
+     1   2   3
+     4   5   6
+
+   stop_
+```
+
+Note that the loop category was set automatically when the tag `loop_category.tag1` was added. You could have also provided the tag when creating the loop by providing it as an argument to the optional `category` argument to the constructor.
+
+#### `from_template()`
+
+This method will create a new loop ready for data with the tags from the BMRB schema corresponding to that loop category.
+
+```python
+>>> chemical_shifts = pynmrstar.Loop.from_template('atom_chem_shift_list')
+>>> print chemical_shifts
+   loop_
+      _Atom_chem_shift.ID
+      _Atom_chem_shift.Assembly_atom_ID
+      _Atom_chem_shift.Entity_assembly_ID
+      _Atom_chem_shift.Entity_ID
+      _Atom_chem_shift.Comp_index_ID
+      _Atom_chem_shift.Seq_ID
+      _Atom_chem_shift.Comp_ID
+      _Atom_chem_shift.Atom_ID
+      _Atom_chem_shift.Atom_type
+      _Atom_chem_shift.Atom_isotope_number
+      _Atom_chem_shift.Val
+      _Atom_chem_shift.Val_err
+      _Atom_chem_shift.Assign_fig_of_merit
+      _Atom_chem_shift.Ambiguity_code
+      _Atom_chem_shift.Ambiguity_set_ID
+      _Atom_chem_shift.Occupancy
+      _Atom_chem_shift.Resonance_ID
+      _Atom_chem_shift.Auth_entity_assembly_ID
+      _Atom_chem_shift.Auth_asym_ID
+      _Atom_chem_shift.Auth_seq_ID
+      _Atom_chem_shift.Auth_comp_ID
+      _Atom_chem_shift.Auth_atom_ID
+      _Atom_chem_shift.Details
+      _Atom_chem_shift.Entry_ID
+      _Atom_chem_shift.Assigned_chem_shift_list_ID
+
+
+   stop_
+```
+
+## Saveframes
+
+There are five ways to make a new loop: `from_file()`, `from_json()`, `from_scratch()`, `from_string()`, and `from_template()`. All of these are classmethods. `from_scratch()` makes a new saveframe, `from_string()` parses an NMR-STAR saveframe from a python string containing NMR-STAR data, `from_json()` parses a JSON object (reversely, `get_json()` will get a JSON representation of the saveframe), `from_scratch()` makes a completely empty saveframe, and `from_template()` makes a saveframe with the tags prefilled from the BMRB schema based on the provided category. `from_file`, `from_json`, and `from_string` are fairly self-explanatory - see the full documentation if needed for usage.
+
+#### `from_scratch()`
+```python
+# You must provide the saveframe name (the value that comes after "save_" at the start of the saveframe and saveframe tag prefix (the value before the "." in a tag name) when creating a saveframe this way
+>>> my_sf = pynmrstar.Saveframe.from_scratch("sf_name", "example_sf_category")
+>>> print my_sf
+save_sf_name
+
+save_
+
+# Add a tag using the add_tag() method. Update=True will override existing tag with the same name. Update=False will raise an exception if the tag already exists
+>>> my_sf.add_tag("tagName1", "tagValue1")
+>>> print my_sf
+save_sf_name
+   _example_sf_category.tagName1  tagValue1
+
+save_
+
+>>> my_sf.add_tag("tagName1", "tagValue2", update=False)
+ValueError: There is already a tag with the name 'tagName1'.
+>>> my_sf.add_tag("tagName1", "tagValue2", update=True)
+>>> print my_sf
+save_sf_name
+   _example_sf_category.tagName1  tagValue1
+
+save_
+# Alternatively, you can access or write tag values using direct subset access:
+>>> my_sf['tagName1']
+['tagValue2']
+>>> my_sf['tagName2'] = "some value"
+>>> print my_sf
+save_sf_name
+   _example_sf_category.tagName1  tagValue2
+   _example_sf_category.tagName2  'some value'
+
+save_
+
+# Now add the loop we created before
+>>> my_sf.add_loop(lp)
+>>> print my_sf
+save_sf_name
+   _example_sf_category.tagName1  tagValue2
+   _example_sf_category.tagName2  'some value'
+
+   loop_
+      _loop_category.tag1
+      _loop_category.tag2
+      _loop_category.tag3
+
+     1   2   3
+     4   5   6
+
+   stop_
+
+save_
+
+# Now write out our saveframe to a file. Optionally specify format="json" to write in JSON format.
+>>> my_sf.write_to_file("file_name.str")
+>>> my_sf.write_to_file("file_name.json", format_="json")
+```
+
+#### `from_template()`
+```python
+
+>>> my_sf = pynmrstar.Saveframe.from_template("assigned_chemical_shifts")
+>>> print my_sf
+print my_sf
+     ###################################
+     #  Assigned chemical shift lists  #
+     ###################################
+
+###################################################################
+#       Chemical Shift Ambiguity Index Value Definitions          #
+#                                                                 #
+# The values other than 1 are used for those atoms with different #
+# chemical shifts that cannot be assigned to stereospecific atoms #
+# or to specific residues or chains.                              #
+#                                                                 #
+#   Index Value            Definition                             #
+#                                                                 #
+#      1             Unique (including isolated methyl protons,   #
+#                         geminal atoms, and geminal methyl       #
+#                         groups with identical chemical shifts)  #
+#                         (e.g. ILE HD11, HD12, HD13 protons)     #
+#      2             Ambiguity of geminal atoms or geminal methyl #
+#                         proton groups (e.g. ASP HB2 and HB3     #
+#                         protons, LEU CD1 and CD2 carbons, or    #
+#                         LEU HD11, HD12, HD13 and HD21, HD22,    #
+#                         HD23 methyl protons)                    #
+#      3             Aromatic atoms on opposite sides of          #
+#                         symmetrical rings (e.g. TYR HE1 and HE2 #
+#                         protons)                                #
+#      4             Intraresidue ambiguities (e.g. LYS HG and    #
+#                         HD protons or TRP HZ2 and HZ3 protons)  #
+#      5             Interresidue ambiguities (LYS 12 vs. LYS 27) #
+#      6             Intermolecular ambiguities (e.g. ASP 31 CA   #
+#                         in monomer 1 and ASP 31 CA in monomer 2 #
+#                         of an asymmetrical homodimer, duplex    #
+#                         DNA assignments, or other assignments   #
+#                         that may apply to atoms in one or more  #
+#                         molecule in the molecular assembly)     #
+#      9             Ambiguous, specific ambiguity not defined    #
+#                                                                 #
+###################################################################
+
+save_assigned_chemical_shifts
+   _Assigned_chem_shift_list.Sf_category                  assigned_chemical_shifts
+   _Assigned_chem_shift_list.Sf_framecode                 assigned_chemical_shifts
+   _Assigned_chem_shift_list.Entry_ID                     .
+   _Assigned_chem_shift_list.ID                           .
+   _Assigned_chem_shift_list.Sample_condition_list_ID     .
+   _Assigned_chem_shift_list.Sample_condition_list_label  .
+   _Assigned_chem_shift_list.Chem_shift_reference_ID      .
+   _Assigned_chem_shift_list.Chem_shift_reference_label   .
+   _Assigned_chem_shift_list.Chem_shift_1H_err            .
+   _Assigned_chem_shift_list.Chem_shift_13C_err           .
+   _Assigned_chem_shift_list.Chem_shift_15N_err           .
+   _Assigned_chem_shift_list.Chem_shift_31P_err           .
+   _Assigned_chem_shift_list.Chem_shift_2H_err            .
+   _Assigned_chem_shift_list.Chem_shift_19F_err           .
+   _Assigned_chem_shift_list.Error_derivation_method      .
+   _Assigned_chem_shift_list.Details                      .
+   _Assigned_chem_shift_list.Text_data_format             .
+   _Assigned_chem_shift_list.Text_data                    .
+
+   loop_
+      _Chem_shift_experiment.Experiment_ID
+      _Chem_shift_experiment.Experiment_name
+      _Chem_shift_experiment.Sample_ID
+      _Chem_shift_experiment.Sample_label
+      _Chem_shift_experiment.Sample_state
+      _Chem_shift_experiment.Entry_ID
+      _Chem_shift_experiment.Assigned_chem_shift_list_ID
+
+
+   stop_
+
+   loop_
+      _Systematic_chem_shift_offset.Type
+      _Systematic_chem_shift_offset.Atom_type
+      _Systematic_chem_shift_offset.Atom_isotope_number
+      _Systematic_chem_shift_offset.Val
+      _Systematic_chem_shift_offset.Val_err
+      _Systematic_chem_shift_offset.Entry_ID
+      _Systematic_chem_shift_offset.Assigned_chem_shift_list_ID
+
+
+   stop_
+
+   loop_
+      _Chem_shift_software.Software_ID
+      _Chem_shift_software.Software_label
+      _Chem_shift_software.Method_ID
+      _Chem_shift_software.Method_label
+      _Chem_shift_software.Entry_ID
+      _Chem_shift_software.Assigned_chem_shift_list_ID
+
+
+   stop_
+
+   loop_
+      _Atom_chem_shift.ID
+      _Atom_chem_shift.Assembly_atom_ID
+      _Atom_chem_shift.Entity_assembly_ID
+      _Atom_chem_shift.Entity_ID
+      _Atom_chem_shift.Comp_index_ID
+      _Atom_chem_shift.Seq_ID
+      _Atom_chem_shift.Comp_ID
+      _Atom_chem_shift.Atom_ID
+      _Atom_chem_shift.Atom_type
+      _Atom_chem_shift.Atom_isotope_number
+      _Atom_chem_shift.Val
+      _Atom_chem_shift.Val_err
+      _Atom_chem_shift.Assign_fig_of_merit
+      _Atom_chem_shift.Ambiguity_code
+      _Atom_chem_shift.Ambiguity_set_ID
+      _Atom_chem_shift.Occupancy
+      _Atom_chem_shift.Resonance_ID
+      _Atom_chem_shift.Auth_entity_assembly_ID
+      _Atom_chem_shift.Auth_asym_ID
+      _Atom_chem_shift.Auth_seq_ID
+      _Atom_chem_shift.Auth_comp_ID
+      _Atom_chem_shift.Auth_atom_ID
+      _Atom_chem_shift.Details
+      _Atom_chem_shift.Entry_ID
+      _Atom_chem_shift.Assigned_chem_shift_list_ID
+
+
+   stop_
+
+   loop_
+      _Ambiguous_atom_chem_shift.Ambiguous_shift_set_ID
+      _Ambiguous_atom_chem_shift.Atom_chem_shift_ID
+      _Ambiguous_atom_chem_shift.Entry_ID
+      _Ambiguous_atom_chem_shift.Assigned_chem_shift_list_ID
+
+
+   stop_
+
+save_
+
+```
+
+# Schema methods
+
+The library makes it easy to add missing tags, sort the tags according to the BMRB schema, and validate the data against the schema. Let's do a simple example of creating a chemical shift loop, adding any missing tags, ordering the tags in the standard order (not required), and then checking for errors.
+
+```python
+# Create the loop with the proper category
+>>> my_cs_loop = pynmrstar.Loop.from_scratch("Atom_chem_shift")
+# Add the tags we will fill
+>>> my_cs_loop.add_tag(['Comp_ID', 'Atom_ID', 'Comp_index_ID', 'Atom_type', 'Val', 'Val_err'])
+   loop_
+      _Atom_chem_shift.Comp_ID
+      _Atom_chem_shift.Atom_ID
+      _Atom_chem_shift.Comp_Index_ID
+      _Atom_chem_shift.Atom_type
+      _Atom_chem_shift.Val
+      _Atom_chem_shift.Val_err
+
+
+   stop_
+# Populate the data array
+>>> my_cs_loop.data = [['SER', 'H',  '2', 'H', '9.3070', '0.01'],
+                       ['SER', 'HA', '2', 'H', '4.5970', '0.01'],
+                       ['SER', 'HB2', '2', 'H', '4.3010', '0.01']]
+>>> print my_cs_loop
+   loop_
+      _Atom_chem_shift.Comp_ID
+      _Atom_chem_shift.Atom_ID
+      _Atom_chem_shift.Comp_Index_ID
+      _Atom_chem_shift.Atom_type
+      _Atom_chem_shift.Val
+      _Atom_chem_shift.Val_err
+
+     SER   H     2   H   9.3070   0.01
+     SER   HA    2   H   4.5970   0.01
+     SER   HB2   2   H   4.3010   0.01
+
+   stop_
+
+# Now lets sort the tags to match the BMRB schema
+>>> my_cs_loop.sort_tags()
+# You can see that the Comp_index_ID tag has been moved to the front to match the BMRB standard
+>>> print my_cs_loop
+   loop_
+      _Atom_chem_shift.Comp_index_ID
+      _Atom_chem_shift.Comp_ID
+      _Atom_chem_shift.Atom_ID
+      _Atom_chem_shift.Atom_type
+      _Atom_chem_shift.Val
+      _Atom_chem_shift.Val_err
+
+     2   SER   H     H   9.3070   0.01
+     2   SER   HA    H   4.5970   0.01
+     2   SER   HB2   H   4.3010   0.01
+
+   stop_
+
+# Check for any errors - returns a list of errors. No errors here:
+>>> print my_cs_loop.validate()
+[]
+# Let us now set 'Comp_index_ID' to have an invalid value
+>>> my_cs_loop.data[0][0] = "invalid"
+# You can see that there is now a validation error - the data doesn't match the specified type
+>>> print my_cs_loop.validate()
+["Value does not match specification: '_Atom_chem_shift.Comp_index_ID':'invalid' on line '0 tag 0 of loop'.\n     Type specified: int\n     Regular expression for type: '-?[0-9]+'"]
+# If you use the pynmrstar.validate(object) function, it will print the report in a human-readable format
+>>> pynmrstar.validate(my_cs_loop)
+1: Value does not match specification: '_Atom_chem_shift.Comp_index_ID':'invalid' on line '0 tag 0 of loop'.
+     Type specified: int
+     Regular expression for type: '-?[0-9]+'
+
+# Finally, add in any tags that you didn't have a value for
+>>> my_cs_loop.add_missing_tags()
+# You can see that all the standard "Atom_chem_shift" loop tags have been added, and their values all set to a logical null value - "."
+>>> print my_cs_loop
+
+   loop_
+      _Atom_chem_shift.ID
+      _Atom_chem_shift.Assembly_atom_ID
+      _Atom_chem_shift.Entity_assembly_ID
+      _Atom_chem_shift.Entity_ID
+      _Atom_chem_shift.Comp_index_ID
+      _Atom_chem_shift.Seq_ID
+      _Atom_chem_shift.Comp_ID
+      _Atom_chem_shift.Atom_ID
+      _Atom_chem_shift.Atom_type
+      _Atom_chem_shift.Atom_isotope_number
+      _Atom_chem_shift.Val
+      _Atom_chem_shift.Val_err
+      _Atom_chem_shift.Assign_fig_of_merit
+      _Atom_chem_shift.Ambiguity_code
+      _Atom_chem_shift.Ambiguity_set_ID
+      _Atom_chem_shift.Occupancy
+      _Atom_chem_shift.Resonance_ID
+      _Atom_chem_shift.Auth_entity_assembly_ID
+      _Atom_chem_shift.Auth_asym_ID
+      _Atom_chem_shift.Auth_seq_ID
+      _Atom_chem_shift.Auth_comp_ID
+      _Atom_chem_shift.Auth_atom_ID
+      _Atom_chem_shift.Details
+      _Atom_chem_shift.Entry_ID
+      _Atom_chem_shift.Assigned_chem_shift_list_ID
+
+     .   .   .   .   invalid   .   SER   H     H   .   9.3070   0.01   .   .   .   .   .   .   .   .   .   .   .   .   .
+     .   .   .   .   2         .   SER   HA    H   .   4.5970   0.01   .   .   .   .   .   .   .   .   .   .   .   .   .
+     .   .   .   .   2         .   SER   HB2   H   .   4.3010   0.01   .   .   .   .   .   .   .   .   .   .   .   .   .
+
+   stop_
+```
+
 
 For more examples of PyNMRSTAR library usage, please look [here](documentation/examples.md).
 For the full documentation of all available methods and classes, please look [here](documentation/full.md).
 
 For any questions or suggestions, please create an issue on the GitHub page.
+
