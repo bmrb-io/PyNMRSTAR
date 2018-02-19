@@ -5,10 +5,10 @@ from __future__ import print_function
 import os
 import sys
 
-# Load the bmrb.py library
-if not os.path.isfile("bmrb.py"):
-    if not os.path.isfile("../bmrb.py"):
-        raise ImportError("Could not locate bmrb.py library. Please copy to this directory.")
+# Load the pynmrstar.py library
+if not os.path.isfile("pynmrstar.py"):
+    if not os.path.isfile("../pynmrstar.py"):
+        raise ImportError("Could not locate pynmrstar.py library. Please copy to this directory.")
     sys.path.append("..")
 import bmrb
 
