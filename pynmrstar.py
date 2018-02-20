@@ -1387,11 +1387,18 @@ class Schema(object):
         """ Returns the schema in JSON format. """
 
         s = {'data_types': self.data_types,
-             'category_order': self.category_order,
-             'schema_order': self.schema_order,
-             'schema': self.schema,
              'headers': self.headers,
              'version': self.version}
+
+        compacted_schema = []
+        for tag in self.schema_order:
+            stag = self.schema[tag.lower()]
+            compacted_tag = []
+            for header in self.headers:
+                compacted_tag.append(stag[header])
+            compacted_schema.append(compacted_tag)
+
+        s['tags'] = compacted_schema
 
         if serialize:
             return json.dumps(s, default=_json_serialize)
