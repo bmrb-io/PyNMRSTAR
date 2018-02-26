@@ -1392,14 +1392,18 @@ class Schema(object):
 
         if not full:
             s['headers'] = ['ADIT category view name', 'User full view',
-                            'Prompt', 'Interface', 'Nullable', 'BMRB data type']
+                            'Prompt', 'Interface', 'Nullable', 'BMRB data type',
+                            'default value', 'Tag', 'SFCategory']
 
         compacted_schema = []
         for tag in self.schema_order:
             stag = self.schema[tag.lower()]
             compacted_tag = []
             for header in s['headers']:
-                compacted_tag.append(stag[header])
+                try:
+                    compacted_tag.append(stag[header].replace("$", ","))
+                except AttributeError:
+                    compacted_tag.append(stag[header])
             compacted_schema.append(compacted_tag)
 
         s['tags'] = compacted_schema
