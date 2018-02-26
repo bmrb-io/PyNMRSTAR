@@ -1383,18 +1383,22 @@ class Schema(object):
                     "valid. Should be '%s'." % (tag, capitalized_tag)]
         return []
 
-    def get_json(self, serialize=True):
+    def get_json(self, serialize=True, full=False):
         """ Returns the schema in JSON format. """
 
         s = {'data_types': self.data_types,
              'headers': self.headers,
              'version': self.version}
 
+        if not full:
+            s['headers'] = ['ADIT category view name', 'User full view',
+                            'Prompt', 'Interface', 'Nullable', 'BMRB data type']
+
         compacted_schema = []
         for tag in self.schema_order:
             stag = self.schema[tag.lower()]
             compacted_tag = []
-            for header in self.headers:
+            for header in s['headers']:
                 compacted_tag.append(stag[header])
             compacted_schema.append(compacted_tag)
 
