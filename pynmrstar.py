@@ -1391,9 +1391,10 @@ class Schema(object):
              'version': self.version}
 
         if not full:
-            s['headers'] = ['ADIT category view name', 'User full view',
-                            'Prompt', 'Interface', 'Nullable', 'BMRB data type',
-                            'default value', 'Tag', 'SFCategory']
+            s['headers'] = ['Tag', 'SFCategory', 'BMRB data type', 'Nullable',
+                            'Prompt', 'Interface', 'default value', 'Example',
+                            'ADIT category view name', 'User full view',
+                            'Foreign Table', 'Sf pointer']
 
         compacted_schema = []
         for tag in self.schema_order:
@@ -1404,6 +1405,17 @@ class Schema(object):
                     compacted_tag.append(stag[header].replace("$", ","))
                 except AttributeError:
                     compacted_tag.append(stag[header])
+                except KeyError:
+                    if header == 'Sf pointer':
+                        try:
+                            compacted_tag.append(stag['Framecode value flag'])
+                        except KeyError:
+                            compacted_tag.append(None)
+                    elif header == 'BMRB data type':
+                        compacted_tag.append('any')
+                    else:
+                        compacted_tag.append(None)
+
             compacted_schema.append(compacted_tag)
 
         s['tags'] = compacted_schema
