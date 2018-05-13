@@ -1397,15 +1397,42 @@ class Schema(object):
                     "valid. Should be '%s'." % (tag, capitalized_tag)]
         return []
 
-    def get_json(self, serialize=True):
+    def get_json(self, serialize=True, full=False):
         """ Returns the schema in JSON format. """
 
         s = {'data_types': self.data_types,
-             'category_order': self.category_order,
-             'schema_order': self.schema_order,
-             'schema': self.schema,
              'headers': self.headers,
              'version': self.version}
+
+        if not full:
+            s['headers'] = ['Tag', 'SFCategory', 'BMRB data type', 'Nullable',
+                            'Prompt', 'Interface', 'default value', 'Example',
+                            'ADIT category view name', 'User full view',
+                            'Foreign Table', 'Sf pointer']
+
+        compacted_schema = []
+        for tag in self.schema_order:
+            stag = self.schema[tag.lower()]
+            compacted_tag = []
+            for header in s['headers']:
+                try:
+                    compacted_tag.append(stag[header].replace("$", ","))
+                except AttributeError:
+                    compacted_tag.append(stag[header])
+                except KeyError:
+                    if header == 'Sf pointer':
+                        try:
+                            compacted_tag.append(stag['Framecode value flag'])
+                        except KeyError:
+                            compacted_tag.append(None)
+                    elif header == 'BMRB data type':
+                        compacted_tag.append('any')
+                    else:
+                        compacted_tag.append(None)
+
+            compacted_schema.append(compacted_tag)
+
+        s['tags'] = compacted_schema
 
         if serialize:
             return json.dumps(s, default=_json_serialize)
