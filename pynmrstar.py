@@ -110,7 +110,7 @@ else:
 
 # This is an odd place for this, but it can't really be avoided if
 #  we want to keep the import at the top.
-def  _build_extension():
+def _build_extension():
     """ Try to compile the c extension. """
     import subprocess
 
@@ -167,7 +167,7 @@ except ImportError as e:
             try:
                 import cnmrstar
             except ImportError:
-                pass
+                cnmrstar = None
 
 
 #############################################
@@ -376,7 +376,7 @@ def clean_value(value):
                 ["data_", "save_", "loop_", "stop_", "_"])):
         # If there is a single quote wrap in double quotes
         if "'" in value:
-            return  '"%s"' % value
+            return '"%s"' % value
         # Either there is a double quote or no quotes
         else:
             return "'%s'" % value
@@ -433,11 +433,11 @@ def _get_schema(passed_schema=None):
 
         # Try to load the local file first
         try:
-            sfile = os.path.join(os.path.dirname(os.path.realpath(__file__)))
-            sfile = os.path.join(sfile, "reference_files/schema.csv")
+            schema_file = os.path.join(os.path.dirname(os.path.realpath(__file__)))
+            schema_file = os.path.join(schema_file, "reference_files/schema.csv")
 
-            _STANDARD_SCHEMA = Schema(schema_file=sfile)
-        except:
+            _STANDARD_SCHEMA = Schema(schema_file=schema_file)
+        except Exception:
             # Try to load from the internet
             try:
                 _STANDARD_SCHEMA = Schema()
@@ -501,7 +501,8 @@ def _load_comments(file_to_load=None):
     except IOError:
         # Load the comments from Github if we can't find them locally
         try:
-            comment_entry = Entry.from_file(_interpret_file("https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v2/reference_files/comments.str"))
+            comment_url = "https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v2/reference_files/comments.str"
+            comment_entry = Entry.from_file(_interpret_file(comment_url))
         except Exception:
             # No comments will be printed
             return
@@ -842,7 +843,7 @@ class _Parser(object):
         self.full_data = None
 
         # Reset the parser
-        if cnmrstar != None:
+        if cnmrstar is not None:
             cnmrstar.reset()
 
         return self.ent
@@ -1077,8 +1078,9 @@ class Schema(object):
                                          "reference_files/data_types.csv"))
         except IOError:
             # Load the data types from Github if we can't find them locally
+            types_url = "https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v2/reference_files/data_types.csv"
             try:
-                types_file = _interpret_file("https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v2/reference_files/data_types.csv")
+                types_file = _interpret_file(types_url)
             except Exception:
                 raise ValueError("Could not load the data type definition file from disk or the internet!")
 
@@ -1113,12 +1115,13 @@ class Schema(object):
         for y in range(0, len(values[0])):
             lengths.append(max([len(str(x[y])) for x in values]))
 
+        format_parameters = (self.schema_file, self.version, "Tag_Prefix", lengths[0],
+                             "Tag", lengths[1]-6, "Type", lengths[2], "Null_Allowed",
+                             lengths[3], "SF_Category")
         text = """BMRB schema from: '%s' version '%s'
 %s
   %-*s %-*s %-*s %-*s
-""" % (self.schema_file, self.version, "Tag_Prefix", lengths[0], "Tag",
-       lengths[1]-6, "Type", lengths[2], "Null_Allowed", lengths[3],
-       "SF_Category")
+""" % format_parameters
 
         last_tag = ""
 
@@ -1631,23 +1634,21 @@ class Entry(object):
                 for each_loop in each_saveframe:
                     each_loop.source = ent_source
 
-            # TODO: Delete this once the database is remediated
-            # Convert datatypes
             if CONVERT_DATATYPES:
-                schem = _get_schema()
+                schema = _get_schema()
                 for each_saveframe in ent:
                     for tag in each_saveframe.tags:
                         cur_tag = each_saveframe.tag_prefix + "." + tag[0]
-                        tag[1] = schem.convert_tag(cur_tag, tag[1],
-                                                   line_num="SF %s" %
-                                                            each_saveframe.name)
+                        tag[1] = schema.convert_tag(cur_tag, tag[1],
+                                                    line_num="SF %s" %
+                                                    each_saveframe.name)
                     for loop in each_saveframe:
                         for row in loop.data:
                             for pos in range(0, len(row)):
                                 category = loop.category + "." + loop.tags[pos]
                                 line_num = "Loop %s" % loop.category
-                                row[pos] = schem.convert_tag(category, row[pos],
-                                                             line_num=line_num)
+                                row[pos] = schema.convert_tag(category, row[pos],
+                                                              line_num=line_num)
 
             return ent
         # The entry doesn't exist
@@ -1886,17 +1887,18 @@ class Entry(object):
 
         # The saveframe/loop order
         ordering = _get_schema(schema).category_order
+
         # Use these to sort saveframes and loops
         def sf_key(x):
             """ Helper function to sort the saveframes."""
 
             try:
-                return (ordering.index(x.tag_prefix), x.get_tag("ID"))
+                return ordering.index(x.tag_prefix), x.get_tag("ID")
             except ValueError:
                 # Generate an arbitrary sort order for saveframes that aren't
                 #  in the schema but make sure that they always come after
                 #   saveframes in the schema
-                return (len(ordering) + hash(x), x.get_tag("ID"))
+                return len(ordering) + hash(x), x.get_tag("ID")
 
         def loop_key(x):
             """ Helper function to sort the loops."""
@@ -2079,6 +2081,7 @@ class Entry(object):
 
         out_file.close()
 
+
 class Saveframe(object):
     """A saveframe object. Create using the class methods, see below."""
 
@@ -2094,7 +2097,7 @@ class Saveframe(object):
         # (calls this method recursively)
         to_delete = self.__getitem__(item)
         if isinstance(to_delete, Loop):
-            self.__delitem__(to_delete)
+            del self.loops[self.loops.index(to_delete)]
             return
 
         # It must be a tag. Try to delete the tag
@@ -2119,7 +2122,7 @@ class Saveframe(object):
             return self.loops[item]
         except TypeError:
             results = self.get_tag(item)
-            if results != []:
+            if results:
                 return results
             else:
                 try:
@@ -2163,6 +2166,8 @@ class Saveframe(object):
         self.category = "unset"
         self.tag_prefix = None
 
+        star_buffer = ""
+
         # Update our source if it provided
         if 'source' in kargs:
             self.source = kargs['source']
@@ -2190,7 +2195,7 @@ class Saveframe(object):
                                  "in the dictionary." % self.category)
 
             s = sorted(schema.values(),
-                       key=lambda x: float(x["Dictionary sequence"]))
+                       key=lambda _: float(_["Dictionary sequence"]))
 
             loops_added = []
 
@@ -2539,7 +2544,7 @@ class Saveframe(object):
             if len(self.tags) < len(other.tags):
                 diffs.append("\tNumber of tags does not match: '%d' vs '%d'. "
                              "The compared entry has at least one tag this "
-                             "entry does not."  %
+                             "entry does not." %
                              (len(self.tags), len(other.tags)))
 
             for tag in self.tags:
@@ -2577,7 +2582,7 @@ class Saveframe(object):
                         diffs.extend(compare)
                 else:
                     diffs.append("\tNo loop with category '%s' in other"
-                                 " entry." % (each_loop.category))
+                                 " entry." % each_loop.category)
 
         except AttributeError as err:
             diffs.append("\tAn exception occured while comparing: '%s'." % err)
@@ -2706,9 +2711,9 @@ class Saveframe(object):
         schema. Will automatically use the standard schema if none
         is provided."""
 
-        mod_key = lambda x: _tag_key(self.tag_prefix + "." + x[0],
-                                     schema=schema)
-        self.tags.sort(key=mod_key)
+        def sort_key(x):
+            return _tag_key(self.tag_prefix + "." + x[0], schema=schema)
+        self.tags.sort(key=sort_key)
 
     def tag_iterator(self):
         """Returns an iterator for saveframe tags."""
@@ -2747,11 +2752,11 @@ class Saveframe(object):
             my_schema = _get_schema(schema)
 
             for tag in self.tags:
-                lineno = str(tag[2]) + " of original file" if len(tag) > 2 else None
+                line_number = str(tag[2]) + " of original file" if len(tag) > 2 else None
                 formatted_tag = self.tag_prefix + "." + tag[0]
                 cur_errors = my_schema.val_type(formatted_tag, tag[1],
                                                 category=my_category,
-                                                linenum=lineno)
+                                                linenum=line_number)
                 errors.extend(cur_errors)
 
         # Check the loops for errors
@@ -2779,6 +2784,7 @@ class Saveframe(object):
             out_file.write(self.get_json())
 
         out_file.close()
+
 
 class Loop(object):
     """A BMRB loop object. Create using the class methods, see below."""
@@ -2819,6 +2825,8 @@ class Loop(object):
         self.category = None
         self.source = "unknown"
 
+        star_buffer = ""
+
         # Update our source if it provided
         if 'source' in kargs:
             self.source = kargs['source']
@@ -2858,9 +2866,9 @@ class Loop(object):
 
         # If we are reading from a CSV file, go ahead and parse it
         if 'csv' in kargs and kargs['csv']:
-            csvreader = csv_reader(star_buffer)
-            self.add_tag(next(csvreader))
-            for row in csvreader:
+            csv_file = csv_reader(star_buffer)
+            self.add_tag(next(csv_file))
+            for row in csv_file:
                 self.add_data(row)
             self.source = "from_csv('%s')" % kargs['csv']
             return
@@ -2961,7 +2969,7 @@ class Loop(object):
         # Start the loop
         ret_string = "\n   loop_\n"
         # Print the tags
-        pstring = "      %-s\n"
+        format_string = "      %-s\n"
 
         # Check to make sure our category is set
         if self.category is None and not ALLOW_V2_ENTRIES:
@@ -2973,10 +2981,10 @@ class Loop(object):
         # Print the categories
         if self.category is None:
             for tag in self.tags:
-                ret_string += pstring % (tag)
+                ret_string += format_string % tag
         else:
             for tag in self.tags:
-                ret_string += pstring % (self.category + "." + tag)
+                ret_string += format_string % (self.category + "." + tag)
 
         ret_string += "\n"
 
@@ -3002,7 +3010,7 @@ class Loop(object):
             # own line...
 
             # Generate the format string
-            pstring = "     " + "%-*s"*len(self.tags) + " \n"
+            format_string = "     " + "%-*s"*len(self.tags) + " \n"
 
             # Print the data, with the tags sized appropriately
             for datum in working_data:
@@ -3012,7 +3020,7 @@ class Loop(object):
 
                 # Print the data (combine the tags' widths with their data)
                 tag_width_list = [d for d in zip(title_widths, datum)]
-                row_strings.append(pstring % tuple(chain.from_iterable(tag_width_list)))
+                row_strings.append(format_string % tuple(chain.from_iterable(tag_width_list)))
 
         # Close the loop
         ret_string += "".join(row_strings) + "\n   stop_\n"
@@ -3518,7 +3526,7 @@ class Loop(object):
 
         # Map tag name to tag position in list
         tag_mapping = dict(zip(reversed(tags_lower),
-                                  reversed(range(len(tags_lower)))))
+                               reversed(range(len(tags_lower)))))
 
         # Make sure their fields are actually present in the entry
         tag_ids = []
@@ -3554,7 +3562,8 @@ class Loop(object):
         # Make a dictionary
         else:
             if whole_tag:
-                result = [dict((self.category + "." + self.tags[col_id], row[col_id]) for col_id in tag_ids) for row in self.data]
+                result = [dict((self.category + "." + self.tags[col_id], row[col_id]) for col_id in tag_ids) for
+                          row in self.data]
             else:
                 result = [dict((self.tags[col_id], row[col_id]) for col_id in tag_ids) for row in self.data]
 
@@ -3564,7 +3573,7 @@ class Loop(object):
         """ Automatically adds any missing tags (according to the schema),
         sorts the tags, and renumbers the tags by ordinal. """
 
-        self.add_tag(Loop._get_tags_from_schema(self.category),
+        self.add_tag(Loop._get_tags_from_schema(self.category, schema=schema),
                      ignore_duplicates=True, update_data=True)
         self.sort_tags()
 
@@ -3577,12 +3586,12 @@ class Loop(object):
             ordinal_idx = self._tag_index("Ordinal")
 
             # If the first ordinal is unassigned, assign it
-            if self.data[0][ordinal_idx] == "." or self.data[0][ordinal_idx] == None:
+            if self.data[0][ordinal_idx] == "." or self.data[0][ordinal_idx] is None:
                 self.data[0][ordinal_idx] = 1
 
             # If we are in another row, assign to the previous row
             for row in self.data:
-                if row[ordinal_idx] == "." or row[ordinal_idx] == None:
+                if row[ordinal_idx] == "." or row[ordinal_idx] is None:
                     row[ordinal_idx] = row[ordinal_idx-1] + 1
 
     def print_tree(self):
@@ -3606,19 +3615,19 @@ class Loop(object):
                                  (supplied_category, self.category))
 
         # Determine which tag ID to renumber
-        renum_tag = self._tag_index(index_tag)
+        renumber_tag = self._tag_index(index_tag)
 
         # The tag to replace in is the tag they specify
-        if renum_tag is None:
+        if renumber_tag is None:
             # Or, perhaps they specified an integer to represent the tag?
             try:
-                renum_tag = int(index_tag)
+                renumber_tag = int(index_tag)
             except ValueError:
                 raise ValueError("The renumbering tag you provided '%s' "
                                  "isn't in this loop!" % index_tag)
 
         # Verify the renumbering column ID
-        if renum_tag >= len(self.tags) or renum_tag < 0:
+        if renumber_tag >= len(self.tags) or renumber_tag < 0:
             raise ValueError("The renumbering tag ID you provided '%s' is "
                              "too large or too small! Valid tag ids are"
                              "0-%d." % (index_tag, len(self.tags)-1))
@@ -3634,25 +3643,25 @@ class Loop(object):
             # If they have a string buried somewhere in the row, we'll
             #  have to restore the original values
             data_copy = deepcopy(self.data)
-
+            offset = 0
             for pos in range(0, len(self.data)):
                 try:
                     if pos == 0:
-                        offset = start_value - int(self.data[0][renum_tag])
-                    new_data = int(self.data[pos][renum_tag]) + offset
-                    self.data[pos][renum_tag] = new_data
+                        offset = start_value - int(self.data[0][renumber_tag])
+                    new_data = int(self.data[pos][renumber_tag]) + offset
+                    self.data[pos][renumber_tag] = new_data
                 except ValueError:
                     self.data = data_copy
                     raise ValueError("You can't renumber a row containing "
                                      "anything that can't be coerced into an "
                                      "integer using maintain_ordering. I.e. "
                                      "what am I suppose to renumber '%s' to?" %
-                                     self.data[pos][renum_tag])
+                                     self.data[pos][renumber_tag])
 
         # Simple renumbering algorithm if we don't need to maintain the ordering
         else:
             for pos in range(0, len(self.data)):
-                self.data[pos][renum_tag] = pos + start_value
+                self.data[pos][renumber_tag] = pos + start_value
 
     def set_category(self, category):
         """ Set the category of the loop. Useful if you didn't know the
@@ -3667,8 +3676,9 @@ class Loop(object):
         current_order = self.get_tag_names()
 
         # Sort the tags
-        loc_key = lambda x: _tag_key(x, schema=schema)
-        sorted_order = sorted(current_order, key=loc_key)
+        def sort_key(_):
+            return _tag_key(_, schema=schema)
+        sorted_order = sorted(current_order, key=sort_key)
 
         # Don't touch the data if the tags are already in order
         if sorted_order == current_order:
@@ -3694,7 +3704,6 @@ class Loop(object):
         # This will determine how we sort
         sort_ordinals = []
 
-        processing_list = []
         if isinstance(tags, list):
             processing_list = tags
         else:
@@ -3737,13 +3746,13 @@ class Loop(object):
             try:
                 if key is None:
                     tmp_data = sorted(self.data,
-                                      key=lambda x, pos=tag: float(x[pos]))
+                                      key=lambda _, pos=tag: float(_[pos]))
                 else:
                     tmp_data = sorted(self.data, key=key)
             except ValueError:
                 if key is None:
                     tmp_data = sorted(self.data,
-                                      key=lambda x, pos=tag: x[pos])
+                                      key=lambda _, pos=tag: _[pos])
                 else:
                     tmp_data = sorted(self.data, key=key)
             self.data = tmp_data
@@ -3767,25 +3776,26 @@ class Loop(object):
             my_schema = _get_schema(schema)
 
             # Check the data
-            for rownum, row in enumerate(self.data):
+            for row_num, row in enumerate(self.data):
                 for pos, datum in enumerate(row):
-                    lineno = str(rownum) + " tag " + str(pos) + " of loop"
+                    line_no = str(row_num) + " tag " + str(pos) + " of loop"
                     errors.extend(my_schema.val_type(self.category + "." +
                                                      self.tags[pos], datum,
                                                      category=category,
-                                                     linenum=lineno))
+                                                     linenum=line_no))
 
         if validate_star:
             # Check for wrong data size
             num_cols = len(self.tags)
-            for rownum, row in enumerate(self.data):
+            for row_num, row in enumerate(self.data):
                 # Make sure the width matches
                 if len(row) != num_cols:
                     errors.append("Loop '%s' data width does not match it's "
                                   "tag width on row '%d'." %
-                                  (self.category, rownum))
+                                  (self.category, row_num))
 
         return errors
+
 
 def _called_directly():
     """ Figure out what to do if we were called on the command line
@@ -3881,7 +3891,7 @@ def _called_directly():
     else:
         print("Running unit tests...")
         try:
-            #pylint: disable=relative-import,wrong-import-order
+            # pylint: disable=relative-import,wrong-import-order
             from unit_tests import bmrb_test
         except ImportError:
             print("No testing module available with this installation.")
@@ -3895,6 +3905,7 @@ def _called_directly():
         bmrb_test.start_tests()
 
     sys.exit(0)
+
 
 # Allow using diff or validate if ran directly
 if __name__ == '__main__':
