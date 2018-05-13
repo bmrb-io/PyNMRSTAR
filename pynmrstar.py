@@ -45,7 +45,7 @@ these entries - nothing else. Only set this if you have a really good
 reason to. Attempting to print a 2.1 entry will 'work' but tags that
 were after loops will be moved to before loops.
 
-* Setting DONT_SHOW_COMMENTS to True will supress the printing of
+* Setting DONT_SHOW_COMMENTS to True will suppress the printing of
 comments before saveframes.
 
 * Setting CONVERT_DATATYPES to True will automatically convert
@@ -79,6 +79,7 @@ import json
 import decimal
 import optparse
 
+from itertools import chain
 from optparse import SUPPRESS_HELP
 from copy import deepcopy
 from csv import reader as csv_reader, writer as csv_writer
@@ -94,15 +95,15 @@ except ImportError:
 # Determine if we are running in python3
 PY3 = (sys.version_info[0] == 3)
 
-#pylint: disable=wrong-import-position,no-name-in-module
-#pylint: disable=import-error,wrong-import-order
+# pylint: disable=wrong-import-position,no-name-in-module
+# pylint: disable=import-error,wrong-import-order
 # Python version dependent loads
 if PY3:
-    from urllib.request import urlopen, Request as urllib_request
+    from urllib.request import urlopen, Request
     from urllib.error import HTTPError, URLError
     from io import StringIO, BytesIO
 else:
-    from urllib2 import urlopen, HTTPError, URLError, Request as urllib_request
+    from urllib2 import urlopen, HTTPError, URLError, Request
     from cStringIO import StringIO
     BytesIO = StringIO
 
@@ -113,10 +114,10 @@ def  _build_extension():
     """ Try to compile the c extension. """
     import subprocess
 
-    curdir = os.getcwd()
+    cur_dir = os.getcwd()
     try:
-        pdir = os.path.join(os.path.dirname(os.path.realpath(__file__)))
-        os.chdir(os.path.join(pdir, "c"))
+        src_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)))
+        os.chdir(os.path.join(src_dir, "c"))
 
         # Use the appropriate build command
         build_cmd = ['make']
@@ -138,7 +139,7 @@ def  _build_extension():
         return False
     finally:
         # Go back to the directory we were in before exiting
-        os.chdir(curdir)
+        os.chdir(cur_dir)
 
     # We should never make it here, but if we do the null return
     #  prevents the attempted importing of the c module.
@@ -168,18 +169,6 @@ except ImportError as e:
             except ImportError:
                 pass
 
-# See if we can import from_iterable
-try:
-    from itertools import chain as _chain
-    _from_iterable = _chain.from_iterable
-except ImportError:
-    def _from_iterable(iterables):
-        """ A simple implementation of chain.from_iterable.
-        As such: _from_iterable(['ABC', 'DEF']) --> A B C D E F """
-
-        for item in iterables:
-            for element in item:
-                yield element
 
 #############################################
 #            Global Variables               #
@@ -203,7 +192,7 @@ CONVERT_DATATYPES = False
 # WARNING: STR_CONVERSION_DICT cannot contain both booleans and
 # arithmetic types. Attempting to use both will cause an issue since
 # boolean True == 1 in python and False == 0.
-STR_CONVERSION_DICT = {None:"."}
+STR_CONVERSION_DICT = {None: "."}
 
 # Used internally
 _STANDARD_SCHEMA = None
@@ -212,6 +201,7 @@ _API_URL = "http://webapi.bmrb.wisc.edu/v2"
 _SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
 __version__ = "2.6"
+
 
 #############################################
 #             Module methods                #
@@ -228,6 +218,7 @@ def enable_nef_defaults():
     SKIP_EMPTY_LOOPS = True
     DONT_SHOW_COMMENTS = True
 
+
 def enable_nmrstar_defaults():
     """ Sets the module variables such that our behavior matches the
     BMRB standard (NMR-STAR). This is the default behavior of this module.
@@ -238,13 +229,16 @@ def enable_nmrstar_defaults():
     SKIP_EMPTY_LOOPS = False
     DONT_SHOW_COMMENTS = False
 
-def delete_empty_saveframes(entry_object,
-                            tags_to_ignore=["sf_category", "sf_framecode"],
-                            allowed_null_values=[".", "?", None]):
+
+def delete_empty_saveframes(entry_object, tags_to_ignore=None, allowed_null_values=None):
     """ This method will delete all empty saveframes in an entry
     (the loops in the saveframe must also be empty for the saveframe
     to be deleted). "Empty" means no values in tags, not no tags present."""
 
+    if not tags_to_ignore:
+        tags_to_ignore = ["sf_category", "sf_framecode"]
+    if not allowed_null_values:
+        allowed_null_values = [".", "?", None]
     to_delete_list = []
 
     # Go through the saveframes
@@ -296,15 +290,6 @@ def validate(entry_to_validate, schema=None):
         print("No problems found during validation.")
     for pos, err in enumerate(validation):
         print("%d: %s" % (pos + 1, err))
-
-
-class _ErrorHandler(object):
-    def fatalError(self, line, msg):
-        print("Critical parse error in line %s: %s\n" % (line, msg))
-    def error(self, line, msg):
-        print("Parse error in line %s: %s\n" % (line, msg))
-    def warning(self, line, msg):
-        print("Parser warning in line %s: %s\n" % (line, msg))
 
 
 def clean_value(value):
@@ -1047,8 +1032,8 @@ class Schema(object):
 
         # Get the schema from the internet, wrap in StringIO and pass that
         #  to the csv reader
-        schem_stream = _interpret_file(schema_file)
-        fix_newlines = StringIO('\n'.join(schem_stream.read().splitlines()))
+        schema_stream = _interpret_file(schema_file)
+        fix_newlines = StringIO('\n'.join(schema_stream.read().splitlines()))
 
         csv_reader_instance = csv_reader(fix_newlines)
         self.headers = next(csv_reader_instance)
@@ -1597,7 +1582,7 @@ class Entry(object):
 
             # Download the entry
             try:
-                req = urllib_request(entry_url)
+                req = Request(entry_url)
                 req.add_header('Application', 'PyNMRSTAR %s' % __version__)
                 url_request = urlopen(req)
 
@@ -1614,7 +1599,7 @@ class Entry(object):
                     raise IOError("Entry '%s' does not exist in the public "
                                   "database." % entry_num)
                 else:
-                    raise HTTPError()
+                    raise err
 
             # If we have zlib decompress
             if zlib:
@@ -3027,7 +3012,7 @@ class Loop(object):
 
                 # Print the data (combine the tags' widths with their data)
                 tag_width_list = [d for d in zip(title_widths, datum)]
-                row_strings.append(pstring % tuple(_from_iterable(tag_width_list)))
+                row_strings.append(pstring % tuple(chain.from_iterable(tag_width_list)))
 
         # Close the loop
         ret_string += "".join(row_strings) + "\n   stop_\n"
