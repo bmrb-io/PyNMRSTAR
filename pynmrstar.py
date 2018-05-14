@@ -1086,7 +1086,7 @@ class Schema(object):
 
         csv_reader_instance = csv_reader(types_file)
         for item in csv_reader_instance:
-            self.data_types[item[0]] = item[1]
+            self.data_types[item[0]] = "^" + item[1] + "$"
 
     def __repr__(self):
         """Return how we can be initialized."""
@@ -2550,7 +2550,7 @@ class Saveframe(object):
             for tag in self.tags:
                 other_tag = other.get_tag(tag[0])
 
-                if other_tag == []:
+                if not other_tag:
                     diffs.append("\tNo tag with name '%s.%s' in compared "
                                  "entry." % (self.tag_prefix, tag[0]))
                     continue
@@ -3779,6 +3779,8 @@ class Loop(object):
             for row_num, row in enumerate(self.data):
                 for pos, datum in enumerate(row):
                     line_no = str(row_num) + " tag " + str(pos) + " of loop"
+                    if datum == "a":
+                        pass
                     errors.extend(my_schema.val_type(self.category + "." +
                                                      self.tags[pos], datum,
                                                      category=category,
