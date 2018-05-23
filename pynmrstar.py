@@ -508,13 +508,12 @@ def _load_comments(file_to_load=None):
             return
 
     # Load the comments
-    categories = comment_entry.get_tag("_comment.category")
-    comments = comment_entry.get_tag("_comment.comment")
-
-    for pos, val in enumerate(categories):
-        comment = comments[pos]
-        if comment != ".":
-            _COMMENT_DICTIONARY[val] = comments[pos].rstrip() + "\n\n"
+    comments = comment_entry[0][0].get_tag(["category", "comment", "every_flag"])
+    comment_map = {'N': False, 'Y': True}
+    for comment in comments:
+        if comment[1] != ".":
+            _COMMENT_DICTIONARY[comment[0]] = {'comment': comment[1].rstrip() + "\n\n",
+                                               'every_flag': comment_map[comment[2]]}
 
 
 def _tag_key(x, schema=None):
@@ -1574,13 +1573,9 @@ class Entry(object):
 
         category_list = []
         for saveframe in self.frame_list:
-            try:
-                category = saveframe['sf_category'][0]
-                if category and category not in category_list:
-                    category_list.append(category)
-            except (KeyError, IndexError):
-                pass
-
+            category = saveframe.category
+            if category and category not in category_list:
+                category_list.append(category)
         return list(category_list)
 
     @classmethod
@@ -2178,7 +2173,7 @@ class Saveframe(object):
         self.loops = []
         self.name = ""
         self.source = "unknown"
-        self.category = "unset"
+        self.category = None
         self.tag_prefix = None
 
         star_buffer = ""
@@ -2325,7 +2320,7 @@ class Saveframe(object):
         # Create a saveframe from scratch and populate it
         ret = Saveframe.from_scratch(json_dict['name'])
         ret.tag_prefix = json_dict['tag_prefix']
-        ret.category = json_dict.get('category', 'unset')
+        ret.category = json_dict.get('category', None)
         ret.tags = json_dict['tags']
         ret.loops = [Loop.from_json(x) for x in json_dict['loops']]
         ret.source = "from_json()"
@@ -2379,7 +2374,7 @@ class Saveframe(object):
             # If the tag already exists, set its value
             self.add_tag(key, item, update=True)
 
-    def __str__(self):
+    def __str__(self, first_in_category=True):
         """Returns the saveframe in STAR format as a string."""
 
         if ALLOW_V2_ENTRIES:
@@ -2400,9 +2395,9 @@ class Saveframe(object):
         ret_string = ""
 
         # Insert the comment if not disabled
-        if not DONT_SHOW_COMMENTS:
+        if not DONT_SHOW_COMMENTS and first_in_category:
             if self.category in _COMMENT_DICTIONARY:
-                ret_string = _COMMENT_DICTIONARY[self.category]
+                ret_string = _COMMENT_DICTIONARY[self.category]['comment']
 
         # Print the saveframe
         ret_string += "save_%s\n" % self.name
@@ -2493,7 +2488,7 @@ class Saveframe(object):
         # Set the category if the tag we are loading is the category
         tagname_lower = name.lower()
         if tagname_lower == "sf_category" or tagname_lower == "_saveframe_category":
-            if self.category == "unset":
+            if not self.category:
                 self.category = value
 
         if linenum:
@@ -2757,7 +2752,7 @@ class Saveframe(object):
         errors = []
 
         my_category = self.category
-        if my_category == "unset":
+        if not my_category:
             errors.append("Cannot properly validate saveframe: '" + self.name +
                           "'. No saveframe category defined.")
             my_category = None
