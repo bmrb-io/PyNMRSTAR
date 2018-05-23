@@ -1568,6 +1568,21 @@ class Entry(object):
                       "\n".join([str(frame) for frame in self.frame_list]))
         return ret_string
 
+    @property
+    def category_list(self):
+        """ Returns a list of the unique categories present in the entry. """
+
+        category_list = []
+        for saveframe in self.frame_list:
+            try:
+                category = saveframe['sf_category'][0]
+                if category and category not in category_list:
+                    category_list.append(category)
+            except (KeyError, IndexError):
+                pass
+
+        return list(category_list)
+
     @classmethod
     def from_database(cls, entry_num):
         """Create an entry corresponding to the most up to date entry on

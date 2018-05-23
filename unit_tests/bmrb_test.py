@@ -303,6 +303,14 @@ class TestPyNMRSTAR(unittest.TestCase):
         frame.set_tag_prefix("new_prefix")
         self.assertEqual(frame.tag_prefix, "_new_prefix")
 
+    def test_category_list(self):
+        """ Test the category list property. """
+
+        tmp = copy(database_entry)
+        self.assertEqual(tmp.category_list, ['entry_information', 'citations', 'assembly', 'entity', 'natural_source', 'experimental_source', 'chem_comp', 'sample', 'sample_conditions', 'software', 'NMR_spectrometer', 'NMR_spectrometer_list', 'experiment_list', 'chem_shift_reference', 'assigned_chemical_shifts'])
+        tmp.add_saveframe(pynmrstar.Saveframe.from_scratch("test", None))
+        self.assertEqual(tmp.category_list, ['entry_information', 'citations', 'assembly', 'entity', 'natural_source', 'experimental_source', 'chem_comp', 'sample', 'sample_conditions', 'software', 'NMR_spectrometer', 'NMR_spectrometer_list', 'experiment_list', 'chem_shift_reference', 'assigned_chemical_shifts'])
+
     def test_loop(self):
         test_loop = self.entry[0][0]
 
