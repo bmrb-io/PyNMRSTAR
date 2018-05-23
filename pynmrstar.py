@@ -1467,7 +1467,8 @@ class Entry(object):
               Entry.from_file()
               Entry.from_string()
               Entry.from_scratch()
-              Entry.from_json()"""
+              Entry.from_json()
+              Entry.from_template()"""
 
         # Default initializations
         self.entry_id = 0
@@ -1475,7 +1476,7 @@ class Entry(object):
         self.source = None
 
         # They initialized us wrong
-        if len(kwargs) == 0 or len(kwargs) > 1:
+        if len(kwargs) == 0 or len(kwargs) > 3:
             raise ValueError("You should not directly instantiate an Entry "
                              "using this method. Instead use the class methods:"
                              " Entry.from_database(), Entry.from_file(), "
@@ -1511,6 +1512,20 @@ class Entry(object):
             except URLError:
                 raise IOError("You don't appear to have an active internet "
                               "connection. Cannot fetch entry.")
+        # Creating from template (schema)
+        elif 'all_tags' in kwargs:
+            self.entry_id = kwargs['entry_id']
+
+            saveframe_categories = {}
+            schema_obj = _get_schema(kwargs['schema']).schema
+            for tag in schema_obj.values():
+                category = tag['SFCategory']
+                if category not in saveframe_categories:
+                    saveframe_categories[category] = True
+                    self.frame_list.append(Saveframe.from_template(category, category,
+                                                                   all_tags=kwargs['all_tags']))
+
+            return
         else:
             # Initialize a blank entry
             self.entry_id = kwargs['entry_id']
@@ -1735,6 +1750,20 @@ class Entry(object):
         (The unique identifier "xxx" from "data_xxx".)"""
 
         return cls(entry_id=entry_id)
+
+    @classmethod
+    def from_template(cls, entry_id, all_tags=False, schema=None):
+        """ Create an entry that has all of the tags and loops from the
+        schema present. No values will be assigned. Specify the category
+        when calling this method. Optionally also provide the name of the
+        saveframe as the 'name' argument.
+
+        The optional argument 'all_tags' forces all tags to be included
+        rather than just the mandatory tags."""
+
+        entry = cls(entry_id=entry_id, all_tags=all_tags, schema=schema)
+        entry.source = "from_template()"
+        return entry
 
     def add_saveframe(self, frame):
         """Add a saveframe to the entry."""
