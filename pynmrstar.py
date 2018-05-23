@@ -2225,9 +2225,9 @@ class Saveframe(object):
                         ft = _format_tag(item["Tag"])
                         # Set the value for sf_category and sf_framecode
                         if ft == "Sf_category":
-                            self.add_tag(ft, self.category)
+                            self.add_tag(item["Tag"], self.category)
                         elif ft == "Sf_framecode":
-                            self.add_tag(ft, self.name)
+                            self.add_tag(item["Tag"], self.name)
                         else:
                             # Unconditional add
                             if kwargs['all_tags']:
@@ -2242,12 +2242,14 @@ class Saveframe(object):
                         cat_formatted = _format_category(item["Tag"])
                         if cat_formatted not in loops_added:
                             loops_added.append(cat_formatted)
-                            nl = Loop.from_template(cat_formatted,
-                                                    all_tags=kwargs['all_tags'],
-                                                    schema=schema_obj)
-                            self.add_loop(nl)
-
+                            try:
+                                self.add_loop(Loop.from_template(cat_formatted,
+                                                                 all_tags=kwargs['all_tags'],
+                                                                 schema=schema_obj))
+                            except ValueError:
+                                pass
             return
+
         elif 'saveframe_name' in kwargs:
             # If they are creating from scratch, just get the saveframe name
             self.name = kwargs['saveframe_name']
