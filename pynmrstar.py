@@ -1753,13 +1753,14 @@ class Entry(object):
 
     @classmethod
     def from_template(cls, entry_id, all_tags=False, schema=None):
-        """ Create an entry that has all of the tags and loops from the
-        schema present. No values will be assigned. Specify the category
-        when calling this method. Optionally also provide the name of the
-        saveframe as the 'name' argument.
+        """ Create an entry that has all of the saveframes and loops from the
+        schema present. No values will be assigned. Specify the entry
+        ID when calling this method.
 
         The optional argument 'all_tags' forces all tags to be included
-        rather than just the mandatory tags."""
+        rather than just the mandatory tags.
+
+        The optional argument 'schema' allows providing a custom schema."""
 
         entry = cls(entry_id=entry_id, all_tags=all_tags, schema=schema)
         entry.source = "from_template()"
