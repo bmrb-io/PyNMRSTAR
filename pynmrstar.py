@@ -1563,9 +1563,16 @@ class Entry(object):
     def __str__(self):
         """Returns the entire entry in STAR format as a string."""
 
-        ret_string = ("data_%s\n\n" % self.entry_id +
-                      "\n".join([str(frame) for frame in self.frame_list]))
-        return ret_string
+        sf_strings = []
+        seen_saveframes = {}
+        for saveframe in self:
+            if saveframe.category in seen_saveframes:
+                sf_strings.append(saveframe.__str__(first_in_category=False))
+            else:
+                sf_strings.append(saveframe.__str__(first_in_category=True))
+                seen_saveframes[saveframe.category] = True
+
+        return "data_%s\n\n%s" % (self.entry_id , "\n".join(sf_strings))
 
     @property
     def category_list(self):
@@ -2395,9 +2402,11 @@ class Saveframe(object):
         ret_string = ""
 
         # Insert the comment if not disabled
-        if not DONT_SHOW_COMMENTS and first_in_category:
+        if not DONT_SHOW_COMMENTS:
             if self.category in _COMMENT_DICTIONARY:
-                ret_string = _COMMENT_DICTIONARY[self.category]['comment']
+                this_comment = _COMMENT_DICTIONARY[self.category]
+                if first_in_category or this_comment['every_flag']:
+                    ret_string = _COMMENT_DICTIONARY[self.category]['comment']
 
         # Print the saveframe
         ret_string += "save_%s\n" % self.name
