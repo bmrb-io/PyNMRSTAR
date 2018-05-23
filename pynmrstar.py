@@ -1460,7 +1460,7 @@ class Entry(object):
         except TypeError:
             return self.get_saveframe_by_name(item)
 
-    def __init__(self, **kargs):
+    def __init__(self, **kwargs):
         """ You should not directly instantiate an Entry using this method.
             Instead use the class methods:"
               Entry.from_database()
@@ -1475,7 +1475,7 @@ class Entry(object):
         self.source = None
 
         # They initialized us wrong
-        if len(kargs) == 0 or len(kargs) > 1:
+        if len(kwargs) == 0 or len(kwargs) > 1:
             raise ValueError("You should not directly instantiate an Entry "
                              "using this method. Instead use the class methods:"
                              " Entry.from_database(), Entry.from_file(), "
@@ -1485,18 +1485,18 @@ class Entry(object):
         # Initialize our local variables
         self.frame_list = []
 
-        if 'the_string' in kargs:
+        if 'the_string' in kwargs:
             # Parse from a string by wrapping it in StringIO
-            star_buffer = StringIO(kargs['the_string'])
+            star_buffer = StringIO(kwargs['the_string'])
             self.source = "from_string()"
-        elif 'file_name' in kargs:
-            star_buffer = _interpret_file(kargs['file_name'])
-            self.source = "from_file('%s')" % kargs['file_name']
-        elif 'entry_num' in kargs:
-            self.source = "from_database(%s)" % kargs['entry_num']
+        elif 'file_name' in kwargs:
+            star_buffer = _interpret_file(kwargs['file_name'])
+            self.source = "from_file('%s')" % kwargs['file_name']
+        elif 'entry_num' in kwargs:
+            self.source = "from_database(%s)" % kwargs['entry_num']
 
             # The location to fetch entries from
-            entry_number = kargs['entry_num']
+            entry_number = kwargs['entry_num']
             url = 'http://rest.bmrb.wisc.edu/bmrb/NMR-STAR3/%s' % entry_number
 
             # Parse from the official BMRB library
@@ -1513,7 +1513,7 @@ class Entry(object):
                               "connection. Cannot fetch entry.")
         else:
             # Initialize a blank entry
-            self.entry_id = kargs['entry_id']
+            self.entry_id = kwargs['entry_id']
             self.source = "from_scratch()"
             return
 
@@ -1572,7 +1572,7 @@ class Entry(object):
                 sf_strings.append(saveframe.__str__(first_in_category=True))
                 seen_saveframes[saveframe.category] = True
 
-        return "data_%s\n\n%s" % (self.entry_id , "\n".join(sf_strings))
+        return "data_%s\n\n%s" % (self.entry_id, "\n".join(sf_strings))
 
     @property
     def category_list(self):
@@ -2159,7 +2159,7 @@ class Saveframe(object):
 
         return self.tag_prefix < other.tag_prefix
 
-    def __init__(self, **kargs):
+    def __init__(self, **kwargs):
         """Don't use this directly. Use the class methods to construct:
              Saveframe.from_scratch()
              Saveframe.from_string()
@@ -2168,7 +2168,7 @@ class Saveframe(object):
              Saveframe.from_json()"""
 
         # They initialized us wrong
-        if len(kargs) == 0:
+        if len(kwargs) == 0:
             raise ValueError("You should not directly instantiate a Saveframe "
                              "using this method. Instead use the class methods:"
                              " Saveframe.from_scratch(), Saveframe.from_string()"
@@ -2186,25 +2186,25 @@ class Saveframe(object):
         star_buffer = ""
 
         # Update our source if it provided
-        if 'source' in kargs:
-            self.source = kargs['source']
+        if 'source' in kwargs:
+            self.source = kwargs['source']
 
-        if 'the_string' in kargs:
+        if 'the_string' in kwargs:
             # Parse from a string by wrapping it in StringIO
-            star_buffer = StringIO(kargs['the_string'])
+            star_buffer = StringIO(kwargs['the_string'])
             self.source = "from_string()"
-        elif 'file_name' in kargs:
-            star_buffer = _interpret_file(kargs['file_name'])
-            self.source = "from_file('%s')" % kargs['file_name']
+        elif 'file_name' in kwargs:
+            star_buffer = _interpret_file(kwargs['file_name'])
+            self.source = "from_file('%s')" % kwargs['file_name']
         # Creating from template (schema)
-        elif 'all_tags' in kargs:
-            schema_obj = _get_schema(kargs['schema'])
+        elif 'all_tags' in kwargs:
+            schema_obj = _get_schema(kwargs['schema'])
             schema = schema_obj.schema
-            self.category = kargs['category']
+            self.category = kwargs['category']
 
             self.name = self.category
-            if 'saveframe_name' in kargs and kargs['saveframe_name']:
-                self.name = kargs['saveframe_name']
+            if 'saveframe_name' in kwargs and kwargs['saveframe_name']:
+                self.name = kwargs['saveframe_name']
 
             # Make sure it is a valid category
             if self.category not in [x["SFCategory"] for x in schema.values()]:
@@ -2230,7 +2230,7 @@ class Saveframe(object):
                             self.add_tag(ft, self.name)
                         else:
                             # Unconditional add
-                            if kargs['all_tags']:
+                            if kwargs['all_tags']:
                                 self.add_tag(item["Tag"], None)
                             # Conditional add
                             else:
@@ -2243,20 +2243,20 @@ class Saveframe(object):
                         if cat_formatted not in loops_added:
                             loops_added.append(cat_formatted)
                             nl = Loop.from_template(cat_formatted,
-                                                    all_tags=kargs['all_tags'],
+                                                    all_tags=kwargs['all_tags'],
                                                     schema=schema_obj)
                             self.add_loop(nl)
 
             return
-        elif 'saveframe_name' in kargs:
+        elif 'saveframe_name' in kwargs:
             # If they are creating from scratch, just get the saveframe name
-            self.name = kargs['saveframe_name']
-            if 'tag_prefix' in kargs:
-                self.tag_prefix = _format_category(kargs['tag_prefix'])
+            self.name = kwargs['saveframe_name']
+            if 'tag_prefix' in kwargs:
+                self.tag_prefix = _format_category(kwargs['tag_prefix'])
             return
 
         # If we are reading from a CSV file, go ahead and parse it
-        if 'csv' in kargs and kargs['csv']:
+        if 'csv' in kwargs and kwargs['csv']:
             csvreader = csv_reader(star_buffer)
             tags = next(csvreader)
             values = next(csvreader)
@@ -2829,7 +2829,7 @@ class Loop(object):
                 item = list(item)
             return self.get_tag(tags=item)
 
-    def __init__(self, **kargs):
+    def __init__(self, **kwargs):
         """ You should not directly instantiate a Loop using this method.
             Instead use the class methods:
               Loop.from_scratch()
@@ -2847,16 +2847,16 @@ class Loop(object):
         star_buffer = ""
 
         # Update our source if it provided
-        if 'source' in kargs:
-            self.source = kargs['source']
+        if 'source' in kwargs:
+            self.source = kwargs['source']
 
         # Update our category if provided
-        if 'category' in kargs:
-            self.category = _format_category(kargs['category'])
+        if 'category' in kwargs:
+            self.category = _format_category(kwargs['category'])
             return
 
         # They initialized us wrong
-        if len(kargs) == 0:
+        if len(kwargs) == 0:
             raise ValueError("You should not directly instantiate a Loop using "
                              "this method. Instead use the class methods: "
                              "Loop.from_scratch(), Loop.from_string(), "
@@ -2864,32 +2864,32 @@ class Loop(object):
                              "Loop.from_json().")
 
         # Parsing from a string
-        if 'the_string' in kargs:
+        if 'the_string' in kwargs:
             # Parse from a string by wrapping it in StringIO
-            star_buffer = StringIO(kargs['the_string'])
+            star_buffer = StringIO(kwargs['the_string'])
             self.source = "from_string()"
         # Parsing from a file
-        elif 'file_name' in kargs:
-            star_buffer = _interpret_file(kargs['file_name'])
-            self.source = "from_file('%s')" % kargs['file_name']
+        elif 'file_name' in kwargs:
+            star_buffer = _interpret_file(kwargs['file_name'])
+            self.source = "from_file('%s')" % kwargs['file_name']
         # Creating from template (schema)
-        elif 'tag_prefix' in kargs:
+        elif 'tag_prefix' in kwargs:
 
-            tags = Loop._get_tags_from_schema(kargs['tag_prefix'],
-                                              all_tags=kargs['all_tags'],
-                                              schema=kargs['schema'])
+            tags = Loop._get_tags_from_schema(kwargs['tag_prefix'],
+                                              all_tags=kwargs['all_tags'],
+                                              schema=kwargs['schema'])
             for tag in tags:
                 self.add_tag(tag)
 
             return
 
         # If we are reading from a CSV file, go ahead and parse it
-        if 'csv' in kargs and kargs['csv']:
+        if 'csv' in kwargs and kwargs['csv']:
             csv_file = csv_reader(star_buffer)
             self.add_tag(next(csv_file))
             for row in csv_file:
                 self.add_data(row)
-            self.source = "from_csv('%s')" % kargs['csv']
+            self.source = "from_csv('%s')" % kwargs['csv']
             return
 
         tmp_entry = Entry.from_scratch(0)
