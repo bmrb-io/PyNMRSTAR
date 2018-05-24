@@ -171,6 +171,19 @@ Entry.from_file()
 Entry.from_string()
 Entry.from_scratch()
 Entry.from_json()
+Entry.from_template()
+
+#### Attributes:
+
+`frame_dict`
+
+A dictionary of saveframe name -> saveframe object for the
+saveframes in the entry. Can raise ValueError if multiple saveframes
+with the same name are present.
+
+`category_list`
+
+A list containing the categories of the saveframes in the entry.
 
 #### def `add_saveframe(frame)`
 
@@ -182,10 +195,6 @@ Returns the differences between two entries as a list.
 Otherwise returns 1 if different and 0 if equal. Non-equal
 entries will always be detected, but specific differences
 detected depends on order of entries.
-
-#### def `frame_dict()`
-
-Returns a dictionary of saveframe name -> saveframe object
 
 #### def `from_database(cls, entry_num)`
 
