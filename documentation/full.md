@@ -160,9 +160,9 @@ An OO representation of a BMRB entry. You can initialize this
 object several ways; (e.g. from a file, from the official database,
 from scratch) see the class methods below.
 
-Methods:
+#### Methods:
 
-#### def `__init__()`
+###### def `__init__()`
 
 You should not directly instantiate an Entry using this method.
 Instead use the class methods:"
@@ -185,98 +185,98 @@ with the same name are present.
 
 A list containing the categories of the saveframes in the entry.
 
-#### def `add_saveframe(frame)`
+##### def `add_saveframe(frame)`
 
 Add a saveframe to the entry.
 
-#### def `compare(other)`
+##### def `compare(other)`
 
 Returns the differences between two entries as a list.
 Otherwise returns 1 if different and 0 if equal. Non-equal
 entries will always be detected, but specific differences
 detected depends on order of entries.
 
-#### def `from_database(cls, entry_num)`
+##### def `from_database(cls, entry_num)`
 
 Create an entry corresponding to the most up to date entry on
 the public BMRB server. (Requires ability to initiate outbound
 HTTP connections.)
 
-#### def `from_file(cls, the_file)`
+##### def `from_file(cls, the_file)`
 
 Create an entry by loading in a file. If the_file starts with
 http://, https://, or ftp:// then we will use those protocols to
 attempt to open the file.
 
-#### def `from_json(cls, json_dict)`
+##### def `from_json(cls, json_dict)`
 
 Create an entry from JSON (serialized or unserialized JSON).
 
-#### def `from_scratch(cls, entry_id)`
+##### def `from_scratch(cls, entry_id)`
 
 Create an empty entry that you can programatically add to.
 You must pass a value corresponding to the Entry ID.
 (The unique identifier "xxx" from "data_xxx".)
 
-#### def `from_string(cls, the_string)`
+##### def `from_string(cls, the_string)`
 
 Create an entry by parsing a string.
 
-#### def `get_json(serialize=True)`
+##### def `get_json(serialize=True)`
 
 Returns the entry in JSON format. If serialize is set to
 False a dictionary representation of the entry that is
 serializeable is returned.
 
-#### def `get_loops_by_category(value)`
+##### def `get_loops_by_category(value)`
 
 Allows fetching loops by category.
 
-#### def `get_saveframe_by_name(frame)`
+##### def `get_saveframe_by_name(frame)`
 
 Allows fetching a saveframe by name.
 
-#### def `get_saveframes_by_category(value)`
+##### def `get_saveframes_by_category(value)`
 
 Allows fetching saveframes by category.
 
-#### def `get_saveframes_by_tag_and_value(tag_name, value)`
+##### def `get_saveframes_by_tag_and_value(tag_name, value)`
 
 Allows fetching saveframe(s) by tag and tag value.
 
-#### def `get_tag(tag, whole_tag=False)`
+##### def `get_tag(tag, whole_tag=False)`
 
 Given a tag (E.g. _Assigned_chem_shift_list.Data_file_name)
 return a list of all values for that tag. Specify whole_tag=True
 and the [tag_name, tag_value (,tag_linenumber)] pair will be
 returned.
 
-#### def `get_tags(tags)`
+##### def `get_tags(tags)`
 
 Given a list of tags, get all of the tags and return the
 results in a dictionary.
 
-#### def `nef_string()`
+##### def `nef_string()`
 
 Returns a string representation of the entry in NEF.
 
-#### def `normalize(schema=None)`
+##### def `normalize(schema=None)`
 
 Sorts saveframes, loops, and tags according to the schema
 provided (or BMRB default if none provided) and according
 to the assigned ID.
 
-#### def `print_tree()`
+##### def `print_tree()`
 
 Prints a summary, tree style, of the frames and loops in
 the entry.
 
-#### def `rename_saveframe(original_name, new_name)`
+##### def `rename_saveframe(original_name, new_name)`
 
 Renames a saveframe and updates all pointers to that
 saveframe in the entry with the new name.
 
-#### def `validate(validate_schema=True, schema=None, validate_star=True)`
+##### def `validate(validate_schema=True, schema=None, validate_star=True)`
 
 Validate an entry in a variety of ways. Returns a list of
 errors found. 0-length list indicates no errors found. By
@@ -289,7 +289,7 @@ otherwise the schema will be fetched from the BMRB servers.
 validate_star - Determines if the STAR syntax checks are ran.
 
 
-#### def `write_to_file(file_name, format_="nmrstar")`
+##### def `write_to_file(file_name, format_="nmrstar")`
 
 Writes the entry to the specified file in NMR-STAR format.
 
@@ -301,9 +301,9 @@ Optionally specify format_=json to write to the file in JSON format.
 
 A saveframe object. Create using the class methods, see below.
 
-Methods:
+#### Methods:
 
-#### def `__init__()`
+##### def `__init__()`
 
 Don't use this directly. Use the class methods to construct:
 Saveframe.from_scratch()
@@ -312,57 +312,57 @@ Saveframe.from_template()
 Saveframe.from_file()
 and Saveframe.from_json()
 
-#### def `add_loop(loop_to_add)`
+##### def `add_loop(loop_to_add)`
 
 Add a loop to the saveframe loops.
 
-#### def `add_tag(name, value, linenum=None, update=False)`
+##### def `add_tag(name, value, linenum=None, update=False)`
 
 Add a tag to the tag list. Does a bit of validation and
 parsing. Set update to true to update a tag if it exists rather
 than raise an exception.
 
-#### def `add_tags(tag_list, update=False)`
+##### def `add_tags(tag_list, update=False)`
 
 Adds multiple tags to the list. Input should be a list of
 tuples that are either [key, value] or [key]. In the latter case
 the value will be set to ".".  Set update to true to update a
 tag if it exists rather than raise an exception.
 
-#### def `compare(other)`
+##### def `compare(other)`
 
 Returns the differences between two saveframes as a list.
 Non-equal saveframes will always be detected, but specific
 differences detected depends on order of saveframes.
 
-#### def `delete_tag(tag)`
+##### def `delete_tag(tag)`
 
 Deletes a tag from the saveframe based on tag name.
 
-#### def `from_file(cls, the_file, csv=False)`
+##### def `from_file(cls, the_file, csv=False)`
 
 Create a saveframe by loading in a file. Specify csv=True is
 the file is a CSV file. If the_file starts with http://,
 https://, or ftp:// then we will use those protocols to attempt
 to open the file.
 
-#### def `from_json(cls, json_dict)`
+##### def `from_json(cls, json_dict)`
 
 Create a saveframe from JSON (serialized or unserialized JSON).
 
-#### def `from_scratch(cls, sf_name, tag_prefix=None, source=from_scratch())`
+##### def `from_scratch(cls, sf_name, tag_prefix=None, source=from_scratch())`
 
 Create an empty saveframe that you can programatically add
 to. You may also pass the tag prefix as the second argument. If
 you do not pass the tag prefix it will be set the first time you
 add a tag.
 
-#### def `from_string(cls, the_string, csv=False)`
+##### def `from_string(cls, the_string, csv=False)`
 
 Create a saveframe by parsing a string. Specify csv=True is
 the string is in CSV format and not NMR-STAR format.
 
-#### def `from_template(cls, category, name=None, all_tags=False, schema=None)`
+##### def `from_template(cls, category, name=None, all_tags=False, schema=None)`
 
 Create a saveframe that has all of the tags and loops from the
 schema present. No values will be assigned. Specify the category
@@ -372,55 +372,55 @@ saveframe as the 'name' argument.
 The optional argument 'all_tags' forces all tags to be included
 rather than just the mandatory tags.
 
-#### def `get_data_as_csv(header=True, show_category=True)`
+##### def `get_data_as_csv(header=True, show_category=True)`
 
 Return the data contained in the loops, properly CSVd, as a
 string. Set header to False omit the header. Set show_category
 to False to omit the loop category from the headers.
 
-#### def `get_json(serialize=True)`
+##### def `get_json(serialize=True)`
 
 Returns the saveframe in JSON format. If serialize is set to
 False a dictionary representation of the saveframe that is
 serializeable is returned.
 
-#### def `get_loop_by_category(name)`
+##### def `get_loop_by_category(name)`
 
 Return a loop based on the loop name (category).
 
-#### def `get_tag(query, whole_tag=False)`
+##### def `get_tag(query, whole_tag=False)`
 
 Allows fetching the value of a tag by tag name. Specify
 whole_tag=True and the [tag_name, tag_value] pair will be
 returned.
 
-#### def `loop_dict()`
+##### def `loop_dict()`
 
 Returns a hash of loop category -> loop.
 
-#### def `loop_iterator()`
+##### def `loop_iterator()`
 
 Returns an iterator for saveframe loops.
 
-#### def `print_tree()`
+##### def `print_tree()`
 
 Prints a summary, tree style, of the loops in the saveframe.
 
-#### def `set_tag_prefix(tag_prefix)`
+##### def `set_tag_prefix(tag_prefix)`
 
 Set the tag prefix for this saveframe.
 
-#### def `sort_tags(schema=None)`
+##### def `sort_tags(schema=None)`
 
 Sort the tags so they are in the same order as a BMRB
 schema. Will automatically use the standard schema if none
 is provided.
 
-#### def `tag_iterator()`
+##### def `tag_iterator()`
 
 Returns an iterator for saveframe tags.
 
-#### def `validate(validate_schema=True, schema=None, validate_star=True)`
+##### def `validate(validate_schema=True, schema=None, validate_star=True)`
 
 Validate a saveframe in a variety of ways. Returns a list of
 errors found. 0-length list indicates no errors found. By
@@ -432,7 +432,7 @@ otherwise the schema will be fetched from the BMRB servers.
 
 validate_star - Determines if the STAR syntax checks are ran.
 
-#### def `write_to_file(file_name, format_="nmrstar")`
+##### def `write_to_file(file_name, format_="nmrstar")`
 
 Writes the saveframe to the specified file in NMR-STAR format.
 
@@ -442,16 +442,16 @@ Optionally specify format_=json to write to the file in JSON format.
 
 A BMRB schema. Used to validate STAR files.
 
-Methods:
+#### Methods:
 
-#### def `__init__(schema_file=None)`
+##### def `__init__(schema_file=None)`
 
 Initialize a BMRB schema. With no arguments the most
 up-to-date schema will be fetched from the BMRB FTP site.
 Otherwise pass a URL or a file to load a schema from using the
 schema_file keyword argument.
 
-#### def `add_tag(tag, tag_type, null_allowed, sf_category, loop_flag, after=None)`
+##### def `add_tag(tag, tag_type, null_allowed, sf_category, loop_flag, after=None)`
 
 Adds the specified tag to the tag dictionary. You must provide:
 
@@ -470,17 +470,17 @@ Adds the specified tag to the tag dictionary. You must provide:
 6) Optional: The tag to order this tag behind when normalizing
 saveframes.
 
-#### def `convert_tag(tag, value, linenum=None)`
+##### def `convert_tag(tag, value, linenum=None)`
 
 Converts the provided tag from string to the appropriate
 type as specified in this schema.
 
-#### def `string_representation(search=None)`
+##### def `string_representation(search=None)`
 
 Prints all the tags in the schema if search is not specified
 and prints the tags that contain the search string if it is.
 
-#### def `val_type(tag, value, category=None, linenum=None)`
+##### def `val_type(tag, value, category=None, linenum=None)`
 
 Validates that a tag matches the type it should have
 according to this schema.
@@ -489,9 +489,9 @@ according to this schema.
 
 A BMRB loop object. Create using the class methods, see below.
 
-Methods:
+#### Methods:
 
-#### def `__init__()`
+##### def `__init__()`
 
 You should not directly instantiate a Loop using this method.
 Instead use the class methods:
@@ -501,7 +501,7 @@ Loop.from_template()
 Loop.from_file()
 Loop.from_json()
 
-#### def `add_column(name, ignore_duplicates=False)`
+##### def `add_column(name, ignore_duplicates=False)`
 
 Add a column to the column list. Does a bit of validation
 and parsing. Set ignore_duplicates to true to ignore attempts
@@ -516,7 +516,7 @@ tags present in this loop. It does not automatically add a column
 of None values to the data array if the loop is already populated
 with data.
 
-#### def `add_data(the_list, rearrange=False)`
+##### def `add_data(the_list, rearrange=False)`
 
 Add a list to the data field. Items in list can be any type,
 they will be converted to string and formatted correctly. The
@@ -525,58 +525,58 @@ must set the rearrange variable to true and have already set all
 the columns in the loop. Rearrange will break a longer list into
 rows based on the number of columns.
 
-#### def `add_data_by_column(column_id, value)`
+##### def `add_data_by_column(column_id, value)`
 
 Add data to the loop one element at a time, based on column.
 Useful when adding data from SANS parsers.
 
-#### def `clear_data()`
+##### def `clear_data()`
 
 Erases all data in this loop. Does not erase the data columns
 or loop category.
 
-#### def `compare(other)`
+##### def `compare(other)`
 
 Returns the differences between two loops as a list. Order of
 loops being compared does not make a difference on the specific
 errors detected.
 
-#### def `delete_data_by_tag_value(tag, value, index_tag=None)`
+##### def `delete_data_by_tag_value(tag, value, index_tag=None)`
 
 Deletes all rows which contain the provided value in the
 provided column. If index_tag is provided, that column is
 renumbered starting with 1. Returns the deleted rows.
 
-#### def `filter(tag_list, ignore_missing_tags=False)`
+##### def `filter(tag_list, ignore_missing_tags=False)`
 
 Returns a new loop containing only the specified tags.
 Specify ignore_missing_tags=True to bypass missing tags rather
 than raising an error.
 
-#### def `from_file(cls, the_file, csv=False)`
+##### def `from_file(cls, the_file, csv=False)`
 
 Create a saveframe by loading in a file. Specify csv=True if
 the file is a CSV file. If the_file starts with http://,
 https://, or ftp:// then we will use those protocols to attempt
 to open the file.
 
-#### def `from_json(cls, json_dict)`
+##### def `from_json(cls, json_dict)`
 
 Create a loop from JSON (serialized or unserialized JSON).
 
-#### def `from_scratch(cls, category=None, source=from_scratch())`
+##### def `from_scratch(cls, category=None, source=from_scratch())`
 
 Create an empty saveframe that you can programatically add
 to. You may also pass the tag prefix as the second argument. If
 you do not pass the tag prefix it will be set the first time you
 add a tag.
 
-#### def `from_string(cls, the_string, csv=False)`
+##### def `from_string(cls, the_string, csv=False)`
 
 Create a saveframe by parsing a string. Specify csv=True is
 the string is in CSV format and not NMR-STAR format.
 
-#### def `from_template(cls, tag_prefix, all_tags=False, schema=None)`
+##### def `from_template(cls, tag_prefix, all_tags=False, schema=None)`
 
 Create a loop that has all of the tags from the schema present.
 No values will be assigned. Specify the tag prefix of the loop.
@@ -584,30 +584,30 @@ No values will be assigned. Specify the tag prefix of the loop.
 The optional argument all_tags forces all tags to be included
 rather than just the mandatory tags.
 
-#### def `get_columns()`
+##### def `get_columns()`
 
 Return the columns for this entry with the category
 included. Throws ValueError if the category was never set.
 
-#### def `get_data_as_csv(header=True, show_category=True)`
+##### def `get_data_as_csv(header=True, show_category=True)`
 
 Return the data contained in the loops, properly CSVd, as a
 string. Set header to False to omit the header. Set
 show_category to false to omit the loop category from the
 headers.
 
-#### def `get_data_by_tag(tags=None)`
+##### def `get_data_by_tag(tags=None)`
 
 Identical to get_tag but wraps the results in a list even if
 only fetching one tag. Primarily exists for legacy code.
 
-#### def `get_json(serialize=True)`
+##### def `get_json(serialize=True)`
 
 Returns the loop in JSON format. If serialize is set to
 False a dictionary representation of the loop that is
 serializeable is returned.
 
-#### def `get_tag(tags=None, whole_tag=False)`
+##### def `get_tag(tags=None, whole_tag=False)`
 
 Provided a tag name (or a list of tag names), or ordinals
 corresponding to columns, return the selected tags by row as
@@ -619,11 +619,11 @@ value, or if dict_result=True, as the tag key.
 If dict_result=True, return the tags as a list of dictionaries
 in which the tag value points to the tag."""
 
-#### def `print_tree()`
+##### def `print_tree()`
 
 Prints a summary, tree style, of the loop.
 
-#### def `renumber_rows(index_tag, start_value=1, maintain_ordering=False)`
+##### def `renumber_rows(index_tag, start_value=1, maintain_ordering=False)`
 
 Renumber a given column incrementally. Set start_value to
 initial value if 1 is not acceptable. Set maintain_ordering to
@@ -631,12 +631,12 @@ preserve sequence with offset.
 
 E.g. 2,3,3,5 would become 1,2,2,4.
 
-#### def `set_category(category)`
+##### def `set_category(category)`
 
 Set the category of the loop. Useful if you didn't know the
 category at loop creation time.
 
-#### def `sort_rows(tags, key=None)`
+##### def `sort_rows(tags, key=None)`
 
 Sort the data in the rows by their values for a given column
 or columns. Specify the columns using their names or ordinals.
@@ -647,12 +647,12 @@ keys it provides. See the help for sorted() for more details. If
 you provide multiple columns to sort by, they are interpreted as
 increasing order of sort priority.
 
-#### def `sort_tags(schema=None)`
+##### def `sort_tags(schema=None)`
 
 Rearranges the columns and data in the loop to match the order
 from the schema. Uses the BMRB schema unless one is provided.
 
-#### def `validate(validate_schema=True, schema=None, validate_star=True, category=None)`
+##### def `validate(validate_schema=True, schema=None, validate_star=True, category=None)`
 
 Validate a loop in a variety of ways. Returns a list of
 errors found. 0-length list indicates no errors found. By
