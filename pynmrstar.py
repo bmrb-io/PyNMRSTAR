@@ -1392,7 +1392,7 @@ class Schema(object):
              'version': self.version}
 
         if not full:
-            s['headers'] = ['Tag', 'SFCategory', 'BMRB data type', 'Nullable',
+            s['headers'] = ['Tag', 'SFCategory', 'BMRB data type',
                             'Prompt', 'Interface', 'default value', 'Example',
                             'ADIT category view name', 'User full view',
                             'Foreign Table', 'Sf pointer']
