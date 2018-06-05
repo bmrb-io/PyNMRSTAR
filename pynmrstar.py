@@ -45,7 +45,7 @@ these entries - nothing else. Only set this if you have a really good
 reason to. Attempting to print a 2.1 entry will 'work' but tags that
 were after loops will be moved to before loops.
 
-* Setting DONT_SHOW_COMMENTS to True will supress the printing of
+* Setting DONT_SHOW_COMMENTS to True will suppress the printing of
 comments before saveframes.
 
 * Setting CONVERT_DATATYPES to True will automatically convert
@@ -79,6 +79,7 @@ import json
 import decimal
 import optparse
 
+from itertools import chain
 from optparse import SUPPRESS_HELP
 from copy import deepcopy
 from csv import reader as csv_reader, writer as csv_writer
@@ -94,17 +95,18 @@ except ImportError:
 # Determine if we are running in python3
 PY3 = (sys.version_info[0] == 3)
 
-#pylint: disable=wrong-import-position,no-name-in-module
-#pylint: disable=import-error,wrong-import-order
+# pylint: disable=wrong-import-position,no-name-in-module
+# pylint: disable=import-error,wrong-import-order
 # Python version dependent loads
 if PY3:
-    from urllib.request import urlopen, Request as urllib_request
+    from urllib.request import urlopen, Request
     from urllib.error import HTTPError, URLError
     from io import StringIO, BytesIO
 else:
-    from urllib2 import urlopen, HTTPError, URLError, Request as urllib_request
+    from urllib2 import urlopen, HTTPError, URLError, Request
     from cStringIO import StringIO
     BytesIO = StringIO
+
 
 # This is an odd place for this, but it can't really be avoided if
 #  we want to keep the import at the top.
@@ -112,10 +114,10 @@ def _build_extension():
     """ Try to compile the c extension. """
     import subprocess
 
-    curdir = os.getcwd()
+    cur_dir = os.getcwd()
     try:
-        pdir = os.path.join(os.path.dirname(os.path.realpath(__file__)))
-        os.chdir(os.path.join(pdir, "c"))
+        src_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)))
+        os.chdir(os.path.join(src_dir, "c"))
 
         # Use the appropriate build command
         build_cmd = ['make']
@@ -125,9 +127,9 @@ def _build_extension():
         process = subprocess.Popen(build_cmd, stderr=subprocess.STDOUT,
                                    stdout=subprocess.PIPE)
         process.communicate()
-        retcode = process.poll()
-        # The make commmand exited with a non-zero status
-        if retcode:
+        ret_code = process.poll()
+        # The make command exited with a non-zero status
+        if ret_code:
             return False
 
         # We were able to build the extension?
@@ -137,10 +139,11 @@ def _build_extension():
         return False
     finally:
         # Go back to the directory we were in before exiting
-        os.chdir(curdir)
+        os.chdir(cur_dir)
 
     # We should never make it here, but if we do the null return
     #  prevents the attempted importing of the c module.
+
 
 # See if we can use the fast tokenizer
 try:
@@ -156,7 +159,7 @@ try:
 except ImportError as e:
     cnmrstar = None
 
-    # Check for nobuild file before continuing
+    # Check for the 'no c module' file before continuing
     if not os.path.isfile(os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                        ".nocompile")):
 
@@ -164,20 +167,8 @@ except ImportError as e:
             try:
                 import cnmrstar
             except ImportError:
-                pass
+                cnmrstar = None
 
-# See if we can import from_iterable
-try:
-    from itertools import chain as _chain
-    _from_iterable = _chain.from_iterable
-except ImportError:
-    def _from_iterable(iterables):
-        """ A simple implementation of chain.from_iterable.
-        As such: _from_iterable(['ABC', 'DEF']) --> A B C D E F """
-
-        for item in iterables:
-            for element in item:
-                yield element
 
 #############################################
 #            Global Variables               #
@@ -201,7 +192,7 @@ CONVERT_DATATYPES = False
 # WARNING: STR_CONVERSION_DICT cannot contain both booleans and
 # arithmetic types. Attempting to use both will cause an issue since
 # boolean True == 1 in python and False == 0.
-STR_CONVERSION_DICT = {None:"."}
+STR_CONVERSION_DICT = {None: "."}
 
 # Used internally
 _STANDARD_SCHEMA = None
@@ -209,7 +200,8 @@ _COMMENT_DICTIONARY = {}
 _API_URL = "http://webapi.bmrb.wisc.edu/v2"
 _SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
-__version__ = "2.6"
+__version__ = "2.6.1"
+
 
 #############################################
 #             Module methods                #
@@ -222,9 +214,10 @@ def enable_nef_defaults():
     convert True -> "true" and False -> "false" when printing."""
 
     global STR_CONVERSION_DICT, SKIP_EMPTY_LOOPS, DONT_SHOW_COMMENTS
-    STR_CONVERSION_DICT = {None:".", True:"true", False:"false"}
+    STR_CONVERSION_DICT = {None: ".", True: "true", False: "false"}
     SKIP_EMPTY_LOOPS = True
     DONT_SHOW_COMMENTS = True
+
 
 def enable_nmrstar_defaults():
     """ Sets the module variables such that our behavior matches the
@@ -232,17 +225,20 @@ def enable_nmrstar_defaults():
     This method only exists to revert after calling enable_nef_defaults()."""
 
     global STR_CONVERSION_DICT, SKIP_EMPTY_LOOPS, DONT_SHOW_COMMENTS
-    STR_CONVERSION_DICT = {None:"."}
+    STR_CONVERSION_DICT = {None: "."}
     SKIP_EMPTY_LOOPS = False
     DONT_SHOW_COMMENTS = False
 
-def delete_empty_saveframes(entry_object,
-                            tags_to_ignore=["sf_category", "sf_framecode"],
-                            allowed_null_values=[".", "?", None]):
+
+def delete_empty_saveframes(entry_object, tags_to_ignore=None, allowed_null_values=None):
     """ This method will delete all empty saveframes in an entry
     (the loops in the saveframe must also be empty for the saveframe
     to be deleted). "Empty" means no values in tags, not no tags present."""
 
+    if not tags_to_ignore:
+        tags_to_ignore = ["sf_category", "sf_framecode"]
+    if not allowed_null_values:
+        allowed_null_values = [".", "?", None]
     to_delete_list = []
 
     # Go through the saveframes
@@ -261,7 +257,7 @@ def delete_empty_saveframes(entry_object,
 
         # Now check the loops
         for loop in frame:
-            if loop.data != []:
+            if loop.data:
                 to_delete = False
                 break
 
@@ -272,6 +268,7 @@ def delete_empty_saveframes(entry_object,
     # Delete the frames
     for pos in reversed(to_delete_list):
         del entry_object[pos]
+
 
 def diff(entry1, entry2):
     """Prints the differences between two entries. Non-equal entries
@@ -284,6 +281,7 @@ def diff(entry1, entry2):
     for difference in diffs:
         print(difference)
 
+
 def validate(entry_to_validate, schema=None):
     """Prints a validation report of an object."""
 
@@ -293,13 +291,6 @@ def validate(entry_to_validate, schema=None):
     for pos, err in enumerate(validation):
         print("%d: %s" % (pos + 1, err))
 
-class _ErrorHandler(object):
-    def fatalError(self, line, msg):
-        print("Critical parse error in line %s: %s\n" % (line, msg))
-    def error(self, line, msg):
-        print("Parse error in line %s: %s\n" % (line, msg))
-    def warning(self, line, msg):
-        print("Parser warning in line %s: %s\n" % (line, msg))
 
 def clean_value(value):
     """Automatically quotes the value in the appropriate way. Don't
@@ -326,7 +317,7 @@ def clean_value(value):
             value = STR_CONVERSION_DICT[value]
 
     # Use the fast code if it is available
-    if cnmrstar != None:
+    if cnmrstar is not None:
         # It's faster to assume we are working with a string and catch
         #  errors than to check the instance for every object and convert
         try:
@@ -385,7 +376,7 @@ def clean_value(value):
                 ["data_", "save_", "loop_", "stop_", "_"])):
         # If there is a single quote wrap in double quotes
         if "'" in value:
-            return  '"%s"' % value
+            return '"%s"' % value
         # Either there is a double quote or no quotes
         else:
             return "'%s'" % value
@@ -399,8 +390,8 @@ def clean_value(value):
     # It's good to go
     return value
 
-# Internal use only methods
 
+# Internal use only methods
 def _json_serialize(obj):
     """JSON serializer for objects not serializable by default json code"""
 
@@ -408,6 +399,7 @@ def _json_serialize(obj):
     if isinstance(obj, (date, decimal.Decimal)):
         return str(obj)
     raise TypeError("Type not serializable: %s" % type(obj))
+
 
 def _format_category(value):
     """Adds a '_' to the front of a tag (if not present) and strips out
@@ -420,12 +412,14 @@ def _format_category(value):
             value = value[:value.index(".")]
     return value
 
+
 def _format_tag(value):
     """Strips anything before the '.'"""
 
     if '.' in value:
         value = value[value.index('.')+1:]
     return value
+
 
 def _get_schema(passed_schema=None):
     """If passed a schema (not None) it returns it. If passed none,
@@ -439,11 +433,11 @@ def _get_schema(passed_schema=None):
 
         # Try to load the local file first
         try:
-            sfile = os.path.join(os.path.dirname(os.path.realpath(__file__)))
-            sfile = os.path.join(sfile, "reference_files/schema.csv")
+            schema_file = os.path.join(os.path.dirname(os.path.realpath(__file__)))
+            schema_file = os.path.join(schema_file, "reference_files/schema.csv")
 
-            _STANDARD_SCHEMA = Schema(schema_file=sfile)
-        except:
+            _STANDARD_SCHEMA = Schema(schema_file=schema_file)
+        except Exception:
             # Try to load from the internet
             try:
                 _STANDARD_SCHEMA = Schema()
@@ -453,6 +447,7 @@ def _get_schema(passed_schema=None):
         passed_schema = _STANDARD_SCHEMA
 
     return passed_schema
+
 
 def _interpret_file(the_file):
     """Helper method returns some sort of object with a read() method.
@@ -492,6 +487,7 @@ def _interpret_file(the_file):
 
     return star_buffer
 
+
 def _load_comments(file_to_load=None):
     """ Loads the comments that should be placed in written files. """
 
@@ -505,7 +501,8 @@ def _load_comments(file_to_load=None):
     except IOError:
         # Load the comments from Github if we can't find them locally
         try:
-            comment_entry = Entry.from_file(_interpret_file("https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v2/reference_files/comments.str"))
+            comment_url = "https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v2/reference_files/comments.str"
+            comment_entry = Entry.from_file(_interpret_file(comment_url))
         except Exception:
             # No comments will be printed
             return
@@ -519,6 +516,7 @@ def _load_comments(file_to_load=None):
         if comment != ".":
             _COMMENT_DICTIONARY[val] = comments[pos].rstrip() + "\n\n"
 
+
 def _tag_key(x, schema=None):
     """ Helper function to figure out how to sort the tags."""
     try:
@@ -528,6 +526,7 @@ def _tag_key(x, schema=None):
         #  schema but make sure that they always come after tags in the
         #   schema
         return len(_get_schema(schema).schema_order) + abs(hash(x))
+
 
 #############################################
 #                Classes                    #
@@ -558,7 +557,7 @@ class _Parser(object):
         """ Returns the current line number that is in the process of
         being parsed."""
 
-        if cnmrstar != None:
+        if cnmrstar is not None:
             return self.line_number
         else:
             return self.full_data[0:self.index].count("\n")+1
@@ -601,12 +600,12 @@ class _Parser(object):
         return self.token
 
     @staticmethod
-    def index_handle(haystack, needle, startpos=None):
+    def index_handle(haystack, needle, start_pos=None):
         """ Finds the index while catching ValueError and returning
         None instead."""
 
         try:
-            return haystack.index(needle, startpos)
+            return haystack.index(needle, start_pos)
         except ValueError:
             return None
 
@@ -633,7 +632,7 @@ class _Parser(object):
         # Change '\n; data ' started multilines to '\n;\ndata'
         data = re.sub(r'\n;([^\n]+?)\n', r'\n;\n\1\n', data)
 
-        if cnmrstar != None:
+        if cnmrstar is not None:
             cnmrstar.load_string(data)
         else:
             self.full_data = data + "\n"
@@ -674,7 +673,7 @@ class _Parser(object):
         self.source = source
 
         # We are expecting to get saveframes
-        while self.get_token() != None:
+        while self.get_token() is not None:
 
             if not self.token.startswith("save_"):
                 raise ValueError("Only 'save_NAME' is valid in the body of a "
@@ -697,7 +696,7 @@ class _Parser(object):
             self.ent.add_saveframe(curframe)
 
             # We are in a saveframe
-            while self.get_token() != None:
+            while self.get_token() is not None:
 
                 if self.token == "loop_":
                     if self.delimiter != " ":
@@ -710,7 +709,7 @@ class _Parser(object):
                     # We are in a loop
                     seen_data = False
                     in_loop = True
-                    while in_loop and self.get_token() != None:
+                    while in_loop and self.get_token() is not None:
 
                         # Add a tag
                         if self.token.startswith("_"):
@@ -731,7 +730,7 @@ class _Parser(object):
                             curframe.add_loop(curloop)
 
                             # We are in the data block of a loop
-                            while self.token != None:
+                            while self.token is not None:
                                 if self.token == "stop_":
                                     if self.delimiter != " ":
                                         raise ValueError("The stop_ keyword may"
@@ -808,7 +807,7 @@ class _Parser(object):
                 # Invalid content in saveframe
                 elif not self.token.startswith("_"):
                     raise ValueError("Invalid token found in saveframe '" +
-                                     curframe.name +  "': '" + self.token +
+                                     curframe.name + "': '" + self.token +
                                      "'", self.get_line_number())
 
                 # Add a tag
@@ -844,7 +843,7 @@ class _Parser(object):
         self.full_data = None
 
         # Reset the parser
-        if cnmrstar != None:
+        if cnmrstar is not None:
             cnmrstar.reset()
 
         return self.ent
@@ -886,7 +885,7 @@ class _Parser(object):
             raw_tmp = self.full_data[self.index:newline_index+1]
             tmp = raw_tmp.lstrip(_WHITESPACE)
 
-        # If it is a multiline comment, recalculate our viewing window
+        # If it is a multi-line comment, recalculate our viewing window
         if tmp[0:2] == ";\n":
             try:
                 qstart = self.full_data.index(";\n", self.index)
@@ -1010,6 +1009,7 @@ class _Parser(object):
             self.delimiter = '$'
         return
 
+
 class Schema(object):
     """A BMRB schema. Used to validate STAR files."""
 
@@ -1033,8 +1033,8 @@ class Schema(object):
 
         # Get the schema from the internet, wrap in StringIO and pass that
         #  to the csv reader
-        schem_stream = _interpret_file(schema_file)
-        fix_newlines = StringIO('\n'.join(schem_stream.read().splitlines()))
+        schema_stream = _interpret_file(schema_file)
+        fix_newlines = StringIO('\n'.join(schema_stream.read().splitlines()))
 
         csv_reader_instance = csv_reader(fix_newlines)
         self.headers = next(csv_reader_instance)
@@ -1078,20 +1078,21 @@ class Schema(object):
                                          "reference_files/data_types.csv"))
         except IOError:
             # Load the data types from Github if we can't find them locally
+            types_url = "https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v2/reference_files/data_types.csv"
             try:
-                types_file = _interpret_file("https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v2/reference_files/data_types.csv")
+                types_file = _interpret_file(types_url)
             except Exception:
                 raise ValueError("Could not load the data type definition file from disk or the internet!")
 
         csv_reader_instance = csv_reader(types_file)
         for item in csv_reader_instance:
-            self.data_types[item[0]] = item[1]
+            self.data_types[item[0]] = "^" + item[1] + "$"
 
     def __repr__(self):
         """Return how we can be initialized."""
 
         return "pynmrstar.Schema(schema_file='%s') version %s" % (self.schema_file,
-                                                             self.version)
+                                                                  self.version)
 
     def __str__(self):
         """Print the schema that we are adhering to."""
@@ -1114,12 +1115,13 @@ class Schema(object):
         for y in range(0, len(values[0])):
             lengths.append(max([len(str(x[y])) for x in values]))
 
+        format_parameters = (self.schema_file, self.version, "Tag_Prefix", lengths[0],
+                             "Tag", lengths[1]-6, "Type", lengths[2], "Null_Allowed",
+                             lengths[3], "SF_Category")
         text = """BMRB schema from: '%s' version '%s'
 %s
   %-*s %-*s %-*s %-*s
-""" % (self.schema_file, self.version, "Tag_Prefix", lengths[0], "Tag",
-       lengths[1]-6, "Type", lengths[2], "Null_Allowed", lengths[3],
-       "SF_Category")
+""" % format_parameters
 
         last_tag = ""
 
@@ -1206,12 +1208,12 @@ class Schema(object):
                              "saveframe.")
 
         # Check the loop flag
-        if loop_flag != True and loop_flag != False:
+        if loop_flag is not True and loop_flag:
             raise ValueError("Invalid loop_flag. Please specify True or False.")
 
         # Conditionally check the tag to insert after
         new_tag_pos = len(self.schema_order)
-        if after != None:
+        if after is not None:
             try:
                 # See if the tag with caps exists in the order
                 new_tag_pos = self.schema_order.index(after) + 1
@@ -1245,12 +1247,12 @@ class Schema(object):
 
         new_tag_pos = _test_pos(new_tag_pos, self)
 
-        self.schema[tag.lower()] = {"Data Type":tag_type, "Loopflag": loop_flag,
-                                    "Nullable":null_allowed, "public": "Y",
-                                    "SFCategory":sf_category, "Tag":tag,
+        self.schema[tag.lower()] = {"Data Type": tag_type, "Loopflag": loop_flag,
+                                    "Nullable": null_allowed, "public": "Y",
+                                    "SFCategory": sf_category, "Tag": tag,
                                     "Dictionary sequence": new_tag_pos}
 
-    def convert_tag(self, tag, value, linenum=None):
+    def convert_tag(self, tag, value, line_num=None):
         """ Converts the provided tag from string to the appropriate
         type as specified in this schema."""
 
@@ -1259,7 +1261,7 @@ class Schema(object):
             if (RAISE_PARSE_WARNINGS and
                     "tag-not-in-schema" not in WARNINGS_TO_IGNORE):
                 raise ValueError("There is a tag in the file that isn't in the"
-                                 " schema: '%s' on line '%s'" % (tag, linenum))
+                                 " schema: '%s' on line '%s'" % (tag, line_num))
             else:
                 if VERBOSE:
                     print("Couldn't convert tag because it is not in the "
@@ -1277,7 +1279,7 @@ class Schema(object):
                     "invalid-null-value" not in WARNINGS_TO_IGNORE):
                 raise ValueError("There is a null in the file that isn't "
                                  "allowed according to the schema: '%s' on "
-                                 "line '%s'" % (tag, linenum))
+                                 "line '%s'" % (tag, line_num))
             else:
                 return None
 
@@ -1289,32 +1291,32 @@ class Schema(object):
         if "INTEGER" in valtype:
             try:
                 return int(value)
-            except:
+            except (ValueError, TypeError):
                 raise ValueError("Could not parse the file because a value "
                                  "that should be an INTEGER is not. Please "
                                  "turn off CONVERT_DATATYPES or fix the file. "
-                                 "Tag: '%s' on line '%s'" % (tag, linenum))
+                                 "Tag: '%s' on line '%s'" % (tag, line_num))
 
         # Convert floats
         if "FLOAT" in valtype:
             try:
                 # If we used int() we would lose the precision
                 return decimal.Decimal(value)
-            except:
+            except (decimal.InvalidOperation, TypeError):
                 raise ValueError("Could not parse the file because a value "
                                  "that should be a FLOAT is not. Please turn "
                                  "off CONVERT_DATATYPES or fix the file. Tag: "
-                                 "'%s' on line '%s'" % (tag, linenum))
+                                 "'%s' on line '%s'" % (tag, line_num))
 
         if "DATETIME year to day" in valtype:
             try:
                 year, month, day = [int(x) for x in value.split("-")]
                 return date(year, month, day)
-            except:
+            except (ValueError, TypeError):
                 raise ValueError("Could not parse the file because a value "
                                  "that should be a DATETIME is not. Please "
                                  "turn off CONVERT_DATATYPES or fix the file. "
-                                 "Tag: '%s' on line '%s'" % (tag, linenum))
+                                 "Tag: '%s' on line '%s'" % (tag, line_num))
 
         # We don't know the data type, so just keep it a string
         return value
@@ -1346,12 +1348,12 @@ class Schema(object):
         # Make local copies of the fields we care about
         full_tag = self.schema[tag.lower()]
         bmrb_type = full_tag["BMRB data type"]
-        valtype = full_tag["Data Type"]
+        val_type = full_tag["Data Type"]
         null_allowed = full_tag["Nullable"]
         allowed_category = full_tag["SFCategory"]
         capitalized_tag = full_tag["Tag"]
 
-        if category != None:
+        if category is not None:
             if category != allowed_category:
                 return ["The tag '%s' in category '%s' should be in category "
                         "'%s'." % (capitalized_tag, category, allowed_category)]
@@ -1363,12 +1365,12 @@ class Schema(object):
             return []
         else:
             # Don't run these checks on unassigned tags
-            if "CHAR" in valtype:
-                length = int(valtype[valtype.index("(")+1:valtype.index(")")])
+            if "CHAR" in val_type:
+                length = int(val_type[val_type.index("(")+1:val_type.index(")")])
                 if len(str(value)) > length:
                     return ["Length of '%d' is too long for %s: "
                             "'%s':'%s' on line '%s'." %
-                            (len(value), valtype, capitalized_tag, value, linenum)]
+                            (len(value), val_type, capitalized_tag, value, linenum)]
 
             # Check that the value matches the regular expression for the type
             if not re.match(self.data_types[bmrb_type], str(value)):
@@ -1383,15 +1385,42 @@ class Schema(object):
                     "valid. Should be '%s'." % (tag, capitalized_tag)]
         return []
 
-    def get_json(self, serialize=True):
+    def get_json(self, serialize=True, full=False):
         """ Returns the schema in JSON format. """
 
         s = {'data_types': self.data_types,
-             'category_order': self.category_order,
-             'schema_order': self.schema_order,
-             'schema': self.schema,
              'headers': self.headers,
              'version': self.version}
+
+        if not full:
+            s['headers'] = ['Tag', 'SFCategory', 'BMRB data type', 'Nullable',
+                            'Prompt', 'Interface', 'default value', 'Example',
+                            'ADIT category view name', 'User full view',
+                            'Foreign Table', 'Sf pointer']
+
+        compacted_schema = []
+        for tag in self.schema_order:
+            stag = self.schema[tag.lower()]
+            compacted_tag = []
+            for header in s['headers']:
+                try:
+                    compacted_tag.append(stag[header].replace("$", ","))
+                except AttributeError:
+                    compacted_tag.append(stag[header])
+                except KeyError:
+                    if header == 'Sf pointer':
+                        try:
+                            compacted_tag.append(stag['Framecode value flag'])
+                        except KeyError:
+                            compacted_tag.append(None)
+                    elif header == 'BMRB data type':
+                        compacted_tag.append('any')
+                    else:
+                        compacted_tag.append(None)
+
+            compacted_schema.append(compacted_tag)
+
+        s['tags'] = compacted_schema
 
         if serialize:
             return json.dumps(s, default=_json_serialize)
@@ -1452,7 +1481,7 @@ class Entry(object):
                              "using this method. Instead use the class methods:"
                              " Entry.from_database(), Entry.from_file(), "
                              "Entry.from_string(), Entry.from_scratch(), and "
-                             "Entry.from_json()." )
+                             "Entry.from_json().")
 
         # Initialize our local variables
         self.frame_list = []
@@ -1556,7 +1585,7 @@ class Entry(object):
 
             # Download the entry
             try:
-                req = urllib_request(entry_url)
+                req = Request(entry_url)
                 req.add_header('Application', 'PyNMRSTAR %s' % __version__)
                 url_request = urlopen(req)
 
@@ -1564,16 +1593,16 @@ class Entry(object):
                     raise IOError("Entry '%s' does not exist in the public "
                                   "database." % entry_num)
                 else:
-                    serialized_ent =  url_request.read()
+                    serialized_ent = url_request.read()
 
                 url_request.close()
 
-            except HTTPError as e:
-                if e.code == 404:
+            except HTTPError as err:
+                if err.code == 404:
                     raise IOError("Entry '%s' does not exist in the public "
                                   "database." % entry_num)
                 else:
-                    raise HTTPError()
+                    raise err
 
             # If we have zlib decompress
             if zlib:
@@ -1605,30 +1634,28 @@ class Entry(object):
                 for each_loop in each_saveframe:
                     each_loop.source = ent_source
 
-            # TODO: Delete this once the database is remediated
-            # Convert datatypes
             if CONVERT_DATATYPES:
-                schem = _get_schema()
+                schema = _get_schema()
                 for each_saveframe in ent:
                     for tag in each_saveframe.tags:
                         cur_tag = each_saveframe.tag_prefix + "." + tag[0]
-                        tag[1] = schem.convert_tag(cur_tag, tag[1],
-                                                   linenum="SF %s" %
-                                                   each_saveframe.name)
+                        tag[1] = schema.convert_tag(cur_tag, tag[1],
+                                                    line_num="SF %s" %
+                                                    each_saveframe.name)
                     for loop in each_saveframe:
                         for row in loop.data:
                             for pos in range(0, len(row)):
-                                catgry = loop.category + "." + loop.tags[pos]
-                                linenum = "Loop %s" % loop.category
-                                row[pos] = schem.convert_tag(catgry, row[pos],
-                                                             linenum=linenum)
+                                category = loop.category + "." + loop.tags[pos]
+                                line_num = "Loop %s" % loop.category
+                                row[pos] = schema.convert_tag(category, row[pos],
+                                                              line_num=line_num)
 
             return ent
         # The entry doesn't exist
         except KeyError:
             raise IOError("Entry '%s' does not exist in the public database." %
                           entry_num)
-        except (URLError):
+        except URLError:
             if VERBOSE:
                 print("BMRB API server appears to be down. Attempting to load "
                       "from FTP site.")
@@ -1664,8 +1691,6 @@ class Entry(object):
             raise ValueError("The JSON you provide must be a hash and must"
                              " contain the key 'entry_id' - even if the key "
                              "points to 'None'.")
-
-
         # Until the migration is complete, 'bmrb_id' is a synonym for
         #  'entry_id'
         if 'entry_id' not in json_dict:
@@ -1688,7 +1713,7 @@ class Entry(object):
 
     @classmethod
     def from_scratch(cls, entry_id):
-        """Create an empty entry that you can programatically add to.
+        """Create an empty entry that you can programmatically add to.
         You must pass a value corresponding to the Entry ID.
         (The unique identifier "xxx" from "data_xxx".)"""
 
@@ -1862,17 +1887,18 @@ class Entry(object):
 
         # The saveframe/loop order
         ordering = _get_schema(schema).category_order
+
         # Use these to sort saveframes and loops
         def sf_key(x):
             """ Helper function to sort the saveframes."""
 
             try:
-                return (ordering.index(x.tag_prefix), x.get_tag("ID"))
+                return ordering.index(x.tag_prefix), x.get_tag("ID")
             except ValueError:
                 # Generate an arbitrary sort order for saveframes that aren't
                 #  in the schema but make sure that they always come after
                 #   saveframes in the schema
-                return (len(ordering) + hash(x), x.get_tag("ID"))
+                return len(ordering) + hash(x), x.get_tag("ID")
 
         def loop_key(x):
             """ Helper function to sort the loops."""
@@ -2055,6 +2081,7 @@ class Entry(object):
 
         out_file.close()
 
+
 class Saveframe(object):
     """A saveframe object. Create using the class methods, see below."""
 
@@ -2070,7 +2097,7 @@ class Saveframe(object):
         # (calls this method recursively)
         to_delete = self.__getitem__(item)
         if isinstance(to_delete, Loop):
-            self.__delitem__(to_delete)
+            del self.loops[self.loops.index(to_delete)]
             return
 
         # It must be a tag. Try to delete the tag
@@ -2095,7 +2122,7 @@ class Saveframe(object):
             return self.loops[item]
         except TypeError:
             results = self.get_tag(item)
-            if results != []:
+            if results:
                 return results
             else:
                 try:
@@ -2139,6 +2166,8 @@ class Saveframe(object):
         self.category = "unset"
         self.tag_prefix = None
 
+        star_buffer = ""
+
         # Update our source if it provided
         if 'source' in kargs:
             self.source = kargs['source']
@@ -2166,7 +2195,7 @@ class Saveframe(object):
                                  "in the dictionary." % self.category)
 
             s = sorted(schema.values(),
-                       key=lambda x: float(x["Dictionary sequence"]))
+                       key=lambda _: float(_["Dictionary sequence"]))
 
             loops_added = []
 
@@ -2221,7 +2250,6 @@ class Saveframe(object):
                 self.add_tag(tags[ordinal], values[ordinal])
             return
 
-
         tmp_entry = Entry.from_scratch(0)
 
         # Load the BMRB entry from the file
@@ -2243,7 +2271,7 @@ class Saveframe(object):
 
     @classmethod
     def from_scratch(cls, sf_name, tag_prefix=None, source="from_scratch()"):
-        """Create an empty saveframe that you can programatically add
+        """Create an empty saveframe that you can programmatically add
         to. You may also pass the tag prefix as the second argument. If
         you do not pass the tag prefix it will be set the first time you
         add a tag."""
@@ -2427,7 +2455,7 @@ class Saveframe(object):
                 name = name[1:]
 
         # No duplicate tags
-        if self.get_tag(name) != []:
+        if self.get_tag(name):
             if not update:
                 raise ValueError("There is already a tag with the name '%s'." %
                                  name)
@@ -2443,7 +2471,7 @@ class Saveframe(object):
         # See if we need to convert the datatype
         if CONVERT_DATATYPES:
             new_tag = [name, _get_schema().convert_tag(
-                self.tag_prefix + "." + name, value, linenum=linenum)]
+                self.tag_prefix + "." + name, value, line_num=linenum)]
         else:
             new_tag = [name, value]
 
@@ -2516,13 +2544,13 @@ class Saveframe(object):
             if len(self.tags) < len(other.tags):
                 diffs.append("\tNumber of tags does not match: '%d' vs '%d'. "
                              "The compared entry has at least one tag this "
-                             "entry does not."  %
+                             "entry does not." %
                              (len(self.tags), len(other.tags)))
 
             for tag in self.tags:
                 other_tag = other.get_tag(tag[0])
 
-                if other_tag == []:
+                if not other_tag:
                     diffs.append("\tNo tag with name '%s.%s' in compared "
                                  "entry." % (self.tag_prefix, tag[0]))
                     continue
@@ -2554,7 +2582,7 @@ class Saveframe(object):
                         diffs.extend(compare)
                 else:
                     diffs.append("\tNo loop with category '%s' in other"
-                                 " entry." % (each_loop.category))
+                                 " entry." % each_loop.category)
 
         except AttributeError as err:
             diffs.append("\tAn exception occured while comparing: '%s'." % err)
@@ -2683,9 +2711,9 @@ class Saveframe(object):
         schema. Will automatically use the standard schema if none
         is provided."""
 
-        mod_key = lambda x: _tag_key(self.tag_prefix + "." + x[0],
-                                     schema=schema)
-        self.tags.sort(key=mod_key)
+        def sort_key(x):
+            return _tag_key(self.tag_prefix + "." + x[0], schema=schema)
+        self.tags.sort(key=sort_key)
 
     def tag_iterator(self):
         """Returns an iterator for saveframe tags."""
@@ -2724,11 +2752,11 @@ class Saveframe(object):
             my_schema = _get_schema(schema)
 
             for tag in self.tags:
-                lineno = str(tag[2]) + " of original file" if len(tag) > 2 else None
+                line_number = str(tag[2]) + " of original file" if len(tag) > 2 else None
                 formatted_tag = self.tag_prefix + "." + tag[0]
                 cur_errors = my_schema.val_type(formatted_tag, tag[1],
                                                 category=my_category,
-                                                linenum=lineno)
+                                                linenum=line_number)
                 errors.extend(cur_errors)
 
         # Check the loops for errors
@@ -2756,6 +2784,7 @@ class Saveframe(object):
             out_file.write(self.get_json())
 
         out_file.close()
+
 
 class Loop(object):
     """A BMRB loop object. Create using the class methods, see below."""
@@ -2796,6 +2825,8 @@ class Loop(object):
         self.category = None
         self.source = "unknown"
 
+        star_buffer = ""
+
         # Update our source if it provided
         if 'source' in kargs:
             self.source = kargs['source']
@@ -2835,9 +2866,9 @@ class Loop(object):
 
         # If we are reading from a CSV file, go ahead and parse it
         if 'csv' in kargs and kargs['csv']:
-            csvreader = csv_reader(star_buffer)
-            self.add_tag(next(csvreader))
-            for row in csvreader:
+            csv_file = csv_reader(star_buffer)
+            self.add_tag(next(csv_file))
+            for row in csv_file:
                 self.add_data(row)
             self.source = "from_csv('%s')" % kargs['csv']
             return
@@ -2938,8 +2969,7 @@ class Loop(object):
         # Start the loop
         ret_string = "\n   loop_\n"
         # Print the tags
-        pstring = "      %-s\n"
-
+        format_string = "      %-s\n"
 
         # Check to make sure our category is set
         if self.category is None and not ALLOW_V2_ENTRIES:
@@ -2951,10 +2981,10 @@ class Loop(object):
         # Print the categories
         if self.category is None:
             for tag in self.tags:
-                ret_string += pstring % (tag)
+                ret_string += format_string % tag
         else:
             for tag in self.tags:
-                ret_string += pstring % (self.category + "." + tag)
+                ret_string += format_string % (self.category + "." + tag)
 
         ret_string += "\n"
 
@@ -2980,7 +3010,7 @@ class Loop(object):
             # own line...
 
             # Generate the format string
-            pstring = "     " + "%-*s"*len(self.tags) + " \n"
+            format_string = "     " + "%-*s"*len(self.tags) + " \n"
 
             # Print the data, with the tags sized appropriately
             for datum in working_data:
@@ -2990,7 +3020,7 @@ class Loop(object):
 
                 # Print the data (combine the tags' widths with their data)
                 tag_width_list = [d for d in zip(title_widths, datum)]
-                row_strings.append(pstring % tuple(_from_iterable(tag_width_list)))
+                row_strings.append(format_string % tuple(chain.from_iterable(tag_width_list)))
 
         # Close the loop
         ret_string += "".join(row_strings) + "\n   stop_\n"
@@ -3160,8 +3190,8 @@ class Loop(object):
                     row[tag_id] = tschem.convert_tag(self.category + "." +
                                                      self.tags[tag_id],
                                                      datum,
-                                                     linenum="Loop %s" %
-                                                     self.category)
+                                                     line_num="Loop %s" %
+                                                              self.category)
 
         self.data = processed_data
 
@@ -3170,7 +3200,7 @@ class Loop(object):
 
         sys.stderr.write("NOTICE: add_data_by_column() is depreciated. Please "
                          " use add_data_by_tag() instead.\n")
-        return self.add_data_by_tag(name, ignore_duplicates, update_data)
+        return self.add_data_by_tag(column_id, value)
 
     def add_data_by_tag(self, tag_id, value):
         """Add data to the loop one element at a time, based on tag.
@@ -3496,7 +3526,7 @@ class Loop(object):
 
         # Map tag name to tag position in list
         tag_mapping = dict(zip(reversed(tags_lower),
-                                  reversed(range(len(tags_lower)))))
+                               reversed(range(len(tags_lower)))))
 
         # Make sure their fields are actually present in the entry
         tag_ids = []
@@ -3532,7 +3562,8 @@ class Loop(object):
         # Make a dictionary
         else:
             if whole_tag:
-                result = [dict((self.category + "." + self.tags[col_id], row[col_id]) for col_id in tag_ids) for row in self.data]
+                result = [dict((self.category + "." + self.tags[col_id], row[col_id]) for col_id in tag_ids) for
+                          row in self.data]
             else:
                 result = [dict((self.tags[col_id], row[col_id]) for col_id in tag_ids) for row in self.data]
 
@@ -3542,7 +3573,7 @@ class Loop(object):
         """ Automatically adds any missing tags (according to the schema),
         sorts the tags, and renumbers the tags by ordinal. """
 
-        self.add_tag(Loop._get_tags_from_schema(self.category),
+        self.add_tag(Loop._get_tags_from_schema(self.category, schema=schema),
                      ignore_duplicates=True, update_data=True)
         self.sort_tags()
 
@@ -3555,12 +3586,12 @@ class Loop(object):
             ordinal_idx = self._tag_index("Ordinal")
 
             # If the first ordinal is unassigned, assign it
-            if self.data[0][ordinal_idx] == "." or self.data[0][ordinal_idx] == None:
+            if self.data[0][ordinal_idx] == "." or self.data[0][ordinal_idx] is None:
                 self.data[0][ordinal_idx] = 1
 
             # If we are in another row, assign to the previous row
             for row in self.data:
-                if row[ordinal_idx] == "." or row[ordinal_idx] == None:
+                if row[ordinal_idx] == "." or row[ordinal_idx] is None:
                     row[ordinal_idx] = row[ordinal_idx-1] + 1
 
     def print_tree(self):
@@ -3584,19 +3615,19 @@ class Loop(object):
                                  (supplied_category, self.category))
 
         # Determine which tag ID to renumber
-        renum_tag = self._tag_index(index_tag)
+        renumber_tag = self._tag_index(index_tag)
 
         # The tag to replace in is the tag they specify
-        if renum_tag is None:
+        if renumber_tag is None:
             # Or, perhaps they specified an integer to represent the tag?
             try:
-                renum_tag = int(index_tag)
+                renumber_tag = int(index_tag)
             except ValueError:
                 raise ValueError("The renumbering tag you provided '%s' "
                                  "isn't in this loop!" % index_tag)
 
         # Verify the renumbering column ID
-        if renum_tag >= len(self.tags) or renum_tag < 0:
+        if renumber_tag >= len(self.tags) or renumber_tag < 0:
             raise ValueError("The renumbering tag ID you provided '%s' is "
                              "too large or too small! Valid tag ids are"
                              "0-%d." % (index_tag, len(self.tags)-1))
@@ -3612,25 +3643,25 @@ class Loop(object):
             # If they have a string buried somewhere in the row, we'll
             #  have to restore the original values
             data_copy = deepcopy(self.data)
-
+            offset = 0
             for pos in range(0, len(self.data)):
                 try:
                     if pos == 0:
-                        offset = start_value - int(self.data[0][renum_tag])
-                    new_data = int(self.data[pos][renum_tag]) + offset
-                    self.data[pos][renum_tag] = new_data
+                        offset = start_value - int(self.data[0][renumber_tag])
+                    new_data = int(self.data[pos][renumber_tag]) + offset
+                    self.data[pos][renumber_tag] = new_data
                 except ValueError:
                     self.data = data_copy
                     raise ValueError("You can't renumber a row containing "
                                      "anything that can't be coerced into an "
                                      "integer using maintain_ordering. I.e. "
                                      "what am I suppose to renumber '%s' to?" %
-                                     self.data[pos][renum_tag])
+                                     self.data[pos][renumber_tag])
 
         # Simple renumbering algorithm if we don't need to maintain the ordering
         else:
             for pos in range(0, len(self.data)):
-                self.data[pos][renum_tag] = pos + start_value
+                self.data[pos][renumber_tag] = pos + start_value
 
     def set_category(self, category):
         """ Set the category of the loop. Useful if you didn't know the
@@ -3645,8 +3676,9 @@ class Loop(object):
         current_order = self.get_tag_names()
 
         # Sort the tags
-        loc_key = lambda x: _tag_key(x, schema=schema)
-        sorted_order = sorted(current_order, key=loc_key)
+        def sort_key(_):
+            return _tag_key(_, schema=schema)
+        sorted_order = sorted(current_order, key=sort_key)
 
         # Don't touch the data if the tags are already in order
         if sorted_order == current_order:
@@ -3672,7 +3704,6 @@ class Loop(object):
         # This will determine how we sort
         sort_ordinals = []
 
-        processing_list = []
         if isinstance(tags, list):
             processing_list = tags
         else:
@@ -3715,13 +3746,13 @@ class Loop(object):
             try:
                 if key is None:
                     tmp_data = sorted(self.data,
-                                      key=lambda x, pos=tag: float(x[pos]))
+                                      key=lambda _, pos=tag: float(_[pos]))
                 else:
                     tmp_data = sorted(self.data, key=key)
             except ValueError:
                 if key is None:
                     tmp_data = sorted(self.data,
-                                      key=lambda x, pos=tag: x[pos])
+                                      key=lambda _, pos=tag: _[pos])
                 else:
                     tmp_data = sorted(self.data, key=key)
             self.data = tmp_data
@@ -3745,25 +3776,28 @@ class Loop(object):
             my_schema = _get_schema(schema)
 
             # Check the data
-            for rownum, row in enumerate(self.data):
+            for row_num, row in enumerate(self.data):
                 for pos, datum in enumerate(row):
-                    lineno = str(rownum) + " tag " + str(pos) + " of loop"
+                    line_no = str(row_num) + " tag " + str(pos) + " of loop"
+                    if datum == "a":
+                        pass
                     errors.extend(my_schema.val_type(self.category + "." +
                                                      self.tags[pos], datum,
                                                      category=category,
-                                                     linenum=lineno))
+                                                     linenum=line_no))
 
         if validate_star:
             # Check for wrong data size
             num_cols = len(self.tags)
-            for rownum, row in enumerate(self.data):
+            for row_num, row in enumerate(self.data):
                 # Make sure the width matches
                 if len(row) != num_cols:
                     errors.append("Loop '%s' data width does not match it's "
                                   "tag width on row '%d'." %
-                                  (self.category, rownum))
+                                  (self.category, row_num))
 
         return errors
+
 
 def _called_directly():
     """ Figure out what to do if we were called on the command line
@@ -3859,7 +3893,7 @@ def _called_directly():
     else:
         print("Running unit tests...")
         try:
-            #pylint: disable=relative-import,wrong-import-order
+            # pylint: disable=relative-import,wrong-import-order
             from unit_tests import bmrb_test
         except ImportError:
             print("No testing module available with this installation.")
@@ -3873,6 +3907,7 @@ def _called_directly():
         bmrb_test.start_tests()
 
     sys.exit(0)
+
 
 # Allow using diff or validate if ran directly
 if __name__ == '__main__':

@@ -8,17 +8,12 @@ import unittest
 import subprocess
 from copy import deepcopy as copy
 
-# Determine if we are running in python3
-PY3 = (sys.version_info[0] == 3)
-
-if PY3:
-    from io import StringIO
-else:
-    from cStringIO import StringIO
-
 # Local imports
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
 import pynmrstar
+
+# Determine if we are running in python3
+PY3 = (sys.version_info[0] == 3)
 
 if pynmrstar.cnmrstar:
     print("Using C library...")
@@ -33,6 +28,7 @@ file_entry = pynmrstar.Entry.from_file(sample_file_location)
 # This needs to be updated to point to whichever version of the schema is
 #  stored in the reference_files folder
 test_schema_url = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/!svn/bc/221/bmrb_only_files/adit_input/xlschem_ann.csv'
+
 
 class TestPyNMRSTAR(unittest.TestCase):
 
@@ -115,20 +111,15 @@ class TestPyNMRSTAR(unittest.TestCase):
 
     def test_Schema(self):
         default = pynmrstar.Schema()
-        loaded = pynmrstar.Schema(test_schema_url)
 
-        self.assertEqual(default.schema, loaded.schema)
-        self.assertEqual(default.headers, loaded.headers)
-        self.assertEqual(default.category_order, loaded.category_order)
         self.assertEqual(default.headers, ['Dictionary sequence', 'SFCategory', 'ADIT category mandatory', 'ADIT category view type', 'ADIT super category ID', 'ADIT super category', 'ADIT category group ID', 'ADIT category view name', 'Tag', 'BMRB current', 'Query prompt', 'Query interface', 'SG Mandatory', '', 'ADIT exists', 'User full view', 'Metabolomics', 'Metabolites', 'SENCI', 'Fragment library', 'Item enumerated', 'Item enumeration closed', 'Enum parent SFcategory', 'Enum parent tag', 'Derived enumeration mantable', 'Derived enumeration', 'ADIT item view name', 'Data Type', 'Nullable', 'Non-public', 'ManDBTableName', 'ManDBColumnName', 'Row Index Key', 'Saveframe ID tag', 'Source Key', 'Table Primary Key', 'Foreign Key Group', 'Foreign Table', 'Foreign Column', 'Secondary index', 'Sub category', 'Units', 'Loopflag', 'Seq', 'Adit initial rows', 'Enumeration ties', 'Mandatory code overides', 'Overide value', 'Overide view value', 'ADIT auto insert', 'Example', 'Prompt', 'Interface', 'bmrbPdbMatchID', 'bmrbPdbTransFunc', 'STAR flag', 'DB flag', 'SfNamelFlg', 'Sf category flag', 'Sf pointer', 'Natural primary key', 'Natural foreign key', 'Redundant keys', 'Parent tag', 'public', 'internal', 'small molecule', 'small molecule', 'metabolomics', 'Entry completeness', 'Overide public', 'internal', 'small molecule', 'small molecule', 'metabolomic', 'metabolomic', 'default value', 'Adit form code', 'Tag category', 'Tag field', 'Local key', 'Datum count flag', 'NEF equivalent', 'mmCIF equivalent', 'Meta data', 'Tag delete', 'BMRB data type', 'STAR vs Curated DB', 'Key group', 'Reference table', 'Reference column', 'Dictionary description', 'variableTypeMatch', 'entryIdFlg', 'outputMapExistsFlg', 'lclSfIdFlg', 'Met ADIT category view name', 'Met Example', 'Met Prompt', 'Met Description', 'SM Struct ADIT-NMR category view name', 'SM Struct Example', 'SM Struct Prompt', 'SM Struct Description', 'Met default value', 'SM default value'] )
 
         self.assertEqual(default.val_type("_Entity.ID", 1), [])
-        self.assertEqual(default.val_type("_Entity.ID", "test"), ["Value does not match specification: '_Entity.ID':'test' on line 'None'.\n     Type specified: int\n     Regular expression for type: '-?[0-9]+'"])
+        self.assertEqual(default.val_type("_Entity.ID", "test"), ["Value does not match specification: '_Entity.ID':'test' on line 'None'.\n     Type specified: int\n     Regular expression for type: '^(?:-?[0-9]*)?$'"])
         self.assertEqual(default.val_type("_Atom_chem_shift.Val", float(1.2)), [])
-        self.assertEqual(default.val_type("_Atom_chem_shift.Val", "invalid"), ["Value does not match specification: '_Atom_chem_shift.Val':'invalid' on line 'None'.\n     Type specified: float\n     Regular expression for type: '-?(([0-9]+)[.]?|([0-9]*[.][0-9]+))([(][0-9]+[)])?([eE][+-]?[0-9]+)?'"])
+        self.assertEqual(default.val_type("_Atom_chem_shift.Val", "invalid"), ["Value does not match specification: '_Atom_chem_shift.Val':'invalid' on line 'None'.\n     Type specified: float\n     Regular expression for type: '^(?:-?[0-9]*\\.?[0-9]+(?:[eE][-+]?[0-9]+)?)?$'"])
 
         self.assertEqual(default.val_type("_Entry.ID", "this should be far too long - much too long"), ["Length of '43' is too long for CHAR(12): '_Entry.ID':'this should be far too long - much too long' on line 'None'."])
-        self.assertEqual(default.val_type("_Assembly.Ambiguous_chem_comp_sites", "this should be far too long - much too long"), ["Length of '43' is too long for VARCHAR(3): '_Assembly.Ambiguous_chem_comp_sites':'this should be far too long - much too long' on line 'None'."])
 
     def test_entry_delitem(self):
         del(self.entry[0])
@@ -201,7 +192,7 @@ class TestPyNMRSTAR(unittest.TestCase):
         validation = [u"Value cannot be NULL but is: '_Chem_comp.Provenance':'.' on line 'None'."]
         self.assertEqual(self.entry.validate(), validation)
         self.entry[-1][-1][0][0] = 'a'
-        validation.append("Value does not match specification: '_Atom_chem_shift.ID':'a' on line '0 tag 0 of loop'.\n     Type specified: int\n     Regular expression for type: '-?[0-9]+'")
+        validation.append("Value does not match specification: '_Atom_chem_shift.ID':'a' on line '0 tag 0 of loop'.\n     Type specified: int\n     Regular expression for type: '^(?:-?[0-9]*)?$'")
         self.assertEqual(self.entry.validate(), validation)
         self.entry[-1][-1][0][0] = '1'
 
@@ -300,7 +291,6 @@ class TestPyNMRSTAR(unittest.TestCase):
         # Test sort
         self.assertEqual(frame.tags, [[u'Sf_category', u'entry_information'], [u'Sf_framecode', u'entry_information'], [u'ID', u'15000'], [u'Title', u'Solution structure of chicken villin headpiece subdomain containing a fluorinated side chain in the core\n'], [u'Type', u'macromolecule'], [u'Version_type', u'original'], [u'Submission_date', u'2006-09-07'], [u'Accession_date', u'2006-09-07'], [u'Last_release_date', u'.'], [u'Original_release_date', u'.'], [u'Origination', u'author'], [u'NMR_STAR_version', u'3.1.1.61'], [u'Original_NMR_STAR_version', u'.'], [u'Experimental_method', u'NMR'], [u'Experimental_method_subtype', u'solution'], [u'BMRB_internal_directory_name', u'.'], [u'example1', 5], [u'example2', u'.']])
 
-        frame.sort_tags
         del frame['example2'], frame['example1']
         frame.tags.append(frame.tags.pop(0))
         frame.sort_tags()
@@ -312,7 +302,6 @@ class TestPyNMRSTAR(unittest.TestCase):
         # Test set_tag_prefix
         frame.set_tag_prefix("new_prefix")
         self.assertEqual(frame.tag_prefix, "_new_prefix")
-
 
     def test_loop(self):
         test_loop = self.entry[0][0]
@@ -484,7 +473,6 @@ class TestPyNMRSTAR(unittest.TestCase):
         # And test they have been put back together
         self.assertEqual(tmp.frame_list, database_entry.frame_list)
 
-
     def test_syntax_outliers(self):
         """ Make sure the case of semi-colon delineated data in a data
         value is properly escaped. """
@@ -503,7 +491,6 @@ class TestPyNMRSTAR(unittest.TestCase):
         # Check the data too - this should never fail (the previous test would
         # have already failed.)
         self.assertEqual(ml[0][0], pynmrstar.Loop.from_string(str(ml))[0][0])
-
 
     def test_parse_outliers(self):
         """ Make sure the parser handles edge cases. """
