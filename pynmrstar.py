@@ -1523,6 +1523,7 @@ class Entry(object):
                 if category not in saveframe_categories:
                     saveframe_categories[category] = True
                     self.frame_list.append(Saveframe.from_template(category, category,
+                                                                   entry_id=self.entry_id,
                                                                    all_tags=kwargs['all_tags']))
 
             return
