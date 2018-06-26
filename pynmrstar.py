@@ -2261,6 +2261,9 @@ class Saveframe(object):
                             self.add_tag(item["Tag"], self.category)
                         elif ft == "Sf_framecode":
                             self.add_tag(item["Tag"], self.name)
+                        # If the tag is the entry ID tag, set the entry ID
+                        elif item["entryIdFlg"] == "Y":
+                            self.add_tag(item["Tag"], kwargs['entry_id'])
                         else:
                             # Unconditional add
                             if kwargs['all_tags']:
@@ -2378,7 +2381,7 @@ class Saveframe(object):
         return cls(the_string=the_string, csv=csv)
 
     @classmethod
-    def from_template(cls, category, name=None, all_tags=False, schema=None):
+    def from_template(cls, category, name=None, entry_id=None, all_tags=False, schema=None):
         """ Create a saveframe that has all of the tags and loops from the
         schema present. No values will be assigned. Specify the category
         when calling this method. Optionally also provide the name of the
@@ -2387,8 +2390,8 @@ class Saveframe(object):
         The optional argument 'all_tags' forces all tags to be included
         rather than just the mandatory tags."""
 
-        return cls(category=category, saveframe_name=name, all_tags=all_tags,
-                   schema=schema, source="from_template()")
+        return cls(category=category, saveframe_name=name, entry_id=entry_id,
+                   all_tags=all_tags, schema=schema, source="from_template()")
 
     def __repr__(self):
         """Returns a description of the saveframe."""
