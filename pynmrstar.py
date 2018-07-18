@@ -1546,6 +1546,7 @@ class Entry(object):
                 if category not in saveframe_categories:
                     saveframe_categories[category] = True
                     self.frame_list.append(Saveframe.from_template(category, category,
+                                                                   entry_id=self.entry_id,
                                                                    all_tags=kwargs['all_tags']))
 
             return
@@ -1584,7 +1585,7 @@ class Entry(object):
                 self.frame_list[key] = item
             except TypeError:
                 # Add by key
-                if key in self.frame_dict():
+                if key in self.frame_dict:
                     dict((frame.name, frame) for frame in self.frame_list)
                     for pos, frame in enumerate(self.frame_list):
                         if frame.name == key:
@@ -1622,6 +1623,28 @@ class Entry(object):
             if category and category not in category_list:
                 category_list.append(category)
         return list(category_list)
+
+    @property
+    def frame_dict(self):
+        """Returns a dictionary of saveframe name -> saveframe object"""
+
+        fast_dict = dict((frame.name, frame) for frame in self.frame_list)
+
+        # If there are no duplicates then continue
+        if len(fast_dict) == len(self.frame_list):
+            return fast_dict
+
+        # Figure out where the duplicate is
+        frame_dict = {}
+
+        for frame in self.frame_list:
+            if frame.name in frame_dict:
+                raise ValueError("The entry has multiple saveframes with the "
+                                 "same name. That is illegal. Please remove or "
+                                 "rename one. Duplicate name: %s" % frame.name)
+            frame_dict[frame.name] = True
+
+        return frame_dict
 
     @classmethod
     def from_database(cls, entry_num):
@@ -1776,13 +1799,14 @@ class Entry(object):
 
     @classmethod
     def from_template(cls, entry_id, all_tags=False, schema=None):
-        """ Create an entry that has all of the tags and loops from the
-        schema present. No values will be assigned. Specify the category
-        when calling this method. Optionally also provide the name of the
-        saveframe as the 'name' argument.
+        """ Create an entry that has all of the saveframes and loops from the
+        schema present. No values will be assigned. Specify the entry
+        ID when calling this method.
 
         The optional argument 'all_tags' forces all tags to be included
-        rather than just the mandatory tags."""
+        rather than just the mandatory tags.
+
+        The optional argument 'schema' allows providing a custom schema."""
 
         entry = cls(entry_id=entry_id, all_tags=all_tags, schema=schema)
         entry.source = "from_template()"
@@ -1797,7 +1821,7 @@ class Entry(object):
 
         # Do not allow the addition of saveframes with the same name
         #  as a saveframe which already exists in the entry
-        if frame.name in self.frame_dict():
+        if frame.name in self.frame_dict:
             raise ValueError("Cannot add a saveframe with name '%s' since a "
                              "saveframe with that name already exists in the "
                              "entry." % frame.name)
@@ -1826,41 +1850,22 @@ class Entry(object):
                 diffs.append("The number of saveframes in the entries are not"
                              " equal: '%d' vs '%d'." %
                              (len(self.frame_list), len(other.frame_list)))
-            for frame in self.frame_dict():
-                if other.frame_dict().get(frame, None) is None:
+            for frame in self.frame_dict:
+                if other.frame_dict.get(frame, None) is None:
                     diffs.append("No saveframe with name '%s' in other entry." %
-                                 self.frame_dict()[frame].name)
+                                 self.frame_dict[frame].name)
                 else:
-                    comp = self.frame_dict()[frame].compare(
-                        other.frame_dict()[frame])
+                    comp = self.frame_dict[frame].compare(
+                        other.frame_dict[frame])
                     if len(comp) > 0:
                         diffs.append("Saveframes do not match: '%s'." %
-                                     self.frame_dict()[frame].name)
+                                     self.frame_dict[frame].name)
                         diffs.extend(comp)
 
         except AttributeError as err:
             diffs.append("An exception occured while comparing: '%s'." % err)
 
         return diffs
-
-    def frame_dict(self):
-        """Returns a dictionary of saveframe name -> saveframe object"""
-
-        fast_dict = dict((frame.name, frame) for frame in self.frame_list)
-
-        # If there are no duplicates then continue
-        if len(fast_dict) == len(self.frame_list):
-            return fast_dict
-
-        # Figure out where the duplicate is
-        frame_dict = {}
-
-        for frame in self.frame_list:
-            if frame.name in frame_dict:
-                raise ValueError("The entry has multiple saveframes with the "
-                                 "same name. That is illegal. Please remove or "
-                                 "rename one. Duplicate name: %s" % frame.name)
-            frame_dict[frame.name] = True
 
     def get_json(self, serialize=True):
         """ Returns the entry in JSON format. If serialize is set to
@@ -1896,7 +1901,7 @@ class Entry(object):
     def get_saveframe_by_name(self, frame):
         """Allows fetching a saveframe by name."""
 
-        frames = self.frame_dict()
+        frames = self.frame_dict
         if frame in frames:
             return frames[frame]
         else:
@@ -2101,7 +2106,7 @@ class Entry(object):
                                   saveframe_names[ordinal])
 
             # Check for dangling references
-            fdict = self.frame_dict()
+            fdict = self.frame_dict
 
             for each_frame in self:
                 # Iterate through the tags
@@ -2280,6 +2285,9 @@ class Saveframe(object):
                             self.add_tag(item["Tag"], self.category)
                         elif ft == "Sf_framecode":
                             self.add_tag(item["Tag"], self.name)
+                        # If the tag is the entry ID tag, set the entry ID
+                        elif item["entryIdFlg"] == "Y":
+                            self.add_tag(item["Tag"], kwargs['entry_id'])
                         else:
                             # Unconditional add
                             if kwargs['all_tags']:
@@ -2397,7 +2405,7 @@ class Saveframe(object):
         return cls(the_string=the_string, csv=csv)
 
     @classmethod
-    def from_template(cls, category, name=None, all_tags=False, schema=None):
+    def from_template(cls, category, name=None, entry_id=None, all_tags=False, schema=None):
         """ Create a saveframe that has all of the tags and loops from the
         schema present. No values will be assigned. Specify the category
         when calling this method. Optionally also provide the name of the
@@ -2406,8 +2414,8 @@ class Saveframe(object):
         The optional argument 'all_tags' forces all tags to be included
         rather than just the mandatory tags."""
 
-        return cls(category=category, saveframe_name=name, all_tags=all_tags,
-                   schema=schema, source="from_template()")
+        return cls(category=category, saveframe_name=name, entry_id=entry_id,
+                   all_tags=all_tags, schema=schema, source="from_template()")
 
     def __repr__(self):
         """Returns a description of the saveframe."""

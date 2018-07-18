@@ -131,7 +131,7 @@ class TestPyNMRSTAR(unittest.TestCase):
         tmp_entry = copy(database_entry)
         self.assertRaises(ValueError, tmp_entry.add_saveframe, tmp_entry[0])
         tmp_entry.frame_list.append(tmp_entry[0])
-        self.assertRaises(ValueError, tmp_entry.frame_dict)
+        self.assertRaises(ValueError, tmp_entry.__getattribute__, 'frame_dict')
 
     def test_entry_eq(self):
         self.assertEqual(file_entry, database_entry)
