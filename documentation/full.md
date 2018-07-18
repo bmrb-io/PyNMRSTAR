@@ -137,19 +137,12 @@ Prints the differences between two entries. Non-equal entries
 will always be detected, but specific differences detected depends
 on order of entries.
 
-
-### def `iter_macromolecule_entries()`
+### def `iter_entries(metabolomics=False)`
 
 Returns a generator that will yield an Entry object for every
 macromolecule entry in the current BMRB database. Perfect for performing
-an operation across the entire BMRB macromolecule database.
-
-### def `iter_metabolomics_entries()`
-
-Returns a generator that will yield an Entry object for every
-metabolomics entry in the current BMRB database. Perfect for performing
-an operation across the entire BMRB metabolomics database.
-
+an operation across the entire BMRB database. Set `metabolomics=True`
+in order to get all the entries in the metabolomics database.
 
 ### def `enable_nef_defaults()`
 

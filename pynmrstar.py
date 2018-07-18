@@ -282,12 +282,17 @@ def diff(entry1, entry2):
         print(difference)
 
 
-def iter_macromolecule_entries():
+def iter_entries(metabolomics=False):
     """ Returns a generator that will yield an Entry object for every
-    macromolecule entry in the current BMRB database. Perfect for performing
-    an operation across the entire BMRB macromolecule database."""
+        macromolecule entry in the current BMRB database. Perfect for performing
+        an operation across the entire BMRB database. Set `metabolomics=True`
+        in order to get all the entries in the metabolomics database."""
 
-    for entry in json.loads(_interpret_file("%s/list_entries?database=macromolecules" % _API_URL).read()):
+    api_url = "%s/list_entries?database=macromolecules" % _API_URL
+    if metabolomics:
+        api_url = "%s/list_entries?database=metabolomics" % _API_URL
+
+    for entry in json.loads(_interpret_file(api_url).read()):
         yield Entry.from_database(entry)
 
 
