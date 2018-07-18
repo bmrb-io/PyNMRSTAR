@@ -282,6 +282,24 @@ def diff(entry1, entry2):
         print(difference)
 
 
+def iter_macromolecule_entries():
+    """ Returns a generator that will yield an Entry object for every
+    macromolecule entry in the current BMRB database. Perfect for performing
+    an operation across the entire BMRB macromolecule database."""
+
+    for entry in json.loads(_interpret_file("%s/list_entries?database=macromolecules" % _API_URL).read()):
+        yield Entry.from_database(entry)
+
+
+def iter_metabolomics_entries():
+    """ Returns a generator that will yield an Entry object for every
+    metabolomics entry in the current BMRB database. Perfect for performing
+    an operation across the entire BMRB metabolomics database."""
+
+    for entry in json.loads(_interpret_file("%s/list_entries?database=metabolomics" % _API_URL).read()):
+        yield Entry.from_database(entry)
+
+
 def validate(entry_to_validate, schema=None):
     """Prints a validation report of an object."""
 
