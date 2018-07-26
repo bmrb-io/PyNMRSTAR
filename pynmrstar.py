@@ -1409,7 +1409,7 @@ class Schema(object):
             s['headers'] = ['Tag', 'SFCategory', 'BMRB data type',
                             'Prompt', 'Interface', 'default value', 'Example',
                             'ADIT category view name', 'User full view',
-                            'Foreign Table', 'Sf pointer', 'Enumeration ties']
+                            'Foreign Table', 'Sf pointer']
 
         compacted_schema = []
         for tag in self.schema_order:
