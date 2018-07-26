@@ -200,7 +200,7 @@ _COMMENT_DICTIONARY = {}
 _API_URL = "http://webapi.bmrb.wisc.edu/v2"
 _SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
-__version__ = "2.6.1"
+__version__ = "2.6.2"
 
 
 #############################################
@@ -280,6 +280,20 @@ def diff(entry1, entry2):
         print("Identical entries.")
     for difference in diffs:
         print(difference)
+
+
+def iter_entries(metabolomics=False):
+    """ Returns a generator that will yield an Entry object for every
+        macromolecule entry in the current BMRB database. Perfect for performing
+        an operation across the entire BMRB database. Set `metabolomics=True`
+        in order to get all the entries in the metabolomics database."""
+
+    api_url = "%s/list_entries?database=macromolecules" % _API_URL
+    if metabolomics:
+        api_url = "%s/list_entries?database=metabolomics" % _API_URL
+
+    for entry in json.loads(_interpret_file(api_url).read()):
+        yield Entry.from_database(entry)
 
 
 def validate(entry_to_validate, schema=None):
@@ -508,13 +522,12 @@ def _load_comments(file_to_load=None):
             return
 
     # Load the comments
-    categories = comment_entry.get_tag("_comment.category")
-    comments = comment_entry.get_tag("_comment.comment")
-
-    for pos, val in enumerate(categories):
-        comment = comments[pos]
-        if comment != ".":
-            _COMMENT_DICTIONARY[val] = comments[pos].rstrip() + "\n\n"
+    comments = comment_entry[0][0].get_tag(["category", "comment", "every_flag"])
+    comment_map = {'N': False, 'Y': True}
+    for comment in comments:
+        if comment[1] != ".":
+            _COMMENT_DICTIONARY[comment[0]] = {'comment': comment[1].rstrip() + "\n\n",
+                                               'every_flag': comment_map[comment[2]]}
 
 
 def _tag_key(x, schema=None):
@@ -1393,7 +1406,7 @@ class Schema(object):
              'version': self.version}
 
         if not full:
-            s['headers'] = ['Tag', 'SFCategory', 'BMRB data type', 'Nullable',
+            s['headers'] = ['Tag', 'SFCategory', 'BMRB data type',
                             'Prompt', 'Interface', 'default value', 'Example',
                             'ADIT category view name', 'User full view',
                             'Foreign Table', 'Sf pointer']
@@ -1461,14 +1474,15 @@ class Entry(object):
         except TypeError:
             return self.get_saveframe_by_name(item)
 
-    def __init__(self, **kargs):
+    def __init__(self, **kwargs):
         """ You should not directly instantiate an Entry using this method.
             Instead use the class methods:"
               Entry.from_database()
               Entry.from_file()
               Entry.from_string()
               Entry.from_scratch()
-              Entry.from_json()"""
+              Entry.from_json()
+              Entry.from_template()"""
 
         # Default initializations
         self.entry_id = 0
@@ -1476,7 +1490,7 @@ class Entry(object):
         self.source = None
 
         # They initialized us wrong
-        if len(kargs) == 0 or len(kargs) > 1:
+        if len(kwargs) == 0 or len(kwargs) > 3:
             raise ValueError("You should not directly instantiate an Entry "
                              "using this method. Instead use the class methods:"
                              " Entry.from_database(), Entry.from_file(), "
@@ -1486,18 +1500,18 @@ class Entry(object):
         # Initialize our local variables
         self.frame_list = []
 
-        if 'the_string' in kargs:
+        if 'the_string' in kwargs:
             # Parse from a string by wrapping it in StringIO
-            star_buffer = StringIO(kargs['the_string'])
+            star_buffer = StringIO(kwargs['the_string'])
             self.source = "from_string()"
-        elif 'file_name' in kargs:
-            star_buffer = _interpret_file(kargs['file_name'])
-            self.source = "from_file('%s')" % kargs['file_name']
-        elif 'entry_num' in kargs:
-            self.source = "from_database(%s)" % kargs['entry_num']
+        elif 'file_name' in kwargs:
+            star_buffer = _interpret_file(kwargs['file_name'])
+            self.source = "from_file('%s')" % kwargs['file_name']
+        elif 'entry_num' in kwargs:
+            self.source = "from_database(%s)" % kwargs['entry_num']
 
             # The location to fetch entries from
-            entry_number = kargs['entry_num']
+            entry_number = kwargs['entry_num']
             url = 'http://rest.bmrb.wisc.edu/bmrb/NMR-STAR3/%s' % entry_number
 
             # Parse from the official BMRB library
@@ -1512,9 +1526,24 @@ class Entry(object):
             except URLError:
                 raise IOError("You don't appear to have an active internet "
                               "connection. Cannot fetch entry.")
+        # Creating from template (schema)
+        elif 'all_tags' in kwargs:
+            self.entry_id = kwargs['entry_id']
+
+            saveframe_categories = {}
+            schema_obj = _get_schema(kwargs['schema']).schema
+            for tag in schema_obj.values():
+                category = tag['SFCategory']
+                if category not in saveframe_categories:
+                    saveframe_categories[category] = True
+                    self.frame_list.append(Saveframe.from_template(category, category,
+                                                                   entry_id=self.entry_id,
+                                                                   all_tags=kwargs['all_tags']))
+
+            return
         else:
             # Initialize a blank entry
-            self.entry_id = kargs['entry_id']
+            self.entry_id = kwargs['entry_id']
             self.source = "from_scratch()"
             return
 
@@ -1547,7 +1576,7 @@ class Entry(object):
                 self.frame_list[key] = item
             except TypeError:
                 # Add by key
-                if key in self.frame_dict():
+                if key in self.frame_dict:
                     dict((frame.name, frame) for frame in self.frame_list)
                     for pos, frame in enumerate(self.frame_list):
                         if frame.name == key:
@@ -1564,9 +1593,49 @@ class Entry(object):
     def __str__(self):
         """Returns the entire entry in STAR format as a string."""
 
-        ret_string = ("data_%s\n\n" % self.entry_id +
-                      "\n".join([str(frame) for frame in self.frame_list]))
-        return ret_string
+        sf_strings = []
+        seen_saveframes = {}
+        for saveframe in self:
+            if saveframe.category in seen_saveframes:
+                sf_strings.append(saveframe.__str__(first_in_category=False))
+            else:
+                sf_strings.append(saveframe.__str__(first_in_category=True))
+                seen_saveframes[saveframe.category] = True
+
+        return "data_%s\n\n%s" % (self.entry_id, "\n".join(sf_strings))
+
+    @property
+    def category_list(self):
+        """ Returns a list of the unique categories present in the entry. """
+
+        category_list = []
+        for saveframe in self.frame_list:
+            category = saveframe.category
+            if category and category not in category_list:
+                category_list.append(category)
+        return list(category_list)
+
+    @property
+    def frame_dict(self):
+        """Returns a dictionary of saveframe name -> saveframe object"""
+
+        fast_dict = dict((frame.name, frame) for frame in self.frame_list)
+
+        # If there are no duplicates then continue
+        if len(fast_dict) == len(self.frame_list):
+            return fast_dict
+
+        # Figure out where the duplicate is
+        frame_dict = {}
+
+        for frame in self.frame_list:
+            if frame.name in frame_dict:
+                raise ValueError("The entry has multiple saveframes with the "
+                                 "same name. That is illegal. Please remove or "
+                                 "rename one. Duplicate name: %s" % frame.name)
+            frame_dict[frame.name] = True
+
+        return frame_dict
 
     @classmethod
     def from_database(cls, entry_num):
@@ -1719,6 +1788,21 @@ class Entry(object):
 
         return cls(entry_id=entry_id)
 
+    @classmethod
+    def from_template(cls, entry_id, all_tags=False, schema=None):
+        """ Create an entry that has all of the saveframes and loops from the
+        schema present. No values will be assigned. Specify the entry
+        ID when calling this method.
+
+        The optional argument 'all_tags' forces all tags to be included
+        rather than just the mandatory tags.
+
+        The optional argument 'schema' allows providing a custom schema."""
+
+        entry = cls(entry_id=entry_id, all_tags=all_tags, schema=schema)
+        entry.source = "from_template()"
+        return entry
+
     def add_saveframe(self, frame):
         """Add a saveframe to the entry."""
 
@@ -1728,7 +1812,7 @@ class Entry(object):
 
         # Do not allow the addition of saveframes with the same name
         #  as a saveframe which already exists in the entry
-        if frame.name in self.frame_dict():
+        if frame.name in self.frame_dict:
             raise ValueError("Cannot add a saveframe with name '%s' since a "
                              "saveframe with that name already exists in the "
                              "entry." % frame.name)
@@ -1757,41 +1841,22 @@ class Entry(object):
                 diffs.append("The number of saveframes in the entries are not"
                              " equal: '%d' vs '%d'." %
                              (len(self.frame_list), len(other.frame_list)))
-            for frame in self.frame_dict():
-                if other.frame_dict().get(frame, None) is None:
+            for frame in self.frame_dict:
+                if other.frame_dict.get(frame, None) is None:
                     diffs.append("No saveframe with name '%s' in other entry." %
-                                 self.frame_dict()[frame].name)
+                                 self.frame_dict[frame].name)
                 else:
-                    comp = self.frame_dict()[frame].compare(
-                        other.frame_dict()[frame])
+                    comp = self.frame_dict[frame].compare(
+                        other.frame_dict[frame])
                     if len(comp) > 0:
                         diffs.append("Saveframes do not match: '%s'." %
-                                     self.frame_dict()[frame].name)
+                                     self.frame_dict[frame].name)
                         diffs.extend(comp)
 
         except AttributeError as err:
             diffs.append("An exception occured while comparing: '%s'." % err)
 
         return diffs
-
-    def frame_dict(self):
-        """Returns a dictionary of saveframe name -> saveframe object"""
-
-        fast_dict = dict((frame.name, frame) for frame in self.frame_list)
-
-        # If there are no duplicates then continue
-        if len(fast_dict) == len(self.frame_list):
-            return fast_dict
-
-        # Figure out where the duplicate is
-        frame_dict = {}
-
-        for frame in self.frame_list:
-            if frame.name in frame_dict:
-                raise ValueError("The entry has multiple saveframes with the "
-                                 "same name. That is illegal. Please remove or "
-                                 "rename one. Duplicate name: %s" % frame.name)
-            frame_dict[frame.name] = True
 
     def get_json(self, serialize=True):
         """ Returns the entry in JSON format. If serialize is set to
@@ -1827,7 +1892,7 @@ class Entry(object):
     def get_saveframe_by_name(self, frame):
         """Allows fetching a saveframe by name."""
 
-        frames = self.frame_dict()
+        frames = self.frame_dict
         if frame in frames:
             return frames[frame]
         else:
@@ -2032,7 +2097,7 @@ class Entry(object):
                                   saveframe_names[ordinal])
 
             # Check for dangling references
-            fdict = self.frame_dict()
+            fdict = self.frame_dict
 
             for each_frame in self:
                 # Iterate through the tags
@@ -2142,7 +2207,7 @@ class Saveframe(object):
 
         return self.tag_prefix < other.tag_prefix
 
-    def __init__(self, **kargs):
+    def __init__(self, **kwargs):
         """Don't use this directly. Use the class methods to construct:
              Saveframe.from_scratch()
              Saveframe.from_string()
@@ -2151,7 +2216,7 @@ class Saveframe(object):
              Saveframe.from_json()"""
 
         # They initialized us wrong
-        if len(kargs) == 0:
+        if len(kwargs) == 0:
             raise ValueError("You should not directly instantiate a Saveframe "
                              "using this method. Instead use the class methods:"
                              " Saveframe.from_scratch(), Saveframe.from_string()"
@@ -2163,31 +2228,31 @@ class Saveframe(object):
         self.loops = []
         self.name = ""
         self.source = "unknown"
-        self.category = "unset"
+        self.category = None
         self.tag_prefix = None
 
         star_buffer = ""
 
         # Update our source if it provided
-        if 'source' in kargs:
-            self.source = kargs['source']
+        if 'source' in kwargs:
+            self.source = kwargs['source']
 
-        if 'the_string' in kargs:
+        if 'the_string' in kwargs:
             # Parse from a string by wrapping it in StringIO
-            star_buffer = StringIO(kargs['the_string'])
+            star_buffer = StringIO(kwargs['the_string'])
             self.source = "from_string()"
-        elif 'file_name' in kargs:
-            star_buffer = _interpret_file(kargs['file_name'])
-            self.source = "from_file('%s')" % kargs['file_name']
+        elif 'file_name' in kwargs:
+            star_buffer = _interpret_file(kwargs['file_name'])
+            self.source = "from_file('%s')" % kwargs['file_name']
         # Creating from template (schema)
-        elif 'all_tags' in kargs:
-            schema_obj = _get_schema(kargs['schema'])
+        elif 'all_tags' in kwargs:
+            schema_obj = _get_schema(kwargs['schema'])
             schema = schema_obj.schema
-            self.category = kargs['category']
+            self.category = kwargs['category']
 
             self.name = self.category
-            if 'saveframe_name' in kargs and kargs['saveframe_name']:
-                self.name = kargs['saveframe_name']
+            if 'saveframe_name' in kwargs and kwargs['saveframe_name']:
+                self.name = kwargs['saveframe_name']
 
             # Make sure it is a valid category
             if self.category not in [x["SFCategory"] for x in schema.values()]:
@@ -2208,12 +2273,15 @@ class Saveframe(object):
                         ft = _format_tag(item["Tag"])
                         # Set the value for sf_category and sf_framecode
                         if ft == "Sf_category":
-                            self.add_tag(ft, self.category)
+                            self.add_tag(item["Tag"], self.category)
                         elif ft == "Sf_framecode":
-                            self.add_tag(ft, self.name)
+                            self.add_tag(item["Tag"], self.name)
+                        # If the tag is the entry ID tag, set the entry ID
+                        elif item["entryIdFlg"] == "Y":
+                            self.add_tag(item["Tag"], kwargs['entry_id'])
                         else:
                             # Unconditional add
-                            if kargs['all_tags']:
+                            if kwargs['all_tags']:
                                 self.add_tag(item["Tag"], None)
                             # Conditional add
                             else:
@@ -2225,21 +2293,23 @@ class Saveframe(object):
                         cat_formatted = _format_category(item["Tag"])
                         if cat_formatted not in loops_added:
                             loops_added.append(cat_formatted)
-                            nl = Loop.from_template(cat_formatted,
-                                                    all_tags=kargs['all_tags'],
-                                                    schema=schema_obj)
-                            self.add_loop(nl)
-
+                            try:
+                                self.add_loop(Loop.from_template(cat_formatted,
+                                                                 all_tags=kwargs['all_tags'],
+                                                                 schema=schema_obj))
+                            except ValueError:
+                                pass
             return
-        elif 'saveframe_name' in kargs:
+
+        elif 'saveframe_name' in kwargs:
             # If they are creating from scratch, just get the saveframe name
-            self.name = kargs['saveframe_name']
-            if 'tag_prefix' in kargs:
-                self.tag_prefix = _format_category(kargs['tag_prefix'])
+            self.name = kwargs['saveframe_name']
+            if 'tag_prefix' in kwargs:
+                self.tag_prefix = _format_category(kwargs['tag_prefix'])
             return
 
         # If we are reading from a CSV file, go ahead and parse it
-        if 'csv' in kargs and kargs['csv']:
+        if 'csv' in kwargs and kwargs['csv']:
             csvreader = csv_reader(star_buffer)
             tags = next(csvreader)
             values = next(csvreader)
@@ -2310,7 +2380,7 @@ class Saveframe(object):
         # Create a saveframe from scratch and populate it
         ret = Saveframe.from_scratch(json_dict['name'])
         ret.tag_prefix = json_dict['tag_prefix']
-        ret.category = json_dict.get('category', 'unset')
+        ret.category = json_dict.get('category', None)
         ret.tags = json_dict['tags']
         ret.loops = [Loop.from_json(x) for x in json_dict['loops']]
         ret.source = "from_json()"
@@ -2326,7 +2396,7 @@ class Saveframe(object):
         return cls(the_string=the_string, csv=csv)
 
     @classmethod
-    def from_template(cls, category, name=None, all_tags=False, schema=None):
+    def from_template(cls, category, name=None, entry_id=None, all_tags=False, schema=None):
         """ Create a saveframe that has all of the tags and loops from the
         schema present. No values will be assigned. Specify the category
         when calling this method. Optionally also provide the name of the
@@ -2335,8 +2405,8 @@ class Saveframe(object):
         The optional argument 'all_tags' forces all tags to be included
         rather than just the mandatory tags."""
 
-        return cls(category=category, saveframe_name=name, all_tags=all_tags,
-                   schema=schema, source="from_template()")
+        return cls(category=category, saveframe_name=name, entry_id=entry_id,
+                   all_tags=all_tags, schema=schema, source="from_template()")
 
     def __repr__(self):
         """Returns a description of the saveframe."""
@@ -2364,7 +2434,7 @@ class Saveframe(object):
             # If the tag already exists, set its value
             self.add_tag(key, item, update=True)
 
-    def __str__(self):
+    def __str__(self, first_in_category=True):
         """Returns the saveframe in STAR format as a string."""
 
         if ALLOW_V2_ENTRIES:
@@ -2387,7 +2457,9 @@ class Saveframe(object):
         # Insert the comment if not disabled
         if not DONT_SHOW_COMMENTS:
             if self.category in _COMMENT_DICTIONARY:
-                ret_string = _COMMENT_DICTIONARY[self.category]
+                this_comment = _COMMENT_DICTIONARY[self.category]
+                if first_in_category or this_comment['every_flag']:
+                    ret_string = _COMMENT_DICTIONARY[self.category]['comment']
 
         # Print the saveframe
         ret_string += "save_%s\n" % self.name
@@ -2478,7 +2550,7 @@ class Saveframe(object):
         # Set the category if the tag we are loading is the category
         tagname_lower = name.lower()
         if tagname_lower == "sf_category" or tagname_lower == "_saveframe_category":
-            if self.category == "unset":
+            if not self.category:
                 self.category = value
 
         if linenum:
@@ -2742,7 +2814,7 @@ class Saveframe(object):
         errors = []
 
         my_category = self.category
-        if my_category == "unset":
+        if not my_category:
             errors.append("Cannot properly validate saveframe: '" + self.name +
                           "'. No saveframe category defined.")
             my_category = None
@@ -2810,7 +2882,7 @@ class Loop(object):
                 item = list(item)
             return self.get_tag(tags=item)
 
-    def __init__(self, **kargs):
+    def __init__(self, **kwargs):
         """ You should not directly instantiate a Loop using this method.
             Instead use the class methods:
               Loop.from_scratch()
@@ -2828,16 +2900,16 @@ class Loop(object):
         star_buffer = ""
 
         # Update our source if it provided
-        if 'source' in kargs:
-            self.source = kargs['source']
+        if 'source' in kwargs:
+            self.source = kwargs['source']
 
         # Update our category if provided
-        if 'category' in kargs:
-            self.category = _format_category(kargs['category'])
+        if 'category' in kwargs:
+            self.category = _format_category(kwargs['category'])
             return
 
         # They initialized us wrong
-        if len(kargs) == 0:
+        if len(kwargs) == 0:
             raise ValueError("You should not directly instantiate a Loop using "
                              "this method. Instead use the class methods: "
                              "Loop.from_scratch(), Loop.from_string(), "
@@ -2845,32 +2917,32 @@ class Loop(object):
                              "Loop.from_json().")
 
         # Parsing from a string
-        if 'the_string' in kargs:
+        if 'the_string' in kwargs:
             # Parse from a string by wrapping it in StringIO
-            star_buffer = StringIO(kargs['the_string'])
+            star_buffer = StringIO(kwargs['the_string'])
             self.source = "from_string()"
         # Parsing from a file
-        elif 'file_name' in kargs:
-            star_buffer = _interpret_file(kargs['file_name'])
-            self.source = "from_file('%s')" % kargs['file_name']
+        elif 'file_name' in kwargs:
+            star_buffer = _interpret_file(kwargs['file_name'])
+            self.source = "from_file('%s')" % kwargs['file_name']
         # Creating from template (schema)
-        elif 'tag_prefix' in kargs:
+        elif 'tag_prefix' in kwargs:
 
-            tags = Loop._get_tags_from_schema(kargs['tag_prefix'],
-                                              all_tags=kargs['all_tags'],
-                                              schema=kargs['schema'])
+            tags = Loop._get_tags_from_schema(kwargs['tag_prefix'],
+                                              all_tags=kwargs['all_tags'],
+                                              schema=kwargs['schema'])
             for tag in tags:
                 self.add_tag(tag)
 
             return
 
         # If we are reading from a CSV file, go ahead and parse it
-        if 'csv' in kargs and kargs['csv']:
+        if 'csv' in kwargs and kwargs['csv']:
             csv_file = csv_reader(star_buffer)
             self.add_tag(next(csv_file))
             for row in csv_file:
                 self.add_data(row)
-            self.source = "from_csv('%s')" % kargs['csv']
+            self.source = "from_csv('%s')" % kwargs['csv']
             return
 
         tmp_entry = Entry.from_scratch(0)
