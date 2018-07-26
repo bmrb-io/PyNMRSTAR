@@ -11,13 +11,6 @@ cnmrstar = Extension('cnmrstar',
 
 from pynmrstar import __version__
 
-if os.path.isfile("README.rst"):
-    long_des = open('README.rst', 'r').read()
-elif os.path.isfile("README"):
-    long_des = open('README', 'r').read()
-else:
-    long_des = "Missing"
-
 setup(name='pynmrstar',
       version = __version__,
       packages = ['pynmrstar'],
@@ -25,7 +18,8 @@ setup(name='pynmrstar',
       author = 'Jon Wedell',
       author_email = 'wedell@bmrb.wisc.edu',
       description = 'PyNMR-STAR provides tools for reading, writing, modifying, and interacting with NMR-STAR files. Maintained by the BMRB.',
-      long_description = long_des,
+      long_description = open('README.md', 'r').read(),
+      long_description_content_type = 'text/markdown',
       keywords = ['bmrb','parser','nmr', 'nmrstar', 'biomagresbank', 'biological magnetic resonance bank'],
       url = 'https://github.com/uwbmrb/PyNMRSTAR',
       license = 'GPL',
