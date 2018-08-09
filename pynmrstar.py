@@ -1531,7 +1531,8 @@ class Entry(object):
             self.entry_id = kwargs['entry_id']
 
             saveframe_categories = {}
-            schema_obj = _get_schema(kwargs['schema']).schema
+            schema = _get_schema(kwargs['schema'])
+            schema_obj = schema.schema
             for tag in schema_obj.values():
                 category = tag['SFCategory']
                 if category not in saveframe_categories:
@@ -1539,7 +1540,7 @@ class Entry(object):
                     self.frame_list.append(Saveframe.from_template(category, category,
                                                                    entry_id=self.entry_id,
                                                                    all_tags=kwargs['all_tags']))
-
+            self.get_saveframes_by_category('entry_information')[0]['NMR_STAR_version'] = schema.version
             return
         else:
             # Initialize a blank entry
