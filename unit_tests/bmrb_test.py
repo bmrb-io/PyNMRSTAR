@@ -8,9 +8,9 @@ import unittest
 import subprocess
 from copy import deepcopy as copy
 
-# Local imports
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
-import pynmrstar
+# Local imports
+from pynmrstar import Entry, Loop, Saveframe, Schema, pynmrstar
 
 # Determine if we are running in python3
 PY3 = (sys.version_info[0] == 3)
@@ -22,9 +22,9 @@ quick_test = False
 
 # We will use this for our tests
 our_path = os.path.dirname(os.path.realpath(__file__))
-database_entry = pynmrstar.Entry.from_database(15000)
+database_entry = Entry.from_database(15000)
 sample_file_location = os.path.join(our_path, "sample_files", "bmr15000_3.str")
-file_entry = pynmrstar.Entry.from_file(sample_file_location)
+file_entry = Entry.from_file(sample_file_location)
 # This needs to be updated to point to whichever version of the schema is
 #  stored in the reference_files folder
 test_schema_url = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/!svn/bc/221/bmrb_only_files/adit_input/xlschem_ann.csv'
@@ -95,22 +95,22 @@ class TestPyNMRSTAR(unittest.TestCase):
     def test___Parser(self):
 
         # Check for error when reserved token present in data value
-        self.assertRaises(ValueError, pynmrstar.Entry.from_string, "data_1\nsave_1\n_tag.example loop_\nsave_\n")
-        self.assertRaises(ValueError, pynmrstar.Entry.from_string, "data_1\nsave_1\n_tag.example data_\nsave_\n")
-        self.assertRaises(ValueError, pynmrstar.Entry.from_string, "data_1\nsave_1\n_tag.example save_\nsave_\n")
-        self.assertRaises(ValueError, pynmrstar.Entry.from_string, "data_1\nsave_1\nloop_\n_tag.tag\nloop_\nstop_\nsave_\n")
-        self.assertRaises(ValueError, pynmrstar.Entry.from_string, "data_1\nsave_1\nloop_\n_tag.tag\nsave_\nstop_\nsave_\n")
-        self.assertRaises(ValueError, pynmrstar.Entry.from_string, "data_1\nsave_1\nloop_\n_tag.tag\nglobal_\nstop_\nsave_\n")
+        self.assertRaises(ValueError, Entry.from_string, "data_1\nsave_1\n_tag.example loop_\nsave_\n")
+        self.assertRaises(ValueError, Entry.from_string, "data_1\nsave_1\n_tag.example data_\nsave_\n")
+        self.assertRaises(ValueError, Entry.from_string, "data_1\nsave_1\n_tag.example save_\nsave_\n")
+        self.assertRaises(ValueError, Entry.from_string, "data_1\nsave_1\nloop_\n_tag.tag\nloop_\nstop_\nsave_\n")
+        self.assertRaises(ValueError, Entry.from_string, "data_1\nsave_1\nloop_\n_tag.tag\nsave_\nstop_\nsave_\n")
+        self.assertRaises(ValueError, Entry.from_string, "data_1\nsave_1\nloop_\n_tag.tag\nglobal_\nstop_\nsave_\n")
 
         # Check for error when reserved token quoted
-        self.assertRaises(ValueError, pynmrstar.Entry.from_string, "'data_1'\nsave_1\nloop_\n_tag.tag\ndata_\nstop_\nsave_\n")
-        self.assertRaises(ValueError, pynmrstar.Entry.from_string, "data_1\n'save_1'\nloop_\n_tag.tag\ndata_\nstop_\nsave_\n")
-        self.assertRaises(ValueError, pynmrstar.Entry.from_string, 'data_1\nsave_1\n"loop"_\n_tag.tag\ndata_\nstop_\nsave_\n')
-        self.assertRaises(ValueError, pynmrstar.Entry.from_string, "data_1\nsave_1\nloop_\n_tag.tag\ndata_\n;\nstop_\n;\nsave_\n")
-        self.assertRaises(ValueError, pynmrstar.Saveframe.from_string, "save_1\n_tag.1 _tag.2")
+        self.assertRaises(ValueError, Entry.from_string, "'data_1'\nsave_1\nloop_\n_tag.tag\ndata_\nstop_\nsave_\n")
+        self.assertRaises(ValueError, Entry.from_string, "data_1\n'save_1'\nloop_\n_tag.tag\ndata_\nstop_\nsave_\n")
+        self.assertRaises(ValueError, Entry.from_string, 'data_1\nsave_1\n"loop"_\n_tag.tag\ndata_\nstop_\nsave_\n')
+        self.assertRaises(ValueError, Entry.from_string, "data_1\nsave_1\nloop_\n_tag.tag\ndata_\n;\nstop_\n;\nsave_\n")
+        self.assertRaises(ValueError, Saveframe.from_string, "save_1\n_tag.1 _tag.2")
 
     def test_Schema(self):
-        default = pynmrstar.Schema()
+        default = Schema()
 
         self.assertEqual(default.headers, ['Dictionary sequence', 'SFCategory', 'ADIT category mandatory', 'ADIT category view type', 'ADIT super category ID', 'ADIT super category', 'ADIT category group ID', 'ADIT category view name', 'Tag', 'BMRB current', 'Query prompt', 'Query interface', 'SG Mandatory', '', 'ADIT exists', 'User full view', 'Metabolomics', 'Metabolites', 'SENCI', 'Fragment library', 'Item enumerated', 'Item enumeration closed', 'Enum parent SFcategory', 'Enum parent tag', 'Derived enumeration mantable', 'Derived enumeration', 'ADIT item view name', 'Data Type', 'Nullable', 'Non-public', 'ManDBTableName', 'ManDBColumnName', 'Row Index Key', 'Saveframe ID tag', 'Source Key', 'Table Primary Key', 'Foreign Key Group', 'Foreign Table', 'Foreign Column', 'Secondary index', 'Sub category', 'Units', 'Loopflag', 'Seq', 'Adit initial rows', 'Enumeration ties', 'Mandatory code overides', 'Overide value', 'Overide view value', 'ADIT auto insert', 'Example', 'Prompt', 'Interface', 'bmrbPdbMatchID', 'bmrbPdbTransFunc', 'STAR flag', 'DB flag', 'SfNamelFlg', 'Sf category flag', 'Sf pointer', 'Natural primary key', 'Natural foreign key', 'Redundant keys', 'Parent tag', 'public', 'internal', 'small molecule', 'small molecule', 'metabolomics', 'Entry completeness', 'Overide public', 'internal', 'small molecule', 'small molecule', 'metabolomic', 'metabolomic', 'default value', 'Adit form code', 'Tag category', 'Tag field', 'Local key', 'Datum count flag', 'NEF equivalent', 'mmCIF equivalent', 'Meta data', 'Tag delete', 'BMRB data type', 'STAR vs Curated DB', 'Key group', 'Reference table', 'Reference column', 'Dictionary description', 'variableTypeMatch', 'entryIdFlg', 'outputMapExistsFlg', 'lclSfIdFlg', 'Met ADIT category view name', 'Met Example', 'Met Prompt', 'Met Description', 'SM Struct ADIT-NMR category view name', 'SM Struct Example', 'SM Struct Prompt', 'SM Struct Description', 'Met default value', 'SM default value'] )
 
@@ -142,14 +142,14 @@ class TestPyNMRSTAR(unittest.TestCase):
 
     def test_init(self):
         # Make sure the correct errors are raised
-        self.assertRaises(ValueError, pynmrstar.Entry)
-        self.assertRaises(ValueError, pynmrstar.Entry, the_string="test", entry_num="test")
+        self.assertRaises(ValueError, Entry)
+        self.assertRaises(ValueError, Entry, the_string="test", entry_num="test")
         # Make sure string parsing is correct
-        self.assertEqual(self.entry, pynmrstar.Entry.from_string(str(self.entry)))
-        self.assertEqual(str(self.entry), str(pynmrstar.Entry.from_string(str(self.entry))))
-        self.assertRaises(IOError, pynmrstar.Entry.from_database, 0)
-        self.assertEqual(str(pynmrstar.Entry.from_scratch(15000)), "data_15000\n\n")
-        self.assertEqual(pynmrstar.Entry.from_file(os.path.join(our_path, "sample_files", "bmr15000_3.str.gz")), self.entry)
+        self.assertEqual(self.entry, Entry.from_string(str(self.entry)))
+        self.assertEqual(str(self.entry), str(Entry.from_string(str(self.entry))))
+        self.assertRaises(IOError, Entry.from_database, 0)
+        self.assertEqual(str(Entry.from_scratch(15000)), "data_15000\n\n")
+        self.assertEqual(Entry.from_file(os.path.join(our_path, "sample_files", "bmr15000_3.str.gz")), self.entry)
 
     def test___setitem(self):
         tmp_entry = copy(file_entry)
@@ -221,14 +221,14 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertEqual(frame[-3] > frame[-1], False)
 
         # Check __init__
-        self.assertRaises(ValueError, pynmrstar.Saveframe)
-        self.assertEqual(pynmrstar.Saveframe.from_string(str(frame)), frame)
-        self.assertEqual(str(pynmrstar.Saveframe.from_scratch("test", tag_prefix="test")), "\nsave_test\n\nsave_\n")
+        self.assertRaises(ValueError, Saveframe)
+        self.assertEqual(Saveframe.from_string(str(frame)), frame)
+        self.assertEqual(str(Saveframe.from_scratch("test", tag_prefix="test")), "\nsave_test\n\nsave_\n")
         tmp = copy(frame)
         tmp.loops = []
         tmp.name = ""
-        self.assertEqual(pynmrstar.Saveframe.from_string(frame.get_data_as_csv(frame), csv=True).compare(tmp), [])
-        self.assertRaises(ValueError, pynmrstar.Saveframe.from_string, "test.1,test.2\n2,3,4", csv=True)
+        self.assertEqual(Saveframe.from_string(frame.get_data_as_csv(frame), csv=True).compare(tmp), [])
+        self.assertRaises(ValueError, Saveframe.from_string, "test.1,test.2\n2,3,4", csv=True)
 
         # Check __repr__
         self.assertEqual(repr(frame), "<pynmrstar.Saveframe 'entry_information'>")
@@ -308,7 +308,7 @@ class TestPyNMRSTAR(unittest.TestCase):
 
         tmp = copy(database_entry)
         self.assertEqual(tmp.category_list, ['entry_information', 'citations', 'assembly', 'entity', 'natural_source', 'experimental_source', 'chem_comp', 'sample', 'sample_conditions', 'software', 'NMR_spectrometer', 'NMR_spectrometer_list', 'experiment_list', 'chem_shift_reference', 'assigned_chemical_shifts'])
-        tmp.add_saveframe(pynmrstar.Saveframe.from_scratch("test", None))
+        tmp.add_saveframe(Saveframe.from_scratch("test", None))
         self.assertEqual(tmp.category_list, ['entry_information', 'citations', 'assembly', 'entity', 'natural_source', 'experimental_source', 'chem_comp', 'sample', 'sample_conditions', 'software', 'NMR_spectrometer', 'NMR_spectrometer_list', 'experiment_list', 'chem_shift_reference', 'assigned_chemical_shifts'])
 
     def test_loop(self):
@@ -316,7 +316,7 @@ class TestPyNMRSTAR(unittest.TestCase):
 
         # Check filter
         self.assertEqual(test_loop.filter(['_Entry_author.Ordinal', '_Entry_author.Middle_initials']),
-                         pynmrstar.Loop.from_string("loop_ _Entry_author.Ordinal _Entry_author.Middle_initials 1 C. 2 . 3 B. 4 H. 5 L. stop_"))
+                         Loop.from_string("loop_ _Entry_author.Ordinal _Entry_author.Middle_initials 1 C. 2 . 3 B. 4 H. 5 L. stop_"))
         # Check eq
         self.assertEqual(test_loop == self.entry[0][0], True)
         self.assertEqual(test_loop != self.entry[0][1], True)
@@ -330,21 +330,21 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertRaises(ValueError, test_loop.__setitem__, '_Entry_author.Ordinal', [1])
         self.assertRaises(ValueError, test_loop.__setitem__, '_Wrong_loop.Ordinal', [1,2,3,4,5])
         # Check __init__
-        self.assertRaises(ValueError, pynmrstar.Loop)
-        test = pynmrstar.Loop.from_scratch(category="test")
+        self.assertRaises(ValueError, Loop)
+        test = Loop.from_scratch(category="test")
         self.assertEqual(test.category, "_test")
-        self.assertEqual(pynmrstar.Loop.from_string(str(test_loop)), test_loop)
-        self.assertEqual(test_loop, pynmrstar.Loop.from_string(test_loop.get_data_as_csv(), csv=True))
+        self.assertEqual(Loop.from_string(str(test_loop)), test_loop)
+        self.assertEqual(test_loop, Loop.from_string(test_loop.get_data_as_csv(), csv=True))
         # Check len
         self.assertEqual(len(test_loop), len(test_loop.data))
         # Check lt
         self.assertEqual(test_loop < self.entry[0][1], True)
         # Check __str__
         pynmrstar.SKIP_EMPTY_LOOPS = False
-        self.assertEqual(str(pynmrstar.Loop.from_scratch()), "\n   loop_\n\n   stop_\n")
+        self.assertEqual(str(Loop.from_scratch()), "\n   loop_\n\n   stop_\n")
         pynmrstar.SKIP_EMPTY_LOOPS = True
-        self.assertEqual(str(pynmrstar.Loop.from_scratch()), "")
-        tmp_loop = pynmrstar.Loop.from_scratch()
+        self.assertEqual(str(Loop.from_scratch()), "")
+        tmp_loop = Loop.from_scratch()
         tmp_loop.data = [[1, 2, 3]]
         self.assertRaises(ValueError, tmp_loop.__str__)
         tmp_loop.add_tag("tag1")
@@ -422,29 +422,29 @@ class TestPyNMRSTAR(unittest.TestCase):
         pynmrstar.SKIP_EMPTY_LOOPS = False
 
         # Test that the from_template method works
-        self.assertEqual(pynmrstar.Loop.from_template("atom_chem_shift", all_tags=False),
-                         pynmrstar.Loop.from_string("loop_ _Atom_chem_shift.ID _Atom_chem_shift.Assembly_atom_ID _Atom_chem_shift.Entity_assembly_ID _Atom_chem_shift.Entity_ID _Atom_chem_shift.Comp_index_ID _Atom_chem_shift.Seq_ID _Atom_chem_shift.Comp_ID _Atom_chem_shift.Atom_ID _Atom_chem_shift.Atom_type _Atom_chem_shift.Atom_isotope_number _Atom_chem_shift.Val _Atom_chem_shift.Val_err _Atom_chem_shift.Assign_fig_of_merit _Atom_chem_shift.Ambiguity_code _Atom_chem_shift.Ambiguity_set_ID _Atom_chem_shift.Occupancy _Atom_chem_shift.Resonance_ID _Atom_chem_shift.Auth_entity_assembly_ID _Atom_chem_shift.Auth_asym_ID _Atom_chem_shift.Auth_seq_ID _Atom_chem_shift.Auth_comp_ID _Atom_chem_shift.Auth_atom_ID _Atom_chem_shift.Details _Atom_chem_shift.Entry_ID _Atom_chem_shift.Assigned_chem_shift_list_ID stop_"))
+        self.assertEqual(Loop.from_template("atom_chem_shift", all_tags=False),
+                         Loop.from_string("loop_ _Atom_chem_shift.ID _Atom_chem_shift.Assembly_atom_ID _Atom_chem_shift.Entity_assembly_ID _Atom_chem_shift.Entity_ID _Atom_chem_shift.Comp_index_ID _Atom_chem_shift.Seq_ID _Atom_chem_shift.Comp_ID _Atom_chem_shift.Atom_ID _Atom_chem_shift.Atom_type _Atom_chem_shift.Atom_isotope_number _Atom_chem_shift.Val _Atom_chem_shift.Val_err _Atom_chem_shift.Assign_fig_of_merit _Atom_chem_shift.Ambiguity_code _Atom_chem_shift.Ambiguity_set_ID _Atom_chem_shift.Occupancy _Atom_chem_shift.Resonance_ID _Atom_chem_shift.Auth_entity_assembly_ID _Atom_chem_shift.Auth_asym_ID _Atom_chem_shift.Auth_seq_ID _Atom_chem_shift.Auth_comp_ID _Atom_chem_shift.Auth_atom_ID _Atom_chem_shift.Details _Atom_chem_shift.Entry_ID _Atom_chem_shift.Assigned_chem_shift_list_ID stop_"))
 
-        self.assertEqual(pynmrstar.Loop.from_template("atom_chem_shift", all_tags=True),
-                         pynmrstar.Loop.from_string("loop_ _Atom_chem_shift.ID _Atom_chem_shift.Assembly_atom_ID _Atom_chem_shift.Entity_assembly_ID _Atom_chem_shift.Entity_ID _Atom_chem_shift.Comp_index_ID _Atom_chem_shift.Seq_ID _Atom_chem_shift.Comp_ID _Atom_chem_shift.Atom_ID _Atom_chem_shift.Atom_type _Atom_chem_shift.Atom_isotope_number _Atom_chem_shift.Val _Atom_chem_shift.Val_err _Atom_chem_shift.Assign_fig_of_merit _Atom_chem_shift.Ambiguity_code _Atom_chem_shift.Ambiguity_set_ID _Atom_chem_shift.Occupancy _Atom_chem_shift.Resonance_ID _Atom_chem_shift.Auth_entity_assembly_ID _Atom_chem_shift.Auth_asym_ID _Atom_chem_shift.Auth_seq_ID _Atom_chem_shift.Auth_comp_ID _Atom_chem_shift.Auth_atom_ID _Atom_chem_shift.PDB_record_ID _Atom_chem_shift.PDB_model_num _Atom_chem_shift.PDB_strand_ID _Atom_chem_shift.PDB_ins_code _Atom_chem_shift.PDB_residue_no _Atom_chem_shift.PDB_residue_name _Atom_chem_shift.PDB_atom_name _Atom_chem_shift.Original_PDB_strand_ID _Atom_chem_shift.Original_PDB_residue_no _Atom_chem_shift.Original_PDB_residue_name _Atom_chem_shift.Original_PDB_atom_name _Atom_chem_shift.Details _Atom_chem_shift.Sf_ID _Atom_chem_shift.Entry_ID _Atom_chem_shift.Assigned_chem_shift_list_ID stop_"))
+        self.assertEqual(Loop.from_template("atom_chem_shift", all_tags=True),
+                         Loop.from_string("loop_ _Atom_chem_shift.ID _Atom_chem_shift.Assembly_atom_ID _Atom_chem_shift.Entity_assembly_ID _Atom_chem_shift.Entity_ID _Atom_chem_shift.Comp_index_ID _Atom_chem_shift.Seq_ID _Atom_chem_shift.Comp_ID _Atom_chem_shift.Atom_ID _Atom_chem_shift.Atom_type _Atom_chem_shift.Atom_isotope_number _Atom_chem_shift.Val _Atom_chem_shift.Val_err _Atom_chem_shift.Assign_fig_of_merit _Atom_chem_shift.Ambiguity_code _Atom_chem_shift.Ambiguity_set_ID _Atom_chem_shift.Occupancy _Atom_chem_shift.Resonance_ID _Atom_chem_shift.Auth_entity_assembly_ID _Atom_chem_shift.Auth_asym_ID _Atom_chem_shift.Auth_seq_ID _Atom_chem_shift.Auth_comp_ID _Atom_chem_shift.Auth_atom_ID _Atom_chem_shift.PDB_record_ID _Atom_chem_shift.PDB_model_num _Atom_chem_shift.PDB_strand_ID _Atom_chem_shift.PDB_ins_code _Atom_chem_shift.PDB_residue_no _Atom_chem_shift.PDB_residue_name _Atom_chem_shift.PDB_atom_name _Atom_chem_shift.Original_PDB_strand_ID _Atom_chem_shift.Original_PDB_residue_no _Atom_chem_shift.Original_PDB_residue_name _Atom_chem_shift.Original_PDB_atom_name _Atom_chem_shift.Details _Atom_chem_shift.Sf_ID _Atom_chem_shift.Entry_ID _Atom_chem_shift.Assigned_chem_shift_list_ID stop_"))
 
         # Test adding a tag to the schema
-        my_schem = pynmrstar.Schema()
+        my_schem = Schema()
         my_schem.add_tag("_Atom_chem_shift.New_Tag", "VARCHAR(100)", True, "assigned_chemical_shifts", True, "_Atom_chem_shift.Atom_ID")
-        self.assertEqual(pynmrstar.Loop.from_template("atom_chem_shift", all_tags=True, schema=my_schem),
-                         pynmrstar.Loop.from_string("loop_ _Atom_chem_shift.ID _Atom_chem_shift.Assembly_atom_ID _Atom_chem_shift.Entity_assembly_ID _Atom_chem_shift.Entity_ID _Atom_chem_shift.Comp_index_ID _Atom_chem_shift.Seq_ID _Atom_chem_shift.Comp_ID _Atom_chem_shift.Atom_ID _Atom_chem_shift.New_Tag _Atom_chem_shift.Atom_type _Atom_chem_shift.Atom_isotope_number _Atom_chem_shift.Val _Atom_chem_shift.Val_err _Atom_chem_shift.Assign_fig_of_merit _Atom_chem_shift.Ambiguity_code _Atom_chem_shift.Ambiguity_set_ID _Atom_chem_shift.Occupancy _Atom_chem_shift.Resonance_ID _Atom_chem_shift.Auth_entity_assembly_ID _Atom_chem_shift.Auth_asym_ID _Atom_chem_shift.Auth_seq_ID _Atom_chem_shift.Auth_comp_ID _Atom_chem_shift.Auth_atom_ID _Atom_chem_shift.PDB_record_ID _Atom_chem_shift.PDB_model_num _Atom_chem_shift.PDB_strand_ID _Atom_chem_shift.PDB_ins_code _Atom_chem_shift.PDB_residue_no _Atom_chem_shift.PDB_residue_name _Atom_chem_shift.PDB_atom_name _Atom_chem_shift.Original_PDB_strand_ID _Atom_chem_shift.Original_PDB_residue_no _Atom_chem_shift.Original_PDB_residue_name _Atom_chem_shift.Original_PDB_atom_name _Atom_chem_shift.Details _Atom_chem_shift.Sf_ID _Atom_chem_shift.Entry_ID _Atom_chem_shift.Assigned_chem_shift_list_ID stop_ "))
+        self.assertEqual(Loop.from_template("atom_chem_shift", all_tags=True, schema=my_schem),
+                         Loop.from_string("loop_ _Atom_chem_shift.ID _Atom_chem_shift.Assembly_atom_ID _Atom_chem_shift.Entity_assembly_ID _Atom_chem_shift.Entity_ID _Atom_chem_shift.Comp_index_ID _Atom_chem_shift.Seq_ID _Atom_chem_shift.Comp_ID _Atom_chem_shift.Atom_ID _Atom_chem_shift.New_Tag _Atom_chem_shift.Atom_type _Atom_chem_shift.Atom_isotope_number _Atom_chem_shift.Val _Atom_chem_shift.Val_err _Atom_chem_shift.Assign_fig_of_merit _Atom_chem_shift.Ambiguity_code _Atom_chem_shift.Ambiguity_set_ID _Atom_chem_shift.Occupancy _Atom_chem_shift.Resonance_ID _Atom_chem_shift.Auth_entity_assembly_ID _Atom_chem_shift.Auth_asym_ID _Atom_chem_shift.Auth_seq_ID _Atom_chem_shift.Auth_comp_ID _Atom_chem_shift.Auth_atom_ID _Atom_chem_shift.PDB_record_ID _Atom_chem_shift.PDB_model_num _Atom_chem_shift.PDB_strand_ID _Atom_chem_shift.PDB_ins_code _Atom_chem_shift.PDB_residue_no _Atom_chem_shift.PDB_residue_name _Atom_chem_shift.PDB_atom_name _Atom_chem_shift.Original_PDB_strand_ID _Atom_chem_shift.Original_PDB_residue_no _Atom_chem_shift.Original_PDB_residue_name _Atom_chem_shift.Original_PDB_atom_name _Atom_chem_shift.Details _Atom_chem_shift.Sf_ID _Atom_chem_shift.Entry_ID _Atom_chem_shift.Assigned_chem_shift_list_ID stop_ "))
 
         # Make sure adding data with a tag works
-        tmp_loop = pynmrstar.Loop.from_string("loop_ _Atom_chem_shift.ID stop_")
+        tmp_loop = Loop.from_string("loop_ _Atom_chem_shift.ID stop_")
         tmp_loop.data = [[1]]
         tmp_loop.add_tag("Assembly_atom_ID", update_data=True)
         self.assertEqual(tmp_loop.data, [[1, None]])
         self.assertEqual(tmp_loop.tags, ["ID", "Assembly_atom_ID"])
 
         # Make sure the add missing tags loop is working
-        tmp_loop = pynmrstar.Loop.from_string("loop_ _Atom_chem_shift.ID stop_")
+        tmp_loop = Loop.from_string("loop_ _Atom_chem_shift.ID stop_")
         tmp_loop.add_missing_tags()
-        self.assertEqual(tmp_loop, pynmrstar.Loop.from_template("atom_chem_shift"))
+        self.assertEqual(tmp_loop, Loop.from_template("atom_chem_shift"))
 
     def test_rename_saveframe(self):
         tmp = copy(database_entry)
@@ -453,9 +453,9 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertEqual(tmp, database_entry)
 
     def test_duplicate_loop_detection(self):
-        one = pynmrstar.Loop.from_scratch(category="duplicate")
-        two = pynmrstar.Loop.from_scratch(category="duplicate")
-        frame = pynmrstar.Saveframe.from_scratch(1)
+        one = Loop.from_scratch(category="duplicate")
+        two = Loop.from_scratch(category="duplicate")
+        frame = Saveframe.from_scratch(1)
         frame.add_loop(one)
         self.assertRaises(ValueError, frame.add_loop, two)
 
@@ -488,17 +488,17 @@ class TestPyNMRSTAR(unittest.TestCase):
         ml = copy(self.entry[0][0])
         # Should always work once
         ml[0][0] = str(ml)
-        self.assertEqual(ml, pynmrstar.Loop.from_string(str(ml)))
+        self.assertEqual(ml, Loop.from_string(str(ml)))
         # Twice could trigger bug
         ml[0][0] = str(ml)
-        self.assertEqual(ml, pynmrstar.Loop.from_string(str(ml)))
-        self.assertEqual(ml[0][0], pynmrstar.Loop.from_string(str(ml))[0][0])
+        self.assertEqual(ml, Loop.from_string(str(ml)))
+        self.assertEqual(ml[0][0], Loop.from_string(str(ml))[0][0])
         # Third time is a charm
         ml[0][0] = str(ml)
-        self.assertEqual(ml, pynmrstar.Loop.from_string(str(ml)))
+        self.assertEqual(ml, Loop.from_string(str(ml)))
         # Check the data too - this should never fail (the previous test would
         # have already failed.)
-        self.assertEqual(ml[0][0], pynmrstar.Loop.from_string(str(ml))[0][0])
+        self.assertEqual(ml[0][0], Loop.from_string(str(ml))[0][0])
 
     def test_parse_outliers(self):
         """ Make sure the parser handles edge cases. """
@@ -629,11 +629,11 @@ _Entry.multi2
             except IOError:
                 continue
 
-            ent = pynmrstar.Entry.from_string(orig_str)
+            ent = Entry.from_string(orig_str)
             ent_str = str(ent)
 
             # The multiple quoted values thing makes this infeasable
-            reent = pynmrstar.Entry.from_string(ent_str)
+            reent = Entry.from_string(ent_str)
             self.assertEqual(reent, ent_str)
 
             if PY3:
