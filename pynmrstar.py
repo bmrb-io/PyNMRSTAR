@@ -1533,7 +1533,7 @@ class Entry(object):
             saveframe_categories = {}
             schema = _get_schema(kwargs['schema'])
             schema_obj = schema.schema
-            for tag in schema_obj.values():
+            for tag in [schema_obj[x.lower()] for x in schema.schema_order]:
                 category = tag['SFCategory']
                 if category not in saveframe_categories:
                     saveframe_categories[category] = True
