@@ -3645,11 +3645,11 @@ class Loop(object):
 
         return result
 
-    def add_missing_tags(self, schema=None):
+    def add_missing_tags(self, schema=None, all_tags=False):
         """ Automatically adds any missing tags (according to the schema),
         sorts the tags, and renumbers the tags by ordinal. """
 
-        self.add_tag(Loop._get_tags_from_schema(self.category, schema=schema),
+        self.add_tag(Loop._get_tags_from_schema(self.category, schema=schema, all_tags=all_tags),
                      ignore_duplicates=True, update_data=True)
         self.sort_tags()
 
