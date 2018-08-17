@@ -1540,7 +1540,10 @@ class Entry(object):
                     self.frame_list.append(Saveframe.from_template(category, category,
                                                                    entry_id=self.entry_id,
                                                                    all_tags=kwargs['all_tags']))
-            self.get_saveframes_by_category('entry_information')[0]['NMR_STAR_version'] = schema.version
+            entry_saveframe = self.get_saveframes_by_category('entry_information')[0]
+            entry_saveframe['NMR_STAR_version'] = schema.version
+            entry_saveframe['Original_NMR_STAR_version'] = schema.version
+
             return
         else:
             # Initialize a blank entry
@@ -1790,7 +1793,7 @@ class Entry(object):
         return cls(entry_id=entry_id)
 
     @classmethod
-    def from_template(cls, entry_id, all_tags=False, schema=None):
+    def from_template(cls, entry_id, all_tags=False, schema=None, initialize_loops=False):
         """ Create an entry that has all of the saveframes and loops from the
         schema present. No values will be assigned. Specify the entry
         ID when calling this method.
