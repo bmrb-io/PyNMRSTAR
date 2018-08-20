@@ -1537,7 +1537,7 @@ class Entry(object):
                 category = tag['SFCategory']
                 if category not in saveframe_categories:
                     saveframe_categories[category] = True
-                    self.frame_list.append(Saveframe.from_template(category, category,
+                    self.frame_list.append(Saveframe.from_template(category, category + "_1",
                                                                    entry_id=self.entry_id,
                                                                    all_tags=kwargs['all_tags']))
             entry_saveframe = self.get_saveframes_by_category('entry_information')[0]
