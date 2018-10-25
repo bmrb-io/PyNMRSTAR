@@ -99,9 +99,8 @@ class TestPyNMRSTAR(unittest.TestCase):
         with open(os.path.join(our_path, "sample_files", "bmr15000_3.str.gz"), "rb") as tmp:
             self.assertEqual(pynmrstar._interpret_file(tmp).read(), local_version)
 
-        # Test reading from ftp and http
+        # Test reading from http (ftp doesn't work on TravisCI)
         self.assertEqual(pynmrstar._interpret_file("http://rest.bmrb.wisc.edu/bmrb/NMR-STAR3/15000").read(), local_version)
-        self.assertEqual(pynmrstar._interpret_file("ftp://ftp.bmrb.wisc.edu/pub/bmrb/entry_directories/bmr15000/bmr15000_3.str").read(), local_version)
 
         # Test reading from https locations
         # TODO: re-enable once API is updated
