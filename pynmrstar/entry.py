@@ -707,10 +707,12 @@ class Entry(object):
         if format_ not in ["nmrstar", "json"]:
             raise ValueError("Invalid output format.")
 
-        out_file = open(file_name, "w")
+        data_to_write = ''
         if format_ == "nmrstar":
-            out_file.write(str(self))
+            data_to_write = str(self)
         elif format_ == "json":
-            out_file.write(self.get_json())
+            data_to_write = self.get_json()
 
+        out_file = open(file_name, "w")
+        out_file.write(data_to_write)
         out_file.close()
