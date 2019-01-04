@@ -194,6 +194,16 @@ class Entry(object):
         return list(category_list)
 
     @property
+    def empty(self):
+        """ Check if the entry has no data. Ignore the structural tags."""
+
+        for saveframe in self.frame_list:
+            if not saveframe.empty:
+                return False
+
+        return True
+
+    @property
     def frame_dict(self):
         """Returns a dictionary of saveframe name -> saveframe object"""
 

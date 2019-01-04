@@ -205,6 +205,23 @@ class Saveframe(object):
         self.name = tmp_entry[0].name
         self.tag_prefix = tmp_entry[0].tag_prefix
 
+    @property
+    def empty(self):
+        """ Check if the saveframe has no data. Ignore the structural tags."""
+
+        for tag in self.tags:
+            tag_lower = tag[0].lower()
+            if tag_lower not in ['sf_category', 'sf_framecode', 'id', 'entry_id', 'nmr_star_version',
+                                 'original_nmr_star_version']:
+                if tag[1] not in [None, '', '.', '?']:
+                    return False
+
+        for loop in self.loops:
+            if not loop.empty:
+                return False
+
+        return True
+
     @classmethod
     def from_scratch(cls, sf_name, tag_prefix=None, source="from_scratch()"):
         """Create an empty saveframe that you can programmatically add

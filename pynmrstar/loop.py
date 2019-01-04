@@ -255,6 +255,17 @@ class Loop(object):
         ret_string += "".join(row_strings) + "\n   stop_\n"
         return ret_string
 
+    @property
+    def empty(self):
+        """ Check if the loop has no data. """
+
+        for row in self.data:
+            for col in row:
+                if col not in [None, '', '.', '?']:
+                    return False
+
+        return True
+
     @classmethod
     def from_file(cls, the_file, csv=False):
         """Create a saveframe by loading in a file. Specify csv=True if
