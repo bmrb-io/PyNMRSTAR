@@ -200,7 +200,7 @@ _COMMENT_DICTIONARY = {}
 _API_URL = "http://webapi.bmrb.wisc.edu/v2"
 _SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
-__version__ = "2.6.2"
+__version__ = "2.6.3"
 
 
 #############################################
@@ -1531,14 +1531,18 @@ class Entry(object):
             self.entry_id = kwargs['entry_id']
 
             saveframe_categories = {}
-            schema_obj = _get_schema(kwargs['schema']).schema
-            for tag in schema_obj.values():
+            schema = _get_schema(kwargs['schema'])
+            schema_obj = schema.schema
+            for tag in [schema_obj[x.lower()] for x in schema.schema_order]:
                 category = tag['SFCategory']
                 if category not in saveframe_categories:
                     saveframe_categories[category] = True
-                    self.frame_list.append(Saveframe.from_template(category, category,
+                    self.frame_list.append(Saveframe.from_template(category, category + "_1",
                                                                    entry_id=self.entry_id,
                                                                    all_tags=kwargs['all_tags']))
+            entry_saveframe = self.get_saveframes_by_category('entry_information')[0]
+            entry_saveframe['NMR_STAR_version'] = schema.version
+            entry_saveframe['Original_NMR_STAR_version'] = schema.version
 
             return
         else:
@@ -1789,7 +1793,7 @@ class Entry(object):
         return cls(entry_id=entry_id)
 
     @classmethod
-    def from_template(cls, entry_id, all_tags=False, schema=None):
+    def from_template(cls, entry_id, all_tags=False, schema=None, initialize_loops=False):
         """ Create an entry that has all of the saveframes and loops from the
         schema present. No values will be assigned. Specify the entry
         ID when calling this method.
@@ -2138,12 +2142,14 @@ class Entry(object):
         if format_ not in ["nmrstar", "json"]:
             raise ValueError("Invalid output format.")
 
-        out_file = open(file_name, "w")
+        data_to_write = ''
         if format_ == "nmrstar":
-            out_file.write(str(self))
+            data_to_write = str(self)
         elif format_ == "json":
-            out_file.write(self.get_json())
+            data_to_write = self.get_json()
 
+        out_file = open(file_name, "w")
+        out_file.write(data_to_write)
         out_file.close()
 
 
@@ -2849,12 +2855,14 @@ class Saveframe(object):
         if format_ not in ["nmrstar", "json"]:
             raise ValueError("Invalid output format.")
 
-        out_file = open(file_name, "w")
+        data_to_write = ''
         if format_ == "nmrstar":
-            out_file.write(str(self))
+            data_to_write = str(self)
         elif format_ == "json":
-            out_file.write(self.get_json())
+            data_to_write = self.get_json()
 
+        out_file = open(file_name, "w")
+        out_file.write(data_to_write)
         out_file.close()
 
 
@@ -3641,11 +3649,11 @@ class Loop(object):
 
         return result
 
-    def add_missing_tags(self, schema=None):
+    def add_missing_tags(self, schema=None, all_tags=False):
         """ Automatically adds any missing tags (according to the schema),
         sorts the tags, and renumbers the tags by ordinal. """
 
-        self.add_tag(Loop._get_tags_from_schema(self.category, schema=schema),
+        self.add_tag(Loop._get_tags_from_schema(self.category, schema=schema, all_tags=all_tags),
                      ignore_duplicates=True, update_data=True)
         self.sort_tags()
 
