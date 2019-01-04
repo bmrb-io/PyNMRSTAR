@@ -459,8 +459,8 @@ def _get_schema(passed_schema=None):
                 raise ValueError("Could not load a BMRB schema from the "
                                  "internet or from the local repository.")
 
-    return _STANDARD_SCHEMA
-
+        return _STANDARD_SCHEMA
+    return passed_schema
 
 def _interpret_file(the_file):
     """Helper method returns some sort of object with a read() method.
