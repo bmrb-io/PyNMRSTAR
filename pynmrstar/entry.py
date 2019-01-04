@@ -1,7 +1,12 @@
 import json
-import pynmrstar
-import parser as parsermod
-import saveframe
+try:
+    import pynmrstar
+    import parser as parsermod
+    import saveframe
+except ImportError:
+    from . import pynmrstar
+    from . import parser as parsermod
+    from . import saveframe
 
 try:
     from urllib.request import urlopen, Request
@@ -74,7 +79,7 @@ class Entry(object):
             star_buffer = pynmrstar.StringIO(kwargs['the_string'])
             self.source = "from_string()"
         elif 'file_name' in kwargs:
-            star_buffer = pynmrstar._interpret_file(kwargs['file_name'])
+            star_buffer = pynmrstar.interpret_file(kwargs['file_name'])
             self.source = "from_file('%s')" % kwargs['file_name']
         elif 'entry_num' in kwargs:
             self.source = "from_database(%s)" % kwargs['entry_num']
@@ -100,7 +105,7 @@ class Entry(object):
             self.entry_id = kwargs['entry_id']
 
             saveframe_categories = {}
-            schema = pynmrstar._get_schema(kwargs['schema'])
+            schema = pynmrstar.get_schema(kwargs['schema'])
             schema_obj = schema.schema
             for tag in [schema_obj[x.lower()] for x in schema.schema_order]:
                 category = tag['SFCategory']
@@ -276,7 +281,7 @@ class Entry(object):
                     each_loop.source = ent_source
 
             if pynmrstar.CONVERT_DATATYPES:
-                schema = pynmrstar._get_schema()
+                schema = pynmrstar.get_schema()
                 for each_saveframe in ent:
                     for tag in each_saveframe.tags:
                         cur_tag = each_saveframe.tag_prefix + "." + tag[0]
@@ -452,7 +457,7 @@ class Entry(object):
     def get_loops_by_category(self, value):
         """Allows fetching loops by category."""
 
-        value = pynmrstar._format_category(value).lower()
+        value = pynmrstar.format_category(value).lower()
 
         results = []
         for frame in self.frame_list:
@@ -523,7 +528,7 @@ class Entry(object):
         to the assigned ID."""
 
         # The saveframe/loop order
-        ordering = pynmrstar._get_schema(schema).category_order
+        ordering = pynmrstar.get_schema(schema).category_order
 
         # Use these to sort saveframes and loops
         def sf_key(x):

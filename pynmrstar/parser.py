@@ -1,9 +1,15 @@
 import re
 
-import pynmrstar
-import loop
-import saveframe
-import entry
+try:
+    import pynmrstar
+    import loop
+    import saveframe
+    import entry
+except ImportError:
+    from . import pynmrstar
+    from . import loop
+    from . import saveframe
+    from . import entry
 
 
 class Parser(object):

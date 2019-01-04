@@ -81,8 +81,12 @@ from datetime import date
 from gzip import GzipFile
 from optparse import SUPPRESS_HELP
 
-import entry
-import schema
+try:
+    import entry
+    import schema
+except ImportError:
+    from . import entry
+    from . import schema
 
 # See if we have zlib
 try:
@@ -172,9 +176,12 @@ except ImportError as e:
 #            Global Variables               #
 #############################################
 
-# Set this to allow import * from bmrb to work sensibly
+# Set this to allow import * from pynmrstar to work sensibly
 __all__ = ['diff', 'validate', 'enable_nef_defaults', 'enable_nmrstar_defaults',
-           'delete_empty_saveframes']
+           'delete_empty_saveframes', 'interpret_file', 'get_schema', 'format_category', 'format_tag',
+           'VERBOSE', 'ALLOW_V2_ENTRIES', 'RAISE_PARSE_WARNINGS', 'WARNINGS_TO_IGNORE', 'SKIP_EMPTY_LOOPS',
+           'DONT_SHOW_COMMENTS', 'CONVERT_DATATYPES', 'STR_CONVERSION_DICT', '_STANDARD_SCHEMA', '_COMMENT_RECORDS',
+           '_API_URL', '_SCHEMA_URL', '_WHITESPACE', '__version__']
 
 # May be set by calling code
 VERBOSE = False
@@ -197,7 +204,7 @@ _COMMENT_RECORDS = {}
 _API_URL = "http://webapi.bmrb.wisc.edu/v2"
 _SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
-__version__ = "2.6.2"
+__version__ = "3.0"
 
 
 #############################################
@@ -289,7 +296,7 @@ def iter_entries(metabolomics=False):
     if metabolomics:
         api_url = "%s/list_entries?database=metabolomics" % _API_URL
 
-    for entry in json.loads(_interpret_file(api_url).read()):
+    for entry in json.loads(interpret_file(api_url).read()):
         yield entry.Entry.from_database(entry)
 
 
@@ -412,7 +419,7 @@ def _json_serialize(obj):
     raise TypeError("Type not serializable: %s" % type(obj))
 
 
-def _format_category(value):
+def format_category(value):
     """Adds a '_' to the front of a tag (if not present) and strips out
     anything after a '.'"""
 
@@ -424,7 +431,7 @@ def _format_category(value):
     return value
 
 
-def _format_tag(value):
+def format_tag(value):
     """Strips anything before the '.'"""
 
     if '.' in value:
@@ -432,7 +439,7 @@ def _format_tag(value):
     return value
 
 
-def _get_schema(passed_schema=None):
+def get_schema(passed_schema=None):
     """If passed a schema (not None) it returns it. If passed none,
     it checks if the default schema has been initialized. If not
     initialized, it initializes it. Then it returns the default schema."""
@@ -448,7 +455,7 @@ def _get_schema(passed_schema=None):
             schema_file = os.path.join(os.path.dirname(os.path.realpath(__file__)))
             schema_file = os.path.join(schema_file, "../reference_files/schema.csv")
             _STANDARD_SCHEMA = schema.Schema(schema_file=schema_file)
-        except Exception:
+        except IOError:
             # Try to load from the internet
             try:
                 _STANDARD_SCHEMA = schema.Schema()
@@ -459,7 +466,7 @@ def _get_schema(passed_schema=None):
     return _STANDARD_SCHEMA
 
 
-def _interpret_file(the_file):
+def interpret_file(the_file):
     """Helper method returns some sort of object with a read() method.
     the_file could be a URL, a file location, a file object, or a
     gzipped version of any of the above."""
@@ -515,7 +522,7 @@ def _get_comments():
         # Load the comments from Github if we can't find them locally
         try:
             comment_url = "https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v2/reference_files/comments.str"
-            comment_entry = entry.Entry.from_file(_interpret_file(comment_url))
+            comment_entry = entry.Entry.from_file(interpret_file(comment_url))
         except Exception:
             # No comments will be printed
             return
@@ -534,12 +541,12 @@ def _get_comments():
 def _tag_key(x, schema=None):
     """ Helper function to figure out how to sort the tags."""
     try:
-        return _get_schema(schema).schema_order.index(x)
+        return get_schema(schema).schema_order.index(x)
     except ValueError:
         # Generate an arbitrary sort order for tags that aren't in the
         #  schema but make sure that they always come after tags in the
         #   schema
-        return len(_get_schema(schema).schema_order) + abs(hash(x))
+        return len(get_schema(schema).schema_order) + abs(hash(x))
 
 
 def _called_directly():

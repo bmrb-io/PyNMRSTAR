@@ -10,7 +10,10 @@ try:
 except ImportError:
     from io import StringIO
 
-import pynmrstar
+try:
+    import pynmrstar
+except ImportError:
+    from . import pynmrstar
 
 
 class Schema(object):
@@ -36,7 +39,7 @@ class Schema(object):
 
         # Get the schema from the internet, wrap in StringIO and pass that
         #  to the csv reader
-        schema_stream = pynmrstar._interpret_file(schema_file)
+        schema_stream = pynmrstar.interpret_file(schema_file)
         fix_newlines = StringIO('\n'.join(schema_stream.read().splitlines()))
 
         csv_reader_instance = csv_reader(fix_newlines)
@@ -70,19 +73,19 @@ class Schema(object):
             self.schema[line[tag_field].lower()] = dict(zip(self.headers, line))
 
             self.schema_order.append(line[tag_field])
-            formatted = pynmrstar._format_category(line[tag_field])
+            formatted = pynmrstar.format_category(line[tag_field])
             if formatted not in self.category_order:
                 self.category_order.append(formatted)
 
         try:
             # Read in the data types
-            types_file = pynmrstar._interpret_file(os.path.join(os.path.dirname(os.path.realpath(__file__)),
+            types_file = pynmrstar.interpret_file(os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                                                 "../reference_files/data_types.csv"))
         except IOError:
             # Load the data types from Github if we can't find them locally
             types_url = "https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v2/reference_files/data_types.csv"
             try:
-                types_file = pynmrstar._interpret_file(types_url)
+                types_file = pynmrstar.interpret_file(types_url)
             except Exception:
                 raise ValueError("Could not load the data type definition file from disk or the internet!")
 
@@ -105,7 +108,7 @@ class Schema(object):
         and prints the tags that contain the search string if it is."""
 
         # Get the longest lengths
-        lengths = [max([len(pynmrstar._format_tag(x)) for x in self.schema_order])]
+        lengths = [max([len(pynmrstar.format_tag(x)) for x in self.schema_order])]
 
         values = []
         for key in self.schema.keys():
@@ -130,13 +133,13 @@ class Schema(object):
             if search and search not in tag:
                 continue
             st = self.schema.get(tag.lower(), None)
-            tag_cat = pynmrstar._format_category(tag)
+            tag_cat = pynmrstar.format_category(tag)
             if st:
                 if tag_cat != last_tag:
                     last_tag = tag_cat
                     text += "\n%-30s\n" % tag_cat
 
-                text += "  %-*s %-*s %-*s  %-*s\n" % (lengths[0], pynmrstar._format_tag(tag),
+                text += "  %-*s %-*s %-*s  %-*s\n" % (lengths[0], pynmrstar.format_tag(tag),
                                                       lengths[1], st["Data Type"],
                                                       lengths[2], st["Nullable"],
                                                       lengths[3], st["SFCategory"])
@@ -227,14 +230,14 @@ class Schema(object):
                                      "after does not exist in the schema.")
         else:
             # Determine a sensible place to put the new tag
-            search = pynmrstar._format_category(tag.lower())
+            search = pynmrstar.format_category(tag.lower())
             for pos, stag in enumerate([x.lower() for x in self.schema_order]):
                 if stag.startswith(search):
                     new_tag_pos = pos + 1
 
         # Add the new tag to the tag order and tag list
         self.schema_order.insert(new_tag_pos, tag)
-        self.category_order.insert(new_tag_pos, "_" + pynmrstar._format_tag(tag))
+        self.category_order.insert(new_tag_pos, "_" + pynmrstar.format_tag(tag))
 
         # Calculate up the 'Dictionary Sequence' based on the tag position
         new_tag_pos = (new_tag_pos - 1) * 10

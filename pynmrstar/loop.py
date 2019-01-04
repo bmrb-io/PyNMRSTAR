@@ -5,9 +5,14 @@ from csv import reader as csv_reader, writer as csv_writer
 from copy import deepcopy
 from itertools import chain
 
-import entry
-import pynmrstar
-import parser as parsermod
+try:
+    import entry
+    import pynmrstar
+    import parser as parsermod
+except ImportError:
+    from . import entry
+    from . import pynmrstar
+    from . import parser as parsermod
 
 
 class Loop(object):
@@ -57,7 +62,7 @@ class Loop(object):
 
         # Update our category if provided
         if 'category' in kwargs:
-            self.category = pynmrstar._format_category(kwargs['category'])
+            self.category = pynmrstar.format_category(kwargs['category'])
             return
 
         # They initialized us wrong
@@ -75,7 +80,7 @@ class Loop(object):
             self.source = "from_string()"
         # Parsing from a file
         elif 'file_name' in kwargs:
-            star_buffer = pynmrstar._interpret_file(kwargs['file_name'])
+            star_buffer = pynmrstar.interpret_file(kwargs['file_name'])
             self.source = "from_file('%s')" % kwargs['file_name']
         # Creating from template (schema)
         elif 'tag_prefix' in kwargs:
@@ -148,7 +153,7 @@ class Loop(object):
         If there are 5 rows of data in the loop, you will need to
         assign a list with 5 elements."""
 
-        tag = pynmrstar._format_tag(key)
+        tag = pynmrstar.format_tag(key)
 
         # Check that their tag is in the loop
         if tag not in self.tags:
@@ -320,7 +325,7 @@ class Loop(object):
         """ Returns the tags from the schema for the category of this
         loop. """
 
-        schema = pynmrstar._get_schema(schema)
+        schema = pynmrstar.get_schema(schema)
 
         # Put the _ on the front for them if necessary
         if not category.startswith("_"):
@@ -354,7 +359,7 @@ class Loop(object):
 
         try:
             lc_col = [x.lower() for x in self.tags]
-            return lc_col.index(pynmrstar._format_tag(str(tag_name)).lower())
+            return lc_col.index(pynmrstar.format_tag(str(tag_name)).lower())
         except ValueError:
             return None
 
@@ -408,7 +413,7 @@ class Loop(object):
 
         # Auto convert datatypes if option set
         if pynmrstar.CONVERT_DATATYPES:
-            tschem = pynmrstar._get_schema()
+            tschem = pynmrstar.get_schema()
             for row in processed_data:
                 for tag_id, datum in enumerate(row):
                     row[tag_id] = tschem.convert_tag(self.category + "." +
@@ -432,7 +437,7 @@ class Loop(object):
 
         # Make sure the category matches - if provided
         if "." in tag_id:
-            supplied_category = pynmrstar._format_category(str(tag_id))
+            supplied_category = pynmrstar.format_category(str(tag_id))
             if supplied_category.lower() != self.category.lower():
                 raise ValueError("Category provided in your tag '%s' does "
                                  "not match this loop's category '%s'." %
@@ -576,7 +581,7 @@ class Loop(object):
 
         # Make sure the category matches - if provided
         if "." in tag:
-            supplied_category = pynmrstar._format_category(str(tag))
+            supplied_category = pynmrstar.format_category(str(tag))
             if supplied_category.lower() != self.category.lower():
                 raise ValueError("Category provided in your tag '%s' does "
                                  "not match this loop's category '%s'." %
@@ -739,11 +744,11 @@ class Loop(object):
         #  it during the process)
         for pos, item in enumerate([str(x) for x in lower_tags]):
             if ("." in item and
-                    pynmrstar._format_category(item).lower() != self.category.lower()):
+                    pynmrstar.format_category(item).lower() != self.category.lower()):
                 raise ValueError("Cannot fetch data with tag '%s' because "
                                  "the category does not match the category of "
                                  "this loop '%s'." % (item, self.category))
-            lower_tags[pos] = pynmrstar._format_tag(item).lower()
+            lower_tags[pos] = pynmrstar.format_tag(item).lower()
 
         # Make a lower case copy of the tags
         tags_lower = [x.lower() for x in self.tags]
@@ -832,7 +837,7 @@ class Loop(object):
 
         # Make sure the category matches
         if "." in str(index_tag):
-            supplied_category = pynmrstar._format_category(str(index_tag))
+            supplied_category = pynmrstar.format_category(str(index_tag))
             if supplied_category.lower() != self.category.lower():
                 raise ValueError("Category provided in your tag '%s' does not "
                                  "match this loop's category '%s'." %
@@ -891,7 +896,7 @@ class Loop(object):
         """ Set the category of the loop. Useful if you didn't know the
         category at loop creation time."""
 
-        self.category = pynmrstar._format_category(category)
+        self.category = pynmrstar.format_category(category)
 
     def sort_tags(self, schema=None):
         """ Rearranges the tag names and data in the loop to match the order
@@ -910,7 +915,7 @@ class Loop(object):
             return
         else:
             self.data = self.get_tag(sorted_order)
-            self.tags = [pynmrstar._format_tag(x) for x in sorted_order]
+            self.tags = [pynmrstar.format_tag(x) for x in sorted_order]
 
     def sort_rows(self, tags, key=None):
         """ Sort the data in the rows by their values for a given tag
@@ -939,7 +944,7 @@ class Loop(object):
 
             # Make sure the category matches
             if "." in cur_tag:
-                supplied_category = pynmrstar._format_category(cur_tag)
+                supplied_category = pynmrstar.format_category(cur_tag)
                 if supplied_category.lower() != self.category.lower():
                     raise ValueError("Category provided in your tag '%s' does "
                                      "not match this loop's category '%s'." %
@@ -998,7 +1003,7 @@ class Loop(object):
 
         if validate_schema:
             # Get the default schema if we are not passed a schema
-            my_schema = pynmrstar._get_schema(schema)
+            my_schema = pynmrstar.get_schema(schema)
 
             # Check the data
             for row_num, row in enumerate(self.data):

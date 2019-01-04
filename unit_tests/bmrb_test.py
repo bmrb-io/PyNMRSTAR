@@ -12,7 +12,7 @@ import json
 
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
 # Local imports
-from pynmrstar import Entry, Loop, Saveframe, Schema, pynmrstar
+from pynmrstar import Entry, Loop, Saveframe, Schema, _Parser, pynmrstar
 
 # Determine if we are running in python3
 PY3 = (sys.version_info[0] == 3)
@@ -68,7 +68,7 @@ class TestPyNMRSTAR(unittest.TestCase):
         """ Make sure the library can handle odd strings. Only in py3. """
 
         if pynmrstar.PY3:
-            saveframe = pynmrstar.Saveframe.from_scratch('test', 'citations')
+            saveframe = Saveframe.from_scratch('test', 'citations')
             with open(os.path.join(our_path, 'naughty-strings/blns.json')) as odd_string_file:
                 odd_strings = json.load(odd_string_file)
             for x, string in enumerate(odd_strings):
@@ -76,31 +76,31 @@ class TestPyNMRSTAR(unittest.TestCase):
                     continue
                 saveframe.add_tag(str(x), string)
 
-            self.assertEqual(saveframe, pynmrstar.Saveframe.from_string(str(saveframe)))
+            self.assertEqual(saveframe, Saveframe.from_string(str(saveframe)))
 
     def test__format_category(self):
-        self.assertEqual(pynmrstar._format_category("test"), "_test")
-        self.assertEqual(pynmrstar._format_category("_test"), "_test")
-        self.assertEqual(pynmrstar._format_category("test.test"), "_test")
+        self.assertEqual(pynmrstar.format_category("test"), "_test")
+        self.assertEqual(pynmrstar.format_category("_test"), "_test")
+        self.assertEqual(pynmrstar.format_category("test.test"), "_test")
 
     def test__format_tag(self):
-        self.assertEqual(pynmrstar._format_tag("test"), "test")
-        self.assertEqual(pynmrstar._format_tag("_test.test"), "test")
-        self.assertEqual(pynmrstar._format_tag("test.test"), "test")
+        self.assertEqual(pynmrstar.format_tag("test"), "test")
+        self.assertEqual(pynmrstar.format_tag("_test.test"), "test")
+        self.assertEqual(pynmrstar.format_tag("test.test"), "test")
 
     def test__InterpretFile(self):
         with open(sample_file_location, "r") as local_file:
             local_version = local_file.read()
 
         # Test reading file from local locations
-        self.assertEqual(pynmrstar._interpret_file(sample_file_location).read(), local_version)
+        self.assertEqual(pynmrstar.interpret_file(sample_file_location).read(), local_version)
         with open(sample_file_location, "rb") as tmp:
-            self.assertEqual(pynmrstar._interpret_file(tmp).read(), local_version)
+            self.assertEqual(pynmrstar.interpret_file(tmp).read(), local_version)
         with open(os.path.join(our_path, "sample_files", "bmr15000_3.str.gz"), "rb") as tmp:
-            self.assertEqual(pynmrstar._interpret_file(tmp).read(), local_version)
+            self.assertEqual(pynmrstar.interpret_file(tmp).read(), local_version)
 
         # Test reading from http (ftp doesn't work on TravisCI)
-        self.assertEqual(pynmrstar._interpret_file("http://rest.bmrb.wisc.edu/bmrb/NMR-STAR3/15000").read(), local_version)
+        self.assertEqual(pynmrstar.interpret_file("http://rest.bmrb.wisc.edu/bmrb/NMR-STAR3/15000").read(), local_version)
 
         # Test reading from https locations
         # TODO: re-enable once API is updated
@@ -518,7 +518,7 @@ class TestPyNMRSTAR(unittest.TestCase):
     def test_parse_outliers(self):
         """ Make sure the parser handles edge cases. """
 
-        parser = pynmrstar._Parser()
+        parser = _Parser()
         parser.load_data("""data_#pound
 save_entry_information  _Entry.Sf_category entry_information _Entry.Sf_framecode entry_information
 _Entry.sameline_comment value #ignore this all
