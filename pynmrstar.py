@@ -451,7 +451,7 @@ def _get_schema(passed_schema=None):
             schema_file = os.path.join(schema_file, "reference_files/schema.csv")
 
             _STANDARD_SCHEMA = Schema(schema_file=schema_file)
-        except Exception:
+        except IOError:
             # Try to load from the internet
             try:
                 _STANDARD_SCHEMA = Schema()
