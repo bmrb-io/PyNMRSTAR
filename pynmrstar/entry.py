@@ -1,10 +1,13 @@
 import json
-from io import StringIO
-from urllib2 import urlopen, HTTPError, URLError, Request
-
 import pynmrstar
 import parser as parsermod
 import saveframe
+
+try:
+    from urllib.request import urlopen, Request
+    from urllib.error import HTTPError, URLError
+except ImportError:
+    from urllib2 import urlopen, Request, HTTPError, URLError
 
 
 class Entry(object):
@@ -68,7 +71,7 @@ class Entry(object):
 
         if 'the_string' in kwargs:
             # Parse from a string by wrapping it in StringIO
-            star_buffer = StringIO(kwargs['the_string'])
+            star_buffer = pynmrstar.StringIO(kwargs['the_string'])
             self.source = "from_string()"
         elif 'file_name' in kwargs:
             star_buffer = pynmrstar._interpret_file(kwargs['file_name'])
@@ -83,7 +86,7 @@ class Entry(object):
             # Parse from the official BMRB library
             try:
                 if pynmrstar.PY3:
-                    star_buffer = StringIO(urlopen(url).read().decode())
+                    star_buffer = pynmrstar.StringIO(urlopen(url).read().decode())
                 else:
                     star_buffer = urlopen(url)
             except HTTPError:

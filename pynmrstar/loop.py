@@ -3,7 +3,6 @@ import os
 import sys
 from csv import reader as csv_reader, writer as csv_writer
 from copy import deepcopy
-from io import StringIO
 from itertools import chain
 
 import entry
@@ -72,7 +71,7 @@ class Loop(object):
         # Parsing from a string
         if 'the_string' in kwargs:
             # Parse from a string by wrapping it in StringIO
-            star_buffer = StringIO(kwargs['the_string'])
+            star_buffer = pynmrstar.StringIO(kwargs['the_string'])
             self.source = "from_string()"
         # Parsing from a file
         elif 'file_name' in kwargs:
@@ -101,9 +100,9 @@ class Loop(object):
         tmp_entry = entry.Entry.from_scratch(0)
 
         # Load the BMRB entry from the file
-        star_buffer = StringIO("data_0 save_internaluseyoushouldntseethis_frame"
-                               " _internal.use internal " + star_buffer.read() +
-                               " save_")
+        star_buffer = pynmrstar.StringIO("data_0 save_internaluseyoushouldntseethis_frame"
+                                         " _internal.use internal " + star_buffer.read() +
+                                         " save_")
         parser = parsermod.Parser(entry_to_parse_into=tmp_entry)
         parser.parse(star_buffer.read(), source=self.source)
 
@@ -652,7 +651,7 @@ class Loop(object):
         show_category to false to omit the loop category from the
         headers."""
 
-        csv_buffer = StringIO()
+        csv_buffer = pynmrstar.StringIO()
         cwriter = csv_writer(csv_buffer)
 
         if header:

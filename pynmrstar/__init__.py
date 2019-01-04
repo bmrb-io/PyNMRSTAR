@@ -3,6 +3,7 @@ from saveframe import Saveframe
 from entry import Entry
 from schema import Schema
 from parser import Parser as _Parser
+from pynmrstar import _interpret_file, _get_schema
 from pynmrstar import *
 
 del loop

@@ -435,7 +435,7 @@ def _format_tag(value):
 def _get_schema(passed_schema=None):
     """If passed a schema (not None) it returns it. If passed none,
     it checks if the default schema has been initialized. If not
-    initialzed, it initializes it. Then it returns the default schema."""
+    initialized, it initializes it. Then it returns the default schema."""
 
     if passed_schema:
         return passed_schema
@@ -447,7 +447,6 @@ def _get_schema(passed_schema=None):
         try:
             schema_file = os.path.join(os.path.dirname(os.path.realpath(__file__)))
             schema_file = os.path.join(schema_file, "../reference_files/schema.csv")
-
             _STANDARD_SCHEMA = schema.Schema(schema_file=schema_file)
         except Exception:
             # Try to load from the internet
@@ -456,9 +455,8 @@ def _get_schema(passed_schema=None):
             except (HTTPError, URLError):
                 raise ValueError("Could not load a BMRB schema from the "
                                  "internet or from the local repository.")
-        passed_schema = _STANDARD_SCHEMA
 
-    return passed_schema
+    return _STANDARD_SCHEMA
 
 
 def _interpret_file(the_file):

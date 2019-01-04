@@ -1,6 +1,5 @@
 import json
 from csv import reader as csv_reader, writer as csv_writer
-from io import StringIO
 
 import loop
 import entry
@@ -100,7 +99,7 @@ class Saveframe(object):
 
         if 'the_string' in kwargs:
             # Parse from a string by wrapping it in StringIO
-            star_buffer = StringIO(kwargs['the_string'])
+            star_buffer = pynmrstar.StringIO(kwargs['the_string'])
             self.source = "from_string()"
         elif 'file_name' in kwargs:
             star_buffer = pynmrstar._interpret_file(kwargs['file_name'])
@@ -184,7 +183,7 @@ class Saveframe(object):
         tmp_entry = entry.Entry.from_scratch(0)
 
         # Load the BMRB entry from the file
-        star_buffer = StringIO("data_1 " + star_buffer.read())
+        star_buffer = pynmrstar.StringIO("data_1 " + star_buffer.read())
         parser = parsermod.Parser(entry_to_parse_into=tmp_entry)
         parser.parse(star_buffer.read(), source=self.source)
 
@@ -539,7 +538,7 @@ class Saveframe(object):
         string. Set header to False omit the header. Set show_category
         to False to omit the loop category from the headers."""
 
-        csv_buffer = StringIO()
+        csv_buffer = pynmrstar.StringIO()
         cwriter = csv_writer(csv_buffer)
 
         if header:
