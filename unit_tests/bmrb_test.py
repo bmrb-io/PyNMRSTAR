@@ -8,6 +8,8 @@ import unittest
 import subprocess
 from copy import deepcopy as copy
 
+import json
+
 # Local imports
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
 import pynmrstar
@@ -62,6 +64,20 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertEqual(pynmrstar.clean_value("loop_"), "noloop_")
         pynmrstar.STR_CONVERSION_DICT = {None:"."}
 
+    def test__odd_strings(self):
+        """ Make sure the library can handle odd strings. Only in py3. """
+
+        if pynmrstar.PY3:
+            saveframe = pynmrstar.Saveframe.from_scratch('test', 'citations')
+            with open(os.path.join(our_path, 'naughty-strings/blns.json')) as odd_string_file:
+                odd_strings = json.load(odd_string_file)
+            for x, string in enumerate(odd_strings):
+                if string == '':
+                    continue
+                saveframe.add_tag(str(x), string)
+
+            self.assertEqual(saveframe, pynmrstar.Saveframe.from_string(str(saveframe)))
+
     def test__format_category(self):
         self.assertEqual(pynmrstar._format_category("test"), "_test")
         self.assertEqual(pynmrstar._format_category("_test"), "_test")
@@ -83,9 +99,8 @@ class TestPyNMRSTAR(unittest.TestCase):
         with open(os.path.join(our_path, "sample_files", "bmr15000_3.str.gz"), "rb") as tmp:
             self.assertEqual(pynmrstar._interpret_file(tmp).read(), local_version)
 
-        # Test reading from ftp and http
+        # Test reading from http (ftp doesn't work on TravisCI)
         self.assertEqual(pynmrstar._interpret_file("http://rest.bmrb.wisc.edu/bmrb/NMR-STAR3/15000").read(), local_version)
-        self.assertEqual(pynmrstar._interpret_file("ftp://ftp.bmrb.wisc.edu/pub/bmrb/entry_directories/bmr15000/bmr15000_3.str").read(), local_version)
 
         # Test reading from https locations
         # TODO: re-enable once API is updated
