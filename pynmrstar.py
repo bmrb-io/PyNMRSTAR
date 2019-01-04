@@ -1619,6 +1619,16 @@ class Entry(object):
         return list(category_list)
 
     @property
+    def empty(self):
+        """ Check if the entry has no data. Ignore the structural tags."""
+
+        for saveframe in self.frame_list:
+            if not saveframe.empty:
+                return False
+
+        return True
+
+    @property
     def frame_dict(self):
         """Returns a dictionary of saveframe name -> saveframe object"""
 
@@ -1792,7 +1802,7 @@ class Entry(object):
         return cls(entry_id=entry_id)
 
     @classmethod
-    def from_template(cls, entry_id, all_tags=False, schema=None, initialize_loops=False):
+    def from_template(cls, entry_id, all_tags=False, schema=None):
         """ Create an entry that has all of the saveframes and loops from the
         schema present. No values will be assigned. Specify the entry
         ID when calling this method.
@@ -2343,6 +2353,23 @@ class Saveframe(object):
         self.loops = tmp_entry[0].loops
         self.name = tmp_entry[0].name
         self.tag_prefix = tmp_entry[0].tag_prefix
+
+    @property
+    def empty(self):
+        """ Check if the saveframe has no data. Ignore the structural tags."""
+
+        for tag in self.tags:
+            tag_lower = tag[0].lower()
+            if tag_lower not in ['sf_category', 'sf_framecode', 'id', 'entry_id', 'nmr_star_version',
+                                 'original_nmr_star_version']:
+                if tag[1] not in [None, '', '.', '?']:
+                    return False
+
+        for loop in self.loops:
+            if not loop.empty:
+                return False
+
+        return True
 
     @classmethod
     def from_scratch(cls, sf_name, tag_prefix=None, source="from_scratch()"):
@@ -3104,6 +3131,17 @@ class Loop(object):
         # Close the loop
         ret_string += "".join(row_strings) + "\n   stop_\n"
         return ret_string
+
+    @property
+    def empty(self):
+        """ Check if the loop has no data. """
+
+        for row in self.data:
+            for col in row:
+                if col not in [None, '', '.', '?']:
+                    return False
+
+        return True
 
     @classmethod
     def from_file(cls, the_file, csv=False):
