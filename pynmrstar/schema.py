@@ -80,7 +80,7 @@ class Schema(object):
         try:
             # Read in the data types
             types_file = utils.interpret_file(os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                                                "../reference_files/data_types.csv"))
+                                                           "../reference_files/data_types.csv"))
         except IOError:
             # Load the data types from Github if we can't find them locally
             types_url = "https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v2/reference_files/data_types.csv"

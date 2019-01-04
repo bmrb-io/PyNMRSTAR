@@ -106,8 +106,8 @@ class Loop(object):
 
         # Load the BMRB entry from the file
         star_buffer = utils.StringIO("data_0 save_internaluseyoushouldntseethis_frame"
-                                         " _internal.use internal " + star_buffer.read() +
-                                         " save_")
+                                     " _internal.use internal " + star_buffer.read() +
+                                     " save_")
         parser = parsermod.Parser(entry_to_parse_into=tmp_entry)
         parser.parse(star_buffer.read(), source=self.source)
 
