@@ -438,7 +438,7 @@ def _format_tag(value):
 def _get_schema(passed_schema=None):
     """If passed a schema (not None) it returns it. If passed none,
     it checks if the default schema has been initialized. If not
-    initialzed, it initializes it. Then it returns the default schema."""
+    initialized, it initializes it. Then it returns the default schema."""
 
     global _STANDARD_SCHEMA
     if passed_schema is None:
@@ -458,9 +458,8 @@ def _get_schema(passed_schema=None):
             except (HTTPError, URLError):
                 raise ValueError("Could not load a BMRB schema from the "
                                  "internet or from the local repository.")
-        passed_schema = _STANDARD_SCHEMA
 
-    return passed_schema
+    return _STANDARD_SCHEMA
 
 
 def _interpret_file(the_file):
