@@ -103,8 +103,8 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertEqual(pynmrstar._interpret_file("http://rest.bmrb.wisc.edu/bmrb/NMR-STAR3/15000").read(), local_version)
 
         # Test reading from https locations
-        # TODO: re-enable once API is updated
-        #self.assertEqual(pynmrstar._interpret_file("https://webapi.bmrb.wisc.edu/v2/entry/15000?format=rawnmrstar").read(), local_version)
+        self.assertEqual(pynmrstar.Entry.from_string(pynmrstar._interpret_file("https://webapi.bmrb.wisc.edu/v2/entry/15000?format=rawnmrstar").read()),
+                         pynmrstar.Entry.from_string(local_version))
 
     # Test the parser
     def test___Parser(self):
