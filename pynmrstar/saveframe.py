@@ -4,12 +4,12 @@ from csv import reader as csv_reader, writer as csv_writer
 try:
     import loop
     import entry
-    import pynmrstar
+    import utils
     import parser as parsermod
 except ImportError:
     from . import loop
     from . import entry
-    from . import pynmrstar
+    from . import utils
     from . import parser as parsermod
 
 
@@ -105,14 +105,14 @@ class Saveframe(object):
 
         if 'the_string' in kwargs:
             # Parse from a string by wrapping it in StringIO
-            star_buffer = pynmrstar.StringIO(kwargs['the_string'])
+            star_buffer = utils.StringIO(kwargs['the_string'])
             self.source = "from_string()"
         elif 'file_name' in kwargs:
-            star_buffer = pynmrstar.interpret_file(kwargs['file_name'])
+            star_buffer = utils.interpret_file(kwargs['file_name'])
             self.source = "from_file('%s')" % kwargs['file_name']
         # Creating from template (schema)
         elif 'all_tags' in kwargs:
-            schema_obj = pynmrstar.get_schema(kwargs['schema'])
+            schema_obj = utils.get_schema(kwargs['schema'])
             schema = schema_obj.schema
             self.category = kwargs['category']
 
@@ -136,7 +136,7 @@ class Saveframe(object):
                     # It is a tag in this saveframe
                     if item["Loopflag"] == "N":
 
-                        ft = pynmrstar.format_tag(item["Tag"])
+                        ft = utils.format_tag(item["Tag"])
                         # Set the value for sf_category and sf_framecode
                         if ft == "Sf_category":
                             self.add_tag(item["Tag"], self.category)
@@ -156,7 +156,7 @@ class Saveframe(object):
 
                     # It is a contained loop tag
                     else:
-                        cat_formatted = pynmrstar.format_category(item["Tag"])
+                        cat_formatted = utils.format_category(item["Tag"])
                         if cat_formatted not in loops_added:
                             loops_added.append(cat_formatted)
                             try:
@@ -171,7 +171,7 @@ class Saveframe(object):
             # If they are creating from scratch, just get the saveframe name
             self.name = kwargs['saveframe_name']
             if 'tag_prefix' in kwargs:
-                self.tag_prefix = pynmrstar.format_category(kwargs['tag_prefix'])
+                self.tag_prefix = utils.format_category(kwargs['tag_prefix'])
             return
 
         # If we are reading from a CSV file, go ahead and parse it
@@ -189,7 +189,7 @@ class Saveframe(object):
         tmp_entry = entry.Entry.from_scratch(0)
 
         # Load the BMRB entry from the file
-        star_buffer = pynmrstar.StringIO("data_1 " + star_buffer.read())
+        star_buffer = utils.StringIO("data_1 " + star_buffer.read())
         parser = parsermod.Parser(entry_to_parse_into=tmp_entry)
         parser.parse(star_buffer.read(), source=self.source)
 
@@ -303,7 +303,7 @@ class Saveframe(object):
     def __str__(self, first_in_category=True):
         """Returns the saveframe in STAR format as a string."""
 
-        if pynmrstar.ALLOW_V2_ENTRIES:
+        if utils.ALLOW_V2_ENTRIES:
             if self.tag_prefix is None:
                 width = max([len(x[0]) for x in self.tags])
             else:
@@ -321,11 +321,11 @@ class Saveframe(object):
         ret_string = ""
 
         # Insert the comment if not disabled
-        if not pynmrstar.DONT_SHOW_COMMENTS:
-            if self.category in pynmrstar._get_comments():
-                this_comment = pynmrstar._get_comments()[self.category]
+        if not utils.DONT_SHOW_COMMENTS:
+            if self.category in utils._get_comments():
+                this_comment = utils._get_comments()[self.category]
                 if first_in_category or this_comment['every_flag']:
-                    ret_string = pynmrstar._get_comments()[self.category]['comment']
+                    ret_string = utils._get_comments()[self.category]['comment']
 
         # Print the saveframe
         ret_string += "save_%s\n" % self.name
@@ -334,9 +334,9 @@ class Saveframe(object):
 
         # Print the tags
         for each_tag in self.tags:
-            clean_tag = pynmrstar.clean_value(each_tag[1])
+            clean_tag = utils.clean_value(each_tag[1])
 
-            if pynmrstar.ALLOW_V2_ENTRIES and self.tag_prefix is None:
+            if utils.ALLOW_V2_ENTRIES and self.tag_prefix is None:
                 if "\n" in clean_tag:
                     ret_string += mstring % (each_tag[0], clean_tag)
                 else:
@@ -380,7 +380,7 @@ class Saveframe(object):
 
         if "." in name:
             if name[0] != ".":
-                prefix = pynmrstar.format_category(name)
+                prefix = utils.format_category(name)
                 if self.tag_prefix is None:
                     self.tag_prefix = prefix
                 elif self.tag_prefix != prefix:
@@ -407,8 +407,8 @@ class Saveframe(object):
             raise ValueError("Tag names can not contain spaces.")
 
         # See if we need to convert the datatype
-        if pynmrstar.CONVERT_DATATYPES:
-            new_tag = [name, pynmrstar.get_schema().convert_tag(
+        if utils.CONVERT_DATATYPES:
+            new_tag = [name, utils.get_schema().convert_tag(
                 self.tag_prefix + "." + name, value, line_num=linenum)]
         else:
             new_tag = [name, value]
@@ -422,7 +422,7 @@ class Saveframe(object):
         if linenum:
             new_tag.append(linenum)
 
-        if pynmrstar.VERBOSE:
+        if utils.VERBOSE:
             print("Adding tag: '%s' with value '%s'" % (name, value))
 
         self.tags.append(new_tag)
@@ -495,9 +495,9 @@ class Saveframe(object):
 
                 # Compare the string version of the tags in case there are
                 #  non-string types. Use the conversion dict to get to str
-                if (str(pynmrstar.STR_CONVERSION_DICT.get(tag[1], tag[1])) !=
-                        str(pynmrstar.STR_CONVERSION_DICT.get(other_tag[0],
-                                                              other_tag[0]))):
+                if (str(utils.STR_CONVERSION_DICT.get(tag[1], tag[1])) !=
+                        str(utils.STR_CONVERSION_DICT.get(other_tag[0],
+                                                          other_tag[0]))):
                     diffs.append("\tMismatched tag values for tag '%s.%s':"
                                  " '%s' vs '%s'." %
                                  (self.tag_prefix, tag[0],
@@ -530,7 +530,7 @@ class Saveframe(object):
     def delete_tag(self, tag):
         """Deletes a tag from the saveframe based on tag name."""
 
-        tag = pynmrstar.format_tag(tag).lower()
+        tag = utils.format_tag(tag).lower()
 
         for position, each_tag in enumerate(self.tags):
             # If the tag is a match, remove it
@@ -544,7 +544,7 @@ class Saveframe(object):
         string. Set header to False omit the header. Set show_category
         to False to omit the loop category from the headers."""
 
-        csv_buffer = pynmrstar.StringIO()
+        csv_buffer = utils.StringIO()
         cwriter = csv_writer(csv_buffer)
 
         if header:
@@ -577,14 +577,14 @@ class Saveframe(object):
         }
 
         if serialize:
-            return json.dumps(saveframe_data, default=pynmrstar._json_serialize)
+            return json.dumps(saveframe_data, default=utils._json_serialize)
         else:
             return saveframe_data
 
     def get_loop_by_category(self, name):
         """Return a loop based on the loop name (category)."""
 
-        name = pynmrstar.format_category(name).lower()
+        name = utils.format_category(name).lower()
         for each_loop in self.loops:
             if str(each_loop.category).lower() == name:
                 return each_loop
@@ -600,7 +600,7 @@ class Saveframe(object):
         # Make sure this is the correct saveframe if they specify a tag
         #  prefix
         if "." in query:
-            tag_prefix = pynmrstar.format_category(query)
+            tag_prefix = utils.format_category(query)
         else:
             tag_prefix = self.tag_prefix
 
@@ -608,12 +608,12 @@ class Saveframe(object):
         for each_loop in self.loops:
             if ((each_loop.category is not None and tag_prefix is not None and
                  each_loop.category.lower() == tag_prefix.lower()) or
-                    pynmrstar.ALLOW_V2_ENTRIES):
+                    utils.ALLOW_V2_ENTRIES):
                 results.extend(each_loop.get_tag(query, whole_tag=whole_tag))
 
         # Check our tags
-        query = pynmrstar.format_tag(query).lower()
-        if (pynmrstar.ALLOW_V2_ENTRIES or
+        query = utils.format_tag(query).lower()
+        if (utils.ALLOW_V2_ENTRIES or
                 (tag_prefix is not None and
                  tag_prefix.lower() == self.tag_prefix.lower())):
             for tag in self.tags:
@@ -642,7 +642,7 @@ class Saveframe(object):
     def set_tag_prefix(self, tag_prefix):
         """Set the tag prefix for this saveframe."""
 
-        self.tag_prefix = pynmrstar.format_category(tag_prefix)
+        self.tag_prefix = utils.format_category(tag_prefix)
 
     def sort_tags(self, schema=None):
         """ Sort the tags so they are in the same order as a BMRB
@@ -650,7 +650,7 @@ class Saveframe(object):
         is provided."""
 
         def sort_key(x):
-            return pynmrstar._tag_key(self.tag_prefix + "." + x[0], schema=schema)
+            return utils._tag_key(self.tag_prefix + "." + x[0], schema=schema)
 
         self.tags.sort(key=sort_key)
 
@@ -688,7 +688,7 @@ class Saveframe(object):
 
         if validate_schema:
             # Get the default schema if we are not passed a schema
-            my_schema = pynmrstar.get_schema(schema)
+            my_schema = utils.get_schema(schema)
 
             for tag in self.tags:
                 line_number = str(tag[2]) + " of original file" if len(tag) > 2 else None

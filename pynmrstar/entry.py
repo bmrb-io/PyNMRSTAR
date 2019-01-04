@@ -1,10 +1,10 @@
 import json
 try:
-    import pynmrstar
+    import utils
     import parser as parsermod
     import saveframe
 except ImportError:
-    from . import pynmrstar
+    from . import utils
     from . import parser as parsermod
     from . import saveframe
 
@@ -76,10 +76,10 @@ class Entry(object):
 
         if 'the_string' in kwargs:
             # Parse from a string by wrapping it in StringIO
-            star_buffer = pynmrstar.StringIO(kwargs['the_string'])
+            star_buffer = utils.StringIO(kwargs['the_string'])
             self.source = "from_string()"
         elif 'file_name' in kwargs:
-            star_buffer = pynmrstar.interpret_file(kwargs['file_name'])
+            star_buffer = utils.interpret_file(kwargs['file_name'])
             self.source = "from_file('%s')" % kwargs['file_name']
         elif 'entry_num' in kwargs:
             self.source = "from_database(%s)" % kwargs['entry_num']
@@ -90,8 +90,8 @@ class Entry(object):
 
             # Parse from the official BMRB library
             try:
-                if pynmrstar.PY3:
-                    star_buffer = pynmrstar.StringIO(urlopen(url).read().decode())
+                if utils.PY3:
+                    star_buffer = utils.StringIO(urlopen(url).read().decode())
                 else:
                     star_buffer = urlopen(url)
             except HTTPError:
@@ -105,7 +105,7 @@ class Entry(object):
             self.entry_id = kwargs['entry_id']
 
             saveframe_categories = {}
-            schema = pynmrstar.get_schema(kwargs['schema'])
+            schema = utils.get_schema(kwargs['schema'])
             schema_obj = schema.schema
             for tag in [schema_obj[x.lower()] for x in schema.schema_order]:
                 category = tag['SFCategory']
@@ -222,17 +222,17 @@ class Entry(object):
 
         # Try to load the entry using JSON
         try:
-            entry_url = pynmrstar._API_URL + "/entry/%s"
+            entry_url = utils._API_URL + "/entry/%s"
             entry_url = entry_url % entry_num
 
             # If we have zlib get the compressed entry
-            if pynmrstar.zlib:
+            if utils.zlib:
                 entry_url += "?format=zlib"
 
             # Download the entry
             try:
                 req = Request(entry_url)
-                req.add_header('Application', 'PyNMRSTAR %s' % pynmrstar.__version__)
+                req.add_header('Application', 'PyNMRSTAR %s' % utils.__version__)
                 url_request = urlopen(req)
 
                 if url_request.getcode() == 404:
@@ -251,11 +251,11 @@ class Entry(object):
                     raise err
 
             # If we have zlib decompress
-            if pynmrstar.zlib:
-                serialized_ent = pynmrstar.zlib.decompress(serialized_ent)
+            if utils.zlib:
+                serialized_ent = utils.zlib.decompress(serialized_ent)
 
             # Convert bytes to string if python3
-            if pynmrstar.PY3:
+            if utils.PY3:
                 serialized_ent = serialized_ent.decode()
 
             # Parse JSON string to dictionary
@@ -265,7 +265,7 @@ class Entry(object):
                 return cls(entry_num=entry_num)
 
             # If pure zlib there is no wrapping
-            if pynmrstar.zlib:
+            if utils.zlib:
                 entry_dictionary = json_data
             else:
                 entry_dictionary = json_data[str(entry_num)]
@@ -280,8 +280,8 @@ class Entry(object):
                 for each_loop in each_saveframe:
                     each_loop.source = ent_source
 
-            if pynmrstar.CONVERT_DATATYPES:
-                schema = pynmrstar.get_schema()
+            if utils.CONVERT_DATATYPES:
+                schema = utils.get_schema()
                 for each_saveframe in ent:
                     for tag in each_saveframe.tags:
                         cur_tag = each_saveframe.tag_prefix + "." + tag[0]
@@ -302,7 +302,7 @@ class Entry(object):
             raise IOError("Entry '%s' does not exist in the public database." %
                           entry_num)
         except URLError:
-            if pynmrstar.VERBOSE:
+            if utils.VERBOSE:
                 print("BMRB API server appears to be down. Attempting to load "
                       "from FTP site.")
             return cls(entry_num=entry_num)
@@ -450,14 +450,14 @@ class Entry(object):
         }
 
         if serialize:
-            return json.dumps(entry_dict, default=pynmrstar._json_serialize)
+            return json.dumps(entry_dict, default=utils._json_serialize)
         else:
             return entry_dict
 
     def get_loops_by_category(self, value):
         """Allows fetching loops by category."""
 
-        value = pynmrstar.format_category(value).lower()
+        value = utils.format_category(value).lower()
 
         results = []
         for frame in self.frame_list:
@@ -498,7 +498,7 @@ class Entry(object):
         and the [tag_name, tag_value (,tag_linenumber)] pair will be
         returned."""
 
-        if "." not in str(tag) and not pynmrstar.ALLOW_V2_ENTRIES:
+        if "." not in str(tag) and not utils.ALLOW_V2_ENTRIES:
             raise ValueError("You must provide the tag category to call this"
                              " method at the entry level.")
 
@@ -528,7 +528,7 @@ class Entry(object):
         to the assigned ID."""
 
         # The saveframe/loop order
-        ordering = pynmrstar.get_schema(schema).category_order
+        ordering = utils.get_schema(schema).category_order
 
         # Use these to sort saveframes and loops
         def sf_key(x):
@@ -577,7 +577,7 @@ class Entry(object):
         tmp_dont_show_comments = DONT_SHOW_COMMENTS
 
         # Change to NEF defaults and get the string representation
-        pynmrstar.enable_nef_defaults()
+        utils.enable_nef_defaults()
         result = str(self)
 
         # Revert module variables
@@ -619,7 +619,7 @@ class Entry(object):
 
         # Make sure the new saveframe name is valid
         for char in new_name:
-            if char in pynmrstar._WHITESPACE:
+            if char in utils._WHITESPACE:
                 raise ValueError("You cannot have whitespace characters in a "
                                  "saveframe name. Illegal character: '%s'" %
                                  char)

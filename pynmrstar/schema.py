@@ -11,9 +11,9 @@ except ImportError:
     from io import StringIO
 
 try:
-    import pynmrstar
+    import utils
 except ImportError:
-    from . import pynmrstar
+    from . import utils
 
 
 class Schema(object):
@@ -34,12 +34,12 @@ class Schema(object):
 
         # Try loading from the internet first
         if schema_file is None:
-            schema_file = pynmrstar._SCHEMA_URL
+            schema_file = utils._SCHEMA_URL
         self.schema_file = schema_file
 
         # Get the schema from the internet, wrap in StringIO and pass that
         #  to the csv reader
-        schema_stream = pynmrstar.interpret_file(schema_file)
+        schema_stream = utils.interpret_file(schema_file)
         fix_newlines = StringIO('\n'.join(schema_stream.read().splitlines()))
 
         csv_reader_instance = csv_reader(fix_newlines)
@@ -73,19 +73,19 @@ class Schema(object):
             self.schema[line[tag_field].lower()] = dict(zip(self.headers, line))
 
             self.schema_order.append(line[tag_field])
-            formatted = pynmrstar.format_category(line[tag_field])
+            formatted = utils.format_category(line[tag_field])
             if formatted not in self.category_order:
                 self.category_order.append(formatted)
 
         try:
             # Read in the data types
-            types_file = pynmrstar.interpret_file(os.path.join(os.path.dirname(os.path.realpath(__file__)),
+            types_file = utils.interpret_file(os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                                                 "../reference_files/data_types.csv"))
         except IOError:
             # Load the data types from Github if we can't find them locally
             types_url = "https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v2/reference_files/data_types.csv"
             try:
-                types_file = pynmrstar.interpret_file(types_url)
+                types_file = utils.interpret_file(types_url)
             except Exception:
                 raise ValueError("Could not load the data type definition file from disk or the internet!")
 
@@ -108,7 +108,7 @@ class Schema(object):
         and prints the tags that contain the search string if it is."""
 
         # Get the longest lengths
-        lengths = [max([len(pynmrstar.format_tag(x)) for x in self.schema_order])]
+        lengths = [max([len(utils.format_tag(x)) for x in self.schema_order])]
 
         values = []
         for key in self.schema.keys():
@@ -133,13 +133,13 @@ class Schema(object):
             if search and search not in tag:
                 continue
             st = self.schema.get(tag.lower(), None)
-            tag_cat = pynmrstar.format_category(tag)
+            tag_cat = utils.format_category(tag)
             if st:
                 if tag_cat != last_tag:
                     last_tag = tag_cat
                     text += "\n%-30s\n" % tag_cat
 
-                text += "  %-*s %-*s %-*s  %-*s\n" % (lengths[0], pynmrstar.format_tag(tag),
+                text += "  %-*s %-*s %-*s  %-*s\n" % (lengths[0], utils.format_tag(tag),
                                                       lengths[1], st["Data Type"],
                                                       lengths[2], st["Nullable"],
                                                       lengths[3], st["SFCategory"])
@@ -230,14 +230,14 @@ class Schema(object):
                                      "after does not exist in the schema.")
         else:
             # Determine a sensible place to put the new tag
-            search = pynmrstar.format_category(tag.lower())
+            search = utils.format_category(tag.lower())
             for pos, stag in enumerate([x.lower() for x in self.schema_order]):
                 if stag.startswith(search):
                     new_tag_pos = pos + 1
 
         # Add the new tag to the tag order and tag list
         self.schema_order.insert(new_tag_pos, tag)
-        self.category_order.insert(new_tag_pos, "_" + pynmrstar.format_tag(tag))
+        self.category_order.insert(new_tag_pos, "_" + utils.format_tag(tag))
 
         # Calculate up the 'Dictionary Sequence' based on the tag position
         new_tag_pos = (new_tag_pos - 1) * 10
@@ -261,12 +261,12 @@ class Schema(object):
 
         # If we don't know what the tag is, just return it
         if tag.lower() not in self.schema:
-            if (pynmrstar.RAISE_PARSE_WARNINGS and
-                    "tag-not-in-schema" not in pynmrstar.WARNINGS_TO_IGNORE):
+            if (utils.RAISE_PARSE_WARNINGS and
+                    "tag-not-in-schema" not in utils.WARNINGS_TO_IGNORE):
                 raise ValueError("There is a tag in the file that isn't in the"
                                  " schema: '%s' on line '%s'" % (tag, line_num))
             else:
-                if pynmrstar.VERBOSE:
+                if utils.VERBOSE:
                     print("Couldn't convert tag because it is not in the "
                           "dictionary: " + tag)
                 return value
@@ -278,8 +278,8 @@ class Schema(object):
 
         # Check for null
         if value == "." or value == "?":
-            if (not null_allowed and pynmrstar.RAISE_PARSE_WARNINGS and
-                    "invalid-null-value" not in pynmrstar.WARNINGS_TO_IGNORE):
+            if (not null_allowed and utils.RAISE_PARSE_WARNINGS and
+                    "invalid-null-value" not in utils.WARNINGS_TO_IGNORE):
                 raise ValueError("There is a null in the file that isn't "
                                  "allowed according to the schema: '%s' on "
                                  "line '%s'" % (tag, line_num))
@@ -336,9 +336,9 @@ class Schema(object):
         is_none = value is None
 
         # Allow manual specification of conversions for booleans, Nones, etc.
-        if value in pynmrstar.STR_CONVERSION_DICT:
-            if any(isinstance(value, type(x)) for x in pynmrstar.STR_CONVERSION_DICT):
-                value = pynmrstar.STR_CONVERSION_DICT[value]
+        if value in utils.STR_CONVERSION_DICT:
+            if any(isinstance(value, type(x)) for x in utils.STR_CONVERSION_DICT):
+                value = utils.STR_CONVERSION_DICT[value]
 
         # Value should always be string
         if not isinstance(value, str):
@@ -426,6 +426,6 @@ class Schema(object):
         s['tags'] = compacted_schema
 
         if serialize:
-            return json.dumps(s, default=pynmrstar._json_serialize)
+            return json.dumps(s, default=utils._json_serialize)
         else:
             return s

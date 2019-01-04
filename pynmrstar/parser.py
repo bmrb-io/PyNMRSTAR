@@ -1,12 +1,12 @@
 import re
 
 try:
-    import pynmrstar
+    import utils
     import loop
     import saveframe
     import entry
 except ImportError:
-    from . import pynmrstar
+    from . import utils
     from . import loop
     from . import saveframe
     from . import entry
@@ -36,7 +36,7 @@ class Parser(object):
         """ Returns the current line number that is in the process of
         being parsed."""
 
-        if pynmrstar.cnmrstar is not None:
+        if utils.cnmrstar is not None:
             return self.line_number
         else:
             return self.full_data[0:self.index].count("\n") + 1
@@ -44,8 +44,8 @@ class Parser(object):
     def get_token(self):
         """ Returns the next token in the parsing process."""
 
-        if pynmrstar.cnmrstar is not None:
-            self.token, self.line_number, self.delimiter = pynmrstar.cnmrstar.get_token_full()
+        if utils.cnmrstar is not None:
+            self.token, self.line_number, self.delimiter = utils.cnmrstar.get_token_full()
         else:
             self.real_get_token()
             self.line_number = 0
@@ -69,7 +69,7 @@ class Parser(object):
                     pass
 
         # This is just too VERBOSE
-        if pynmrstar.VERBOSE == "very":
+        if utils.VERBOSE == "very":
             if self.token:
                 print("'%s': '%s'" % (self.delimiter, self.token))
             else:
@@ -95,7 +95,7 @@ class Parser(object):
         string."""
 
         for pos, char in enumerate(data):
-            if char in pynmrstar._WHITESPACE:
+            if char in utils._WHITESPACE:
                 return pos
         return len(data)
 
@@ -111,8 +111,8 @@ class Parser(object):
         # Change '\n; data ' started multilines to '\n;\ndata'
         data = re.sub(r'\n;([^\n]+?)\n', r'\n;\n\1\n', data)
 
-        if pynmrstar.cnmrstar is not None:
-            pynmrstar.cnmrstar.load_string(data)
+        if utils.cnmrstar is not None:
+            utils.cnmrstar.load_string(data)
         else:
             self.full_data = data + "\n"
 
@@ -217,14 +217,14 @@ class Parser(object):
                                                          "semicolon-delineated.",
                                                          self.get_line_number())
                                     if len(curloop.tags) == 0:
-                                        if (pynmrstar.RAISE_PARSE_WARNINGS and
-                                                "tag-only-loop" not in pynmrstar.WARNINGS_TO_IGNORE):
+                                        if (utils.RAISE_PARSE_WARNINGS and
+                                                "tag-only-loop" not in utils.WARNINGS_TO_IGNORE):
                                             raise ValueError("Loop with no "
                                                              "tags.", self.get_line_number())
                                         curloop = None
                                     if (not seen_data and
-                                            pynmrstar.RAISE_PARSE_WARNINGS and
-                                            "empty-loop" not in pynmrstar.WARNINGS_TO_IGNORE):
+                                            utils.RAISE_PARSE_WARNINGS and
+                                            "empty-loop" not in utils.WARNINGS_TO_IGNORE):
                                         raise ValueError("Loop with no data.",
                                                          self.get_line_number())
                                     else:
@@ -270,7 +270,7 @@ class Parser(object):
                         raise ValueError("The save_ keyword may not be quoted "
                                          "or semicolon-delineated.",
                                          self.get_line_number())
-                    if not pynmrstar.ALLOW_V2_ENTRIES:
+                    if not utils.ALLOW_V2_ENTRIES:
                         if curframe.tag_prefix is None:
                             raise ValueError("The tag prefix was never set! "
                                              "Either the saveframe had no tags,"
@@ -322,8 +322,8 @@ class Parser(object):
         self.full_data = None
 
         # Reset the parser
-        if pynmrstar.cnmrstar is not None:
-            pynmrstar.cnmrstar.reset()
+        if utils.cnmrstar is not None:
+            utils.cnmrstar.reset()
 
         return self.ent
 
@@ -354,7 +354,7 @@ class Parser(object):
                 raw_tmp = self.full_data[self.index:newline_index]
             except ValueError:
                 # End of file
-                self.token = self.full_data[self.index:].lstrip(pynmrstar._WHITESPACE)
+                self.token = self.full_data[self.index:].lstrip(utils._WHITESPACE)
                 if self.token == "":
                     self.token = None
                 self.index = len(self.full_data)
@@ -362,7 +362,7 @@ class Parser(object):
 
             newline_index = self.full_data.index("\n", self.index + 1)
             raw_tmp = self.full_data[self.index:newline_index + 1]
-            tmp = raw_tmp.lstrip(pynmrstar._WHITESPACE)
+            tmp = raw_tmp.lstrip(utils._WHITESPACE)
 
         # If it is a multi-line comment, recalculate our viewing window
         if tmp[0:2] == ";\n":
@@ -402,8 +402,8 @@ class Parser(object):
                 # The line was terminated improperly
                 else:
                     if self.next_whitespace(tmp[until + 2:]) == 0:
-                        if (pynmrstar.RAISE_PARSE_WARNINGS and
-                                "bad-multiline" not in pynmrstar.WARNINGS_TO_IGNORE):
+                        if (utils.RAISE_PARSE_WARNINGS and
+                                "bad-multiline" not in utils.WARNINGS_TO_IGNORE):
                             raise ValueError("Warning: Technically invalid line"
                                              " found in file. Multiline values "
                                              "should terminate with \\n;\\n but"
@@ -439,7 +439,7 @@ class Parser(object):
             # Make sure we don't stop for quotes that are not followed
             #  by whitespace
             try:
-                while tmp[until + 1:until + 2] not in pynmrstar._WHITESPACE:
+                while tmp[until + 1:until + 2] not in utils._WHITESPACE:
                     until = self.index_handle(tmp, "'", until + 1)
             except TypeError:
                 raise ValueError("Invalid file. Single quoted value was never "
@@ -461,7 +461,7 @@ class Parser(object):
             # Make sure we don't stop for quotes that are not followed
             #  by whitespace
             try:
-                while tmp[until + 1:until + 2] not in pynmrstar._WHITESPACE:
+                while tmp[until + 1:until + 2] not in utils._WHITESPACE:
                     until = self.index_handle(tmp, '"', until + 1)
             except TypeError:
                 raise ValueError("Invalid file. Double quoted value was never "

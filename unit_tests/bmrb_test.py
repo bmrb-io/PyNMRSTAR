@@ -12,12 +12,12 @@ import json
 
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
 # Local imports
-from pynmrstar import Entry, Loop, Saveframe, Schema, _Parser, pynmrstar
+from pynmrstar import Entry, Loop, Saveframe, Schema, _Parser, utils
 
 # Determine if we are running in python3
 PY3 = (sys.version_info[0] == 3)
 
-if pynmrstar.cnmrstar:
+if utils.cnmrstar:
     print("Using C library...")
 
 quick_test = False
@@ -38,36 +38,36 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.entry = copy(database_entry)
 
     def test_enable_nef_defaults(self):
-        pynmrstar.enable_nef_defaults()
-        self.assertEqual(pynmrstar.STR_CONVERSION_DICT, {None:".", True:"true", False:"false"})
-        self.assertEqual(pynmrstar.SKIP_EMPTY_LOOPS, True)
+        utils.enable_nef_defaults()
+        self.assertEqual(utils.STR_CONVERSION_DICT, {None: ".", True: "true", False: "false"})
+        self.assertEqual(utils.SKIP_EMPTY_LOOPS, True)
 
     def test_enable_nmrstar_defaults(self):
-        pynmrstar.enable_nmrstar_defaults()
-        self.assertEqual(pynmrstar.STR_CONVERSION_DICT, {None:"."})
-        self.assertEqual(pynmrstar.SKIP_EMPTY_LOOPS, False)
+        utils.enable_nmrstar_defaults()
+        self.assertEqual(utils.STR_CONVERSION_DICT, {None: "."})
+        self.assertEqual(utils.SKIP_EMPTY_LOOPS, False)
 
     def test_clean_val(self):
         # Check tag cleaning
-        self.assertEqual(pynmrstar.clean_value("single quote test"), "'single quote test'")
-        self.assertEqual(pynmrstar.clean_value("double quote' test"), '"double quote\' test"')
-        self.assertEqual(pynmrstar.clean_value("loop_"), "'loop_'")
-        self.assertEqual(pynmrstar.clean_value("#comment"), "'#comment'")
-        self.assertEqual(pynmrstar.clean_value("_tag"), "'_tag'")
-        self.assertEqual(pynmrstar.clean_value("simple"), "simple")
-        self.assertEqual(pynmrstar.clean_value("  "), "'  '")
-        self.assertEqual(pynmrstar.clean_value("\nnewline\n"), "\nnewline\n")
-        self.assertEqual(pynmrstar.clean_value(None), ".")
-        self.assertRaises(ValueError, pynmrstar.clean_value, "")
+        self.assertEqual(utils.clean_value("single quote test"), "'single quote test'")
+        self.assertEqual(utils.clean_value("double quote' test"), '"double quote\' test"')
+        self.assertEqual(utils.clean_value("loop_"), "'loop_'")
+        self.assertEqual(utils.clean_value("#comment"), "'#comment'")
+        self.assertEqual(utils.clean_value("_tag"), "'_tag'")
+        self.assertEqual(utils.clean_value("simple"), "simple")
+        self.assertEqual(utils.clean_value("  "), "'  '")
+        self.assertEqual(utils.clean_value("\nnewline\n"), "\nnewline\n")
+        self.assertEqual(utils.clean_value(None), ".")
+        self.assertRaises(ValueError, utils.clean_value, "")
 
-        pynmrstar.STR_CONVERSION_DICT = {"loop_":"noloop_"}
-        self.assertEqual(pynmrstar.clean_value("loop_"), "noloop_")
-        pynmrstar.STR_CONVERSION_DICT = {None:"."}
+        utils.STR_CONVERSION_DICT = {"loop_": "noloop_"}
+        self.assertEqual(utils.clean_value("loop_"), "noloop_")
+        utils.STR_CONVERSION_DICT = {None: "."}
 
     def test__odd_strings(self):
         """ Make sure the library can handle odd strings. Only in py3. """
 
-        if pynmrstar.PY3:
+        if utils.PY3:
             saveframe = Saveframe.from_scratch('test', 'citations')
             with open(os.path.join(our_path, 'naughty-strings/blns.json')) as odd_string_file:
                 odd_strings = json.load(odd_string_file)
@@ -79,28 +79,28 @@ class TestPyNMRSTAR(unittest.TestCase):
             self.assertEqual(saveframe, Saveframe.from_string(str(saveframe)))
 
     def test__format_category(self):
-        self.assertEqual(pynmrstar.format_category("test"), "_test")
-        self.assertEqual(pynmrstar.format_category("_test"), "_test")
-        self.assertEqual(pynmrstar.format_category("test.test"), "_test")
+        self.assertEqual(utils.format_category("test"), "_test")
+        self.assertEqual(utils.format_category("_test"), "_test")
+        self.assertEqual(utils.format_category("test.test"), "_test")
 
     def test__format_tag(self):
-        self.assertEqual(pynmrstar.format_tag("test"), "test")
-        self.assertEqual(pynmrstar.format_tag("_test.test"), "test")
-        self.assertEqual(pynmrstar.format_tag("test.test"), "test")
+        self.assertEqual(utils.format_tag("test"), "test")
+        self.assertEqual(utils.format_tag("_test.test"), "test")
+        self.assertEqual(utils.format_tag("test.test"), "test")
 
     def test__InterpretFile(self):
         with open(sample_file_location, "r") as local_file:
             local_version = local_file.read()
 
         # Test reading file from local locations
-        self.assertEqual(pynmrstar.interpret_file(sample_file_location).read(), local_version)
+        self.assertEqual(utils.interpret_file(sample_file_location).read(), local_version)
         with open(sample_file_location, "rb") as tmp:
-            self.assertEqual(pynmrstar.interpret_file(tmp).read(), local_version)
+            self.assertEqual(utils.interpret_file(tmp).read(), local_version)
         with open(os.path.join(our_path, "sample_files", "bmr15000_3.str.gz"), "rb") as tmp:
-            self.assertEqual(pynmrstar.interpret_file(tmp).read(), local_version)
+            self.assertEqual(utils.interpret_file(tmp).read(), local_version)
 
         # Test reading from http (ftp doesn't work on TravisCI)
-        self.assertEqual(pynmrstar.interpret_file("http://rest.bmrb.wisc.edu/bmrb/NMR-STAR3/15000").read(), local_version)
+        self.assertEqual(utils.interpret_file("http://rest.bmrb.wisc.edu/bmrb/NMR-STAR3/15000").read(), local_version)
 
         # Test reading from https locations
         # TODO: re-enable once API is updated
@@ -355,9 +355,9 @@ class TestPyNMRSTAR(unittest.TestCase):
         # Check lt
         self.assertEqual(test_loop < self.entry[0][1], True)
         # Check __str__
-        pynmrstar.SKIP_EMPTY_LOOPS = False
+        utils.SKIP_EMPTY_LOOPS = False
         self.assertEqual(str(Loop.from_scratch()), "\n   loop_\n\n   stop_\n")
-        pynmrstar.SKIP_EMPTY_LOOPS = True
+        utils.SKIP_EMPTY_LOOPS = True
         self.assertEqual(str(Loop.from_scratch()), "")
         tmp_loop = Loop.from_scratch()
         tmp_loop.data = [[1, 2, 3]]
@@ -434,7 +434,7 @@ class TestPyNMRSTAR(unittest.TestCase):
         tmp_loop.clear_data()
         self.assertEqual(tmp_loop.data, [])
 
-        pynmrstar.SKIP_EMPTY_LOOPS = False
+        utils.SKIP_EMPTY_LOOPS = False
 
         # Test that the from_template method works
         self.assertEqual(Loop.from_template("atom_chem_shift", all_tags=False),

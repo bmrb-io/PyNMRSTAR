@@ -178,10 +178,7 @@ except ImportError as e:
 
 # Set this to allow import * from pynmrstar to work sensibly
 __all__ = ['diff', 'validate', 'enable_nef_defaults', 'enable_nmrstar_defaults',
-           'delete_empty_saveframes', 'interpret_file', 'get_schema', 'format_category', 'format_tag',
-           'VERBOSE', 'ALLOW_V2_ENTRIES', 'RAISE_PARSE_WARNINGS', 'WARNINGS_TO_IGNORE', 'SKIP_EMPTY_LOOPS',
-           'DONT_SHOW_COMMENTS', 'CONVERT_DATATYPES', 'STR_CONVERSION_DICT', '_STANDARD_SCHEMA', '_COMMENT_RECORDS',
-           '_API_URL', '_SCHEMA_URL', '_WHITESPACE', '__version__']
+           'delete_empty_saveframes', 'interpret_file', 'get_schema', 'format_category', 'format_tag']
 
 # May be set by calling code
 VERBOSE = False
