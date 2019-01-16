@@ -3702,14 +3702,9 @@ class Loop(object):
         except TypeError:
             ordinal_idx = self._tag_index("Ordinal")
 
-            # If the first ordinal is unassigned, assign it
-            if self.data[0][ordinal_idx] == "." or self.data[0][ordinal_idx] is None:
-                self.data[0][ordinal_idx] = 1
-
             # If we are in another row, assign to the previous row
-            for row in self.data:
-                if row[ordinal_idx] == "." or row[ordinal_idx] is None:
-                    row[ordinal_idx] = row[ordinal_idx-1] + 1
+            for pos, row in enumerate(self.data):
+                row[ordinal_idx] = pos + 1
 
     def print_tree(self):
         """Prints a summary, tree style, of the loop."""
