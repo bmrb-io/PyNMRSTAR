@@ -462,6 +462,7 @@ def _get_schema(passed_schema=None):
         return _STANDARD_SCHEMA
     return passed_schema
 
+
 def _interpret_file(the_file):
     """Helper method returns some sort of object with a read() method.
     the_file could be a URL, a file location, a file object, or a
@@ -1538,7 +1539,8 @@ class Entry(object):
                     saveframe_categories[category] = True
                     self.frame_list.append(Saveframe.from_template(category, category + "_1",
                                                                    entry_id=self.entry_id,
-                                                                   all_tags=kwargs['all_tags']))
+                                                                   all_tags=kwargs['all_tags'],
+                                                                   schema=schema))
             entry_saveframe = self.get_saveframes_by_category('entry_information')[0]
             entry_saveframe['NMR_STAR_version'] = schema.version
             entry_saveframe['Original_NMR_STAR_version'] = schema.version
@@ -1813,7 +1815,7 @@ class Entry(object):
         The optional argument 'schema' allows providing a custom schema."""
 
         entry = cls(entry_id=entry_id, all_tags=all_tags, schema=schema)
-        entry.source = "from_template()"
+        entry.source = "from_template(%s)" % schema.version
         return entry
 
     def add_saveframe(self, frame):
