@@ -146,13 +146,17 @@ class Saveframe(object):
                         elif item["entryIdFlg"] == "Y":
                             self.add_tag(item["Tag"], kwargs['entry_id'])
                         else:
+                            tag_value = None
+                            if kwargs['default_values']:
+                                if item['default value'] != "?":
+                                    tag_value = item['default value']
                             # Unconditional add
                             if kwargs['all_tags']:
-                                self.add_tag(item["Tag"], None)
+                                self.add_tag(item["Tag"], tag_value)
                             # Conditional add
                             else:
                                 if item["public"] != "I":
-                                    self.add_tag(item["Tag"], None)
+                                    self.add_tag(item["Tag"], tag_value)
 
                     # It is a contained loop tag
                     else:
@@ -279,17 +283,22 @@ class Saveframe(object):
         return cls(the_string=the_string, csv=csv)
 
     @classmethod
-    def from_template(cls, category, name=None, entry_id=None, all_tags=False, schema=None):
+    def from_template(cls, category, name=None, entry_id=None, all_tags=False, default_values=False, schema=None):
         """ Create a saveframe that has all of the tags and loops from the
         schema present. No values will be assigned. Specify the category
         when calling this method. Optionally also provide the name of the
         saveframe as the 'name' argument.
 
         The optional argument 'all_tags' forces all tags to be included
-        rather than just the mandatory tags."""
+        rather than just the mandatory tags.
 
+        The optional argument 'default_values' will insert the default
+        values from the schema."""
+
+        schema = utils.get_schema(schema)
         return cls(category=category, saveframe_name=name, entry_id=entry_id,
-                   all_tags=all_tags, schema=schema, source="from_template()")
+                   all_tags=all_tags, default_values=default_values, schema=schema,
+                   source="from_template(%s)" % schema.version)
 
     def __repr__(self):
         """Returns a description of the saveframe."""

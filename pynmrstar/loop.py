@@ -328,8 +328,9 @@ class Loop(object):
         The optional argument all_tags forces all tags to be included
         rather than just the mandatory tags."""
 
+        schema = utils.get_schema(schema)
         return cls(tag_prefix=tag_prefix, all_tags=all_tags,
-                   schema=schema, source="from_template()")
+                   schema=schema, source="from_template(%s)" % schema.version)
 
     @staticmethod
     def _get_tags_from_schema(category, schema=None, all_tags=False):

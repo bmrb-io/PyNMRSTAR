@@ -65,7 +65,7 @@ class Entry(object):
         self.source = None
 
         # They initialized us wrong
-        if len(kwargs) == 0 or len(kwargs) > 3:
+        if len(kwargs) == 0:
             raise ValueError("You should not directly instantiate an Entry "
                              "using this method. Instead use the class methods:"
                              " Entry.from_database(), Entry.from_file(), "
@@ -115,6 +115,7 @@ class Entry(object):
                     self.frame_list.append(saveframe.Saveframe.from_template(category, category + "_1",
                                                                              entry_id=self.entry_id,
                                                                              all_tags=kwargs['all_tags'],
+                                                                             default_values=kwargs['default_values'],
                                                                              schema=schema))
             entry_saveframe = self.get_saveframes_by_category('entry_information')[0]
             entry_saveframe['NMR_STAR_version'] = schema.version
@@ -378,7 +379,7 @@ class Entry(object):
         return cls(entry_id=entry_id)
 
     @classmethod
-    def from_template(cls, entry_id, all_tags=False, schema=None):
+    def from_template(cls, entry_id, all_tags=False, default_values=False, schema=None):
         """ Create an entry that has all of the saveframes and loops from the
         schema present. No values will be assigned. Specify the entry
         ID when calling this method.
@@ -386,9 +387,13 @@ class Entry(object):
         The optional argument 'all_tags' forces all tags to be included
         rather than just the mandatory tags.
 
+        The optional argument 'default_values' will insert the default
+        values from the schema.
+
         The optional argument 'schema' allows providing a custom schema."""
 
-        entry = cls(entry_id=entry_id, all_tags=all_tags, schema=schema)
+        schema = utils.get_schema(schema)
+        entry = cls(entry_id=entry_id, all_tags=all_tags, default_values=default_values, schema=schema)
         entry.source = "from_template(%s)" % schema.version
         return entry
 
