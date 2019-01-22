@@ -148,7 +148,7 @@ class Saveframe(object):
                         else:
                             tag_value = None
                             if kwargs['default_values']:
-                                if item['default value'] != "?":
+                                if item['default value'] != "?" and item['default value'] != '':
                                     tag_value = item['default value']
                             # Unconditional add
                             if kwargs['all_tags']:
