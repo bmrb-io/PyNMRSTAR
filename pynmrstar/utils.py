@@ -199,7 +199,7 @@ STR_CONVERSION_DICT = {None: "."}
 _STANDARD_SCHEMA = None
 _COMMENT_RECORDS = {}
 _API_URL = "http://webapi.bmrb.wisc.edu/v2"
-_SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
+_SCHEMA_URL = 'https://raw.githubusercontent.com/uwbmrb/nmr-star-dictionary/master/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
 __version__ = "3.0"
 
