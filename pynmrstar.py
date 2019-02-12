@@ -198,7 +198,7 @@ STR_CONVERSION_DICT = {None: "."}
 _STANDARD_SCHEMA = None
 _COMMENT_DICTIONARY = {}
 _API_URL = "http://webapi.bmrb.wisc.edu/v2"
-_SCHEMA_URL = 'http://svn.bmrb.wisc.edu/svn/nmr-star-dictionary/bmrb_only_files/adit_input/xlschem_ann.csv'
+_SCHEMA_URL = 'https://raw.githubusercontent.com/uwbmrb/nmr-star-dictionary/master/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
 __version__ = "2.6.3"
 
@@ -438,7 +438,7 @@ def _format_tag(value):
 def _get_schema(passed_schema=None):
     """If passed a schema (not None) it returns it. If passed none,
     it checks if the default schema has been initialized. If not
-    initialzed, it initializes it. Then it returns the default schema."""
+    initialized, it initializes it. Then it returns the default schema."""
 
     global _STANDARD_SCHEMA
     if passed_schema is None:
@@ -451,15 +451,15 @@ def _get_schema(passed_schema=None):
             schema_file = os.path.join(schema_file, "reference_files/schema.csv")
 
             _STANDARD_SCHEMA = Schema(schema_file=schema_file)
-        except Exception:
+        except IOError:
             # Try to load from the internet
             try:
                 _STANDARD_SCHEMA = Schema()
             except (HTTPError, URLError):
                 raise ValueError("Could not load a BMRB schema from the "
                                  "internet or from the local repository.")
-        passed_schema = _STANDARD_SCHEMA
 
+        return _STANDARD_SCHEMA
     return passed_schema
 
 
@@ -1490,7 +1490,7 @@ class Entry(object):
         self.source = None
 
         # They initialized us wrong
-        if len(kwargs) == 0 or len(kwargs) > 3:
+        if len(kwargs) == 0:
             raise ValueError("You should not directly instantiate an Entry "
                              "using this method. Instead use the class methods:"
                              " Entry.from_database(), Entry.from_file(), "
@@ -1539,7 +1539,9 @@ class Entry(object):
                     saveframe_categories[category] = True
                     self.frame_list.append(Saveframe.from_template(category, category + "_1",
                                                                    entry_id=self.entry_id,
-                                                                   all_tags=kwargs['all_tags']))
+                                                                   all_tags=kwargs['all_tags'],
+                                                                   default_values=kwargs['default_values'],
+                                                                   schema=schema))
             entry_saveframe = self.get_saveframes_by_category('entry_information')[0]
             entry_saveframe['NMR_STAR_version'] = schema.version
             entry_saveframe['Original_NMR_STAR_version'] = schema.version
@@ -1618,6 +1620,16 @@ class Entry(object):
             if category and category not in category_list:
                 category_list.append(category)
         return list(category_list)
+
+    @property
+    def empty(self):
+        """ Check if the entry has no data. Ignore the structural tags."""
+
+        for saveframe in self.frame_list:
+            if not saveframe.empty:
+                return False
+
+        return True
 
     @property
     def frame_dict(self):
@@ -1793,7 +1805,7 @@ class Entry(object):
         return cls(entry_id=entry_id)
 
     @classmethod
-    def from_template(cls, entry_id, all_tags=False, schema=None, initialize_loops=False):
+    def from_template(cls, entry_id, all_tags=False, default_values=False, schema=None):
         """ Create an entry that has all of the saveframes and loops from the
         schema present. No values will be assigned. Specify the entry
         ID when calling this method.
@@ -1801,10 +1813,14 @@ class Entry(object):
         The optional argument 'all_tags' forces all tags to be included
         rather than just the mandatory tags.
 
+        The optional argument 'default_values' will insert the default
+        values from the schema.
+
         The optional argument 'schema' allows providing a custom schema."""
 
-        entry = cls(entry_id=entry_id, all_tags=all_tags, schema=schema)
-        entry.source = "from_template()"
+        schema = _get_schema(schema)
+        entry = cls(entry_id=entry_id, all_tags=all_tags, default_values=default_values, schema=schema)
+        entry.source = "from_template(%s)" % schema.version
         return entry
 
     def add_saveframe(self, frame):
@@ -2286,13 +2302,17 @@ class Saveframe(object):
                         elif item["entryIdFlg"] == "Y":
                             self.add_tag(item["Tag"], kwargs['entry_id'])
                         else:
+                            tag_value = None
+                            if kwargs['default_values']:
+                                if item['default value'] != "?" and item['default value'] != '':
+                                    tag_value = item['default value']
                             # Unconditional add
                             if kwargs['all_tags']:
-                                self.add_tag(item["Tag"], None)
+                                self.add_tag(item["Tag"], tag_value)
                             # Conditional add
                             else:
                                 if item["public"] != "I":
-                                    self.add_tag(item["Tag"], None)
+                                    self.add_tag(item["Tag"], tag_value)
 
                     # It is a contained loop tag
                     else:
@@ -2344,6 +2364,23 @@ class Saveframe(object):
         self.loops = tmp_entry[0].loops
         self.name = tmp_entry[0].name
         self.tag_prefix = tmp_entry[0].tag_prefix
+
+    @property
+    def empty(self):
+        """ Check if the saveframe has no data. Ignore the structural tags."""
+
+        for tag in self.tags:
+            tag_lower = tag[0].lower()
+            if tag_lower not in ['sf_category', 'sf_framecode', 'id', 'entry_id', 'nmr_star_version',
+                                 'original_nmr_star_version']:
+                if tag[1] not in [None, '', '.', '?']:
+                    return False
+
+        for loop in self.loops:
+            if not loop.empty:
+                return False
+
+        return True
 
     @classmethod
     def from_scratch(cls, sf_name, tag_prefix=None, source="from_scratch()"):
@@ -2402,17 +2439,22 @@ class Saveframe(object):
         return cls(the_string=the_string, csv=csv)
 
     @classmethod
-    def from_template(cls, category, name=None, entry_id=None, all_tags=False, schema=None):
+    def from_template(cls, category, name=None, entry_id=None, all_tags=False, default_values=False, schema=None):
         """ Create a saveframe that has all of the tags and loops from the
         schema present. No values will be assigned. Specify the category
         when calling this method. Optionally also provide the name of the
         saveframe as the 'name' argument.
 
         The optional argument 'all_tags' forces all tags to be included
-        rather than just the mandatory tags."""
+        rather than just the mandatory tags.
 
+        The optional argument 'default_values' will insert the default
+        values from the schema."""
+
+        schema = _get_schema(schema)
         return cls(category=category, saveframe_name=name, entry_id=entry_id,
-                   all_tags=all_tags, schema=schema, source="from_template()")
+                   all_tags=all_tags, default_values=default_values, schema=schema,
+                   source="from_template(%s)" % schema.version)
 
     def __repr__(self):
         """Returns a description of the saveframe."""
@@ -3106,6 +3148,17 @@ class Loop(object):
         ret_string += "".join(row_strings) + "\n   stop_\n"
         return ret_string
 
+    @property
+    def empty(self):
+        """ Check if the loop has no data. """
+
+        for row in self.data:
+            for col in row:
+                if col not in [None, '', '.', '?']:
+                    return False
+
+        return True
+
     @classmethod
     def from_file(cls, the_file, csv=False):
         """Create a saveframe by loading in a file. Specify csv=True if
@@ -3168,8 +3221,9 @@ class Loop(object):
         The optional argument all_tags forces all tags to be included
         rather than just the mandatory tags."""
 
+        schema = _get_schema(schema)
         return cls(tag_prefix=tag_prefix, all_tags=all_tags,
-                   schema=schema, source="from_template()")
+                   schema=schema, source="from_template(%s)" % schema.version)
 
     @staticmethod
     def _get_tags_from_schema(category, schema=None, all_tags=False):
@@ -3665,14 +3719,9 @@ class Loop(object):
         except TypeError:
             ordinal_idx = self._tag_index("Ordinal")
 
-            # If the first ordinal is unassigned, assign it
-            if self.data[0][ordinal_idx] == "." or self.data[0][ordinal_idx] is None:
-                self.data[0][ordinal_idx] = 1
-
             # If we are in another row, assign to the previous row
-            for row in self.data:
-                if row[ordinal_idx] == "." or row[ordinal_idx] is None:
-                    row[ordinal_idx] = row[ordinal_idx-1] + 1
+            for pos, row in enumerate(self.data):
+                row[ordinal_idx] = pos + 1
 
     def print_tree(self):
         """Prints a summary, tree style, of the loop."""

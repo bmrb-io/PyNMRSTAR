@@ -39,12 +39,12 @@ class TestPyNMRSTAR(unittest.TestCase):
 
     def test_enable_nef_defaults(self):
         pynmrstar.enable_nef_defaults()
-        self.assertEqual(pynmrstar.STR_CONVERSION_DICT, {None:".", True:"true", False:"false"})
+        self.assertEqual(pynmrstar.STR_CONVERSION_DICT, {None: ".", True: "true", False: "false"})
         self.assertEqual(pynmrstar.SKIP_EMPTY_LOOPS, True)
 
     def test_enable_nmrstar_defaults(self):
         pynmrstar.enable_nmrstar_defaults()
-        self.assertEqual(pynmrstar.STR_CONVERSION_DICT, {None:"."})
+        self.assertEqual(pynmrstar.STR_CONVERSION_DICT, {None: "."})
         self.assertEqual(pynmrstar.SKIP_EMPTY_LOOPS, False)
 
     def test_clean_val(self):
@@ -60,9 +60,9 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertEqual(pynmrstar.clean_value(None), ".")
         self.assertRaises(ValueError, pynmrstar.clean_value, "")
 
-        pynmrstar.STR_CONVERSION_DICT = {"loop_":"noloop_"}
+        pynmrstar.STR_CONVERSION_DICT = {"loop_": "noloop_"}
         self.assertEqual(pynmrstar.clean_value("loop_"), "noloop_")
-        pynmrstar.STR_CONVERSION_DICT = {None:"."}
+        pynmrstar.STR_CONVERSION_DICT = {None: "."}
 
     def test__odd_strings(self):
         """ Make sure the library can handle odd strings. Only in py3. """
@@ -100,11 +100,13 @@ class TestPyNMRSTAR(unittest.TestCase):
             self.assertEqual(pynmrstar._interpret_file(tmp).read(), local_version)
 
         # Test reading from http (ftp doesn't work on TravisCI)
-        self.assertEqual(pynmrstar._interpret_file("http://rest.bmrb.wisc.edu/bmrb/NMR-STAR3/15000").read(), local_version)
+        self.assertEqual(pynmrstar._interpret_file("http://rest.bmrb.wisc.edu/bmrb/NMR-STAR3/15000").read(),
+                         local_version)
 
         # Test reading from https locations
-        # TODO: re-enable once API is updated
-        #self.assertEqual(pynmrstar._interpret_file("https://webapi.bmrb.wisc.edu/v2/entry/15000?format=rawnmrstar").read(), local_version)
+        self.assertEqual(pynmrstar.Entry.from_string(
+            pynmrstar._interpret_file("https://webapi.bmrb.wisc.edu/v2/entry/15000?format=rawnmrstar").read()),
+                         pynmrstar.Entry.from_string(local_version))
 
     # Test the parser
     def test___Parser(self):
@@ -113,31 +115,64 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertRaises(ValueError, pynmrstar.Entry.from_string, "data_1\nsave_1\n_tag.example loop_\nsave_\n")
         self.assertRaises(ValueError, pynmrstar.Entry.from_string, "data_1\nsave_1\n_tag.example data_\nsave_\n")
         self.assertRaises(ValueError, pynmrstar.Entry.from_string, "data_1\nsave_1\n_tag.example save_\nsave_\n")
-        self.assertRaises(ValueError, pynmrstar.Entry.from_string, "data_1\nsave_1\nloop_\n_tag.tag\nloop_\nstop_\nsave_\n")
-        self.assertRaises(ValueError, pynmrstar.Entry.from_string, "data_1\nsave_1\nloop_\n_tag.tag\nsave_\nstop_\nsave_\n")
-        self.assertRaises(ValueError, pynmrstar.Entry.from_string, "data_1\nsave_1\nloop_\n_tag.tag\nglobal_\nstop_\nsave_\n")
+        self.assertRaises(ValueError, pynmrstar.Entry.from_string,
+                          "data_1\nsave_1\nloop_\n_tag.tag\nloop_\nstop_\nsave_\n")
+        self.assertRaises(ValueError, pynmrstar.Entry.from_string,
+                          "data_1\nsave_1\nloop_\n_tag.tag\nsave_\nstop_\nsave_\n")
+        self.assertRaises(ValueError, pynmrstar.Entry.from_string,
+                          "data_1\nsave_1\nloop_\n_tag.tag\nglobal_\nstop_\nsave_\n")
 
         # Check for error when reserved token quoted
-        self.assertRaises(ValueError, pynmrstar.Entry.from_string, "'data_1'\nsave_1\nloop_\n_tag.tag\ndata_\nstop_\nsave_\n")
-        self.assertRaises(ValueError, pynmrstar.Entry.from_string, "data_1\n'save_1'\nloop_\n_tag.tag\ndata_\nstop_\nsave_\n")
-        self.assertRaises(ValueError, pynmrstar.Entry.from_string, 'data_1\nsave_1\n"loop"_\n_tag.tag\ndata_\nstop_\nsave_\n')
-        self.assertRaises(ValueError, pynmrstar.Entry.from_string, "data_1\nsave_1\nloop_\n_tag.tag\ndata_\n;\nstop_\n;\nsave_\n")
+        self.assertRaises(ValueError, pynmrstar.Entry.from_string,
+                          "'data_1'\nsave_1\nloop_\n_tag.tag\ndata_\nstop_\nsave_\n")
+        self.assertRaises(ValueError, pynmrstar.Entry.from_string,
+                          "data_1\n'save_1'\nloop_\n_tag.tag\ndata_\nstop_\nsave_\n")
+        self.assertRaises(ValueError, pynmrstar.Entry.from_string,
+                          'data_1\nsave_1\n"loop"_\n_tag.tag\ndata_\nstop_\nsave_\n')
+        self.assertRaises(ValueError, pynmrstar.Entry.from_string,
+                          "data_1\nsave_1\nloop_\n_tag.tag\ndata_\n;\nstop_\n;\nsave_\n")
         self.assertRaises(ValueError, pynmrstar.Saveframe.from_string, "save_1\n_tag.1 _tag.2")
 
     def test_Schema(self):
         default = pynmrstar.Schema()
 
-        self.assertEqual(default.headers, ['Dictionary sequence', 'SFCategory', 'ADIT category mandatory', 'ADIT category view type', 'ADIT super category ID', 'ADIT super category', 'ADIT category group ID', 'ADIT category view name', 'Tag', 'BMRB current', 'Query prompt', 'Query interface', 'SG Mandatory', '', 'ADIT exists', 'User full view', 'Metabolomics', 'Metabolites', 'SENCI', 'Fragment library', 'Item enumerated', 'Item enumeration closed', 'Enum parent SFcategory', 'Enum parent tag', 'Derived enumeration mantable', 'Derived enumeration', 'ADIT item view name', 'Data Type', 'Nullable', 'Non-public', 'ManDBTableName', 'ManDBColumnName', 'Row Index Key', 'Saveframe ID tag', 'Source Key', 'Table Primary Key', 'Foreign Key Group', 'Foreign Table', 'Foreign Column', 'Secondary index', 'Sub category', 'Units', 'Loopflag', 'Seq', 'Adit initial rows', 'Enumeration ties', 'Mandatory code overides', 'Overide value', 'Overide view value', 'ADIT auto insert', 'Example', 'Prompt', 'Interface', 'bmrbPdbMatchID', 'bmrbPdbTransFunc', 'STAR flag', 'DB flag', 'SfNamelFlg', 'Sf category flag', 'Sf pointer', 'Natural primary key', 'Natural foreign key', 'Redundant keys', 'Parent tag', 'public', 'internal', 'small molecule', 'small molecule', 'metabolomics', 'Entry completeness', 'Overide public', 'internal', 'small molecule', 'small molecule', 'metabolomic', 'metabolomic', 'default value', 'Adit form code', 'Tag category', 'Tag field', 'Local key', 'Datum count flag', 'NEF equivalent', 'mmCIF equivalent', 'Meta data', 'Tag delete', 'BMRB data type', 'STAR vs Curated DB', 'Key group', 'Reference table', 'Reference column', 'Dictionary description', 'variableTypeMatch', 'entryIdFlg', 'outputMapExistsFlg', 'lclSfIdFlg', 'Met ADIT category view name', 'Met Example', 'Met Prompt', 'Met Description', 'SM Struct ADIT-NMR category view name', 'SM Struct Example', 'SM Struct Prompt', 'SM Struct Description', 'Met default value', 'SM default value'] )
+        self.assertEqual(default.headers,
+                         ['Dictionary sequence', 'SFCategory', 'ADIT category mandatory', 'ADIT category view type',
+                          'ADIT super category ID', 'ADIT super category', 'ADIT category group ID',
+                          'ADIT category view name', 'Tag', 'BMRB current', 'Query prompt', 'Query interface',
+                          'SG Mandatory', '', 'ADIT exists', 'User full view', 'Metabolomics', 'Metabolites', 'SENCI',
+                          'Fragment library', 'Item enumerated', 'Item enumeration closed', 'Enum parent SFcategory',
+                          'Enum parent tag', 'Derived enumeration mantable', 'Derived enumeration',
+                          'ADIT item view name', 'Data Type', 'Nullable', 'Non-public', 'ManDBTableName',
+                          'ManDBColumnName', 'Row Index Key', 'Saveframe ID tag', 'Source Key', 'Table Primary Key',
+                          'Foreign Key Group', 'Foreign Table', 'Foreign Column', 'Secondary index', 'Sub category',
+                          'Units', 'Loopflag', 'Seq', 'Adit initial rows', 'Enumeration ties',
+                          'Mandatory code overides', 'Overide value', 'Overide view value', 'ADIT auto insert',
+                          'Example', 'Prompt', 'Interface', 'bmrbPdbMatchID', 'bmrbPdbTransFunc', 'STAR flag',
+                          'DB flag', 'SfNamelFlg', 'Sf category flag', 'Sf pointer', 'Natural primary key',
+                          'Natural foreign key', 'Redundant keys', 'Parent tag', 'public', 'internal', 'small molecule',
+                          'small molecule', 'metabolomics', 'Entry completeness', 'Overide public', 'internal',
+                          'small molecule', 'small molecule', 'metabolomic', 'metabolomic', 'default value',
+                          'Adit form code', 'Tag category', 'Tag field', 'Local key', 'Datum count flag',
+                          'NEF equivalent', 'mmCIF equivalent', 'Meta data', 'Tag delete', 'BMRB data type',
+                          'STAR vs Curated DB', 'Key group', 'Reference table', 'Reference column',
+                          'Dictionary description', 'variableTypeMatch', 'entryIdFlg', 'outputMapExistsFlg',
+                          'lclSfIdFlg', 'Met ADIT category view name', 'Met Example', 'Met Prompt', 'Met Description',
+                          'SM Struct ADIT-NMR category view name', 'SM Struct Example', 'SM Struct Prompt',
+                          'SM Struct Description', 'Met default value', 'SM default value'])
 
         self.assertEqual(default.val_type("_Entity.ID", 1), [])
-        self.assertEqual(default.val_type("_Entity.ID", "test"), ["Value does not match specification: '_Entity.ID':'test' on line 'None'.\n     Type specified: int\n     Regular expression for type: '^(?:-?[0-9]*)?$'"])
+        self.assertEqual(default.val_type("_Entity.ID", "test"), [
+            "Value does not match specification: '_Entity.ID':'test' on line 'None'.\n     Type specified: int\n     Regular expression for type: '^(?:-?[0-9]*)?$'"])
         self.assertEqual(default.val_type("_Atom_chem_shift.Val", float(1.2)), [])
-        self.assertEqual(default.val_type("_Atom_chem_shift.Val", "invalid"), ["Value does not match specification: '_Atom_chem_shift.Val':'invalid' on line 'None'.\n     Type specified: float\n     Regular expression for type: '^(?:-?[0-9]*\\.?[0-9]+(?:[eE][-+]?[0-9]+)?)?$'"])
+        self.assertEqual(default.val_type("_Atom_chem_shift.Val", "invalid"), [
+            "Value does not match specification: '_Atom_chem_shift.Val':'invalid' on line 'None'.\n     Type specified: float\n     Regular expression for type: '^(?:-?[0-9]*\\.?[0-9]+(?:[eE][-+]?[0-9]+)?)?$'"])
 
-        self.assertEqual(default.val_type("_Entry.ID", "this should be far too long - much too long"), ["Length of '43' is too long for CHAR(12): '_Entry.ID':'this should be far too long - much too long' on line 'None'."])
+        self.assertEqual(default.val_type("_Entry.ID", "this should be far too long - much too long"), [
+            "Length of '43' is too long for CHAR(12): '_Entry.ID':'this should be far too long - much too long' on line 'None'."])
 
     def test_entry_delitem(self):
-        del(self.entry[0])
+        del (self.entry[0])
         tmp_entry = copy(database_entry)
         tmp_entry.frame_list.pop(0)
         self.assertEqual(self.entry, tmp_entry)
@@ -164,7 +199,8 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertEqual(str(self.entry), str(pynmrstar.Entry.from_string(str(self.entry))))
         self.assertRaises(IOError, pynmrstar.Entry.from_database, 0)
         self.assertEqual(str(pynmrstar.Entry.from_scratch(15000)), "data_15000\n\n")
-        self.assertEqual(pynmrstar.Entry.from_file(os.path.join(our_path, "sample_files", "bmr15000_3.str.gz")), self.entry)
+        self.assertEqual(pynmrstar.Entry.from_file(os.path.join(our_path, "sample_files", "bmr15000_3.str.gz")),
+                         self.entry)
 
     def test___setitem(self):
         tmp_entry = copy(file_entry)
@@ -173,7 +209,8 @@ class TestPyNMRSTAR(unittest.TestCase):
         tmp_entry['entry_information'] = tmp_entry.get_saveframe_by_name('entry_information')
         self.assertEqual(tmp_entry, self.entry)
 
-        self.assertRaises(KeyError, tmp_entry.__setitem__, 'entry_informations', tmp_entry.get_saveframe_by_name('entry_information'))
+        self.assertRaises(KeyError, tmp_entry.__setitem__, 'entry_informations',
+                          tmp_entry.get_saveframe_by_name('entry_information'))
         self.assertRaises(ValueError, tmp_entry.__setitem__, 'entry_information', 1)
 
     def test_compare(self):
@@ -182,7 +219,10 @@ class TestPyNMRSTAR(unittest.TestCase):
 
         self.entry.entry_id = 14999
         self.entry.frame_list.pop()
-        self.assertEqual(file_entry.compare(self.entry), ["Entry ID does not match between entries: '15000' vs '14999'.", "The number of saveframes in the entries are not equal: '25' vs '24'.", "No saveframe with name 'assigned_chem_shift_list_1' in other entry."])
+        self.assertEqual(file_entry.compare(self.entry),
+                         ["Entry ID does not match between entries: '15000' vs '14999'.",
+                          "The number of saveframes in the entries are not equal: '25' vs '24'.",
+                          "No saveframe with name 'assigned_chem_shift_list_1' in other entry."])
 
     def test_getmethods(self):
         self.assertEqual(5, len(self.entry.get_loops_by_category("_Vendor")))
@@ -201,13 +241,15 @@ class TestPyNMRSTAR(unittest.TestCase):
 
         self.assertRaises(ValueError, self.entry.get_tag, 'bad_tag')
         self.assertEqual(self.entry.get_tag("entry.Submission_date"), ['2006-09-07'])
-        self.assertEqual(self.entry.get_tag("entry.Submission_date", whole_tag=True), [[u'Submission_date', u'2006-09-07']])
+        self.assertEqual(self.entry.get_tag("entry.Submission_date", whole_tag=True),
+                         [[u'Submission_date', u'2006-09-07']])
 
     def test_validate(self):
         validation = [u"Value cannot be NULL but is: '_Chem_comp.Provenance':'.' on line 'None'."]
         self.assertEqual(self.entry.validate(), validation)
         self.entry[-1][-1][0][0] = 'a'
-        validation.append("Value does not match specification: '_Atom_chem_shift.ID':'a' on line '0 tag 0 of loop'.\n     Type specified: int\n     Regular expression for type: '^(?:-?[0-9]*)?$'")
+        validation.append(
+            "Value does not match specification: '_Atom_chem_shift.ID':'a' on line '0 tag 0 of loop'.\n     Type specified: int\n     Regular expression for type: '^(?:-?[0-9]*)?$'")
         self.assertEqual(self.entry.validate(), validation)
         self.entry[-1][-1][0][0] = '1'
 
@@ -215,11 +257,29 @@ class TestPyNMRSTAR(unittest.TestCase):
         frame = self.entry[0]
 
         # Check initial state before tests
-        self.assertEqual(frame.tags, [[u'Sf_category', u'entry_information'], [u'Sf_framecode', u'entry_information'], [u'ID', u'15000'], [u'Title', u'Solution structure of chicken villin headpiece subdomain containing a fluorinated side chain in the core\n'], [u'Type', u'macromolecule'], [u'Version_type', u'original'], [u'Submission_date', u'2006-09-07'], [u'Accession_date', u'2006-09-07'], [u'Last_release_date', u'.'], [u'Original_release_date', u'.'], [u'Origination', u'author'], [u'NMR_STAR_version', u'3.1.1.61'], [u'Original_NMR_STAR_version', u'.'], [u'Experimental_method', u'NMR'], [u'Experimental_method_subtype', u'solution'], [u'Details', u'.'], [u'BMRB_internal_directory_name', u'.']])
+        self.assertEqual(frame.tags, [[u'Sf_category', u'entry_information'], [u'Sf_framecode', u'entry_information'],
+                                      [u'ID', u'15000'], [u'Title',
+                                                          u'Solution structure of chicken villin headpiece subdomain containing a fluorinated side chain in the core\n'],
+                                      [u'Type', u'macromolecule'], [u'Version_type', u'original'],
+                                      [u'Submission_date', u'2006-09-07'], [u'Accession_date', u'2006-09-07'],
+                                      [u'Last_release_date', u'.'], [u'Original_release_date', u'.'],
+                                      [u'Origination', u'author'], [u'NMR_STAR_version', u'3.1.1.61'],
+                                      [u'Original_NMR_STAR_version', u'.'], [u'Experimental_method', u'NMR'],
+                                      [u'Experimental_method_subtype', u'solution'], [u'Details', u'.'],
+                                      [u'BMRB_internal_directory_name', u'.']])
 
         # Check __delitem__
         del frame['DEtails']
-        self.assertEqual(frame.tags, [[u'Sf_category', u'entry_information'], [u'Sf_framecode', u'entry_information'], [u'ID', u'15000'], [u'Title', u'Solution structure of chicken villin headpiece subdomain containing a fluorinated side chain in the core\n'], [u'Type', u'macromolecule'], [u'Version_type', u'original'], [u'Submission_date', u'2006-09-07'], [u'Accession_date', u'2006-09-07'], [u'Last_release_date', u'.'], [u'Original_release_date', u'.'], [u'Origination', u'author'], [u'NMR_STAR_version', u'3.1.1.61'], [u'Original_NMR_STAR_version', u'.'], [u'Experimental_method', u'NMR'], [u'Experimental_method_subtype', u'solution'], [u'BMRB_internal_directory_name', u'.']])
+        self.assertEqual(frame.tags, [[u'Sf_category', u'entry_information'], [u'Sf_framecode', u'entry_information'],
+                                      [u'ID', u'15000'], [u'Title',
+                                                          u'Solution structure of chicken villin headpiece subdomain containing a fluorinated side chain in the core\n'],
+                                      [u'Type', u'macromolecule'], [u'Version_type', u'original'],
+                                      [u'Submission_date', u'2006-09-07'], [u'Accession_date', u'2006-09-07'],
+                                      [u'Last_release_date', u'.'], [u'Original_release_date', u'.'],
+                                      [u'Origination', u'author'], [u'NMR_STAR_version', u'3.1.1.61'],
+                                      [u'Original_NMR_STAR_version', u'.'], [u'Experimental_method', u'NMR'],
+                                      [u'Experimental_method_subtype', u'solution'],
+                                      [u'BMRB_internal_directory_name', u'.']])
         self.assertEqual(len(frame), 7)
         del frame[0]
         self.assertEqual(len(frame), 6)
@@ -275,7 +335,8 @@ class TestPyNMRSTAR(unittest.TestCase):
 
         # Check compare
         self.assertEqual(frame.compare(frame), [])
-        self.assertEqual(frame.compare(self.entry[1]), ["\tSaveframe names do not match: 'entry_information' vs 'citation_1'."])
+        self.assertEqual(frame.compare(self.entry[1]),
+                         ["\tSaveframe names do not match: 'entry_information' vs 'citation_1'."])
         tmp = copy(frame)
         tmp.tag_prefix = "test"
         self.assertEqual(frame.compare(tmp), ["\tTag prefix does not match: '_Entry' vs 'test'."])
@@ -289,10 +350,14 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertEqual(frame.get_tag("test"), [])
 
         # Test get_data_as_csv
-        self.assertEqual(frame.get_data_as_csv(), '_Entry.Sf_category,_Entry.Sf_framecode,_Entry.ID,_Entry.Title,_Entry.Type,_Entry.Version_type,_Entry.Submission_date,_Entry.Accession_date,_Entry.Last_release_date,_Entry.Original_release_date,_Entry.Origination,_Entry.NMR_STAR_version,_Entry.Original_NMR_STAR_version,_Entry.Experimental_method,_Entry.Experimental_method_subtype,_Entry.BMRB_internal_directory_name,_Entry.example1,_Entry.example2\nentry_information,entry_information,15000,"Solution structure of chicken villin headpiece subdomain containing a fluorinated side chain in the core\n",macromolecule,original,2006-09-07,2006-09-07,.,.,author,3.1.1.61,.,NMR,solution,.,5,.\n')
-        self.assertEqual(frame.get_data_as_csv(show_category=False), 'Sf_category,Sf_framecode,ID,Title,Type,Version_type,Submission_date,Accession_date,Last_release_date,Original_release_date,Origination,NMR_STAR_version,Original_NMR_STAR_version,Experimental_method,Experimental_method_subtype,BMRB_internal_directory_name,example1,example2\nentry_information,entry_information,15000,"Solution structure of chicken villin headpiece subdomain containing a fluorinated side chain in the core\n",macromolecule,original,2006-09-07,2006-09-07,.,.,author,3.1.1.61,.,NMR,solution,.,5,.\n')
-        self.assertEqual(frame.get_data_as_csv(header=False), 'entry_information,entry_information,15000,"Solution structure of chicken villin headpiece subdomain containing a fluorinated side chain in the core\n",macromolecule,original,2006-09-07,2006-09-07,.,.,author,3.1.1.61,.,NMR,solution,.,5,.\n')
-        self.assertEqual(frame.get_data_as_csv(show_category=False, header=False), 'entry_information,entry_information,15000,"Solution structure of chicken villin headpiece subdomain containing a fluorinated side chain in the core\n",macromolecule,original,2006-09-07,2006-09-07,.,.,author,3.1.1.61,.,NMR,solution,.,5,.\n')
+        self.assertEqual(frame.get_data_as_csv(),
+                         '_Entry.Sf_category,_Entry.Sf_framecode,_Entry.ID,_Entry.Title,_Entry.Type,_Entry.Version_type,_Entry.Submission_date,_Entry.Accession_date,_Entry.Last_release_date,_Entry.Original_release_date,_Entry.Origination,_Entry.NMR_STAR_version,_Entry.Original_NMR_STAR_version,_Entry.Experimental_method,_Entry.Experimental_method_subtype,_Entry.BMRB_internal_directory_name,_Entry.example1,_Entry.example2\nentry_information,entry_information,15000,"Solution structure of chicken villin headpiece subdomain containing a fluorinated side chain in the core\n",macromolecule,original,2006-09-07,2006-09-07,.,.,author,3.1.1.61,.,NMR,solution,.,5,.\n')
+        self.assertEqual(frame.get_data_as_csv(show_category=False),
+                         'Sf_category,Sf_framecode,ID,Title,Type,Version_type,Submission_date,Accession_date,Last_release_date,Original_release_date,Origination,NMR_STAR_version,Original_NMR_STAR_version,Experimental_method,Experimental_method_subtype,BMRB_internal_directory_name,example1,example2\nentry_information,entry_information,15000,"Solution structure of chicken villin headpiece subdomain containing a fluorinated side chain in the core\n",macromolecule,original,2006-09-07,2006-09-07,.,.,author,3.1.1.61,.,NMR,solution,.,5,.\n')
+        self.assertEqual(frame.get_data_as_csv(header=False),
+                         'entry_information,entry_information,15000,"Solution structure of chicken villin headpiece subdomain containing a fluorinated side chain in the core\n",macromolecule,original,2006-09-07,2006-09-07,.,.,author,3.1.1.61,.,NMR,solution,.,5,.\n')
+        self.assertEqual(frame.get_data_as_csv(show_category=False, header=False),
+                         'entry_information,entry_information,15000,"Solution structure of chicken villin headpiece subdomain containing a fluorinated side chain in the core\n",macromolecule,original,2006-09-07,2006-09-07,.,.,author,3.1.1.61,.,NMR,solution,.,5,.\n')
 
         # Test get_loop_by_category
         self.assertEqual(repr(frame.get_loop_by_category("_SG_projecT")), "<pynmrstar.Loop '_SG_project'>")
@@ -304,12 +369,30 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertEqual(frame.get_tag("entry.sf_category", whole_tag=True), [[u'Sf_category', u'entry_information']])
 
         # Test sort
-        self.assertEqual(frame.tags, [[u'Sf_category', u'entry_information'], [u'Sf_framecode', u'entry_information'], [u'ID', u'15000'], [u'Title', u'Solution structure of chicken villin headpiece subdomain containing a fluorinated side chain in the core\n'], [u'Type', u'macromolecule'], [u'Version_type', u'original'], [u'Submission_date', u'2006-09-07'], [u'Accession_date', u'2006-09-07'], [u'Last_release_date', u'.'], [u'Original_release_date', u'.'], [u'Origination', u'author'], [u'NMR_STAR_version', u'3.1.1.61'], [u'Original_NMR_STAR_version', u'.'], [u'Experimental_method', u'NMR'], [u'Experimental_method_subtype', u'solution'], [u'BMRB_internal_directory_name', u'.'], [u'example1', 5], [u'example2', u'.']])
+        self.assertEqual(frame.tags, [[u'Sf_category', u'entry_information'], [u'Sf_framecode', u'entry_information'],
+                                      [u'ID', u'15000'], [u'Title',
+                                                          u'Solution structure of chicken villin headpiece subdomain containing a fluorinated side chain in the core\n'],
+                                      [u'Type', u'macromolecule'], [u'Version_type', u'original'],
+                                      [u'Submission_date', u'2006-09-07'], [u'Accession_date', u'2006-09-07'],
+                                      [u'Last_release_date', u'.'], [u'Original_release_date', u'.'],
+                                      [u'Origination', u'author'], [u'NMR_STAR_version', u'3.1.1.61'],
+                                      [u'Original_NMR_STAR_version', u'.'], [u'Experimental_method', u'NMR'],
+                                      [u'Experimental_method_subtype', u'solution'],
+                                      [u'BMRB_internal_directory_name', u'.'], [u'example1', 5], [u'example2', u'.']])
 
         del frame['example2'], frame['example1']
         frame.tags.append(frame.tags.pop(0))
         frame.sort_tags()
-        self.assertEqual(frame.tags, [[u'Sf_category', u'entry_information'], [u'Sf_framecode', u'entry_information'], [u'ID', u'15000'], [u'Title', u'Solution structure of chicken villin headpiece subdomain containing a fluorinated side chain in the core\n'], [u'Type', u'macromolecule'], [u'Version_type', u'original'], [u'Submission_date', u'2006-09-07'], [u'Accession_date', u'2006-09-07'], [u'Last_release_date', u'.'], [u'Original_release_date', u'.'], [u'Origination', u'author'], [u'NMR_STAR_version', u'3.1.1.61'], [u'Original_NMR_STAR_version', u'.'], [u'Experimental_method', u'NMR'], [u'Experimental_method_subtype', u'solution'], [u'BMRB_internal_directory_name', u'.']])
+        self.assertEqual(frame.tags, [[u'Sf_category', u'entry_information'], [u'Sf_framecode', u'entry_information'],
+                                      [u'ID', u'15000'], [u'Title',
+                                                          u'Solution structure of chicken villin headpiece subdomain containing a fluorinated side chain in the core\n'],
+                                      [u'Type', u'macromolecule'], [u'Version_type', u'original'],
+                                      [u'Submission_date', u'2006-09-07'], [u'Accession_date', u'2006-09-07'],
+                                      [u'Last_release_date', u'.'], [u'Original_release_date', u'.'],
+                                      [u'Origination', u'author'], [u'NMR_STAR_version', u'3.1.1.61'],
+                                      [u'Original_NMR_STAR_version', u'.'], [u'Experimental_method', u'NMR'],
+                                      [u'Experimental_method_subtype', u'solution'],
+                                      [u'BMRB_internal_directory_name', u'.']])
 
         # Test validate
         self.assertEqual(self.entry['assigned_chem_shift_list_1'].validate(), [])
@@ -322,28 +405,36 @@ class TestPyNMRSTAR(unittest.TestCase):
         """ Test the category list property. """
 
         tmp = copy(database_entry)
-        self.assertEqual(tmp.category_list, ['entry_information', 'citations', 'assembly', 'entity', 'natural_source', 'experimental_source', 'chem_comp', 'sample', 'sample_conditions', 'software', 'NMR_spectrometer', 'NMR_spectrometer_list', 'experiment_list', 'chem_shift_reference', 'assigned_chemical_shifts'])
+        self.assertEqual(tmp.category_list, ['entry_information', 'citations', 'assembly', 'entity', 'natural_source',
+                                             'experimental_source', 'chem_comp', 'sample', 'sample_conditions',
+                                             'software', 'NMR_spectrometer', 'NMR_spectrometer_list', 'experiment_list',
+                                             'chem_shift_reference', 'assigned_chemical_shifts'])
         tmp.add_saveframe(pynmrstar.Saveframe.from_scratch("test", None))
-        self.assertEqual(tmp.category_list, ['entry_information', 'citations', 'assembly', 'entity', 'natural_source', 'experimental_source', 'chem_comp', 'sample', 'sample_conditions', 'software', 'NMR_spectrometer', 'NMR_spectrometer_list', 'experiment_list', 'chem_shift_reference', 'assigned_chemical_shifts'])
+        self.assertEqual(tmp.category_list, ['entry_information', 'citations', 'assembly', 'entity', 'natural_source',
+                                             'experimental_source', 'chem_comp', 'sample', 'sample_conditions',
+                                             'software', 'NMR_spectrometer', 'NMR_spectrometer_list', 'experiment_list',
+                                             'chem_shift_reference', 'assigned_chemical_shifts'])
 
     def test_loop(self):
         test_loop = self.entry[0][0]
 
         # Check filter
         self.assertEqual(test_loop.filter(['_Entry_author.Ordinal', '_Entry_author.Middle_initials']),
-                         pynmrstar.Loop.from_string("loop_ _Entry_author.Ordinal _Entry_author.Middle_initials 1 C. 2 . 3 B. 4 H. 5 L. stop_"))
+                         pynmrstar.Loop.from_string(
+                             "loop_ _Entry_author.Ordinal _Entry_author.Middle_initials 1 C. 2 . 3 B. 4 H. 5 L. stop_"))
         # Check eq
         self.assertEqual(test_loop == self.entry[0][0], True)
         self.assertEqual(test_loop != self.entry[0][1], True)
         # Check __getitem__
         self.assertEqual(test_loop['_Entry_author.Ordinal'], ['1', '2', '3', '4', '5'])
-        self.assertEqual(test_loop[['_Entry_author.Ordinal', '_Entry_author.Middle_initials']], [['1', 'C.'], ['2', '.'], ['3', 'B.'], ['4', 'H.'], ['5', 'L.']])
+        self.assertEqual(test_loop[['_Entry_author.Ordinal', '_Entry_author.Middle_initials']],
+                         [['1', 'C.'], ['2', '.'], ['3', 'B.'], ['4', 'H.'], ['5', 'L.']])
         # Test __setitem__
-        test_loop['_Entry_author.Ordinal'] = [1]*5
-        self.assertEqual(test_loop['_Entry_author.Ordinal'], [1,1,1,1,1])
-        test_loop['_Entry_author.Ordinal'] = ['1','2','3','4','5']
+        test_loop['_Entry_author.Ordinal'] = [1] * 5
+        self.assertEqual(test_loop['_Entry_author.Ordinal'], [1, 1, 1, 1, 1])
+        test_loop['_Entry_author.Ordinal'] = ['1', '2', '3', '4', '5']
         self.assertRaises(ValueError, test_loop.__setitem__, '_Entry_author.Ordinal', [1])
-        self.assertRaises(ValueError, test_loop.__setitem__, '_Wrong_loop.Ordinal', [1,2,3,4,5])
+        self.assertRaises(ValueError, test_loop.__setitem__, '_Wrong_loop.Ordinal', [1, 2, 3, 4, 5])
         # Check __init__
         self.assertRaises(ValueError, pynmrstar.Loop)
         test = pynmrstar.Loop.from_scratch(category="test")
@@ -368,7 +459,8 @@ class TestPyNMRSTAR(unittest.TestCase):
         tmp_loop.add_tag("tag3")
         self.assertRaises(ValueError, tmp_loop.__str__)
         tmp_loop.set_category("test")
-        self.assertEqual(str(tmp_loop), "\n   loop_\n      _test.tag1\n      _test.tag2\n      _test.tag3\n\n     1   2   3    \n\n   stop_\n")
+        self.assertEqual(str(tmp_loop),
+                         "\n   loop_\n      _test.tag1\n      _test.tag2\n      _test.tag3\n\n     1   2   3    \n\n   stop_\n")
         self.assertEqual(tmp_loop.category, "_test")
         # Check different category
         self.assertRaises(ValueError, tmp_loop.add_tag, "invalid.tag")
@@ -415,11 +507,19 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertEqual(tmp_loop.get_tag(["tag1", "tag2"]), [[1, 5], [2, 8]])
         self.assertEqual(tmp_loop.get_tag("tag1", whole_tag=True), [['_test.tag1', 1], ['_test.tag1', 2]])
 
-        self.assertEqual(test_loop.get_tag(['_Entry_author.Ordinal', '_Entry_author.Middle_initials'], dict_result=True),
-                         [{'Middle_initials': 'C.', 'Ordinal': '1'},{'Middle_initials': '.', 'Ordinal': '2'},{'Middle_initials': 'B.', 'Ordinal': '3'},{'Middle_initials': 'H.', 'Ordinal': '4'},{'Middle_initials': 'L.', 'Ordinal': '5'}])
+        self.assertEqual(
+            test_loop.get_tag(['_Entry_author.Ordinal', '_Entry_author.Middle_initials'], dict_result=True),
+            [{'Middle_initials': 'C.', 'Ordinal': '1'}, {'Middle_initials': '.', 'Ordinal': '2'},
+             {'Middle_initials': 'B.', 'Ordinal': '3'}, {'Middle_initials': 'H.', 'Ordinal': '4'},
+             {'Middle_initials': 'L.', 'Ordinal': '5'}])
 
-        self.assertEqual(test_loop.get_tag(['_Entry_author.Ordinal', '_Entry_author.Middle_initials'], dict_result=True, whole_tag=True),
-                         [{'_Entry_author.Middle_initials': 'C.', '_Entry_author.Ordinal': '1'},{'_Entry_author.Middle_initials': '.', '_Entry_author.Ordinal': '2'},{'_Entry_author.Middle_initials': 'B.', '_Entry_author.Ordinal': '3'},{'_Entry_author.Middle_initials': 'H.', '_Entry_author.Ordinal': '4'},{'_Entry_author.Middle_initials': 'L.', '_Entry_author.Ordinal': '5'}])
+        self.assertEqual(test_loop.get_tag(['_Entry_author.Ordinal', '_Entry_author.Middle_initials'], dict_result=True,
+                                           whole_tag=True),
+                         [{'_Entry_author.Middle_initials': 'C.', '_Entry_author.Ordinal': '1'},
+                          {'_Entry_author.Middle_initials': '.', '_Entry_author.Ordinal': '2'},
+                          {'_Entry_author.Middle_initials': 'B.', '_Entry_author.Ordinal': '3'},
+                          {'_Entry_author.Middle_initials': 'H.', '_Entry_author.Ordinal': '4'},
+                          {'_Entry_author.Middle_initials': 'L.', '_Entry_author.Ordinal': '5'}])
 
         def simple_key(x):
             return -int(x[2])
@@ -438,16 +538,20 @@ class TestPyNMRSTAR(unittest.TestCase):
 
         # Test that the from_template method works
         self.assertEqual(pynmrstar.Loop.from_template("atom_chem_shift", all_tags=False),
-                         pynmrstar.Loop.from_string("loop_ _Atom_chem_shift.ID _Atom_chem_shift.Assembly_atom_ID _Atom_chem_shift.Entity_assembly_ID _Atom_chem_shift.Entity_ID _Atom_chem_shift.Comp_index_ID _Atom_chem_shift.Seq_ID _Atom_chem_shift.Comp_ID _Atom_chem_shift.Atom_ID _Atom_chem_shift.Atom_type _Atom_chem_shift.Atom_isotope_number _Atom_chem_shift.Val _Atom_chem_shift.Val_err _Atom_chem_shift.Assign_fig_of_merit _Atom_chem_shift.Ambiguity_code _Atom_chem_shift.Ambiguity_set_ID _Atom_chem_shift.Occupancy _Atom_chem_shift.Resonance_ID _Atom_chem_shift.Auth_entity_assembly_ID _Atom_chem_shift.Auth_asym_ID _Atom_chem_shift.Auth_seq_ID _Atom_chem_shift.Auth_comp_ID _Atom_chem_shift.Auth_atom_ID _Atom_chem_shift.Details _Atom_chem_shift.Entry_ID _Atom_chem_shift.Assigned_chem_shift_list_ID stop_"))
+                         pynmrstar.Loop.from_string(
+                             "loop_ _Atom_chem_shift.ID _Atom_chem_shift.Assembly_atom_ID _Atom_chem_shift.Entity_assembly_ID _Atom_chem_shift.Entity_ID _Atom_chem_shift.Comp_index_ID _Atom_chem_shift.Seq_ID _Atom_chem_shift.Comp_ID _Atom_chem_shift.Atom_ID _Atom_chem_shift.Atom_type _Atom_chem_shift.Atom_isotope_number _Atom_chem_shift.Val _Atom_chem_shift.Val_err _Atom_chem_shift.Assign_fig_of_merit _Atom_chem_shift.Ambiguity_code _Atom_chem_shift.Ambiguity_set_ID _Atom_chem_shift.Occupancy _Atom_chem_shift.Resonance_ID _Atom_chem_shift.Auth_entity_assembly_ID _Atom_chem_shift.Auth_asym_ID _Atom_chem_shift.Auth_seq_ID _Atom_chem_shift.Auth_comp_ID _Atom_chem_shift.Auth_atom_ID _Atom_chem_shift.Details _Atom_chem_shift.Entry_ID _Atom_chem_shift.Assigned_chem_shift_list_ID stop_"))
 
         self.assertEqual(pynmrstar.Loop.from_template("atom_chem_shift", all_tags=True),
-                         pynmrstar.Loop.from_string("loop_ _Atom_chem_shift.ID _Atom_chem_shift.Assembly_atom_ID _Atom_chem_shift.Entity_assembly_ID _Atom_chem_shift.Entity_ID _Atom_chem_shift.Comp_index_ID _Atom_chem_shift.Seq_ID _Atom_chem_shift.Comp_ID _Atom_chem_shift.Atom_ID _Atom_chem_shift.Atom_type _Atom_chem_shift.Atom_isotope_number _Atom_chem_shift.Val _Atom_chem_shift.Val_err _Atom_chem_shift.Assign_fig_of_merit _Atom_chem_shift.Ambiguity_code _Atom_chem_shift.Ambiguity_set_ID _Atom_chem_shift.Occupancy _Atom_chem_shift.Resonance_ID _Atom_chem_shift.Auth_entity_assembly_ID _Atom_chem_shift.Auth_asym_ID _Atom_chem_shift.Auth_seq_ID _Atom_chem_shift.Auth_comp_ID _Atom_chem_shift.Auth_atom_ID _Atom_chem_shift.PDB_record_ID _Atom_chem_shift.PDB_model_num _Atom_chem_shift.PDB_strand_ID _Atom_chem_shift.PDB_ins_code _Atom_chem_shift.PDB_residue_no _Atom_chem_shift.PDB_residue_name _Atom_chem_shift.PDB_atom_name _Atom_chem_shift.Original_PDB_strand_ID _Atom_chem_shift.Original_PDB_residue_no _Atom_chem_shift.Original_PDB_residue_name _Atom_chem_shift.Original_PDB_atom_name _Atom_chem_shift.Details _Atom_chem_shift.Sf_ID _Atom_chem_shift.Entry_ID _Atom_chem_shift.Assigned_chem_shift_list_ID stop_"))
+                         pynmrstar.Loop.from_string(
+                             "loop_ _Atom_chem_shift.ID _Atom_chem_shift.Assembly_atom_ID _Atom_chem_shift.Entity_assembly_ID _Atom_chem_shift.Entity_ID _Atom_chem_shift.Comp_index_ID _Atom_chem_shift.Seq_ID _Atom_chem_shift.Comp_ID _Atom_chem_shift.Atom_ID _Atom_chem_shift.Atom_type _Atom_chem_shift.Atom_isotope_number _Atom_chem_shift.Val _Atom_chem_shift.Val_err _Atom_chem_shift.Assign_fig_of_merit _Atom_chem_shift.Ambiguity_code _Atom_chem_shift.Ambiguity_set_ID _Atom_chem_shift.Occupancy _Atom_chem_shift.Resonance_ID _Atom_chem_shift.Auth_entity_assembly_ID _Atom_chem_shift.Auth_asym_ID _Atom_chem_shift.Auth_seq_ID _Atom_chem_shift.Auth_comp_ID _Atom_chem_shift.Auth_atom_ID _Atom_chem_shift.PDB_record_ID _Atom_chem_shift.PDB_model_num _Atom_chem_shift.PDB_strand_ID _Atom_chem_shift.PDB_ins_code _Atom_chem_shift.PDB_residue_no _Atom_chem_shift.PDB_residue_name _Atom_chem_shift.PDB_atom_name _Atom_chem_shift.Original_PDB_strand_ID _Atom_chem_shift.Original_PDB_residue_no _Atom_chem_shift.Original_PDB_residue_name _Atom_chem_shift.Original_PDB_atom_name _Atom_chem_shift.Details _Atom_chem_shift.Sf_ID _Atom_chem_shift.Entry_ID _Atom_chem_shift.Assigned_chem_shift_list_ID stop_"))
 
         # Test adding a tag to the schema
-        my_schem = pynmrstar.Schema()
-        my_schem.add_tag("_Atom_chem_shift.New_Tag", "VARCHAR(100)", True, "assigned_chemical_shifts", True, "_Atom_chem_shift.Atom_ID")
+        my_schem = pynmrstar._get_schema()
+        my_schem.add_tag("_Atom_chem_shift.New_Tag", "VARCHAR(100)", True, "assigned_chemical_shifts", True,
+                         "_Atom_chem_shift.Atom_ID")
         self.assertEqual(pynmrstar.Loop.from_template("atom_chem_shift", all_tags=True, schema=my_schem),
-                         pynmrstar.Loop.from_string("loop_ _Atom_chem_shift.ID _Atom_chem_shift.Assembly_atom_ID _Atom_chem_shift.Entity_assembly_ID _Atom_chem_shift.Entity_ID _Atom_chem_shift.Comp_index_ID _Atom_chem_shift.Seq_ID _Atom_chem_shift.Comp_ID _Atom_chem_shift.Atom_ID _Atom_chem_shift.New_Tag _Atom_chem_shift.Atom_type _Atom_chem_shift.Atom_isotope_number _Atom_chem_shift.Val _Atom_chem_shift.Val_err _Atom_chem_shift.Assign_fig_of_merit _Atom_chem_shift.Ambiguity_code _Atom_chem_shift.Ambiguity_set_ID _Atom_chem_shift.Occupancy _Atom_chem_shift.Resonance_ID _Atom_chem_shift.Auth_entity_assembly_ID _Atom_chem_shift.Auth_asym_ID _Atom_chem_shift.Auth_seq_ID _Atom_chem_shift.Auth_comp_ID _Atom_chem_shift.Auth_atom_ID _Atom_chem_shift.PDB_record_ID _Atom_chem_shift.PDB_model_num _Atom_chem_shift.PDB_strand_ID _Atom_chem_shift.PDB_ins_code _Atom_chem_shift.PDB_residue_no _Atom_chem_shift.PDB_residue_name _Atom_chem_shift.PDB_atom_name _Atom_chem_shift.Original_PDB_strand_ID _Atom_chem_shift.Original_PDB_residue_no _Atom_chem_shift.Original_PDB_residue_name _Atom_chem_shift.Original_PDB_atom_name _Atom_chem_shift.Details _Atom_chem_shift.Sf_ID _Atom_chem_shift.Entry_ID _Atom_chem_shift.Assigned_chem_shift_list_ID stop_ "))
+                         pynmrstar.Loop.from_string(
+                             "loop_ _Atom_chem_shift.ID _Atom_chem_shift.Assembly_atom_ID _Atom_chem_shift.Entity_assembly_ID _Atom_chem_shift.Entity_ID _Atom_chem_shift.Comp_index_ID _Atom_chem_shift.Seq_ID _Atom_chem_shift.Comp_ID _Atom_chem_shift.Atom_ID _Atom_chem_shift.New_Tag _Atom_chem_shift.Atom_type _Atom_chem_shift.Atom_isotope_number _Atom_chem_shift.Val _Atom_chem_shift.Val_err _Atom_chem_shift.Assign_fig_of_merit _Atom_chem_shift.Ambiguity_code _Atom_chem_shift.Ambiguity_set_ID _Atom_chem_shift.Occupancy _Atom_chem_shift.Resonance_ID _Atom_chem_shift.Auth_entity_assembly_ID _Atom_chem_shift.Auth_asym_ID _Atom_chem_shift.Auth_seq_ID _Atom_chem_shift.Auth_comp_ID _Atom_chem_shift.Auth_atom_ID _Atom_chem_shift.PDB_record_ID _Atom_chem_shift.PDB_model_num _Atom_chem_shift.PDB_strand_ID _Atom_chem_shift.PDB_ins_code _Atom_chem_shift.PDB_residue_no _Atom_chem_shift.PDB_residue_name _Atom_chem_shift.PDB_atom_name _Atom_chem_shift.Original_PDB_strand_ID _Atom_chem_shift.Original_PDB_residue_no _Atom_chem_shift.Original_PDB_residue_name _Atom_chem_shift.Original_PDB_atom_name _Atom_chem_shift.Details _Atom_chem_shift.Sf_ID _Atom_chem_shift.Entry_ID _Atom_chem_shift.Assigned_chem_shift_list_ID stop_ "))
 
         # Make sure adding data with a tag works
         tmp_loop = pynmrstar.Loop.from_string("loop_ _Atom_chem_shift.ID stop_")
@@ -590,7 +694,7 @@ _Entry.multi2
         parser.get_token()
         self.assertEqual((parser.token, parser.delimiter), ('_Entry.Original_NMR_STAR_version', ' '))
         parser.get_token()
-        self.assertEqual((parser.token, parser.delimiter), ('_.','\''))
+        self.assertEqual((parser.token, parser.delimiter), ('_.', '\''))
         parser.get_token()
         self.assertEqual((parser.token, parser.delimiter), ('_Entry.Experimental_method', ' '))
         parser.get_token()
@@ -658,9 +762,9 @@ _Entry.multi2
                                         "-ignore-tag",
                                         "_Spectral_peak_list.Text_data",
                                         "-", location],
-                                        stdin=subprocess.PIPE,
-                                        stdout=subprocess.PIPE,
-                                        stderr=subprocess.PIPE)
+                                       stdin=subprocess.PIPE,
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.PIPE)
             results = compare.communicate(input=ent_str)[0]
 
             if PY3:
@@ -669,11 +773,13 @@ _Entry.multi2
             self.assertEqual("<standard input>:%s: NO DIFFERENCES REPORTED\n" %
                              location, results,
                              msg="%d: Output inconsistent with original: %s" %
-                             (x, results.strip()))
+                                 (x, results.strip()))
+
 
 # Allow unit testing from other modules
 def start_tests():
     unittest.main(module=__name__)
+
 
 # Run unit tests if we are called directly
 if __name__ == '__main__':
