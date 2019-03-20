@@ -222,6 +222,16 @@ def patch_parser(pynmstar_instance):
 
         for loop in self.ent.get_loops_by_category('_Constraint_file'):
             loop.sort_rows('ID')
+            max_row = 0
+            for row in loop.get_tag('ID'):
+                if max_row > int(row) < 999:
+                    max_row = int(row)
+            id_col = loop._tag_index('ID')
+
+            renumber_row = max_row + 2
+            for row in loop.data:
+                if int(row[id_col]) >= 999:
+                    row[id_col] = int(row[id_col]) - 999 + renumber_row
 
         return self.ent
 
