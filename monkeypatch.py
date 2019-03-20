@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+
 def patch_parser(pynmstar_instance):
 
     def parse(self, data, source="unknown"):
@@ -236,4 +237,9 @@ def patch_parser(pynmstar_instance):
         return self.ent
 
     # Do the actual patching
+    pynmstar_instance._Parser.original_parse = pynmstar_instance._Parser.parse
     pynmstar_instance._Parser.parse = parse
+
+
+def unpatch_parser(pynmstar_instance):
+    pynmstar_instance._Parser.parse = pynmstar_instance._Parser.original_parse
