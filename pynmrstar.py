@@ -3327,7 +3327,7 @@ class Loop(object):
                                                      line_num="Loop %s" %
                                                               self.category)
 
-        self.data = processed_data
+        self.data.extend(processed_data)
 
     def add_data_by_column(self, column_id, value):
         """ Depreciated, please use add_data_by_tag() instead. """
