@@ -148,7 +148,7 @@ def _build_extension():
 # See if we can use the fast tokenizer
 try:
     import cnmrstar
-    if "version" not in dir(cnmrstar) or cnmrstar.version() < "2.2.7":
+    if "version" not in dir(cnmrstar) or cnmrstar.version() < "2.2.8":
         print("Recompiling cnmrstar module due to API changes. You may "
               "experience a segmentation fault immediately following this "
               "message but should have no issues the next time you run your "
@@ -200,7 +200,7 @@ _COMMENT_DICTIONARY = {}
 _API_URL = "http://webapi.bmrb.wisc.edu/v2"
 _SCHEMA_URL = 'https://raw.githubusercontent.com/uwbmrb/nmr-star-dictionary/master/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
-__version__ = "2.6.3"
+__version__ = "2.6.4"
 
 
 #############################################
@@ -3327,7 +3327,7 @@ class Loop(object):
                                                      line_num="Loop %s" %
                                                               self.category)
 
-        self.data = processed_data
+        self.data.extend(processed_data)
 
     def add_data_by_column(self, column_id, value):
         """ Depreciated, please use add_data_by_tag() instead. """

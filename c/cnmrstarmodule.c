@@ -3,7 +3,7 @@
 
 // Version number. Only need to update when
 // API changes.
-#define module_version "2.2.7"
+#define module_version "2.2.8"
 
 // Use for returning errors
 #define err_size 500
@@ -271,7 +271,11 @@ char * update_token(parser_data * parser, long length, char delineator){
 
     // Figure out what to set the last delineator as
     if (parser->index == 0){
-        parser->last_delineator = ' ';
+        if (delineator == '#') {
+            parser->last_delineator = '#';
+        } else {
+            parser->last_delineator = ' ';
+        }
     } else {
         parser->last_delineator = delineator;
     }
