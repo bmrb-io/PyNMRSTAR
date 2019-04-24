@@ -4,22 +4,18 @@ import os
 import re
 from csv import reader as csv_reader
 from datetime import date
+from io import StringIO
+from typing import TextIO, BinaryIO
+from typing import Union, List, Optional, Any, Dict, Iterable
 
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from io import StringIO
-
-try:
-    import utils
-except ImportError:
-    from . import utils
+from . import definitions
+from . import utils
 
 
 class Schema(object):
     """A BMRB schema. Used to validate STAR files."""
 
-    def __init__(self, schema_file=None):
+    def __init__(self, schema_file: Union[str, TextIO, BinaryIO] = None):
         """Initialize a BMRB schema. With no arguments the most
         up-to-date schema will be fetched from the BMRB FTP site.
         Otherwise pass a URL or a file to load a schema from using the
@@ -34,7 +30,7 @@ class Schema(object):
 
         # Try loading from the internet first
         if schema_file is None:
-            schema_file = utils._SCHEMA_URL
+            schema_file = definitions.SCHEMA_URL
         self.schema_file = schema_file
 
         # Get the schema from the internet, wrap in StringIO and pass that
@@ -165,7 +161,7 @@ class Schema(object):
         6) Optional: The tag to order this tag behind when normalizing
            saveframes."""
 
-        # Add the underscore preceeding the tag
+        # Add the underscore preceding the tag
         if tag[0] != "_":
             tag = "_" + tag
 
@@ -277,7 +273,7 @@ class Schema(object):
         valtype, null_allowed = full_tag["Data Type"], full_tag["Nullable"]
 
         # Check for null
-        if value == "." or value == "?":
+        if value in definitions.NULL_VALUES:
             if (not null_allowed and utils.RAISE_PARSE_WARNINGS and
                     "invalid-null-value" not in utils.WARNINGS_TO_IGNORE):
                 raise ValueError("There is a null in the file that isn't "
@@ -336,16 +332,16 @@ class Schema(object):
         is_none = value is None
 
         # Allow manual specification of conversions for booleans, Nones, etc.
-        if value in utils.STR_CONVERSION_DICT:
-            if any(isinstance(value, type(x)) for x in utils.STR_CONVERSION_DICT):
-                value = utils.STR_CONVERSION_DICT[value]
+        if value in definitions.STR_CONVERSION_DICT:
+            if any(isinstance(value, type(x)) for x in definitions.STR_CONVERSION_DICT):
+                value = definitions.STR_CONVERSION_DICT[value]
 
         # Value should always be string
         if not isinstance(value, str):
             value = str(value)
 
         # Check that it isn't a string None
-        if value == "." or value == "?":
+        if value in definitions.NULL_VALUES:
             is_none = True
 
         # Make local copies of the fields we care about

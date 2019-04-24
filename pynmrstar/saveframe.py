@@ -1,33 +1,32 @@
 import json
 from csv import reader as csv_reader, writer as csv_writer
+from io import StringIO
+from typing import TextIO, BinaryIO
+from typing import Union, List, Optional, Any, Dict, Iterable
 
-try:
-    import loop
-    import entry
-    import utils
-    import parser as parsermod
-except ImportError:
-    from . import loop
-    from . import entry
-    from . import utils
-    from . import parser as parsermod
+from . import definitions
+from . import entry as entry_mod
+from . import loop as loop_mod
+from . import parser as parser_mod
+from . import schema as schema_mod
+from . import utils
 
 
 class Saveframe(object):
     """A saveframe object. Create using the class methods, see below."""
 
-    def __delitem__(self, item):
+    def __delitem__(self, item: Union[int, str, 'loop_mod.Loop']) -> None:
         """Remove the indicated tag or loop."""
 
         # If they specify the specific loop to delete, go ahead and delete it
-        if isinstance(item, loop.Loop):
+        if isinstance(item, loop_mod.Loop):
             del self.loops[self.loops.index(item)]
             return
 
         # See if the result of get(item) is a loop. If so, delete it
         # (calls this method recursively)
         to_delete = self.__getitem__(item)
-        if isinstance(to_delete, loop.Loop):
+        if isinstance(to_delete, loop_mod.Loop):
             del self.loops[self.loops.index(to_delete)]
             return
 
@@ -35,18 +34,16 @@ class Saveframe(object):
         else:
             self.delete_tag(item)
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         """Returns True if this saveframe is equal to another saveframe,
         False if it is equal."""
 
+        if not isinstance(other, Saveframe):
+            return False
+
         return len(self.compare(other)) == 0
 
-    def __ne__(self, other):
-        """It isn't enough to define __eq__ in python2.x."""
-
-        return not self.__eq__(other)
-
-    def __getitem__(self, item):
+    def __getitem__(self, item: Union[int, str]) -> Union[list, 'loop_mod.Loop']:
         """Get the indicated loop or tag."""
 
         try:
@@ -57,11 +54,11 @@ class Saveframe(object):
                 return results
             else:
                 try:
-                    return self.loop_dict()[item.lower()]
+                    return self.loop_dict[item.lower()]
                 except KeyError:
                     raise KeyError("No tag or loop matching '%s'" % item)
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Return the number of loops in this saveframe."""
 
         return len(self.loops)
@@ -70,6 +67,9 @@ class Saveframe(object):
         """Returns True if this saveframe sorts lower than the compared
         saveframe, false otherwise. The alphabetical ordering of the
         saveframe category is used to perform the comparison."""
+
+        if not isinstance(other, Saveframe):
+            return NotImplemented
 
         return self.tag_prefix < other.tag_prefix
 
@@ -83,21 +83,19 @@ class Saveframe(object):
 
         # They initialized us wrong
         if len(kwargs) == 0:
-            raise ValueError("You should not directly instantiate a Saveframe "
-                             "using this method. Instead use the class methods:"
-                             " Saveframe.from_scratch(), Saveframe.from_string()"
-                             ", Saveframe.from_template(), Saveframe.from_file()"
-                             ", and Saveframe.from_json().")
+            raise ValueError("You should not directly instantiate a Saveframe using this method. Instead use the class"
+                             " methods: Saveframe.from_scratch(), Saveframe.from_string(), Saveframe.from_template(), "
+                             "Saveframe.from_file(), and Saveframe.from_json().")
 
         # Initialize our local variables
-        self.tags = []
-        self.loops = []
-        self.name = ""
-        self.source = "unknown"
-        self.category = None
-        self.tag_prefix = None
+        self.tags: List[Any] = []
+        self.loops: List[loop_mod.Loop] = []
+        self.name: str = ""
+        self.source: str = "unknown"
+        self.category: Optional[str] = None
+        self.tag_prefix: Optional[str] = None
 
-        star_buffer = ""
+        star_buffer: StringIO = StringIO('')
 
         # Update our source if it provided
         if 'source' in kwargs:
@@ -105,7 +103,7 @@ class Saveframe(object):
 
         if 'the_string' in kwargs:
             # Parse from a string by wrapping it in StringIO
-            star_buffer = utils.StringIO(kwargs['the_string'])
+            star_buffer = StringIO(kwargs['the_string'])
             self.source = "from_string()"
         elif 'file_name' in kwargs:
             star_buffer = utils.interpret_file(kwargs['file_name'])
@@ -122,11 +120,9 @@ class Saveframe(object):
 
             # Make sure it is a valid category
             if self.category not in [x["SFCategory"] for x in schema.values()]:
-                raise ValueError("The saveframe category '%s' was not found "
-                                 "in the dictionary." % self.category)
+                raise ValueError("The saveframe category '%s' was not found in the dictionary." % self.category)
 
-            s = sorted(schema.values(),
-                       key=lambda _: float(_["Dictionary sequence"]))
+            s = sorted(schema.values(), key=lambda _: float(_["Dictionary sequence"]))
 
             loops_added = []
 
@@ -148,7 +144,7 @@ class Saveframe(object):
                         else:
                             tag_value = None
                             if kwargs['default_values']:
-                                if item['default value'] != "?" and item['default value'] != '':
+                                if item['default value'] not in definitions.NULL_VALUES:
                                     tag_value = item['default value']
                             # Unconditional add
                             if kwargs['all_tags']:
@@ -164,9 +160,9 @@ class Saveframe(object):
                         if cat_formatted not in loops_added:
                             loops_added.append(cat_formatted)
                             try:
-                                self.add_loop(loop.Loop.from_template(cat_formatted,
-                                                                      all_tags=kwargs['all_tags'],
-                                                                      schema=schema_obj))
+                                self.add_loop(loop_mod.Loop.from_template(cat_formatted,
+                                                                          all_tags=kwargs['all_tags'],
+                                                                          schema=schema_obj))
                             except ValueError:
                                 pass
             return
@@ -180,37 +176,44 @@ class Saveframe(object):
 
         # If we are reading from a CSV file, go ahead and parse it
         if 'csv' in kwargs and kwargs['csv']:
-            csvreader = csv_reader(star_buffer)
-            tags = next(csvreader)
-            values = next(csvreader)
+            csv_reader_object = csv_reader(star_buffer)
+            tags = next(csv_reader_object)
+            values = next(csv_reader_object)
             if len(tags) != len(values):
-                raise ValueError("Your CSV data is invalid. The header length"
-                                 " does not match the data length.")
+                raise ValueError("Your CSV data is invalid. The header length does not match the data length.")
             for ordinal in range(0, len(tags)):
                 self.add_tag(tags[ordinal], values[ordinal])
             return
 
-        tmp_entry = entry.Entry.from_scratch(0)
+        tmp_entry = entry_mod.Entry.from_scratch(0)
 
         # Load the BMRB entry from the file
-        star_buffer = utils.StringIO("data_1 " + star_buffer.read())
-        parser = parsermod.Parser(entry_to_parse_into=tmp_entry)
+        star_buffer = StringIO("data_1 " + star_buffer.read())
+        parser = parser_mod.Parser(entry_to_parse_into=tmp_entry)
         parser.parse(star_buffer.read(), source=self.source)
 
         # Copy the first parsed saveframe into ourself
         if len(tmp_entry.frame_list) > 1:
-            raise ValueError("You attempted to parse one saveframe but the "
-                             "source you provided had more than one saveframe."
-                             " Please either parse all saveframes as an entry "
-                             "or only parse one saveframe. Saveframes "
-                             "detected: " + str(tmp_entry.frame_list))
+            raise ValueError("You attempted to parse one saveframe but the source you provided had more than one "
+                             "saveframe. Please either parse all saveframes as an entry or only parse one saveframe. "
+                             "Saveframes detected: " + str(tmp_entry.frame_list))
         self.tags = tmp_entry[0].tags
         self.loops = tmp_entry[0].loops
         self.name = tmp_entry[0].name
         self.tag_prefix = tmp_entry[0].tag_prefix
 
     @property
-    def empty(self):
+    def loop_dict(self) -> Dict[str, 'loop_mod.Loop']:
+        """Returns a hash of loop category -> loop."""
+
+        res = {}
+        for each_loop in self.loops:
+            if each_loop.category is not None:
+                res[each_loop.category.lower()] = each_loop
+        return res
+
+    @property
+    def empty(self) -> bool:
         """ Check if the saveframe has no data. Ignore the structural tags."""
 
         for tag in self.tags:
@@ -227,17 +230,16 @@ class Saveframe(object):
         return True
 
     @classmethod
-    def from_scratch(cls, sf_name, tag_prefix=None, source="from_scratch()"):
+    def from_scratch(cls, sf_name: str, tag_prefix: str = None, source: str = "from_scratch()"):
         """Create an empty saveframe that you can programmatically add
         to. You may also pass the tag prefix as the second argument. If
         you do not pass the tag prefix it will be set the first time you
         add a tag."""
 
-        return cls(saveframe_name=sf_name, tag_prefix=tag_prefix,
-                   source=source)
+        return cls(saveframe_name=sf_name, tag_prefix=tag_prefix, source=source)
 
     @classmethod
-    def from_file(cls, the_file, csv=False):
+    def from_file(cls, the_file: Union[str, TextIO, BinaryIO], csv: bool = False):
         """Create a saveframe by loading in a file. Specify csv=True is
         the file is a CSV file. If the_file starts with http://,
         https://, or ftp:// then we will use those protocols to attempt
@@ -246,7 +248,7 @@ class Saveframe(object):
         return cls(file_name=the_file, csv=csv)
 
     @classmethod
-    def from_json(cls, json_dict):
+    def from_json(cls, json_dict: Union[dict, str]):
         """Create a saveframe from JSON (serialized or unserialized JSON)."""
 
         # If they provided a string, try to load it using JSON
@@ -260,8 +262,7 @@ class Saveframe(object):
         # Make sure it has the correct keys
         for check in ["name", "tag_prefix", "tags", "loops"]:
             if check not in json_dict:
-                raise ValueError("The JSON you provide must be a hash and must"
-                                 " contain the key '%s' - even if the key "
+                raise ValueError("The JSON you provide must be a hash and must contain the key '%s' - even if the key "
                                  "points to None." % check)
 
         # Create a saveframe from scratch and populate it
@@ -269,21 +270,22 @@ class Saveframe(object):
         ret.tag_prefix = json_dict['tag_prefix']
         ret.category = json_dict.get('category', None)
         ret.tags = json_dict['tags']
-        ret.loops = [loop.Loop.from_json(x) for x in json_dict['loops']]
+        ret.loops = [loop_mod.Loop.from_json(x) for x in json_dict['loops']]
         ret.source = "from_json()"
 
         # Return the new loop
         return ret
 
     @classmethod
-    def from_string(cls, the_string, csv=False):
+    def from_string(cls, the_string: str, csv: bool = False):
         """Create a saveframe by parsing a string. Specify csv=True is
         the string is in CSV format and not NMR-STAR format."""
 
         return cls(the_string=the_string, csv=csv)
 
     @classmethod
-    def from_template(cls, category, name=None, entry_id=None, all_tags=False, default_values=False, schema=None):
+    def from_template(cls, category: str, name: str = None, entry_id: Union[str, int] = None, all_tags: bool = False,
+                      default_values: bool = False, schema: schema_mod.Schema = None):
         """ Create a saveframe that has all of the tags and loops from the
         schema present. No values will be assigned. Specify the category
         when calling this method. Optionally also provide the name of the
@@ -300,33 +302,32 @@ class Saveframe(object):
                    all_tags=all_tags, default_values=default_values, schema=schema,
                    source="from_template(%s)" % schema.version)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Returns a description of the saveframe."""
 
         return "<pynmrstar.Saveframe '%s'>" % self.name
 
-    def __setitem__(self, key, item):
+    def __setitem__(self, key: Union[str, int], item: Union[str, 'loop_mod.Loop']) -> None:
         """Set the indicated loop or tag."""
 
         # It's a loop
-        if isinstance(item, loop.Loop):
+        if isinstance(item, loop_mod.Loop):
             try:
                 integer = int(str(key))
                 self.loops[integer] = item
             except ValueError:
-                if key.lower() in self.loop_dict():
+                if key.lower() in self.loop_dict:
                     for pos, tmp_loop in enumerate(self.loops):
                         if tmp_loop.category.lower() == key.lower():
                             self.loops[pos] = item
                 else:
-                    raise KeyError("Loop with category '%s' does not exist and"
-                                   " therefore cannot be written to. Use "
+                    raise KeyError("Loop with category '%s' does not exist and therefore cannot be written to. Use "
                                    "add_loop instead." % key)
         else:
             # If the tag already exists, set its value
             self.add_tag(key, item, update=True)
 
-    def __str__(self, first_in_category=True):
+    def __str__(self, first_in_category: bool = True) -> str:
         """Returns the saveframe in STAR format as a string."""
 
         if utils.ALLOW_V2_ENTRIES:
@@ -382,24 +383,21 @@ class Saveframe(object):
         ret_string += "\nsave_\n"
         return ret_string
 
-    def add_loop(self, loop_to_add):
+    def add_loop(self, loop_to_add: 'loop_mod.Loop') -> None:
         """Add a loop to the saveframe loops."""
 
-        if (loop_to_add.category in self.loop_dict() or
-                str(loop_to_add.category).lower() in self.loop_dict()):
+        if (loop_to_add.category in self.loop_dict or
+                str(loop_to_add.category).lower() in self.loop_dict):
             if loop_to_add.category is None:
-                raise ValueError("You cannot have two loops with the same "
-                                 "category in one saveframe. You are getting "
-                                 "this error because you haven't yet set your "
-                                 "loop categories.")
+                raise ValueError("You cannot have two loops with the same category in one saveframe. You are getting "
+                                 "this error because you haven't yet set your loop categories.")
             else:
-                raise ValueError("You cannot have two loops with the same "
-                                 "category in one saveframe. Category: '%s'." %
+                raise ValueError("You cannot have two loops with the same category in one saveframe. Category: '%s'." %
                                  loop_to_add.category)
 
         self.loops.append(loop_to_add)
 
-    def add_tag(self, name, value, linenum=None, update=False):
+    def add_tag(self, name: str, value: Any, line_num: Optional[int] = None, update: bool = False) -> None:
         """Add a tag to the tag list. Does a bit of validation and
         parsing. Set update to true to update a tag if it exists rather
         than raise an exception."""
@@ -410,10 +408,8 @@ class Saveframe(object):
                 if self.tag_prefix is None:
                     self.tag_prefix = prefix
                 elif self.tag_prefix != prefix:
-                    raise ValueError("One saveframe cannot have tags with "
-                                     "different categories (or tags that don't "
-                                     "match the set category)! '%s' vs '%s'." %
-                                     (self.tag_prefix, prefix))
+                    raise ValueError("One saveframe cannot have tags with different categories (or tags that don't "
+                                     "match the set category)! '%s' vs '%s'." % (self.tag_prefix, prefix))
                 name = name[name.index(".") + 1:]
             else:
                 name = name[1:]
@@ -421,8 +417,7 @@ class Saveframe(object):
         # No duplicate tags
         if self.get_tag(name):
             if not update:
-                raise ValueError("There is already a tag with the name '%s'." %
-                                 name)
+                raise ValueError("There is already a tag with the name '%s'." % name)
             else:
                 self.get_tag(name, whole_tag=True)[0][1] = value
                 return
@@ -432,28 +427,28 @@ class Saveframe(object):
         if " " in name:
             raise ValueError("Tag names can not contain spaces.")
 
-        # See if we need to convert the datatype
+        # See if we need to convert the data type
         if utils.CONVERT_DATATYPES:
             new_tag = [name, utils.get_schema().convert_tag(
-                self.tag_prefix + "." + name, value, line_num=linenum)]
+                self.tag_prefix + "." + name, value, line_num=line_num)]
         else:
             new_tag = [name, value]
 
         # Set the category if the tag we are loading is the category
-        tagname_lower = name.lower()
-        if tagname_lower == "sf_category" or tagname_lower == "_saveframe_category":
+        tag_name_lower = name.lower()
+        if tag_name_lower == "sf_category" or tag_name_lower == "_saveframe_category":
             if not self.category:
                 self.category = value
 
-        if linenum:
-            new_tag.append(linenum)
+        if line_num:
+            new_tag.append(line_num)
 
         if utils.VERBOSE:
             print("Adding tag: '%s' with value '%s'" % (name, value))
 
         self.tags.append(new_tag)
 
-    def add_tags(self, tag_list, update=False):
+    def add_tags(self, tag_list: list, update: bool = False) -> None:
         """Adds multiple tags to the list. Input should be a list of
         tuples that are either [key, value] or [key]. In the latter case
         the value will be set to ".".  Set update to true to update a
@@ -465,10 +460,9 @@ class Saveframe(object):
             elif len(tag_pair) == 1:
                 self.add_tag(tag_pair[0], ".", update=update)
             else:
-                raise ValueError("You provided an invalid tag/value to add:"
-                                 " '%s'." % tag_pair)
+                raise ValueError("You provided an invalid tag/value to add: '%s'." % tag_pair)
 
-    def compare(self, other):
+    def compare(self, other) -> List[str]:
         """Returns the differences between two saveframes as a list.
         Non-equal saveframes will always be detected, but specific
         differences detected depends on order of saveframes."""
@@ -484,6 +478,8 @@ class Saveframe(object):
                 return []
             else:
                 return ['String was not exactly equal to saveframe.']
+        elif not isinstance(other, Saveframe):
+            return ['Other object is not of class Saveframe.']
 
         # We need to do this in case of an extra "\n" on the end of one tag
         if str(other) == str(self):
@@ -494,66 +490,54 @@ class Saveframe(object):
             if str(self.name) != str(other.name):
                 # No point comparing apples to oranges. If the tags are
                 #  this different just return
-                diffs.append("\tSaveframe names do not match: '%s' vs '%s'." %
-                             (self.name, other.name))
+                diffs.append("\tSaveframe names do not match: '%s' vs '%s'." % (self.name, other.name))
                 return diffs
 
             if str(self.tag_prefix) != str(other.tag_prefix):
                 # No point comparing apples to oranges. If the tags are
                 #  this different just return
-                diffs.append("\tTag prefix does not match: '%s' vs '%s'." %
-                             (self.tag_prefix, other.tag_prefix))
+                diffs.append("\tTag prefix does not match: '%s' vs '%s'." % (self.tag_prefix, other.tag_prefix))
                 return diffs
 
             if len(self.tags) < len(other.tags):
-                diffs.append("\tNumber of tags does not match: '%d' vs '%d'. "
-                             "The compared entry has at least one tag this "
-                             "entry does not." %
-                             (len(self.tags), len(other.tags)))
+                diffs.append("\tNumber of tags does not match: '%d' vs '%d'. The compared entry has at least one "
+                             "tag this entry does not." % (len(self.tags), len(other.tags)))
 
             for tag in self.tags:
                 other_tag = other.get_tag(tag[0])
 
                 if not other_tag:
-                    diffs.append("\tNo tag with name '%s.%s' in compared "
-                                 "entry." % (self.tag_prefix, tag[0]))
+                    diffs.append("\tNo tag with name '%s.%s' in compared entry." % (self.tag_prefix, tag[0]))
                     continue
 
                 # Compare the string version of the tags in case there are
                 #  non-string types. Use the conversion dict to get to str
-                if (str(utils.STR_CONVERSION_DICT.get(tag[1], tag[1])) !=
-                        str(utils.STR_CONVERSION_DICT.get(other_tag[0],
-                                                          other_tag[0]))):
-                    diffs.append("\tMismatched tag values for tag '%s.%s':"
-                                 " '%s' vs '%s'." %
-                                 (self.tag_prefix, tag[0],
-                                  str(tag[1]).replace("\n", "\\n"),
+                if (str(definitions.STR_CONVERSION_DICT.get(tag[1], tag[1])) !=
+                        str(definitions.STR_CONVERSION_DICT.get(other_tag[0], other_tag[0]))):
+                    diffs.append("\tMismatched tag values for tag '%s.%s': '%s' vs '%s'." %
+                                 (self.tag_prefix, tag[0], str(tag[1]).replace("\n", "\\n"),
                                   str(other_tag[0]).replace("\n", "\\n")))
 
             if len(self.loops) != len(other.loops):
-                diffs.append("\tNumber of children loops does not match: "
-                             "'%d' vs '%d'." %
+                diffs.append("\tNumber of children loops does not match: '%d' vs '%d'." %
                              (len(self.loops), len(other.loops)))
 
-            compare_loop_dict = other.loop_dict()
+            compare_loop_dict = other.loop_dict
             for each_loop in self.loops:
                 if each_loop.category.lower() in compare_loop_dict:
-                    compare = each_loop.compare(
-                        compare_loop_dict[each_loop.category.lower()])
+                    compare = each_loop.compare(compare_loop_dict[each_loop.category.lower()])
                     if len(compare) > 0:
-                        diffs.append("\tLoops do not match: '%s'." %
-                                     each_loop.category)
+                        diffs.append("\tLoops do not match: '%s'." % each_loop.category)
                         diffs.extend(compare)
                 else:
-                    diffs.append("\tNo loop with category '%s' in other"
-                                 " entry." % each_loop.category)
+                    diffs.append("\tNo loop with category '%s' in other entry." % each_loop.category)
 
         except AttributeError as err:
-            diffs.append("\tAn exception occured while comparing: '%s'." % err)
+            diffs.append("\tAn exception occurred while comparing: '%s'." % err)
 
         return diffs
 
-    def delete_tag(self, tag):
+    def delete_tag(self, tag: str) -> None:
         """Deletes a tag from the saveframe based on tag name."""
 
         tag = utils.format_tag(tag).lower()
@@ -565,31 +549,30 @@ class Saveframe(object):
 
         raise KeyError("There is no tag with name '%s' to remove." % tag)
 
-    def get_data_as_csv(self, header=True, show_category=True):
+    def get_data_as_csv(self, header: bool = True, show_category: bool = True) -> str:
         """Return the data contained in the loops, properly CSVd, as a
         string. Set header to False omit the header. Set show_category
         to False to omit the loop category from the headers."""
 
-        csv_buffer = utils.StringIO()
-        cwriter = csv_writer(csv_buffer)
+        csv_buffer = StringIO()
+        csv_writer_object = csv_writer(csv_buffer)
 
         if header:
             if show_category:
-                cwriter.writerow(
-                    [str(self.tag_prefix) + "." + str(x[0]) for x in self.tags])
+                csv_writer_object.writerow([str(self.tag_prefix) + "." + str(x[0]) for x in self.tags])
             else:
-                cwriter.writerow([str(x[0]) for x in self.tags])
+                csv_writer_object.writerow([str(x[0]) for x in self.tags])
 
         data = []
         for each_tag in self.tags:
             data.append(each_tag[1])
 
-        cwriter.writerow(data)
+        csv_writer_object.writerow(data)
 
         csv_buffer.seek(0)
         return csv_buffer.read().replace('\r\n', '\n')
 
-    def get_json(self, serialize=True):
+    def get_json(self, serialize: bool = True) -> Union[dict, str]:
         """ Returns the saveframe in JSON format. If serialize is set to
         False a dictionary representation of the saveframe that is
         serializeable is returned."""
@@ -607,7 +590,7 @@ class Saveframe(object):
         else:
             return saveframe_data
 
-    def get_loop_by_category(self, name):
+    def get_loop_by_category(self, name: str) -> 'loop_mod.Loop':
         """Return a loop based on the loop name (category)."""
 
         name = utils.format_category(name).lower()
@@ -616,7 +599,7 @@ class Saveframe(object):
                 return each_loop
         raise KeyError("No loop with category '%s'." % name)
 
-    def get_tag(self, query, whole_tag=False):
+    def get_tag(self, query: str, whole_tag: bool = False) -> list:
         """Allows fetching the value of a tag by tag name. Specify
         whole_tag=True and the [tag_name, tag_value] pair will be
         returned."""
@@ -633,15 +616,12 @@ class Saveframe(object):
         # Check the loops
         for each_loop in self.loops:
             if ((each_loop.category is not None and tag_prefix is not None and
-                 each_loop.category.lower() == tag_prefix.lower()) or
-                    utils.ALLOW_V2_ENTRIES):
+                 each_loop.category.lower() == tag_prefix.lower()) or utils.ALLOW_V2_ENTRIES):
                 results.extend(each_loop.get_tag(query, whole_tag=whole_tag))
 
         # Check our tags
         query = utils.format_tag(query).lower()
-        if (utils.ALLOW_V2_ENTRIES or
-                (tag_prefix is not None and
-                 tag_prefix.lower() == self.tag_prefix.lower())):
+        if utils.ALLOW_V2_ENTRIES or (tag_prefix is not None and tag_prefix.lower() == self.tag_prefix.lower()):
             for tag in self.tags:
                 if query == tag[0].lower():
                     if whole_tag:
@@ -651,26 +631,17 @@ class Saveframe(object):
 
         return results
 
-    def loop_dict(self):
-        """Returns a hash of loop category -> loop."""
-
-        res = {}
-        for each_loop in self.loops:
-            if each_loop.category is not None:
-                res[each_loop.category.lower()] = each_loop
-        return res
-
-    def loop_iterator(self):
+    def loop_iterator(self) -> Iterable['loop_mod.Loop']:
         """Returns an iterator for saveframe loops."""
 
         return iter(self.loops)
 
-    def set_tag_prefix(self, tag_prefix):
+    def set_tag_prefix(self, tag_prefix: str) -> None:
         """Set the tag prefix for this saveframe."""
 
         self.tag_prefix = utils.format_category(tag_prefix)
 
-    def sort_tags(self, schema=None):
+    def sort_tags(self, schema: schema_mod.Schema = None) -> None:
         """ Sort the tags so they are in the same order as a BMRB
         schema. Will automatically use the standard schema if none
         is provided."""
@@ -680,20 +651,19 @@ class Saveframe(object):
 
         self.tags.sort(key=sort_key)
 
-    def tag_iterator(self):
+    def tag_iterator(self) -> Iterable[list]:
         """Returns an iterator for saveframe tags."""
 
         return iter(self.tags)
 
-    def print_tree(self):
+    def print_tree(self) -> None:
         """Prints a summary, tree style, of the loops in the saveframe."""
 
         print(repr(self))
         for pos, each_loop in enumerate(self):
             print("\t[%d] %s" % (pos, repr(each_loop)))
 
-    def validate(self, validate_schema=True, schema=None,
-                 validate_star=True):
+    def validate(self, validate_schema: bool = True, schema: schema_mod.Schema = None, validate_star: bool = True):
         """Validate a saveframe in a variety of ways. Returns a list of
         errors found. 0-length list indicates no errors found. By
         default all validation modes are enabled.
@@ -708,8 +678,7 @@ class Saveframe(object):
 
         my_category = self.category
         if not my_category:
-            errors.append("Cannot properly validate saveframe: '" + self.name +
-                          "'. No saveframe category defined.")
+            errors.append("Cannot properly validate saveframe: '%s'. No saveframe category defined." % self.name)
             my_category = None
 
         if validate_schema:
@@ -719,22 +688,17 @@ class Saveframe(object):
             for tag in self.tags:
                 line_number = str(tag[2]) + " of original file" if len(tag) > 2 else None
                 formatted_tag = self.tag_prefix + "." + tag[0]
-                cur_errors = my_schema.val_type(formatted_tag, tag[1],
-                                                category=my_category,
-                                                linenum=line_number)
+                cur_errors = my_schema.val_type(formatted_tag, tag[1], category=my_category, linenum=line_number)
                 errors.extend(cur_errors)
 
         # Check the loops for errors
         for each_loop in self.loops:
-            errors.extend(
-                each_loop.validate(validate_schema=validate_schema,
-                                   schema=schema,
-                                   validate_star=validate_star,
-                                   category=my_category))
+            errors.extend(each_loop.validate(validate_schema=validate_schema, schema=schema,
+                                             validate_star=validate_star, category=my_category))
 
         return errors
 
-    def write_to_file(self, file_name, format_="nmrstar"):
+    def write_to_file(self, file_name: str, format_: str = "nmrstar"):
         """ Writes the saveframe to the specified file in NMR-STAR format.
 
         Optionally specify format_=json to write to the file in JSON format."""

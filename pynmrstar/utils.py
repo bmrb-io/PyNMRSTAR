@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """This module provides Entry, Saveframe, and Loop objects. Use python's
 built in help function for documentation.
@@ -68,52 +68,27 @@ Call directly (rather than importing) to run a self-test.
 #                 Imports                   #
 #############################################
 
-# Make sure print functions work in python2 and python3
-from __future__ import print_function
-
-import decimal
-import json
-import optparse
-# Standard library imports
 import os
 import sys
+import json
+import decimal
+import optparse
 from datetime import date
 from gzip import GzipFile
-from optparse import SUPPRESS_HELP
+from io import StringIO, BytesIO
+from urllib.request import urlopen
+from urllib.error import HTTPError, URLError
+from typing import Union, Optional, Dict, Iterable, Any
+from typing import TextIO, BinaryIO
 
-try:
-    import entry
-    import schema
-except ImportError:
-    from . import entry
-    from . import schema
-
-# See if we have zlib
-try:
-    import zlib
-except ImportError:
-    zlib = None
-
-# Determine if we are running in python3
-PY3 = (sys.version_info[0] == 3)
-
-# pylint: disable=wrong-import-position,no-name-in-module
-# pylint: disable=import-error,wrong-import-order
-# Python version dependent loads
-try:
-    from urllib.request import urlopen
-    from urllib.error import HTTPError, URLError
-    from io import StringIO, BytesIO
-except ImportError:
-    from urllib2 import urlopen, HTTPError, URLError
-    from cStringIO import StringIO
-
-    BytesIO = StringIO
+from . import definitions
+from . import entry as entry_mod
+from . import schema as schema_mod
 
 
 # This is an odd place for this, but it can't really be avoided if
 #  we want to keep the import at the top.
-def _build_extension():
+def _build_extension() -> bool:
     """ Try to compile the c extension. """
     import subprocess
 
@@ -123,11 +98,7 @@ def _build_extension():
         os.chdir(os.path.join(src_dir, "c"))
 
         # Use the appropriate build command
-        build_cmd = ['make']
-        if PY3:
-            build_cmd.append("python3")
-
-        process = subprocess.Popen(build_cmd, stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
+        process = subprocess.Popen(['make', 'python3'], stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
         process.communicate()
         ret_code = process.poll()
         # The make command exited with a non-zero status
@@ -163,8 +134,7 @@ except ImportError as e:
     cnmrstar = None
 
     # Check for the 'no c module' file before continuing
-    if not os.path.isfile(os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                       ".nocompile")):
+    if not os.path.isfile(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".nocompile")):
 
         if _build_extension():
             try:
@@ -177,101 +147,31 @@ except ImportError as e:
 #############################################
 
 # Set this to allow import * from pynmrstar to work sensibly
-__all__ = ['diff', 'validate', 'enable_nef_defaults', 'enable_nmrstar_defaults',
-           'delete_empty_saveframes', 'interpret_file', 'get_schema', 'format_category', 'format_tag']
+__all__ = ['diff', 'validate', 'interpret_file', 'get_schema', 'format_category', 'format_tag']
 
 # May be set by calling code
 VERBOSE = False
 
-ALLOW_V2_ENTRIES = False
-RAISE_PARSE_WARNINGS = False
+ALLOW_V2_ENTRIES: bool = False
+RAISE_PARSE_WARNINGS: bool = False
 WARNINGS_TO_IGNORE = []
-SKIP_EMPTY_LOOPS = False
-DONT_SHOW_COMMENTS = False
-CONVERT_DATATYPES = False
+SKIP_EMPTY_LOOPS: bool = False
+DONT_SHOW_COMMENTS: bool = False
+CONVERT_DATATYPES: bool = False
 
 # WARNING: STR_CONVERSION_DICT cannot contain both booleans and
 # arithmetic types. Attempting to use both will cause an issue since
 # boolean True == 1 in python and False == 0.
-STR_CONVERSION_DICT = {None: "."}
 
-# Used internally
-_STANDARD_SCHEMA = None
-_COMMENT_RECORDS = {}
-_API_URL = "http://webapi.bmrb.wisc.edu/v2"
-_SCHEMA_URL = 'https://raw.githubusercontent.com/uwbmrb/nmr-star-dictionary/master/xlschem_ann.csv'
-_WHITESPACE = " \t\n\v"
-__version__ = "3.0"
+_STANDARD_SCHEMA: Optional['schema_mod.Schema'] = None
+_COMMENT_RECORDS: Dict[str, Dict[str, str]] = {}
 
 
 #############################################
 #             Module methods                #
 #############################################
 
-# Public use methods
-def enable_nef_defaults():
-    """ Sets the module variables such that our behavior matches the NEF
-    standard. Specifically, suppress printing empty loops by default and
-    convert True -> "true" and False -> "false" when printing."""
-
-    global STR_CONVERSION_DICT, SKIP_EMPTY_LOOPS, DONT_SHOW_COMMENTS
-    STR_CONVERSION_DICT = {None: ".", True: "true", False: "false"}
-    SKIP_EMPTY_LOOPS = True
-    DONT_SHOW_COMMENTS = True
-
-
-def enable_nmrstar_defaults():
-    """ Sets the module variables such that our behavior matches the
-    BMRB standard (NMR-STAR). This is the default behavior of this module.
-    This method only exists to revert after calling enable_nef_defaults()."""
-
-    global STR_CONVERSION_DICT, SKIP_EMPTY_LOOPS, DONT_SHOW_COMMENTS
-    STR_CONVERSION_DICT = {None: "."}
-    SKIP_EMPTY_LOOPS = False
-    DONT_SHOW_COMMENTS = False
-
-
-def delete_empty_saveframes(entry_object, tags_to_ignore=None, allowed_null_values=None):
-    """ This method will delete all empty saveframes in an entry
-    (the loops in the saveframe must also be empty for the saveframe
-    to be deleted). "Empty" means no values in tags, not no tags present."""
-
-    if not tags_to_ignore:
-        tags_to_ignore = ["sf_category", "sf_framecode"]
-    if not allowed_null_values:
-        allowed_null_values = [".", "?", None]
-    to_delete_list = []
-
-    # Go through the saveframes
-    for pos, frame in enumerate(entry_object):
-        to_delete = True
-
-        # Go through the tags
-        for tag in frame.tag_iterator():
-
-            # Check if the tag is one to ignore
-            if tag[0].lower() not in tags_to_ignore:
-                # Check if the value is not null
-                if tag[1] not in allowed_null_values:
-                    to_delete = False
-                    break
-
-        # Now check the loops
-        for loop in frame:
-            if loop.data:
-                to_delete = False
-                break
-
-        # Now we know if we can delete
-        if to_delete:
-            to_delete_list.append(pos)
-
-    # Delete the frames
-    for pos in reversed(to_delete_list):
-        del entry_object[pos]
-
-
-def diff(entry1, entry2):
+def diff(entry1: 'entry_mod.Entry', entry2: 'entry_mod.Entry') -> None:
     """Prints the differences between two entries. Non-equal entries
     will always be detected, but specific differences detected depends
     on order of entries."""
@@ -283,21 +183,21 @@ def diff(entry1, entry2):
         print(difference)
 
 
-def iter_entries(metabolomics=False):
+def iter_entries(metabolomics: bool = False) -> Iterable['entry_mod.Entry']:
     """ Returns a generator that will yield an Entry object for every
         macromolecule entry in the current BMRB database. Perfect for performing
         an operation across the entire BMRB database. Set `metabolomics=True`
         in order to get all the entries in the metabolomics database."""
 
-    api_url = "%s/list_entries?database=macromolecules" % _API_URL
+    api_url = "%s/list_entries?database=macromolecules" % definitions.API_URL
     if metabolomics:
-        api_url = "%s/list_entries?database=metabolomics" % _API_URL
+        api_url = "%s/list_entries?database=metabolomics" % definitions.API_URL
 
     for entry in json.loads(interpret_file(api_url).read()):
         yield entry.Entry.from_database(entry)
 
 
-def validate(entry_to_validate, schema=None):
+def validate(entry_to_validate: 'entry_mod.Entry', schema: 'schema_mod.Schema' = None) -> None:
     """Prints a validation report of an object."""
 
     validation = entry_to_validate.validate(schema=schema)
@@ -307,7 +207,7 @@ def validate(entry_to_validate, schema=None):
         print("%d: %s" % (pos + 1, err))
 
 
-def clean_value(value):
+def clean_value(value: Any) -> str:
     """Automatically quotes the value in the appropriate way. Don't
     quote values you send to this method or they will show up in
     another set of quotes as part of the actual data. E.g.:
@@ -327,9 +227,9 @@ def clean_value(value):
     """
 
     # Allow manual specification of conversions for booleans, Nones, etc.
-    if value in STR_CONVERSION_DICT:
-        if any(isinstance(value, type(x)) for x in STR_CONVERSION_DICT):
-            value = STR_CONVERSION_DICT[value]
+    if value in definitions.STR_CONVERSION_DICT:
+        if any(isinstance(value, type(x)) for x in definitions.STR_CONVERSION_DICT):
+            value = definitions.STR_CONVERSION_DICT[value]
 
     # Use the fast code if it is available
     if cnmrstar is not None:
@@ -344,7 +244,7 @@ def clean_value(value):
     if not isinstance(value, str):
         value = str(value)
 
-    # If it is a STAR-format multiline comment already, we need to escape it
+    # If it is a STAR-format multi-line comment already, we need to escape it
     if "\n;" in value:
         value = value.replace("\n", "\n   ")
         if value[-1] != "\n":
@@ -360,8 +260,7 @@ def clean_value(value):
         return value
 
     if value == "":
-        raise ValueError("Empty strings are not allowed as values. "
-                         "Use a '.' or a '?' if needed.")
+        raise ValueError("Empty strings are not allowed as values. Use a '.' or a '?' if needed.")
 
     # If it has single and double quotes it will need to go on its
     #  own line under certain conditions...
@@ -372,7 +271,7 @@ def clean_value(value):
         for pos, char in enumerate(value):
             next_char = value[pos + 1:pos + 2]
 
-            if next_char != "" and next_char in _WHITESPACE:
+            if next_char != "" and next_char in definitions.WHITESPACE:
                 if char == "'":
                     can_wrap_single = False
                 if char == '"':
@@ -386,9 +285,8 @@ def clean_value(value):
             return '"%s"' % value
 
     # Check for special characters in a tag
-    if (any(x in value for x in " \t\v#") or
-            any(value.startswith(x) for x in
-                ["data_", "save_", "loop_", "stop_", "_"])):
+    if any(x in value for x in definitions.WHITESPACE) or '#' in value or value in definitions.RESERVED_KEYWORDS or \
+            value.startswith("_"):
         # If there is a single quote wrap in double quotes
         if "'" in value:
             return '"%s"' % value
@@ -407,7 +305,7 @@ def clean_value(value):
 
 
 # Internal use only methods
-def _json_serialize(obj):
+def _json_serialize(obj: object) -> str:
     """JSON serializer for objects not serializable by default json code"""
 
     # Serialize datetime.date objects by calling str() on them
@@ -416,27 +314,27 @@ def _json_serialize(obj):
     raise TypeError("Type not serializable: %s" % type(obj))
 
 
-def format_category(value):
+def format_category(tag: str) -> str:
     """Adds a '_' to the front of a tag (if not present) and strips out
     anything after a '.'"""
 
-    if value:
-        if not value.startswith("_"):
-            value = "_" + value
-        if "." in value:
-            value = value[:value.index(".")]
-    return value
+    if tag:
+        if not tag.startswith("_"):
+            return "_" + tag
+        if "." in tag:
+            return tag[:tag.index(".")]
+    return tag
 
 
-def format_tag(value):
+def format_tag(tag: str) -> str:
     """Strips anything before the '.'"""
 
-    if '.' in value:
-        value = value[value.index('.') + 1:]
-    return value
+    if '.' in tag:
+        return tag[tag.index('.') + 1:]
+    return tag
 
 
-def get_schema(passed_schema=None):
+def get_schema(passed_schema: 'schema_mod.Schema' = None) -> 'schema_mod.Schema':
     """If passed a schema (not None) it returns it. If passed none,
     it checks if the default schema has been initialized. If not
     initialized, it initializes it. Then it returns the default schema."""
@@ -451,11 +349,11 @@ def get_schema(passed_schema=None):
         try:
             schema_file = os.path.join(os.path.dirname(os.path.realpath(__file__)))
             schema_file = os.path.join(schema_file, "../reference_files/schema.csv")
-            _STANDARD_SCHEMA = schema.Schema(schema_file=schema_file)
+            _STANDARD_SCHEMA = schema_mod.Schema(schema_file=schema_file)
         except IOError:
             # Try to load from the internet
             try:
-                _STANDARD_SCHEMA = schema.Schema()
+                _STANDARD_SCHEMA = schema_mod.Schema()
             except (HTTPError, URLError):
                 raise ValueError("Could not load a BMRB schema from the "
                                  "internet or from the local repository.")
@@ -463,14 +361,14 @@ def get_schema(passed_schema=None):
     return _STANDARD_SCHEMA
 
 
-def interpret_file(the_file):
+def interpret_file(the_file: Union[str, TextIO, BinaryIO]) -> StringIO:
     """Helper method returns some sort of object with a read() method.
     the_file could be a URL, a file location, a file object, or a
     gzipped version of any of the above."""
 
     if hasattr(the_file, 'read') and hasattr(the_file, 'readline'):
         star_buffer = the_file
-    elif isinstance(the_file, str) or isinstance(the_file, unicode):
+    elif isinstance(the_file, str):
         if (the_file.startswith("http://") or the_file.startswith("https://") or
                 the_file.startswith("ftp://")):
             url_data = urlopen(the_file)
@@ -496,13 +394,13 @@ def interpret_file(the_file):
     # If the type is still bytes, convert it to string for python3
     full_star = star_buffer.read()
     star_buffer.seek(0)
-    if PY3 and isinstance(full_star, bytes):
+    if isinstance(full_star, bytes):
         star_buffer = StringIO(full_star.decode())
 
     return star_buffer
 
 
-def _get_comments():
+def _get_comments() -> Dict[str, Dict[str, str]]:
     """ Loads the comments that should be placed in written files. """
 
     # Comment dictionary already exists
@@ -514,15 +412,15 @@ def _get_comments():
     file_to_load = os.path.join(file_to_load, "../reference_files/comments.str")
 
     try:
-        comment_entry = entry.Entry.from_file(file_to_load)
+        comment_entry = entry_mod.Entry.from_file(file_to_load)
     except IOError:
         # Load the comments from Github if we can't find them locally
         try:
             comment_url = "https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v2/reference_files/comments.str"
-            comment_entry = entry.Entry.from_file(interpret_file(comment_url))
+            comment_entry = entry_mod.Entry.from_file(interpret_file(comment_url))
         except Exception:
             # No comments will be printed
-            return
+            return {}
 
     # Load the comments
     comment_records = comment_entry[0][0].get_tag(["category", "comment", "every_flag"])
@@ -535,8 +433,9 @@ def _get_comments():
     return _COMMENT_RECORDS
 
 
-def _tag_key(x, schema=None):
+def _tag_key(x, schema: 'schema_mod.Schema' = None) -> int:
     """ Helper function to figure out how to sort the tags."""
+
     try:
         return get_schema(schema).schema_order.index(x)
     except ValueError:
@@ -546,13 +445,13 @@ def _tag_key(x, schema=None):
         return len(get_schema(schema).schema_order) + abs(hash(x))
 
 
-def _called_directly():
+def _called_directly() -> None:
     """ Figure out what to do if we were called on the command line
     rather than imported as a module."""
 
     # Specify some basic information about our command
     optparser = optparse.OptionParser(usage="usage: %prog",
-                                      version=__version__,
+                                      version=1,
                                       description="NMR-STAR handling python "
                                                   "module. Usually you'll want "
                                                   "to import this. When ran "
@@ -574,7 +473,7 @@ def _called_directly():
                               "tag with the fewest results, and the values for"
                               " the tags will be separated with tabs.")
     optparser.add_option("--quick", action="store_true", default=False,
-                         dest="quick_test", help=SUPPRESS_HELP)
+                         dest="quick_test", help=optparse.SUPPRESS_HELP)
 
     # Options, parse 'em
     (options, cmd_input) = optparser.parse_args()
@@ -592,17 +491,17 @@ def _called_directly():
 
     # Validate an entry
     if options.validate is not None:
-        validate(entry.Entry.from_file(options.validate))
+        validate(entry_mod.Entry.from_file(options.validate))
 
     # Print the diff report
     elif options.diff is not None:
-        diff(entry.Entry.from_file(options.diff[0]), entry.Entry.from_file(options.diff[1]))
+        diff(entry_mod.Entry.from_file(options.diff[0]), entry_mod.Entry.from_file(options.diff[1]))
 
     # Fetch a tag and print it
     elif options.fetch_tag is not None:
 
         # Build an Entry from their file
-        entry_local = entry.Entry.from_file(options.fetch_tag[0])
+        entry_local = entry_mod.Entry.from_file(options.fetch_tag[0])
 
         # Figure out if they want one or more tags
         if "," in options.fetch_tag[1]:
@@ -659,10 +558,3 @@ def _called_directly():
 # Allow using diff or validate if ran directly
 if __name__ == '__main__':
     _called_directly()
-else:
-    #############################################
-    #          Module initializations           #
-    #############################################
-
-    # This makes sure that when decimals are printed a lower case "e" is used
-    decimal.getcontext().capitals = 0

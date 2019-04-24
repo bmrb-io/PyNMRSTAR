@@ -12,10 +12,11 @@ import json
 
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
 # Local imports
-from pynmrstar import Entry, Loop, Saveframe, Schema, _Parser, utils
+from pynmrstar import Entry, Loop, Saveframe, Schema
+import pynmrstar.parser
+import pynmrstar.definitions
+import pynmrstar.utils as utils
 
-# Determine if we are running in python3
-PY3 = (sys.version_info[0] == 3)
 
 if utils.cnmrstar:
     print("Using C library...")
@@ -37,16 +38,6 @@ class TestPyNMRSTAR(unittest.TestCase):
     def setUp(self):
         self.entry = copy(database_entry)
 
-    def test_enable_nef_defaults(self):
-        utils.enable_nef_defaults()
-        self.assertEqual(utils.STR_CONVERSION_DICT, {None: ".", True: "true", False: "false"})
-        self.assertEqual(utils.SKIP_EMPTY_LOOPS, True)
-
-    def test_enable_nmrstar_defaults(self):
-        utils.enable_nmrstar_defaults()
-        self.assertEqual(utils.STR_CONVERSION_DICT, {None: "."})
-        self.assertEqual(utils.SKIP_EMPTY_LOOPS, False)
-
     def test_clean_val(self):
         # Check tag cleaning
         self.assertEqual(utils.clean_value("single quote test"), "'single quote test'")
@@ -60,23 +51,22 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertEqual(utils.clean_value(None), ".")
         self.assertRaises(ValueError, utils.clean_value, "")
 
-        utils.STR_CONVERSION_DICT = {"loop_": "noloop_"}
+        pynmrstar.definitions.STR_CONVERSION_DICT = {"loop_": "noloop_"}
         self.assertEqual(utils.clean_value("loop_"), "noloop_")
-        utils.STR_CONVERSION_DICT = {None: "."}
+        pynmrstar.definitions.STR_CONVERSION_DICT = {None: "."}
 
     def test__odd_strings(self):
-        """ Make sure the library can handle odd strings. Only in py3. """
+        """ Make sure the library can handle odd strings. """
 
-        if utils.PY3:
-            saveframe = Saveframe.from_scratch('test', 'citations')
-            with open(os.path.join(our_path, 'naughty-strings/blns.json')) as odd_string_file:
-                odd_strings = json.load(odd_string_file)
-            for x, string in enumerate(odd_strings):
-                if string == '':
-                    continue
-                saveframe.add_tag(str(x), string)
+        saveframe = Saveframe.from_scratch('test', 'citations')
+        with open(os.path.join(our_path, 'naughty-strings/blns.json')) as odd_string_file:
+            odd_strings = json.load(odd_string_file)
+        for x, string in enumerate(odd_strings):
+            if string == '':
+                continue
+            saveframe.add_tag(str(x), string)
 
-            self.assertEqual(saveframe, Saveframe.from_string(str(saveframe)))
+        self.assertEqual(saveframe, Saveframe.from_string(str(saveframe)))
 
     def test__format_category(self):
         self.assertEqual(utils.format_category("test"), "_test")
@@ -612,7 +602,7 @@ class TestPyNMRSTAR(unittest.TestCase):
     def test_parse_outliers(self):
         """ Make sure the parser handles edge cases. """
 
-        parser = _Parser()
+        parser = pynmrstar.parser.Parser()
         parser.load_data("""data_#pound
 save_entry_information  _Entry.Sf_category entry_information _Entry.Sf_framecode entry_information
 _Entry.sameline_comment value #ignore this all
@@ -745,8 +735,7 @@ _Entry.multi2
             reent = Entry.from_string(ent_str)
             self.assertEqual(reent, ent_str)
 
-            if PY3:
-                ent_str = ent_str.encode()
+            ent_str = ent_str.encode()
 
             compare = subprocess.Popen(["/bmrb/linux/bin/stardiff",
                                         "-ignore-tag",
@@ -756,9 +745,7 @@ _Entry.multi2
                                        stdout=subprocess.PIPE,
                                        stderr=subprocess.PIPE)
             results = compare.communicate(input=ent_str)[0]
-
-            if PY3:
-                results = results.decode()
+            results = results.decode()
 
             self.assertEqual("<standard input>:%s: NO DIFFERENCES REPORTED\n" %
                              location, results,
