@@ -12,10 +12,8 @@ import json
 
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
 # Local imports
-from pynmrstar import Entry, Loop, Saveframe, Schema
-import pynmrstar.parser
-import pynmrstar.definitions
-import pynmrstar.utils as utils
+from pynmrstar import Entry, Loop, Saveframe, Schema, definitions, utils, _Parser
+
 
 
 if utils.cnmrstar:
@@ -51,9 +49,9 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertEqual(utils.clean_value(None), ".")
         self.assertRaises(ValueError, utils.clean_value, "")
 
-        pynmrstar.definitions.STR_CONVERSION_DICT = {"loop_": "noloop_"}
+        definitions.STR_CONVERSION_DICT = {"loop_": "noloop_"}
         self.assertEqual(utils.clean_value("loop_"), "noloop_")
-        pynmrstar.definitions.STR_CONVERSION_DICT = {None: "."}
+        definitions.STR_CONVERSION_DICT = {None: "."}
 
     def test__odd_strings(self):
         """ Make sure the library can handle odd strings. """
@@ -602,7 +600,7 @@ class TestPyNMRSTAR(unittest.TestCase):
     def test_parse_outliers(self):
         """ Make sure the parser handles edge cases. """
 
-        parser = pynmrstar.parser.Parser()
+        parser = _Parser()
         parser.load_data("""data_#pound
 save_entry_information  _Entry.Sf_category entry_information _Entry.Sf_framecode entry_information
 _Entry.sameline_comment value #ignore this all

@@ -6,12 +6,12 @@ from typing import Union, List, Optional, Dict, Any
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen, Request
 
-from . import definitions
+from . import definitions, utils
 from . import loop as loop_mod
 from . import parser as parser_mod
 from . import saveframe as saveframe_mod
 from . import schema as schema_mod
-from . import utils
+from ._version import __version__
 
 
 class Entry(object):
