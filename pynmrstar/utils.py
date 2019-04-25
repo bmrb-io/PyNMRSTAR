@@ -79,7 +79,7 @@ from io import StringIO, BytesIO
 from urllib.request import urlopen
 from urllib.error import HTTPError, URLError
 from typing import Union, Optional, Dict, Iterable, Any
-from typing import TextIO, BinaryIO
+from typing import IO
 
 from . import definitions
 from . import entry as entry_mod
@@ -361,43 +361,39 @@ def get_schema(passed_schema: 'schema_mod.Schema' = None) -> 'schema_mod.Schema'
     return _STANDARD_SCHEMA
 
 
-def interpret_file(the_file: Union[str, TextIO, BinaryIO]) -> StringIO:
+def interpret_file(the_file: Union[str, IO]) -> StringIO:
     """Helper method returns some sort of object with a read() method.
     the_file could be a URL, a file location, a file object, or a
     gzipped version of any of the above."""
 
-    if hasattr(the_file, 'read') and hasattr(the_file, 'readline'):
-        star_buffer = the_file
+    buffer: BytesIO
+
+    if isinstance(the_file, StringIO):
+        buffer = BytesIO(the_file.read().encode())
+    elif isinstance(the_file, BytesIO):
+        buffer = BytesIO(the_file.read())
     elif isinstance(the_file, str):
-        if (the_file.startswith("http://") or the_file.startswith("https://") or
-                the_file.startswith("ftp://")):
-            url_data = urlopen(the_file)
-            star_buffer = BytesIO(url_data.read())
-            url_data.close()
+        if the_file.startswith("http://") or the_file.startswith("https://") or the_file.startswith("ftp://"):
+            with urlopen(the_file) as url_data:
+                buffer = BytesIO(url_data.read())
         else:
             with open(the_file, 'rb') as read_file:
-                star_buffer = BytesIO(read_file.read())
+                buffer = BytesIO(read_file.read())
     else:
-        raise ValueError("Cannot figure out how to interpret the file"
-                         " you passed.")
+        raise ValueError("Cannot figure out how to interpret the file you passed.")
 
     # Decompress the buffer if we are looking at a gzipped file
     try:
-        gzip_buffer = GzipFile(fileobj=star_buffer)
+        gzip_buffer = GzipFile(fileobj=buffer)
         gzip_buffer.readline()
         gzip_buffer.seek(0)
-        star_buffer = gzip_buffer
+        buffer = BytesIO(gzip_buffer.read())
     # Apparently we are not looking at a gzipped file
     except (IOError, AttributeError, UnicodeDecodeError):
-        star_buffer.seek(0)
+        pass
 
-    # If the type is still bytes, convert it to string for python3
-    full_star = star_buffer.read()
-    star_buffer.seek(0)
-    if isinstance(full_star, bytes):
-        star_buffer = StringIO(full_star.decode())
-
-    return star_buffer
+    buffer.seek(0)
+    return StringIO(buffer.read().decode())
 
 
 def _get_comments() -> Dict[str, Dict[str, str]]:
