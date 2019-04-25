@@ -32,7 +32,7 @@ class Entry(object):
         """Returns True if this entry is equal to another entry, false
         if it is not equal."""
 
-        if not isinstance(other, Entry):
+        if not isinstance(other, (Entry, str)):
             return False
 
         return len(self.compare(other)) == 0
@@ -401,7 +401,7 @@ class Entry(object):
                 if frame.name not in other_frame_dict:
                     diffs.append("No saveframe with name '%s' in other entry." % frame.name)
                 else:
-                    comp = frame.compare(other_frame_dict[frame])
+                    comp = frame.compare(other_frame_dict[frame.name])
                     if len(comp) > 0:
                         diffs.append("Saveframes do not match: '%s'." % frame.name)
                         diffs.extend(comp)

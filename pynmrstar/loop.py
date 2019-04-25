@@ -21,7 +21,7 @@ class Loop(object):
         """Returns True if this loop is equal to another loop, False if
         it is different."""
 
-        if not isinstance(other, Loop):
+        if not isinstance(other, (Loop, str)):
             return False
 
         return len(self.compare(other)) == 0

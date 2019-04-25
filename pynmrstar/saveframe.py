@@ -38,7 +38,7 @@ class Saveframe(object):
         """Returns True if this saveframe is equal to another saveframe,
         False if it is equal."""
 
-        if not isinstance(other, Saveframe):
+        if not isinstance(other, (Saveframe, str)):
             return False
 
         return len(self.compare(other)) == 0

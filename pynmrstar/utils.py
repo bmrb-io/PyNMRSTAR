@@ -320,9 +320,9 @@ def format_category(tag: str) -> str:
 
     if tag:
         if not tag.startswith("_"):
-            return "_" + tag
+            tag = "_" + tag
         if "." in tag:
-            return tag[:tag.index(".")]
+            tag = tag[:tag.index(".")]
     return tag
 
 

@@ -479,7 +479,6 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertEqual(tmp_loop.get_data_as_csv(show_category=False, header=False), "1,5,6\n2,8,9\n")
 
         # Test get_tag
-        self.assertEqual(tmp_loop.get_data_by_tag("tag1"), [[1, 2]])
         self.assertRaises(ValueError, tmp_loop.get_tag, "invalid.tag1")
         self.assertEqual(tmp_loop.get_tag("tag1"), [1, 2])
         self.assertEqual(tmp_loop.get_tag(["tag1", "tag2"]), [[1, 5], [2, 8]])
