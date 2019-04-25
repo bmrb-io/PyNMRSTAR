@@ -17,7 +17,7 @@ from pynmrstar import Entry, Loop, Saveframe, Schema, definitions, utils, _Parse
 if cnmrstar:
     print("Using C library...")
 
-logging.basicConfig(filename=os.path.join(this_path, 'test.log'), level=logging.INFO)
+logging.basicConfig('test.log', level=logging.INFO)
 
 quick_test = False
 
