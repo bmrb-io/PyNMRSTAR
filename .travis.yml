@@ -5,4 +5,4 @@ python:
   - "3.7"
   - "3.8-dev"
 # command to run tests
-script: touch ".nocompile" && ./unit_tests/bmrb_test.py && rm .nocompile && ./unit_tests/bmrb_test.py
+script: touch "pynmrstar/.nocompile" && ./unit_tests/bmrb_test.py && rm pynmrstar/.nocompile && ./unit_tests/bmrb_test.py

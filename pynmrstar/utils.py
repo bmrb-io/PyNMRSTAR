@@ -1,49 +1,10 @@
 #!/usr/bin/env python3
 
-"""This module provides Entry, Saveframe, and Loop objects. Use python's
-built in help function for documentation.
-
-There are eight module variables you can set to control our behavior.
-
-* Setting VERBOSE to True will print some of what is going on to
-the terminal.
-
-* Setting RAISE_PARSE_WARNINGS to True will raise an exception if
-the parser encounters something problematic. Normally warnings are
-suppressed.
-
-* In addition, if you want to ignore some parse warnings but allow the
-rest, you can specify warnings to ignore by adding the warning to ignore
-to the "WARNINGS_TO_IGNORE" list.
-
-Here are descriptions of the parse warnings that can be suppressed:
-
-* "tag-only-loop": A loop with no data was found.
-* "empty-loop": A loop with no tags or values was found.
-* "tag-not-in-schema": A tag was found in the entry that was not present
-in the schema.
-* "invalid-null-value": A tag for which the schema disallows null values
-had a null value.
-* "bad-multiline": A tag with an improper multi-line value was found.
-Multiline values should look like this:
-\n;\nThe multi-line\nvalue here.\n;\n
-but the tag looked like this:
-\n; The multi-line\nvalue here.\n;\n
-
-* Setting SKIP_EMPTY_LOOPS to True will suppress the printing of empty
-loops when calling __str__ methods.
-
+"""
 * Adding key->value pairs to STR_CONVERSION_DICT will automatically
 convert tags whose value matches "key" to the string "value" when
 printing. This allows you to set the default conversion value for
 Booleans or other objects.
-
-* Setting ALLOW_V2_ENTRIES will allow parsing of NMR-STAR version
-2.1 entries. Most other methods will not operate correctly on parsed
-2.1 entries. This is only to allow you parse and access the data in
-these entries - nothing else. Only set this if you have a really good
-reason to. Attempting to print a 2.1 entry will 'work' but tags that
-were after loops will be moved to before loops.
 
 * Setting DONT_SHOW_COMMENTS to True will suppress the printing of
 comments before saveframes.
@@ -58,89 +19,27 @@ on all objects. Other that converting uppercase "E"s in scientific
 notation floats to lowercase "e"s this should not cause any change in
 the way re-printed NMR-STAR objects are displayed.
 
-Some errors will be detected and exceptions raised, but this does not
-implement a full validator (at least at present).
-
-Call directly (rather than importing) to run a self-test.
 """
 
 #############################################
 #                 Imports                   #
 #############################################
 
+import json
+import optparse
 import os
 import sys
-import json
-import decimal
-import optparse
-from datetime import date
 from gzip import GzipFile
 from io import StringIO, BytesIO
-from urllib.request import urlopen
-from urllib.error import HTTPError, URLError
-from typing import Union, Optional, Dict, Iterable, Any
 from typing import IO
+from typing import Union, Optional, Iterable, Any
+from urllib.error import HTTPError, URLError
+from urllib.request import urlopen
 
 from . import definitions
 from . import entry as entry_mod
 from . import schema as schema_mod
-
-
-# This is an odd place for this, but it can't really be avoided if
-#  we want to keep the import at the top.
-def _build_extension() -> bool:
-    """ Try to compile the c extension. """
-    import subprocess
-
-    cur_dir = os.getcwd()
-    try:
-        src_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)))
-        os.chdir(os.path.join(src_dir, "c"))
-
-        # Use the appropriate build command
-        process = subprocess.Popen(['make', 'python3'], stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
-        process.communicate()
-        ret_code = process.poll()
-        # The make command exited with a non-zero status
-        if ret_code:
-            return False
-
-        # We were able to build the extension?
-        return True
-    except OSError:
-        # There was an error going into the c dir
-        return False
-    finally:
-        # Go back to the directory we were in before exiting
-        os.chdir(cur_dir)
-
-    # We should never make it here, but if we do the null return
-    #  prevents the attempted importing of the c module.
-
-
-# See if we can use the fast tokenizer
-try:
-    import cnmrstar
-
-    if "version" not in dir(cnmrstar) or cnmrstar.version() < "2.2.8":
-        print("Recompiling cnmrstar module due to API changes. You may "
-              "experience a segmentation fault immediately following this "
-              "message but should have no issues the next time you run your "
-              "script or this program.")
-        _build_extension()
-        sys.exit(0)
-
-except ImportError as e:
-    cnmrstar = None
-
-    # Check for the 'no c module' file before continuing
-    if not os.path.isfile(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".nocompile")):
-
-        if _build_extension():
-            try:
-                import cnmrstar
-            except ImportError:
-                cnmrstar = None
+from ._internal import _get_cnmrstar
 
 #############################################
 #            Global Variables               #
@@ -149,27 +48,13 @@ except ImportError as e:
 # Set this to allow import * from pynmrstar to work sensibly
 __all__ = ['diff', 'validate', 'interpret_file', 'get_schema', 'format_category', 'format_tag']
 
-# May be set by calling code
-VERBOSE = False
-
-ALLOW_V2_ENTRIES: bool = False
-RAISE_PARSE_WARNINGS: bool = False
-WARNINGS_TO_IGNORE = []
-SKIP_EMPTY_LOOPS: bool = False
 DONT_SHOW_COMMENTS: bool = False
 CONVERT_DATATYPES: bool = False
 
-# WARNING: STR_CONVERSION_DICT cannot contain both booleans and
-# arithmetic types. Attempting to use both will cause an issue since
-# boolean True == 1 in python and False == 0.
-
 _STANDARD_SCHEMA: Optional['schema_mod.Schema'] = None
-_COMMENT_RECORDS: Dict[str, Dict[str, str]] = {}
 
+cnmrstar = _get_cnmrstar()
 
-#############################################
-#             Module methods                #
-#############################################
 
 def diff(entry1: 'entry_mod.Entry', entry2: 'entry_mod.Entry') -> None:
     """Prints the differences between two entries. Non-equal entries
@@ -225,6 +110,8 @@ def clean_value(value: Any) -> str:
     way the value is converted to a string.
 
     """
+
+    cnmrstar = _get_cnmrstar()
 
     # Allow manual specification of conversions for booleans, Nones, etc.
     if value in definitions.STR_CONVERSION_DICT:
@@ -304,16 +191,6 @@ def clean_value(value: Any) -> str:
     return value
 
 
-# Internal use only methods
-def _json_serialize(obj: object) -> str:
-    """JSON serializer for objects not serializable by default json code"""
-
-    # Serialize datetime.date objects by calling str() on them
-    if isinstance(obj, (date, decimal.Decimal)):
-        return str(obj)
-    raise TypeError("Type not serializable: %s" % type(obj))
-
-
 def format_category(tag: str) -> str:
     """Adds a '_' to the front of a tag (if not present) and strips out
     anything after a '.'"""
@@ -366,12 +243,14 @@ def interpret_file(the_file: Union[str, IO]) -> StringIO:
     the_file could be a URL, a file location, a file object, or a
     gzipped version of any of the above."""
 
-    buffer: BytesIO
-
-    if isinstance(the_file, StringIO):
-        buffer = BytesIO(the_file.read().encode())
-    elif isinstance(the_file, BytesIO):
-        buffer = BytesIO(the_file.read())
+    if hasattr(the_file, 'read'):
+        read_data: Union[bytes, str] = the_file.read()
+        if type(read_data) == bytes:
+            buffer: BytesIO = BytesIO(read_data)
+        elif type(read_data, str):
+            buffer = BytesIO(read_data.encode())
+        else:
+            raise IOError("What did your file object return when .read() was called on it?")
     elif isinstance(the_file, str):
         if the_file.startswith("http://") or the_file.startswith("https://") or the_file.startswith("ftp://"):
             with urlopen(the_file) as url_data:
@@ -394,51 +273,6 @@ def interpret_file(the_file: Union[str, IO]) -> StringIO:
 
     buffer.seek(0)
     return StringIO(buffer.read().decode())
-
-
-def _get_comments() -> Dict[str, Dict[str, str]]:
-    """ Loads the comments that should be placed in written files. """
-
-    # Comment dictionary already exists
-    global _COMMENT_RECORDS
-    if _COMMENT_RECORDS:
-        return _COMMENT_RECORDS
-
-    file_to_load = os.path.join(os.path.dirname(os.path.realpath(__file__)))
-    file_to_load = os.path.join(file_to_load, "../reference_files/comments.str")
-
-    try:
-        comment_entry = entry_mod.Entry.from_file(file_to_load)
-    except IOError:
-        # Load the comments from Github if we can't find them locally
-        try:
-            comment_url = "https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v2/reference_files/comments.str"
-            comment_entry = entry_mod.Entry.from_file(interpret_file(comment_url))
-        except Exception:
-            # No comments will be printed
-            return {}
-
-    # Load the comments
-    comment_records = comment_entry[0][0].get_tag(["category", "comment", "every_flag"])
-    comment_map = {'N': False, 'Y': True}
-    for comment in comment_records:
-        if comment[1] != ".":
-            _COMMENT_RECORDS[comment[0]] = {'comment': comment[1].rstrip() + "\n\n",
-                                            'every_flag': comment_map[comment[2]]}
-
-    return _COMMENT_RECORDS
-
-
-def _tag_key(x, schema: 'schema_mod.Schema' = None) -> int:
-    """ Helper function to figure out how to sort the tags."""
-
-    try:
-        return get_schema(schema).schema_order.index(x)
-    except ValueError:
-        # Generate an arbitrary sort order for tags that aren't in the
-        #  schema but make sure that they always come after tags in the
-        #   schema
-        return len(get_schema(schema).schema_order) + abs(hash(x))
 
 
 def _called_directly() -> None:

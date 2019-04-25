@@ -1,5 +1,4 @@
 import json
-import os
 from copy import deepcopy
 from csv import reader as csv_reader, writer as csv_writer
 from io import StringIO
@@ -12,6 +11,7 @@ from . import entry as entry_mod
 from . import parser as parser_mod
 from . import schema as schema_mod
 from . import utils
+from ._internal import _tag_key, _json_serialize
 
 
 class Loop(object):
@@ -132,15 +132,7 @@ class Loop(object):
     def __repr__(self) -> str:
         """Returns a description of the loop."""
 
-        if utils.ALLOW_V2_ENTRIES and self.category is None:
-            common = os.path.commonprefix(self.tags)
-            if common.endswith("_"):
-                common = common[:-1]
-            if common == "":
-                common = "Unknown"
-            return "<pynmrstar.Loop '%s'>" % common
-        else:
-            return "<pynmrstar.Loop '%s'>" % self.category
+        return "<pynmrstar.Loop '%s'>" % self.category
 
     def __setitem__(self, key: str, item: Any) -> None:
         """Set all of the instances of a tag to the provided value.
@@ -166,13 +158,13 @@ class Loop(object):
         for pos, row in enumerate(self.data):
             row[tag_id] = item[pos]
 
-    def __str__(self) -> str:
+    def __str__(self, skip_empty_loops: bool = False) -> str:
         """Returns the loop in STAR format as a string."""
 
         # Check if there is any data in this loop
         if len(self.data) == 0:
             # They do not want us to print empty loops
-            if utils.SKIP_EMPTY_LOOPS:
+            if skip_empty_loops:
                 return ""
             else:
                 # If we have no tags than return the empty loop
@@ -191,7 +183,7 @@ class Loop(object):
         format_string = "      %-s\n"
 
         # Check to make sure our category is set
-        if self.category is None and not utils.ALLOW_V2_ENTRIES:
+        if self.category is None:
             raise ValueError("The category was never set for this loop. Either add a tag with the category intact, "
                              "specify it when generating the loop, or set it using set_category.")
 
@@ -658,7 +650,7 @@ class Loop(object):
         }
 
         if serialize:
-            return json.dumps(loop_dict, default=utils._json_serialize)
+            return json.dumps(loop_dict, default=_json_serialize)
         else:
             return loop_dict
 
@@ -720,11 +712,8 @@ class Loop(object):
             elif isinstance(query, int):
                 tag_ids.append(query)
             else:
-                if utils.ALLOW_V2_ENTRIES:
-                    return []
-                else:
-                    raise ValueError("Could not locate the tag with name or ID: '%s' in loop '%s'." %
-                                     (query, str(self.category)))
+                raise ValueError("Could not locate the tag with name or ID: '%s' in loop '%s'." %
+                                 (query, str(self.category)))
 
         # First build the tags as a list
         if not dict_result:
@@ -844,7 +833,7 @@ class Loop(object):
 
         # Sort the tags
         def sort_key(_):
-            return utils._tag_key(_, schema=schema)
+            return _tag_key(_, schema=schema)
 
         sorted_order = sorted(current_order, key=sort_key)
 

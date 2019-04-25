@@ -1,23 +1,23 @@
-#!/usr/bin/env python
-
-# Standard imports
-import os
-import sys
-import random
-import unittest
-import subprocess
-from copy import deepcopy as copy
+#!/usr/bin/env python3
 
 import json
+import os
+import random
+import subprocess
+import sys
+import unittest
+import logging
+from copy import deepcopy as copy
 
-sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
+this_path = os.path.realpath(__file__)
+sys.path.append(os.path.join(os.path.dirname(this_path), ".."))
 # Local imports
-from pynmrstar import Entry, Loop, Saveframe, Schema, definitions, utils, _Parser
+from pynmrstar import Entry, Loop, Saveframe, Schema, definitions, utils, _Parser, cnmrstar
 
-
-
-if utils.cnmrstar:
+if cnmrstar:
     print("Using C library...")
+
+logging.basicConfig(filename=os.path.join(this_path, 'test.log'), level=logging.INFO)
 
 quick_test = False
 
@@ -427,7 +427,7 @@ class TestPyNMRSTAR(unittest.TestCase):
         utils.SKIP_EMPTY_LOOPS = False
         self.assertEqual(str(Loop.from_scratch()), "\n   loop_\n\n   stop_\n")
         utils.SKIP_EMPTY_LOOPS = True
-        self.assertEqual(str(Loop.from_scratch()), "")
+        self.assertEqual(Loop.from_scratch().__str__(skip_empty_loops=True), "")
         tmp_loop = Loop.from_scratch()
         tmp_loop.data = [[1, 2, 3]]
         self.assertRaises(ValueError, tmp_loop.__str__)

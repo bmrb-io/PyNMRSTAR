@@ -2,12 +2,14 @@ import decimal
 import json
 import os
 import re
+import logging
 from csv import reader as csv_reader
 from datetime import date
 from io import StringIO
 from typing import TextIO, BinaryIO
 from typing import Union, List, Optional, Any, Dict, Iterable
 
+import pynmrstar._internal
 from . import definitions
 from . import utils
 
@@ -257,15 +259,8 @@ class Schema(object):
 
         # If we don't know what the tag is, just return it
         if tag.lower() not in self.schema:
-            if (utils.RAISE_PARSE_WARNINGS and
-                    "tag-not-in-schema" not in utils.WARNINGS_TO_IGNORE):
-                raise ValueError("There is a tag in the file that isn't in the"
-                                 " schema: '%s' on line '%s'" % (tag, line_num))
-            else:
-                if utils.VERBOSE:
-                    print("Couldn't convert tag because it is not in the "
-                          "dictionary: " + tag)
-                return value
+            logging.warning("Couldn't convert tag data type because it is not in the dictionary: " + tag)
+            return value
 
         full_tag = self.schema[tag.lower()]
 
@@ -274,13 +269,7 @@ class Schema(object):
 
         # Check for null
         if value in definitions.NULL_VALUES:
-            if (not null_allowed and utils.RAISE_PARSE_WARNINGS and
-                    "invalid-null-value" not in utils.WARNINGS_TO_IGNORE):
-                raise ValueError("There is a null in the file that isn't "
-                                 "allowed according to the schema: '%s' on "
-                                 "line '%s'" % (tag, line_num))
-            else:
-                return None
+            return None
 
         # Keep strings strings
         if "CHAR" in valtype or "VARCHAR" in valtype or "TEXT" in valtype:
@@ -291,10 +280,8 @@ class Schema(object):
             try:
                 return int(value)
             except (ValueError, TypeError):
-                raise ValueError("Could not parse the file because a value "
-                                 "that should be an INTEGER is not. Please "
-                                 "turn off CONVERT_DATATYPES or fix the file. "
-                                 "Tag: '%s' on line '%s'" % (tag, line_num))
+                raise ValueError("Could not parse the file because a value that should be an INTEGER is not. Please "
+                                 "turn off CONVERT_DATATYPES or fix the file. Tag: '%s' on line '%s'" % (tag, line_num))
 
         # Convert floats
         if "FLOAT" in valtype:
@@ -302,20 +289,16 @@ class Schema(object):
                 # If we used int() we would lose the precision
                 return decimal.Decimal(value)
             except (decimal.InvalidOperation, TypeError):
-                raise ValueError("Could not parse the file because a value "
-                                 "that should be a FLOAT is not. Please turn "
-                                 "off CONVERT_DATATYPES or fix the file. Tag: "
-                                 "'%s' on line '%s'" % (tag, line_num))
+                raise ValueError("Could not parse the file because a value that should be a FLOAT is not. Please turn "
+                                 "off CONVERT_DATATYPES or fix the file. Tag: '%s' on line '%s'" % (tag, line_num))
 
         if "DATETIME year to day" in valtype:
             try:
                 year, month, day = [int(x) for x in value.split("-")]
                 return date(year, month, day)
             except (ValueError, TypeError):
-                raise ValueError("Could not parse the file because a value "
-                                 "that should be a DATETIME is not. Please "
-                                 "turn off CONVERT_DATATYPES or fix the file. "
-                                 "Tag: '%s' on line '%s'" % (tag, line_num))
+                raise ValueError("Could not parse the file because a value that should be a DATETIME is not. Please "
+                                 "turn off CONVERT_DATATYPES or fix the file. Tag: '%s' on line '%s'" % (tag, line_num))
 
         # We don't know the data type, so just keep it a string
         return value
@@ -325,8 +308,7 @@ class Schema(object):
         according to this schema."""
 
         if tag.lower() not in self.schema:
-            return ["Tag '%s' not found in schema. Line '%s'." %
-                    (tag, linenum)]
+            return ["Tag '%s' not found in schema. Line '%s'." % (tag, linenum)]
 
         # We will skip type checks for None's
         is_none = value is None
@@ -422,6 +404,6 @@ class Schema(object):
         s['tags'] = compacted_schema
 
         if serialize:
-            return json.dumps(s, default=utils._json_serialize)
+            return json.dumps(s, default=pynmrstar._internal._json_serialize)
         else:
             return s

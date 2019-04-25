@@ -1,4 +1,5 @@
 import json
+import logging
 import zlib
 from io import StringIO
 from typing import TextIO, BinaryIO
@@ -11,7 +12,7 @@ from . import loop as loop_mod
 from . import parser as parser_mod
 from . import saveframe as saveframe_mod
 from . import schema as schema_mod
-from ._version import __version__
+from ._internal import __version__, _json_serialize
 
 
 class Entry(object):
@@ -162,16 +163,18 @@ class Entry(object):
         else:
             raise ValueError("You can only assign a saveframe to an entry splice.")
 
-    def __str__(self) -> str:
+    def __str__(self, skip_empty_loops: bool = False, show_comments: bool = True) -> str:
         """Returns the entire entry in STAR format as a string."""
 
         sf_strings = []
         seen_saveframes = {}
         for saveframe_obj in self:
             if saveframe_obj.category in seen_saveframes:
-                sf_strings.append(saveframe_obj.__str__(first_in_category=False))
+                sf_strings.append(saveframe_obj.__str__(first_in_category=False, skip_empty_loops=skip_empty_loops,
+                                                        show_comments=show_comments))
             else:
-                sf_strings.append(saveframe_obj.__str__(first_in_category=True))
+                sf_strings.append(saveframe_obj.__str__(first_in_category=True, skip_empty_loops=skip_empty_loops,
+                                                        show_comments=show_comments))
                 seen_saveframes[saveframe_obj.category] = True
 
         return "data_%s\n\n%s" % (self.entry_id, "\n".join(sf_strings))
@@ -285,8 +288,7 @@ class Entry(object):
         except KeyError:
             raise IOError("Entry '%s' does not exist in the public database." % entry_num)
         except URLError:
-            if utils.VERBOSE:
-                print("BMRB API server appears to be down. Attempting to load from FTP site.")
+            logging.warning("BMRB API server appears to be down. Attempting to load from FTP site.")
             return cls(entry_num=entry_num)
 
     @classmethod
@@ -420,6 +422,12 @@ class Entry(object):
             if entry.empty:
                 del self.frame_list[pos]
 
+    def format(self, skip_empty_loops: bool = False, show_comments: bool = True) -> str:
+        """ The same as calling str(Entry), except that you can pass options
+        to customize how the entry is printed. """
+
+        return self.__str__(skip_empty_loops=skip_empty_loops, show_comments=show_comments)
+
     def get_json(self, serialize: bool = True) -> Union[dict, str]:
         """ Returns the entry in JSON format. If serialize is set to
         False a dictionary representation of the entry that is
@@ -433,7 +441,7 @@ class Entry(object):
         }
 
         if serialize:
-            return json.dumps(entry_dict, default=utils._json_serialize)
+            return json.dumps(entry_dict, default=_json_serialize)
         else:
             return entry_dict
 
@@ -481,7 +489,7 @@ class Entry(object):
         and the [tag_name, tag_value (,tag_line_number)] pair will be
         returned."""
 
-        if "." not in str(tag) and not utils.ALLOW_V2_ENTRIES:
+        if "." not in str(tag):
             raise ValueError("You must provide the tag category to call this method at the entry level.")
 
         results = []

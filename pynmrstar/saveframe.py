@@ -10,6 +10,7 @@ from . import loop as loop_mod
 from . import parser as parser_mod
 from . import schema as schema_mod
 from . import utils
+from ._internal import _get_comments, _tag_key, _json_serialize
 
 
 class Saveframe(object):
@@ -327,32 +328,27 @@ class Saveframe(object):
             # If the tag already exists, set its value
             self.add_tag(key, item, update=True)
 
-    def __str__(self, first_in_category: bool = True) -> str:
+    def __str__(self, first_in_category: bool = True, skip_empty_loops: bool = False,
+                show_comments: bool = True) -> str:
         """Returns the saveframe in STAR format as a string."""
 
-        if utils.ALLOW_V2_ENTRIES:
-            if self.tag_prefix is None:
-                width = max([len(x[0]) for x in self.tags])
-            else:
-                width = max([len(self.tag_prefix + "." + x[0]) for x in self.tags])
-        else:
-            if self.tag_prefix is None:
-                raise ValueError("The tag prefix was never set!")
+        if self.tag_prefix is None:
+            raise ValueError("The tag prefix was never set!")
 
-            # Make sure this isn't a dummy saveframe before proceeding
-            try:
-                width = max([len(self.tag_prefix + "." + x[0]) for x in self.tags])
-            except ValueError:
-                return "\nsave_%s\n\nsave_\n" % self.name
+        # Make sure this isn't a dummy saveframe before proceeding
+        try:
+            width = max([len(self.tag_prefix + "." + x[0]) for x in self.tags])
+        except ValueError:
+            return "\nsave_%s\n\nsave_\n" % self.name
 
         ret_string = ""
 
         # Insert the comment if not disabled
-        if not utils.DONT_SHOW_COMMENTS:
-            if self.category in utils._get_comments():
-                this_comment = utils._get_comments()[self.category]
+        if show_comments:
+            if self.category in _get_comments():
+                this_comment = _get_comments()[self.category]
                 if first_in_category or this_comment['every_flag']:
-                    ret_string = utils._get_comments()[self.category]['comment']
+                    ret_string = _get_comments()[self.category]['comment']
 
         # Print the saveframe
         ret_string += "save_%s\n" % self.name
@@ -362,22 +358,15 @@ class Saveframe(object):
         # Print the tags
         for each_tag in self.tags:
             clean_tag = utils.clean_value(each_tag[1])
-
-            if utils.ALLOW_V2_ENTRIES and self.tag_prefix is None:
-                if "\n" in clean_tag:
-                    ret_string += mstring % (each_tag[0], clean_tag)
-                else:
-                    ret_string += pstring % (each_tag[0], clean_tag)
+            formatted_tag = self.tag_prefix + "." + each_tag[0]
+            if "\n" in clean_tag:
+                ret_string += mstring % (formatted_tag, clean_tag)
             else:
-                formatted_tag = self.tag_prefix + "." + each_tag[0]
-                if "\n" in clean_tag:
-                    ret_string += mstring % (formatted_tag, clean_tag)
-                else:
-                    ret_string += pstring % (formatted_tag, clean_tag)
+                ret_string += pstring % (formatted_tag, clean_tag)
 
         # Print any loops
         for each_loop in self.loops:
-            ret_string += str(each_loop)
+            ret_string += each_loop.__str__(skip_empty_loops=skip_empty_loops)
 
         # Close the saveframe
         ret_string += "\nsave_\n"
@@ -442,9 +431,6 @@ class Saveframe(object):
 
         if line_num:
             new_tag.append(line_num)
-
-        if utils.VERBOSE:
-            print("Adding tag: '%s' with value '%s'" % (name, value))
 
         self.tags.append(new_tag)
 
@@ -586,7 +572,7 @@ class Saveframe(object):
         }
 
         if serialize:
-            return json.dumps(saveframe_data, default=utils._json_serialize)
+            return json.dumps(saveframe_data, default=_json_serialize)
         else:
             return saveframe_data
 
@@ -616,12 +602,12 @@ class Saveframe(object):
         # Check the loops
         for each_loop in self.loops:
             if ((each_loop.category is not None and tag_prefix is not None and
-                 each_loop.category.lower() == tag_prefix.lower()) or utils.ALLOW_V2_ENTRIES):
+                 each_loop.category.lower() == tag_prefix.lower())):
                 results.extend(each_loop.get_tag(query, whole_tag=whole_tag))
 
         # Check our tags
         query = utils.format_tag(query).lower()
-        if utils.ALLOW_V2_ENTRIES or (tag_prefix is not None and tag_prefix.lower() == self.tag_prefix.lower()):
+        if tag_prefix is not None and tag_prefix.lower() == self.tag_prefix.lower():
             for tag in self.tags:
                 if query == tag[0].lower():
                     if whole_tag:
@@ -647,7 +633,7 @@ class Saveframe(object):
         is provided."""
 
         def sort_key(x):
-            return utils._tag_key(self.tag_prefix + "." + x[0], schema=schema)
+            return _tag_key(self.tag_prefix + "." + x[0], schema=schema)
 
         self.tags.sort(key=sort_key)
 
