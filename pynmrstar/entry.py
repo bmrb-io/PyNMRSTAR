@@ -444,6 +444,13 @@ class Entry(object):
 
         return diffs
 
+    def add_missing_tags(self, schema: 'schema_mod.Schema' = None, all_tags: bool = False) -> None:
+        """ Automatically adds any missing tags (according to the schema)
+        to all saveframes and loops and sorts the tags. """
+
+        for saveframe in self.frame_list:
+            saveframe.add_missing_tags(schema=schema, all_tags=all_tags)
+
     def delete_empty_saveframes(self):
         """ This method will delete all empty saveframes in an entry
         (the loops in the saveframe must also be empty for the saveframe

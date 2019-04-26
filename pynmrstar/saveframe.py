@@ -468,9 +468,13 @@ class Saveframe(object):
             else:
                 raise ValueError("You provided an invalid tag/value to add: '%s'." % tag_pair)
 
-    def add_missing_tags(self, schema: 'schema_mod.Schema' = None, all_tags: bool = False) -> None:
+    def add_missing_tags(self, schema: 'schema_mod.Schema' = None, all_tags: bool = False,
+                         recursive: bool = True) -> None:
         """ Automatically adds any missing tags (according to the schema)
-        and sorts the tags. """
+        and sorts the tags.
+
+        Set recursive to False to only operate on the tags in this saveframe,
+        and not those in child loops."""
 
         if not self.tag_prefix:
             raise ValueError("You must first specify the tag prefix of this Saveframe before calling this method. "
@@ -496,6 +500,10 @@ class Saveframe(object):
                             self.add_tag(item, None)
                 except ValueError:
                     pass
+
+        if recursive:
+            for loop in self.loops:
+                loop.add_missing_tags(schema=schema, all_tags=all_tags)
 
         self.sort_tags()
 
