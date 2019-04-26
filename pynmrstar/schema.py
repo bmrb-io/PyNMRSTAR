@@ -99,7 +99,7 @@ class Schema(object):
 
         return self.string_representation()
 
-    def add_tag(self, tag: str, tag_type: str, null_allowed: bool, sf_category: bool, loop_flag: bool,
+    def add_tag(self, tag: str, tag_type: str, null_allowed: bool, sf_category: str, loop_flag: bool,
                 after: str = None):
         """ Adds the specified tag to the tag dictionary. You must provide:
 

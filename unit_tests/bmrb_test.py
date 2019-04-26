@@ -10,11 +10,10 @@ import sys
 import unittest
 from copy import deepcopy as copy
 
-import pynmrstar._internal
-
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
 from pynmrstar import Entry, Loop, Saveframe, Schema, definitions, utils, _Parser
 from pynmrstar.exceptions import ParsingError
+from pynmrstar._internal import _interpret_file
 
 try:
     import pynmrstar.cnmrstar as cnmrstar
@@ -88,18 +87,18 @@ class TestPyNMRSTAR(unittest.TestCase):
             local_version = local_file.read()
 
         # Test reading file from local locations
-        self.assertEqual(pynmrstar._internal._interpret_file(sample_file_location).read(), local_version)
+        self.assertEqual(_interpret_file(sample_file_location).read(), local_version)
         with open(sample_file_location, "rb") as tmp:
-            self.assertEqual(pynmrstar._internal._interpret_file(tmp).read(), local_version)
+            self.assertEqual(_interpret_file(tmp).read(), local_version)
         with open(os.path.join(our_path, "sample_files", "bmr15000_3.str.gz"), "rb") as tmp:
-            self.assertEqual(pynmrstar._internal._interpret_file(tmp).read(), local_version)
+            self.assertEqual(_interpret_file(tmp).read(), local_version)
 
         # Test reading from http (ftp doesn't work on TravisCI)
-        self.assertEqual(pynmrstar._internal._interpret_file("http://rest.bmrb.wisc.edu/bmrb/NMR-STAR3/15000").read(), local_version)
+        self.assertEqual(_interpret_file("http://rest.bmrb.wisc.edu/bmrb/NMR-STAR3/15000").read(), local_version)
 
         # Test reading from https locations
         self.assertEqual(Entry.from_string(
-            pynmrstar._internal._interpret_file("https://webapi.bmrb.wisc.edu/v2/entry/15000?format=rawnmrstar").read()),
+            _interpret_file("https://webapi.bmrb.wisc.edu/v2/entry/15000?format=rawnmrstar").read()),
             Entry.from_string(local_version))
 
     # Test the parser
