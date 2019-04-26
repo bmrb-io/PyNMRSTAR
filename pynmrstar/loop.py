@@ -361,17 +361,6 @@ class Loop(object):
 
         return tags
 
-    def _tag_index(self, tag_name: str) -> Optional[int]:
-        """ Helper method to do a case-insensitive check for the presence
-        of a given tag in this loop. Returns the index of the tag if found
-        and None if not found."""
-
-        try:
-            lc_col = [x.lower() for x in self.tags]
-            return lc_col.index(utils.format_tag(str(tag_name)).lower())
-        except ValueError:
-            return None
-
     def _check_tags_match_data(self) -> bool:
         """ Ensures that each row of the data has the same number of
         elements as there are tags for the loop. This is necessary to
@@ -432,7 +421,7 @@ class Loop(object):
                 raise ValueError("Category provided in your tag '%s' does not match this loop's category '%s'." %
                                  (supplied_category, self.category))
 
-        pos = self._tag_index(tag_name)
+        pos = self.tag_index(tag_name)
         if pos is None:
             raise ValueError("The tag '%s' to which you are attempting to add data does not yet exist. Create the "
                              "tags before adding data." % tag_name)
@@ -481,7 +470,7 @@ class Loop(object):
                 name = name[1:]
 
         # Ignore duplicate tags
-        if self._tag_index(name) is not None:
+        if self.tag_index(name) is not None:
             if ignore_duplicates:
                 return
             else:
@@ -573,7 +562,7 @@ class Loop(object):
                 raise ValueError("Category provided in your tag '%s' does not match this loop's category '%s'." %
                                  (supplied_category, self.category))
 
-        search_tag = self._tag_index(tag)
+        search_tag = self.tag_index(tag)
         if search_tag is None:
             raise ValueError("The tag you provided '%s' isn't in this loop!" % tag)
 
@@ -609,7 +598,7 @@ class Loop(object):
         for tag in tag_list:
 
             # Handle an invalid tag
-            if self._tag_index(tag) is None:
+            if self.tag_index(tag) is None:
                 if not ignore_missing_tags:
                     raise ValueError("Cannot filter tag '%s' as it isn't present in this loop." % tag)
                 continue
@@ -800,7 +789,7 @@ class Loop(object):
                                  (supplied_category, self.category))
 
         # Determine which tag ID to renumber
-        renumber_tag = self._tag_index(index_tag)
+        renumber_tag = self.tag_index(index_tag)
 
         # The tag to replace in is the tag they specify
         if renumber_tag is None:
@@ -896,7 +885,7 @@ class Loop(object):
                     raise ValueError("Category provided in your tag '%s' does not match this loop's category '%s'." %
                                      (supplied_category, self.category))
 
-            renumber_tag = self._tag_index(cur_tag)
+            renumber_tag = self.tag_index(cur_tag)
 
             # They didn't specify a valid tag
             if renumber_tag is None:
@@ -923,6 +912,17 @@ class Loop(object):
                 else:
                     tmp_data = sorted(self.data, key=key)
             self.data = tmp_data
+
+    def tag_index(self, tag_name: str) -> Optional[int]:
+        """ Helper method to do a case-insensitive check for the presence
+        of a given tag in this loop. Returns the index of the tag if found
+        and None if not found."""
+
+        try:
+            lc_col = [x.lower() for x in self.tags]
+            return lc_col.index(utils.format_tag(str(tag_name)).lower())
+        except ValueError:
+            return None
 
     def validate(self, validate_schema: bool = True, schema: 'schema_mod.Schema' = None,
                  validate_star: bool = True, category: str = None) -> List[str]:
