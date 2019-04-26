@@ -6,6 +6,8 @@ built in help function for documentation."""
 import decimal
 
 from . import definitions
+# noinspection PyCompatibility
+from . import exceptions
 from . import utils
 from ._internal import __version__, _ensure_cnmrstar
 from .entry import Entry
@@ -25,4 +27,4 @@ del schema
 del parser
 del decimal
 
-__all__ = ['Loop', 'Saveframe', 'Entry', 'Schema', 'definitions', 'utils', '__version__']
+__all__ = ['Loop', 'Saveframe', 'Entry', 'Schema', 'definitions', 'utils', '__version__', 'exceptions']
