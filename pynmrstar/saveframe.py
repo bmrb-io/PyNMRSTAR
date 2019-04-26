@@ -503,7 +503,10 @@ class Saveframe(object):
 
         if recursive:
             for loop in self.loops:
-                loop.add_missing_tags(schema=schema, all_tags=all_tags)
+                try:
+                    loop.add_missing_tags(schema=schema, all_tags=all_tags)
+                except ValueError:
+                    pass
 
         self.sort_tags()
 
