@@ -10,7 +10,7 @@ from typing import Union, List, Optional, Any, Dict
 
 from . import definitions
 from . import utils
-from ._internal import _json_serialize
+from ._internal import _json_serialize, _interpret_file
 
 
 class Schema(object):
@@ -35,7 +35,7 @@ class Schema(object):
         self.schema_file = schema_file
 
         # Get whatever schema they specified, wrap in StringIO and pass that to the csv reader
-        schema_stream = utils.interpret_file(schema_file)
+        schema_stream = _interpret_file(schema_file)
         fix_newlines = StringIO('\n'.join(schema_stream.read().splitlines()))
 
         csv_reader_instance = csv_reader(fix_newlines)
@@ -75,13 +75,13 @@ class Schema(object):
 
         try:
             # Read in the data types
-            types_file = utils.interpret_file(os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                                           "../reference_files/data_types.csv"))
+            types_file = _interpret_file(os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                                                      "../reference_files/data_types.csv"))
         except IOError:
             # Load the data types from Github if we can't find them locally
             types_url = "https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v2/reference_files/data_types.csv"
             try:
-                types_file = utils.interpret_file(types_url)
+                types_file = _interpret_file(types_url)
             except Exception:
                 raise ValueError("Could not load the data type definition file from disk or the internet!")
 
@@ -256,7 +256,6 @@ class Schema(object):
         # We don't know the data type, so just keep it a string
         return value
 
-
     def get_json(self, serialize: bool = True, full: bool = False) -> Union[str, dict]:
         """ Returns the schema in JSON format. """
 
@@ -340,7 +339,7 @@ class Schema(object):
 
         return text
 
-    def val_type(self, tag: str, value: Any, category: str = None, line_number: int = None):
+    def val_type(self, tag: str, value: Any, category: str = None, line_number: Union[int, str] = None):
         """ Validates that a tag matches the type it should have
         according to this schema."""
 

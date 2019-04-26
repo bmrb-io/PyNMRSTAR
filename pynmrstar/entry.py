@@ -12,7 +12,7 @@ from . import loop as loop_mod
 from . import parser as parser_mod
 from . import saveframe as saveframe_mod
 from . import schema as schema_mod
-from ._internal import __version__, _json_serialize
+from ._internal import __version__, _json_serialize, _interpret_file
 
 
 class Entry(object):
@@ -72,7 +72,7 @@ class Entry(object):
             star_buffer: StringIO = StringIO(kwargs['the_string'])
             self.source = "from_string()"
         elif 'file_name' in kwargs:
-            star_buffer = utils.interpret_file(kwargs['file_name'])
+            star_buffer = _interpret_file(kwargs['file_name'])
             self.source = "from_file('%s')" % kwargs['file_name']
         elif 'entry_num' in kwargs:
             self.source = "from_database(%s)" % kwargs['entry_num']

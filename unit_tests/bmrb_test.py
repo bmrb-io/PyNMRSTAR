@@ -10,6 +10,8 @@ import sys
 import unittest
 from copy import deepcopy as copy
 
+import pynmrstar._internal
+
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
 from pynmrstar import Entry, Loop, Saveframe, Schema, definitions, utils, _Parser
 from pynmrstar.exceptions import ParsingError
@@ -43,19 +45,19 @@ class TestPyNMRSTAR(unittest.TestCase):
 
     def test_clean_val(self):
         # Check tag cleaning
-        self.assertEqual(utils.clean_value("single quote test"), "'single quote test'")
-        self.assertEqual(utils.clean_value("double quote' test"), '"double quote\' test"')
-        self.assertEqual(utils.clean_value("loop_"), "'loop_'")
-        self.assertEqual(utils.clean_value("#comment"), "'#comment'")
-        self.assertEqual(utils.clean_value("_tag"), "'_tag'")
-        self.assertEqual(utils.clean_value("simple"), "simple")
-        self.assertEqual(utils.clean_value("  "), "'  '")
-        self.assertEqual(utils.clean_value("\nnewline\n"), "\nnewline\n")
-        self.assertEqual(utils.clean_value(None), ".")
-        self.assertRaises(ValueError, utils.clean_value, "")
+        self.assertEqual(utils.quote_value("single quote test"), "'single quote test'")
+        self.assertEqual(utils.quote_value("double quote' test"), '"double quote\' test"')
+        self.assertEqual(utils.quote_value("loop_"), "'loop_'")
+        self.assertEqual(utils.quote_value("#comment"), "'#comment'")
+        self.assertEqual(utils.quote_value("_tag"), "'_tag'")
+        self.assertEqual(utils.quote_value("simple"), "simple")
+        self.assertEqual(utils.quote_value("  "), "'  '")
+        self.assertEqual(utils.quote_value("\nnewline\n"), "\nnewline\n")
+        self.assertEqual(utils.quote_value(None), ".")
+        self.assertRaises(ValueError, utils.quote_value, "")
 
         definitions.STR_CONVERSION_DICT = {"loop_": "noloop_"}
-        self.assertEqual(utils.clean_value("loop_"), "noloop_")
+        self.assertEqual(utils.quote_value("loop_"), "noloop_")
         definitions.STR_CONVERSION_DICT = {None: "."}
 
     def test__odd_strings(self):
@@ -86,18 +88,18 @@ class TestPyNMRSTAR(unittest.TestCase):
             local_version = local_file.read()
 
         # Test reading file from local locations
-        self.assertEqual(utils.interpret_file(sample_file_location).read(), local_version)
+        self.assertEqual(pynmrstar._internal._interpret_file(sample_file_location).read(), local_version)
         with open(sample_file_location, "rb") as tmp:
-            self.assertEqual(utils.interpret_file(tmp).read(), local_version)
+            self.assertEqual(pynmrstar._internal._interpret_file(tmp).read(), local_version)
         with open(os.path.join(our_path, "sample_files", "bmr15000_3.str.gz"), "rb") as tmp:
-            self.assertEqual(utils.interpret_file(tmp).read(), local_version)
+            self.assertEqual(pynmrstar._internal._interpret_file(tmp).read(), local_version)
 
         # Test reading from http (ftp doesn't work on TravisCI)
-        self.assertEqual(utils.interpret_file("http://rest.bmrb.wisc.edu/bmrb/NMR-STAR3/15000").read(), local_version)
+        self.assertEqual(pynmrstar._internal._interpret_file("http://rest.bmrb.wisc.edu/bmrb/NMR-STAR3/15000").read(), local_version)
 
         # Test reading from https locations
         self.assertEqual(Entry.from_string(
-            utils.interpret_file("https://webapi.bmrb.wisc.edu/v2/entry/15000?format=rawnmrstar").read()),
+            pynmrstar._internal._interpret_file("https://webapi.bmrb.wisc.edu/v2/entry/15000?format=rawnmrstar").read()),
             Entry.from_string(local_version))
 
     # Test the parser

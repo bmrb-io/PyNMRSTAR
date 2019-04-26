@@ -11,7 +11,7 @@ from . import entry as entry_mod
 from . import parser as parser_mod
 from . import schema as schema_mod
 from . import utils
-from ._internal import _tag_key, _json_serialize
+from ._internal import _tag_key, _json_serialize, _interpret_file
 
 
 class Loop(object):
@@ -75,7 +75,7 @@ class Loop(object):
             self.source = "from_string()"
         # Parsing from a file
         elif 'file_name' in kwargs:
-            star_buffer = utils.interpret_file(kwargs['file_name'])
+            star_buffer = _interpret_file(kwargs['file_name'])
             self.source = "from_file('%s')" % kwargs['file_name']
         # Creating from template (schema)
         elif 'tag_prefix' in kwargs:
@@ -205,7 +205,7 @@ class Loop(object):
             working_data = []
             # Put quotes as needed on the data
             for datum in self.data:
-                working_data.append([utils.clean_value(x) for x in datum])
+                working_data.append([utils.quote_value(x) for x in datum])
 
             # The nightmare below creates a list of the maximum length of
             #  elements in each tag in the self.data matrix. Don't try to
@@ -646,7 +646,7 @@ class Loop(object):
         show_category to false to omit the loop category from the
         headers."""
 
-        csv_buffer = utils.StringIO()
+        csv_buffer = StringIO()
         csv_writer_object = csv_writer(csv_buffer)
 
         if header:

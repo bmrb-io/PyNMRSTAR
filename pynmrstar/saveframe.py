@@ -10,7 +10,7 @@ from . import loop as loop_mod
 from . import parser as parser_mod
 from . import schema as schema_mod
 from . import utils
-from ._internal import _get_comments, _tag_key, _json_serialize
+from ._internal import _get_comments, _tag_key, _json_serialize, _interpret_file
 
 
 class Saveframe(object):
@@ -107,7 +107,7 @@ class Saveframe(object):
             star_buffer = StringIO(kwargs['the_string'])
             self.source = "from_string()"
         elif 'file_name' in kwargs:
-            star_buffer = utils.interpret_file(kwargs['file_name'])
+            star_buffer = _interpret_file(kwargs['file_name'])
             self.source = "from_file('%s')" % kwargs['file_name']
         # Creating from template (schema)
         elif 'all_tags' in kwargs:
@@ -377,7 +377,7 @@ class Saveframe(object):
 
         # Print the tags
         for each_tag in self.tags:
-            clean_tag = utils.clean_value(each_tag[1])
+            clean_tag = utils.quote_value(each_tag[1])
             formatted_tag = self.tag_prefix + "." + each_tag[0]
             if "\n" in clean_tag:
                 ret_string += mstring % (formatted_tag, clean_tag)

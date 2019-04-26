@@ -2,7 +2,10 @@ import decimal
 import os
 import sys
 from datetime import date
-from typing import Dict
+from gzip import GzipFile
+from io import StringIO, BytesIO
+from typing import Dict, Union, IO
+from urllib.request import urlopen
 
 from . import entry as entry_mod
 from . import schema as schema_mod
@@ -86,7 +89,7 @@ def _get_comments(_comment_cache: Dict[str, Dict[str, str]] = {}) -> Dict[str, D
         # Load the comments from Github if we can't find them locally
         try:
             comment_url = "https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v2/reference_files/comments.str"
-            comment_entry = entry_mod.Entry.from_file(utils.interpret_file(comment_url))
+            comment_entry = entry_mod.Entry.from_file(_interpret_file(comment_url))
         except Exception:
             # No comments will be printed
             return {}
@@ -121,3 +124,40 @@ def _tag_key(x, schema: 'schema_mod.Schema' = None) -> int:
         #  schema but make sure that they always come after tags in the
         #   schema
         return len(utils.get_schema(schema).schema_order) + abs(hash(x))
+
+
+def _interpret_file(the_file: Union[str, IO]) -> StringIO:
+    """Helper method returns some sort of object with a read() method.
+    the_file could be a URL, a file location, a file object, or a
+    gzipped version of any of the above."""
+
+    if hasattr(the_file, 'read'):
+        read_data: Union[bytes, str] = the_file.read()
+        if type(read_data) == bytes:
+            buffer: BytesIO = BytesIO(read_data)
+        elif type(read_data, str):
+            buffer = BytesIO(read_data.encode())
+        else:
+            raise IOError("What did your file object return when .read() was called on it?")
+    elif isinstance(the_file, str):
+        if the_file.startswith("http://") or the_file.startswith("https://") or the_file.startswith("ftp://"):
+            with urlopen(the_file) as url_data:
+                buffer = BytesIO(url_data.read())
+        else:
+            with open(the_file, 'rb') as read_file:
+                buffer = BytesIO(read_file.read())
+    else:
+        raise ValueError("Cannot figure out how to interpret the file you passed.")
+
+    # Decompress the buffer if we are looking at a gzipped file
+    try:
+        gzip_buffer = GzipFile(fileobj=buffer)
+        gzip_buffer.readline()
+        gzip_buffer.seek(0)
+        buffer = BytesIO(gzip_buffer.read())
+    # Apparently we are not looking at a gzipped file
+    except (IOError, AttributeError, UnicodeDecodeError):
+        pass
+
+    buffer.seek(0)
+    return StringIO(buffer.read().decode())
