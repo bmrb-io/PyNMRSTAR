@@ -446,9 +446,8 @@ class Saveframe(object):
 
         # Set the category if the tag we are loading is the category
         tag_name_lower = name.lower()
-        if tag_name_lower == "sf_category" or tag_name_lower == "_saveframe_category":
-            if not self.category:
-                self.category = value
+        if tag_name_lower == "sf_category":
+            self.category = value
 
         if line_num:
             new_tag.append(line_num)
@@ -468,6 +467,37 @@ class Saveframe(object):
                 self.add_tag(tag_pair[0], ".", update=update)
             else:
                 raise ValueError("You provided an invalid tag/value to add: '%s'." % tag_pair)
+
+    def add_missing_tags(self, schema: 'schema_mod.Schema' = None, all_tags: bool = False) -> None:
+        """ Automatically adds any missing tags (according to the schema)
+        and sorts the tags. """
+
+        if not self.tag_prefix:
+            raise ValueError("You must first specify the tag prefix of this Saveframe before calling this method. "
+                             "You can do this by adding a fully qualified tag (i.e. _Entry.Sf_framecode), "
+                             "by specifying the tag_prefix when calling from_scratch() or by modifying the .tag_prefix "
+                             "attribute.")
+
+        schema = utils.get_schema(schema)
+        tag_prefix: str = self.tag_prefix.lower() + '.'
+
+        for item in schema.schema_order:
+
+            # The tag is in the loop
+            if item.lower().startswith(tag_prefix):
+
+                try:
+                    # Unconditional add
+                    if all_tags:
+                        self.add_tag(item, None)
+                    # Conditional add
+                    else:
+                        if schema.schema[item.lower()]["public"] != "I":
+                            self.add_tag(item, None)
+                except ValueError:
+                    pass
+
+        self.sort_tags()
 
     def compare(self, other) -> List[str]:
         """Returns the differences between two saveframes as a list.
