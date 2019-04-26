@@ -12,6 +12,7 @@ from copy import deepcopy as copy
 
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
 from pynmrstar import Entry, Loop, Saveframe, Schema, definitions, utils, _Parser
+from pynmrstar.exceptions import ParsingError
 
 try:
     import pynmrstar.cnmrstar as cnmrstar
@@ -21,12 +22,12 @@ except ImportError:
 if cnmrstar:
     print("Using C library...")
 
-logging.basicConfig(filename='test.log', level=logging.INFO)
 
 quick_test = False
 
 # We will use this for our tests
 our_path = os.path.dirname(os.path.realpath(__file__))
+logging.basicConfig(filename=os.path.join(our_path, 'test.log'), filemode='w', level=logging.INFO)
 database_entry = Entry.from_database(15000)
 sample_file_location = os.path.join(our_path, "sample_files", "bmr15000_3.str")
 file_entry = Entry.from_file(sample_file_location)
@@ -103,19 +104,19 @@ class TestPyNMRSTAR(unittest.TestCase):
     def test___Parser(self):
 
         # Check for error when reserved token present in data value
-        self.assertRaises(ValueError, Entry.from_string, "data_1\nsave_1\n_tag.example loop_\nsave_\n")
-        self.assertRaises(ValueError, Entry.from_string, "data_1\nsave_1\n_tag.example data_\nsave_\n")
-        self.assertRaises(ValueError, Entry.from_string, "data_1\nsave_1\n_tag.example save_\nsave_\n")
-        self.assertRaises(ValueError, Entry.from_string, "data_1\nsave_1\nloop_\n_tag.tag\nloop_\nstop_\nsave_\n")
-        self.assertRaises(ValueError, Entry.from_string, "data_1\nsave_1\nloop_\n_tag.tag\nsave_\nstop_\nsave_\n")
-        self.assertRaises(ValueError, Entry.from_string, "data_1\nsave_1\nloop_\n_tag.tag\nglobal_\nstop_\nsave_\n")
+        self.assertRaises(ParsingError, Entry.from_string, "data_1\nsave_1\n_tag.example loop_\nsave_\n")
+        self.assertRaises(ParsingError, Entry.from_string, "data_1\nsave_1\n_tag.example data_\nsave_\n")
+        self.assertRaises(ParsingError, Entry.from_string, "data_1\nsave_1\n_tag.example save_\nsave_\n")
+        self.assertRaises(ParsingError, Entry.from_string, "data_1\nsave_1\nloop_\n_tag.tag\nloop_\nstop_\nsave_\n")
+        self.assertRaises(ParsingError, Entry.from_string, "data_1\nsave_1\nloop_\n_tag.tag\nsave_\nstop_\nsave_\n")
+        self.assertRaises(ParsingError, Entry.from_string, "data_1\nsave_1\nloop_\n_tag.tag\nglobal_\nstop_\nsave_\n")
 
         # Check for error when reserved token quoted
-        self.assertRaises(ValueError, Entry.from_string, "'data_1'\nsave_1\nloop_\n_tag.tag\ndata_\nstop_\nsave_\n")
-        self.assertRaises(ValueError, Entry.from_string, "data_1\n'save_1'\nloop_\n_tag.tag\ndata_\nstop_\nsave_\n")
-        self.assertRaises(ValueError, Entry.from_string, 'data_1\nsave_1\n"loop"_\n_tag.tag\ndata_\nstop_\nsave_\n')
-        self.assertRaises(ValueError, Entry.from_string, "data_1\nsave_1\nloop_\n_tag.tag\ndata_\n;\nstop_\n;\nsave_\n")
-        self.assertRaises(ValueError, Saveframe.from_string, "save_1\n_tag.1 _tag.2")
+        self.assertRaises(ParsingError, Entry.from_string, "'data_1'\nsave_1\nloop_\n_tag.tag\ndata_\nstop_\nsave_\n")
+        self.assertRaises(ParsingError, Entry.from_string, "data_1\n'save_1'\nloop_\n_tag.tag\ndata_\nstop_\nsave_\n")
+        self.assertRaises(ParsingError, Entry.from_string, 'data_1\nsave_1\n"loop"_\n_tag.tag\ndata_\nstop_\nsave_\n')
+        self.assertRaises(ParsingError, Entry.from_string, "data_1\nsave_1\nloop_\n_tag.tag\ndata_\n;\nstop_\n;\nsave_\n")
+        self.assertRaises(ParsingError, Saveframe.from_string, "save_1\n_tag.1 _tag.2")
 
     def test_Schema(self):
         default = Schema()

@@ -63,3 +63,6 @@ target/
 
 # PyCharm
 .idea/
+
+# Ignore the test results
+unit_tests/test.log
