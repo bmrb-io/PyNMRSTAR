@@ -3,6 +3,10 @@
 """ NMR-STAR definitions and other module parameters live here. Technically
 you can edit them, but you should really know what you're doing.
 
+Adding key->value pairs to STR_CONVERSION_DICT will automatically convert tags
+whose value matches "key" to the string "value" when printing. This allows you
+to set the default conversion value for Booleans or other objects.
+
 WARNING: STR_CONVERSION_DICT cannot contain both booleans and arithmetic types.
 Attempting to use both will cause an issue since boolean True == 1 in python
 and False == 0.

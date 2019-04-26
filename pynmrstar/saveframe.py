@@ -643,6 +643,13 @@ class Saveframe(object):
 
         return iter(self.loops)
 
+    def print_tree(self) -> None:
+        """Prints a summary, tree style, of the loops in the saveframe."""
+
+        print(repr(self))
+        for pos, each_loop in enumerate(self):
+            print("\t[%d] %s" % (pos, repr(each_loop)))
+
     def set_tag_prefix(self, tag_prefix: str) -> None:
         """Set the tag prefix for this saveframe."""
 
@@ -662,13 +669,6 @@ class Saveframe(object):
         """Returns an iterator for saveframe tags."""
 
         return iter(self.tags)
-
-    def print_tree(self) -> None:
-        """Prints a summary, tree style, of the loops in the saveframe."""
-
-        print(repr(self))
-        for pos, each_loop in enumerate(self):
-            print("\t[%d] %s" % (pos, repr(each_loop)))
 
     def validate(self, validate_schema: bool = True, schema: schema_mod.Schema = None, validate_star: bool = True):
         """Validate a saveframe in a variety of ways. Returns a list of

@@ -433,6 +433,26 @@ class Loop(object):
             raise ValueError("You cannot add data out of tag order.")
         self.data[-1].append(value)
 
+    def add_missing_tags(self, schema: 'schema_mod.Schema' = None, all_tags: bool = False) -> None:
+        """ Automatically adds any missing tags (according to the schema),
+        sorts the tags, and renumbers the tags by ordinal. """
+
+        self.add_tag(Loop._get_tags_from_schema(self.category, schema=schema, all_tags=all_tags),
+                     ignore_duplicates=True, update_data=True)
+        self.sort_tags()
+
+        # See if we can sort the rows (in addition to tags)
+        try:
+            self.sort_rows("Ordinal")
+        except ValueError:
+            pass
+        except TypeError:
+            ordinal_idx = self.tag_index("Ordinal")
+
+            # If we are in another row, assign to the previous row
+            for pos, row in enumerate(self.data):
+                row[ordinal_idx] = pos + 1
+
     def add_tag(self, name: Union[str, List[str]], ignore_duplicates: bool = False, update_data: bool = False) -> None:
         """Add a tag to the tag name list. Does a bit of validation
         and parsing. Set ignore_duplicates to true to ignore attempts
@@ -748,26 +768,6 @@ class Loop(object):
                 result = [dict((self.tags[col_id], row[col_id]) for col_id in tag_ids) for row in self.data]
 
         return result
-
-    def add_missing_tags(self, schema: 'schema_mod.Schema' = None, all_tags: bool = False) -> None:
-        """ Automatically adds any missing tags (according to the schema),
-        sorts the tags, and renumbers the tags by ordinal. """
-
-        self.add_tag(Loop._get_tags_from_schema(self.category, schema=schema, all_tags=all_tags),
-                     ignore_duplicates=True, update_data=True)
-        self.sort_tags()
-
-        # See if we can sort the rows (in addition to tags)
-        try:
-            self.sort_rows("Ordinal")
-        except ValueError:
-            pass
-        except TypeError:
-            ordinal_idx = self._tag_index("Ordinal")
-
-            # If we are in another row, assign to the previous row
-            for pos, row in enumerate(self.data):
-                row[ordinal_idx] = pos + 1
 
     def print_tree(self) -> None:
         """Prints a summary, tree style, of the loop."""

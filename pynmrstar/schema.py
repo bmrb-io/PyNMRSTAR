@@ -99,49 +99,6 @@ class Schema(object):
 
         return self.string_representation()
 
-    def string_representation(self, search: bool = None) -> str:
-        """ Prints all the tags in the schema if search is not specified
-        and prints the tags that contain the search string if it is."""
-
-        # Get the longest lengths
-        lengths = [max([len(utils.format_tag(x)) for x in self.schema_order])]
-
-        values = []
-        for key in self.schema.keys():
-            sc = self.schema[key]
-            values.append((sc["Data Type"], sc["Nullable"], sc["SFCategory"], sc["Tag"]))
-
-        for y in range(0, len(values[0])):
-            lengths.append(max([len(str(x[y])) for x in values]))
-
-        format_parameters = (self.schema_file, self.version, "Tag_Prefix", lengths[0],
-                             "Tag", lengths[1] - 6, "Type", lengths[2], "Null_Allowed",
-                             lengths[3], "SF_Category")
-        text = """BMRB schema from: '%s' version '%s'
-%s
-  %-*s %-*s %-*s %-*s
-""" % format_parameters
-
-        last_tag = ""
-
-        for tag in self.schema_order:
-            # Skip to the next tag if there is a search and it fails
-            if search and search not in tag:
-                continue
-            st = self.schema.get(tag.lower(), None)
-            tag_cat = utils.format_category(tag)
-            if st:
-                if tag_cat != last_tag:
-                    last_tag = tag_cat
-                    text += "\n%-30s\n" % tag_cat
-
-                text += "  %-*s %-*s %-*s  %-*s\n" % (lengths[0], utils.format_tag(tag),
-                                                      lengths[1], st["Data Type"],
-                                                      lengths[2], st["Nullable"],
-                                                      lengths[3], st["SFCategory"])
-
-        return text
-
     def add_tag(self, tag: str, tag_type: str, null_allowed: bool, sf_category: bool, loop_flag: bool,
                 after: str = None):
         """ Adds the specified tag to the tag dictionary. You must provide:
@@ -299,6 +256,90 @@ class Schema(object):
         # We don't know the data type, so just keep it a string
         return value
 
+
+    def get_json(self, serialize: bool = True, full: bool = False) -> Union[str, dict]:
+        """ Returns the schema in JSON format. """
+
+        s = {'data_types': self.data_types,
+             'headers': self.headers,
+             'version': self.version}
+
+        if not full:
+            s['headers'] = ['Tag', 'SFCategory', 'BMRB data type', 'Prompt', 'Interface', 'default value', 'Example',
+                            'ADIT category view name', 'User full view', 'Foreign Table', 'Sf pointer']
+
+        compacted_schema = []
+        for tag in self.schema_order:
+            stag = self.schema[tag.lower()]
+            compacted_tag = []
+            for header in s['headers']:
+                try:
+                    compacted_tag.append(stag[header].replace("$", ","))
+                except AttributeError:
+                    compacted_tag.append(stag[header])
+                except KeyError:
+                    if header == 'Sf pointer':
+                        try:
+                            compacted_tag.append(stag['Framecode value flag'])
+                        except KeyError:
+                            compacted_tag.append(None)
+                    elif header == 'BMRB data type':
+                        compacted_tag.append('any')
+                    else:
+                        compacted_tag.append(None)
+
+            compacted_schema.append(compacted_tag)
+
+        s['tags'] = compacted_schema
+
+        if serialize:
+            return json.dumps(s, default=_json_serialize)
+        else:
+            return s
+
+    def string_representation(self, search: bool = None) -> str:
+        """ Prints all the tags in the schema if search is not specified
+        and prints the tags that contain the search string if it is."""
+
+        # Get the longest lengths
+        lengths = [max([len(utils.format_tag(x)) for x in self.schema_order])]
+
+        values = []
+        for key in self.schema.keys():
+            sc = self.schema[key]
+            values.append((sc["Data Type"], sc["Nullable"], sc["SFCategory"], sc["Tag"]))
+
+        for y in range(0, len(values[0])):
+            lengths.append(max([len(str(x[y])) for x in values]))
+
+        format_parameters = (self.schema_file, self.version, "Tag_Prefix", lengths[0],
+                             "Tag", lengths[1] - 6, "Type", lengths[2], "Null_Allowed",
+                             lengths[3], "SF_Category")
+        text = """BMRB schema from: '%s' version '%s'
+%s
+  %-*s %-*s %-*s %-*s
+""" % format_parameters
+
+        last_tag = ""
+
+        for tag in self.schema_order:
+            # Skip to the next tag if there is a search and it fails
+            if search and search not in tag:
+                continue
+            st = self.schema.get(tag.lower(), None)
+            tag_cat = utils.format_category(tag)
+            if st:
+                if tag_cat != last_tag:
+                    last_tag = tag_cat
+                    text += "\n%-30s\n" % tag_cat
+
+                text += "  %-*s %-*s %-*s  %-*s\n" % (lengths[0], utils.format_tag(tag),
+                                                      lengths[1], st["Data Type"],
+                                                      lengths[2], st["Nullable"],
+                                                      lengths[3], st["SFCategory"])
+
+        return text
+
     def val_type(self, tag: str, value: Any, category: str = None, line_number: int = None):
         """ Validates that a tag matches the type it should have
         according to this schema."""
@@ -358,43 +399,3 @@ class Schema(object):
             return ["The tag '%s' is improperly capitalized but otherwise valid. Should be '%s'." %
                     (tag, capitalized_tag)]
         return []
-
-    def get_json(self, serialize: bool = True, full: bool = False) -> Union[str, dict]:
-        """ Returns the schema in JSON format. """
-
-        s = {'data_types': self.data_types,
-             'headers': self.headers,
-             'version': self.version}
-
-        if not full:
-            s['headers'] = ['Tag', 'SFCategory', 'BMRB data type', 'Prompt', 'Interface', 'default value', 'Example',
-                            'ADIT category view name', 'User full view', 'Foreign Table', 'Sf pointer']
-
-        compacted_schema = []
-        for tag in self.schema_order:
-            stag = self.schema[tag.lower()]
-            compacted_tag = []
-            for header in s['headers']:
-                try:
-                    compacted_tag.append(stag[header].replace("$", ","))
-                except AttributeError:
-                    compacted_tag.append(stag[header])
-                except KeyError:
-                    if header == 'Sf pointer':
-                        try:
-                            compacted_tag.append(stag['Framecode value flag'])
-                        except KeyError:
-                            compacted_tag.append(None)
-                    elif header == 'BMRB data type':
-                        compacted_tag.append('any')
-                    else:
-                        compacted_tag.append(None)
-
-            compacted_schema.append(compacted_tag)
-
-        s['tags'] = compacted_schema
-
-        if serialize:
-            return json.dumps(s, default=_json_serialize)
-        else:
-            return s

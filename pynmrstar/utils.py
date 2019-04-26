@@ -1,22 +1,11 @@
 #!/usr/bin/env python3
 
-"""
-* Adding key->value pairs to STR_CONVERSION_DICT will automatically
-convert tags whose value matches "key" to the string "value" when
-printing. This allows you to set the default conversion value for
-Booleans or other objects.
-
-
-"""
-
 #############################################
 #                 Imports                   #
 #############################################
 
 import json
-import optparse
 import os
-import sys
 from gzip import GzipFile
 from io import StringIO, BytesIO
 from typing import IO
@@ -41,42 +30,6 @@ except ImportError:
 __all__ = ['diff', 'validate', 'interpret_file', 'get_schema', 'format_category', 'format_tag']
 
 _STANDARD_SCHEMA: Optional['schema_mod.Schema'] = None
-
-
-def diff(entry1: 'entry_mod.Entry', entry2: 'entry_mod.Entry') -> None:
-    """Prints the differences between two entries. Non-equal entries
-    will always be detected, but specific differences detected depends
-    on order of entries."""
-
-    diffs = entry1.compare(entry2)
-    if len(diffs) == 0:
-        print("Identical entries.")
-    for difference in diffs:
-        print(difference)
-
-
-def iter_entries(metabolomics: bool = False) -> Iterable['entry_mod.Entry']:
-    """ Returns a generator that will yield an Entry object for every
-        macromolecule entry in the current BMRB database. Perfect for performing
-        an operation across the entire BMRB database. Set `metabolomics=True`
-        in order to get all the entries in the metabolomics database."""
-
-    api_url = "%s/list_entries?database=macromolecules" % definitions.API_URL
-    if metabolomics:
-        api_url = "%s/list_entries?database=metabolomics" % definitions.API_URL
-
-    for entry in json.loads(interpret_file(api_url).read()):
-        yield entry.Entry.from_database(entry)
-
-
-def validate(entry_to_validate: 'entry_mod.Entry', schema: 'schema_mod.Schema' = None) -> None:
-    """Prints a validation report of an object."""
-
-    validation = entry_to_validate.validate(schema=schema)
-    if len(validation) == 0:
-        print("No problems found during validation.")
-    for pos, err in enumerate(validation):
-        print("%d: %s" % (pos + 1, err))
 
 
 def clean_value(value: Any) -> str:
@@ -176,6 +129,18 @@ def clean_value(value: Any) -> str:
     return value
 
 
+def diff(entry1: 'entry_mod.Entry', entry2: 'entry_mod.Entry') -> None:
+    """Prints the differences between two entries. Non-equal entries
+    will always be detected, but specific differences detected depends
+    on order of entries."""
+
+    diffs = entry1.compare(entry2)
+    if len(diffs) == 0:
+        print("Identical entries.")
+    for difference in diffs:
+        print(difference)
+
+
 def format_category(tag: str) -> str:
     """Adds a '_' to the front of a tag (if not present) and strips out
     anything after a '.'"""
@@ -260,116 +225,25 @@ def interpret_file(the_file: Union[str, IO]) -> StringIO:
     return StringIO(buffer.read().decode())
 
 
-def _called_directly() -> None:
-    """ Figure out what to do if we were called on the command line
-    rather than imported as a module."""
+def iter_entries(metabolomics: bool = False) -> Iterable['entry_mod.Entry']:
+    """ Returns a generator that will yield an Entry object for every
+        macromolecule entry in the current BMRB database. Perfect for performing
+        an operation across the entire BMRB database. Set `metabolomics=True`
+        in order to get all the entries in the metabolomics database."""
 
-    # Specify some basic information about our command
-    optparser = optparse.OptionParser(usage="usage: %prog",
-                                      version=1,
-                                      description="NMR-STAR handling python "
-                                                  "module. Usually you'll want "
-                                                  "to import this. When ran "
-                                                  "without arguments a unit "
-                                                  "test is performed.")
-    optparser.add_option("--diff", metavar="FILE1 FILE2", action="store",
-                         dest="diff", default=None, type="string", nargs=2,
-                         help="Print a comparison of two entries.")
-    optparser.add_option("--validate", metavar="FILE", action="store",
-                         dest="validate", default=None, type="string",
-                         help="Print the validation report for an entry.")
-    optparser.add_option("--tag", metavar="FILE TAG", action="store",
-                         dest="fetch_tag", default=None, nargs=2, type="string",
-                         help="Print all of the values of the specified tags "
-                              "separated by newlines. Existing newlines in data"
-                              " are escaped. You can query multiple tags by "
-                              "comma separating them; if you do that the "
-                              "results will be truncated to the length of the "
-                              "tag with the fewest results, and the values for"
-                              " the tags will be separated with tabs.")
-    optparser.add_option("--quick", action="store_true", default=False,
-                         dest="quick_test", help=optparse.SUPPRESS_HELP)
+    api_url = "%s/list_entries?database=macromolecules" % definitions.API_URL
+    if metabolomics:
+        api_url = "%s/list_entries?database=metabolomics" % definitions.API_URL
 
-    # Options, parse 'em
-    (options, cmd_input) = optparser.parse_args()
-
-    if len(cmd_input) > 0:
-        print("No arguments are allowed. Please see the options using --help.")
-        sys.exit(0)
-
-    # Check for command misuse
-    if sum(1 for x in [options.validate,
-                       options.diff, options.fetch_tag] if x) > 1:
-        print("You can only use one of the --diff, --validate, and --tag "
-              "options at once.")
-        sys.exit(1)
-
-    # Validate an entry
-    if options.validate is not None:
-        validate(entry_mod.Entry.from_file(options.validate))
-
-    # Print the diff report
-    elif options.diff is not None:
-        diff(entry_mod.Entry.from_file(options.diff[0]), entry_mod.Entry.from_file(options.diff[1]))
-
-    # Fetch a tag and print it
-    elif options.fetch_tag is not None:
-
-        # Build an Entry from their file
-        entry_local = entry_mod.Entry.from_file(options.fetch_tag[0])
-
-        # Figure out if they want one or more tags
-        if "," in options.fetch_tag[1]:
-            query_tags = options.fetch_tag[1].split(",")
-        else:
-            query_tags = [options.fetch_tag[1]]
-
-        # Get the tags they queried
-        result = entry_local.get_tags(query_tags)
-        result = [result[tag] for tag in query_tags]
-
-        results_lengths = [len(x) for x in result]
-        max_length = max(results_lengths)
-
-        if len(set(results_lengths)) != 1:
-            sys.stderr.write("Warning! Not all queried tags had the same number"
-                             " of values. It is not recommended to combine tags "
-                             "from saveframes and loops. Please ensure that "
-                             "your script is separating tags by one tab and "
-                             "not by whitespace or this output may be "
-                             "misinterpreted.\n")
-
-        # Lengthen the short tags
-        for x, tag in enumerate(result):
-            while len(tag) < max_length:
-                tag.append("")
-
-        result = zip(*result)
-
-        for row in result:
-            print("\t".join([x.replace("\n", "\\n").replace("\t", "\\t")
-                             for x in row]))
-
-    # Run unit tests with no special mode invoked
-    else:
-        print("Running unit tests...")
-        try:
-            # pylint: disable=relative-import,wrong-import-order
-            from unit_tests import bmrb_test
-        except ImportError:
-            print("No testing module available with this installation.")
-            sys.exit(0)
-
-        # Only do a quick test
-        if options.quick_test:
-            bmrb_test.quick_test = True
-            sys.argv.pop()
-
-        bmrb_test.start_tests()
-
-    sys.exit(0)
+    for entry in json.loads(interpret_file(api_url).read()):
+        yield entry.Entry.from_database(entry)
 
 
-# Allow using diff or validate if ran directly
-if __name__ == '__main__':
-    _called_directly()
+def validate(entry_to_validate: 'entry_mod.Entry', schema: 'schema_mod.Schema' = None) -> None:
+    """Prints a validation report of an object."""
+
+    validation = entry_to_validate.validate(schema=schema)
+    if len(validation) == 0:
+        print("No problems found during validation.")
+    for pos, err in enumerate(validation):
+        print("%d: %s" % (pos + 1, err))

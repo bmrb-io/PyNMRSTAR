@@ -11,62 +11,6 @@ from . import utils
 __version__: str = "3.0"
 
 
-# noinspection PyDefaultArgument
-def _get_comments(_comment_cache: Dict[str, Dict[str, str]] = {}) -> Dict[str, Dict[str, str]]:
-    """ Loads the comments that should be placed in written files.
-
-    The default argument is mutable on purpose, as it is used as a cache for memoization."""
-
-    # Comment dictionary already exists
-    if _comment_cache:
-        return _comment_cache
-
-    file_to_load = os.path.join(os.path.dirname(os.path.realpath(__file__)))
-    file_to_load = os.path.join(file_to_load, "../reference_files/comments.str")
-
-    try:
-        comment_entry = entry_mod.Entry.from_file(file_to_load)
-    except IOError:
-        # Load the comments from Github if we can't find them locally
-        try:
-            comment_url = "https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v2/reference_files/comments.str"
-            comment_entry = entry_mod.Entry.from_file(utils.interpret_file(comment_url))
-        except Exception:
-            # No comments will be printed
-            return {}
-
-    # Load the comments
-    comment_records = comment_entry[0][0].get_tag(["category", "comment", "every_flag"])
-    comment_map = {'N': False, 'Y': True}
-    for comment in comment_records:
-        if comment[1] != ".":
-            _comment_cache[comment[0]] = {'comment': comment[1].rstrip() + "\n\n",
-                                          'every_flag': comment_map[comment[2]]}
-
-    return _comment_cache
-
-
-def _tag_key(x, schema: 'schema_mod.Schema' = None) -> int:
-    """ Helper function to figure out how to sort the tags."""
-
-    try:
-        return utils.get_schema(schema).schema_order.index(x)
-    except ValueError:
-        # Generate an arbitrary sort order for tags that aren't in the
-        #  schema but make sure that they always come after tags in the
-        #   schema
-        return len(utils.get_schema(schema).schema_order) + abs(hash(x))
-
-
-def _json_serialize(obj: object) -> str:
-    """JSON serializer for objects not serializable by default json code"""
-
-    # Serialize datetime.date objects by calling str() on them
-    if isinstance(obj, (date, decimal.Decimal)):
-        return str(obj)
-    raise TypeError("Type not serializable: %s" % type(obj))
-
-
 def _build_extension() -> bool:
     """ Try to compile the c extension. """
     import subprocess
@@ -121,3 +65,59 @@ def _ensure_cnmrstar() -> bool:
                     return False
 
         return False
+
+
+# noinspection PyDefaultArgument
+def _get_comments(_comment_cache: Dict[str, Dict[str, str]] = {}) -> Dict[str, Dict[str, str]]:
+    """ Loads the comments that should be placed in written files.
+
+    The default argument is mutable on purpose, as it is used as a cache for memoization."""
+
+    # Comment dictionary already exists
+    if _comment_cache:
+        return _comment_cache
+
+    file_to_load = os.path.join(os.path.dirname(os.path.realpath(__file__)))
+    file_to_load = os.path.join(file_to_load, "../reference_files/comments.str")
+
+    try:
+        comment_entry = entry_mod.Entry.from_file(file_to_load)
+    except IOError:
+        # Load the comments from Github if we can't find them locally
+        try:
+            comment_url = "https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v2/reference_files/comments.str"
+            comment_entry = entry_mod.Entry.from_file(utils.interpret_file(comment_url))
+        except Exception:
+            # No comments will be printed
+            return {}
+
+    # Load the comments
+    comment_records = comment_entry[0][0].get_tag(["category", "comment", "every_flag"])
+    comment_map = {'N': False, 'Y': True}
+    for comment in comment_records:
+        if comment[1] != ".":
+            _comment_cache[comment[0]] = {'comment': comment[1].rstrip() + "\n\n",
+                                          'every_flag': comment_map[comment[2]]}
+
+    return _comment_cache
+
+
+def _json_serialize(obj: object) -> str:
+    """JSON serializer for objects not serializable by default json code"""
+
+    # Serialize datetime.date objects by calling str() on them
+    if isinstance(obj, (date, decimal.Decimal)):
+        return str(obj)
+    raise TypeError("Type not serializable: %s" % type(obj))
+
+
+def _tag_key(x, schema: 'schema_mod.Schema' = None) -> int:
+    """ Helper function to figure out how to sort the tags."""
+
+    try:
+        return utils.get_schema(schema).schema_order.index(x)
+    except ValueError:
+        # Generate an arbitrary sort order for tags that aren't in the
+        #  schema but make sure that they always come after tags in the
+        #   schema
+        return len(utils.get_schema(schema).schema_order) + abs(hash(x))
