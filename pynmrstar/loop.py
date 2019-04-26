@@ -916,7 +916,10 @@ class Loop(object):
     def tag_index(self, tag_name: str) -> Optional[int]:
         """ Helper method to do a case-insensitive check for the presence
         of a given tag in this loop. Returns the index of the tag if found
-        and None if not found."""
+        and None if not found.
+
+        This is useful if you need to get the index of a certain tag to
+        iterate through the data and modify it."""
 
         try:
             lc_col = [x.lower() for x in self.tags]
