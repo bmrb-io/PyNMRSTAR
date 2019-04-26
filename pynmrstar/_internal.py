@@ -18,6 +18,8 @@ def _build_extension() -> bool:
     """ Try to compile the c extension. """
     import subprocess
 
+    print('building')
+
     cur_dir = os.getcwd()
     try:
         src_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)))
