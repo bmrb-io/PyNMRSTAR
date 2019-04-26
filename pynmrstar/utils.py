@@ -71,7 +71,6 @@ def get_schema(passed_schema: 'schema_mod.Schema' = None, _cached_schema: Dict[s
 
     if not _cached_schema:
 
-        print('getting schema...')
         # Try to load the local file first
         try:
             schema_file = os.path.join(os.path.dirname(os.path.realpath(__file__)))
