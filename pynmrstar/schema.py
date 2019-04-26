@@ -1,17 +1,17 @@
 import decimal
 import json
+import logging
 import os
 import re
-import logging
 from csv import reader as csv_reader
 from datetime import date
 from io import StringIO
 from typing import TextIO, BinaryIO
-from typing import Union, List, Optional, Any, Dict, Iterable
+from typing import Union
 
-import pynmrstar._internal
 from . import definitions
 from . import utils
+from ._internal import _json_serialize
 
 
 class Schema(object):
@@ -404,6 +404,6 @@ class Schema(object):
         s['tags'] = compacted_schema
 
         if serialize:
-            return json.dumps(s, default=pynmrstar._internal._json_serialize)
+            return json.dumps(s, default=_json_serialize)
         else:
             return s

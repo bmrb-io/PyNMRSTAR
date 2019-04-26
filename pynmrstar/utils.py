@@ -27,6 +27,7 @@ from urllib.request import urlopen
 from . import definitions
 from . import entry as entry_mod
 from . import schema as schema_mod
+
 try:
     from . import cnmrstar
 except ImportError:
