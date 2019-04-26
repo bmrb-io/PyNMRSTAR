@@ -7,7 +7,7 @@ import decimal
 
 from . import definitions
 from . import utils
-from ._internal import _build_extension, __version__, _get_cnmrstar
+from ._internal import __version__, _get_cnmrstar
 from .entry import Entry
 from .loop import Loop
 from .parser import Parser as _Parser
@@ -25,4 +25,4 @@ del schema
 del parser
 del decimal
 
-__all__ = ['Loop', 'Saveframe', 'Entry', 'Schema', 'definitions', 'utils', '__version__', 'cnmrstar']
+__all__ = ['Loop', 'Saveframe', 'Entry', 'Schema', 'definitions', 'utils', '__version__']

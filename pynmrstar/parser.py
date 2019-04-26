@@ -6,12 +6,11 @@ from . import definitions
 from . import entry as entry_mod
 from . import loop as loop_mod
 from . import saveframe as saveframe_mod
-from . import utils
 
-from ._internal import _get_cnmrstar
-
-
-cnmrstar = _get_cnmrstar()
+try:
+    from . import cnmrstar
+except ImportError:
+    cnmrstar = None
 
 
 class Parser(object):

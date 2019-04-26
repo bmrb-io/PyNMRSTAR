@@ -191,7 +191,7 @@ class Saveframe(object):
         # Load the BMRB entry from the file
         star_buffer = StringIO("data_1 " + star_buffer.read())
         parser = parser_mod.Parser(entry_to_parse_into=tmp_entry)
-        parser.parse(star_buffer.read(), source=self.source)
+        parser.parse(star_buffer.read(), source=self.source, convert_data_types=kwargs['convert_data_types'])
 
         # Copy the first parsed saveframe into ourself
         if len(tmp_entry.frame_list) > 1:
@@ -240,13 +240,23 @@ class Saveframe(object):
         return cls(saveframe_name=sf_name, tag_prefix=tag_prefix, source=source)
 
     @classmethod
-    def from_file(cls, the_file: Union[str, TextIO, BinaryIO], csv: bool = False):
+    def from_file(cls, the_file: Union[str, TextIO, BinaryIO], csv: bool = False, convert_data_types: bool = False):
         """Create a saveframe by loading in a file. Specify csv=True is
         the file is a CSV file. If the_file starts with http://,
         https://, or ftp:// then we will use those protocols to attempt
-        to open the file."""
+        to open the file.
 
-        return cls(file_name=the_file, csv=csv)
+        Setting convert_data_types to True will automatically convert
+        the data loaded from the file into the corresponding python type as
+        determined by loading the standard BMRB schema. This would mean that
+        all floats will be represented as decimal.Decimal objects, all integers
+        will be python int objects, strings and vars will remain strings, and
+        dates will become datetime.date objects. When printing str() is called
+        on all objects. Other that converting uppercase "E"s in scientific
+        notation floats to lowercase "e"s this should not cause any change in
+        the way re-printed NMR-STAR objects are displayed."""
+
+        return cls(file_name=the_file, csv=csv, convert_data_types=convert_data_types)
 
     @classmethod
     def from_json(cls, json_dict: Union[dict, str]):
@@ -278,11 +288,21 @@ class Saveframe(object):
         return ret
 
     @classmethod
-    def from_string(cls, the_string: str, csv: bool = False):
+    def from_string(cls, the_string: str, csv: bool = False, convert_data_types: bool = False):
         """Create a saveframe by parsing a string. Specify csv=True is
-        the string is in CSV format and not NMR-STAR format."""
+        the string is in CSV format and not NMR-STAR format.
+        
+        Setting convert_data_types to True will automatically convert
+        the data loaded from the file into the corresponding python type as
+        determined by loading the standard BMRB schema. This would mean that
+        all floats will be represented as decimal.Decimal objects, all integers
+        will be python int objects, strings and vars will remain strings, and
+        dates will become datetime.date objects. When printing str() is called
+        on all objects. Other that converting uppercase "E"s in scientific
+        notation floats to lowercase "e"s this should not cause any change in
+        the way re-printed NMR-STAR objects are displayed."""
 
-        return cls(the_string=the_string, csv=csv)
+        return cls(the_string=the_string, csv=csv, convert_data_types=convert_data_types)
 
     @classmethod
     def from_template(cls, category: str, name: str = None, entry_id: Union[str, int] = None, all_tags: bool = False,

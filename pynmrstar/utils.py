@@ -6,18 +6,6 @@ convert tags whose value matches "key" to the string "value" when
 printing. This allows you to set the default conversion value for
 Booleans or other objects.
 
-* Setting DONT_SHOW_COMMENTS to True will suppress the printing of
-comments before saveframes.
-
-* Setting CONVERT_DATATYPES to True will automatically convert
-the data loaded from the file into the corresponding python type as
-determined by loading the standard BMRB schema. This would mean that
-all floats will be represented as decimal.Decimal objects, all integers
-will be python int objects, strings and vars will remain strings, and
-dates will become datetime.date objects. When printing str() is called
-on all objects. Other that converting uppercase "E"s in scientific
-notation floats to lowercase "e"s this should not cause any change in
-the way re-printed NMR-STAR objects are displayed.
 
 """
 
@@ -39,7 +27,10 @@ from urllib.request import urlopen
 from . import definitions
 from . import entry as entry_mod
 from . import schema as schema_mod
-from ._internal import _get_cnmrstar
+try:
+    from . import cnmrstar
+except ImportError:
+    cnmrstar = None
 
 #############################################
 #            Global Variables               #
@@ -48,12 +39,7 @@ from ._internal import _get_cnmrstar
 # Set this to allow import * from pynmrstar to work sensibly
 __all__ = ['diff', 'validate', 'interpret_file', 'get_schema', 'format_category', 'format_tag']
 
-DONT_SHOW_COMMENTS: bool = False
-CONVERT_DATATYPES: bool = False
-
 _STANDARD_SCHEMA: Optional['schema_mod.Schema'] = None
-
-cnmrstar = _get_cnmrstar()
 
 
 def diff(entry1: 'entry_mod.Entry', entry2: 'entry_mod.Entry') -> None:
@@ -110,8 +96,6 @@ def clean_value(value: Any) -> str:
     way the value is converted to a string.
 
     """
-
-    cnmrstar = _get_cnmrstar()
 
     # Allow manual specification of conversions for booleans, Nones, etc.
     if value in definitions.STR_CONVERSION_DICT:
