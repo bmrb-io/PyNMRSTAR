@@ -191,7 +191,7 @@ class Saveframe(object):
         # Load the BMRB entry from the file
         star_buffer = StringIO("data_1 " + star_buffer.read())
         parser = parser_mod.Parser(entry_to_parse_into=tmp_entry)
-        parser.parse(star_buffer.read(), source=self.source, convert_data_types=kwargs['convert_data_types'])
+        parser.parse(star_buffer.read(), source=self.source, convert_data_types=kwargs.get('convert_data_types', False))
 
         # Copy the first parsed saveframe into ourself
         if len(tmp_entry.frame_list) > 1:

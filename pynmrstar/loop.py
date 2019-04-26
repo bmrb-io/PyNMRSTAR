@@ -92,7 +92,7 @@ class Loop(object):
             csv_file = csv_reader(star_buffer)
             self.add_tag(next(csv_file))
             for row in csv_file:
-                self.add_data(row, convert_data_types=kwargs['convert_data_types'])
+                self.add_data(row, convert_data_types=kwargs.get('convert_data_types', False))
             self.source = "from_csv('%s')" % kwargs['csv']
             return
 
@@ -102,7 +102,7 @@ class Loop(object):
         star_buffer = StringIO("data_0 save_internaluseyoushouldntseethis_frame _internal.use internal %s save_" %
                                star_buffer.read())
         parser = parser_mod.Parser(entry_to_parse_into=tmp_entry)
-        parser.parse(star_buffer.read(), source=self.source, convert_data_types=kwargs['convert_data_types'])
+        parser.parse(star_buffer.read(), source=self.source, convert_data_types=kwargs.get('convert_data_types', False))
 
         # Check that there was only one loop here
         if len(tmp_entry[0].loops) > 1:

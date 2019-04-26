@@ -117,7 +117,7 @@ class Entry(object):
 
         # Load the BMRB entry from the file
         parser: parser_mod.Parser = parser_mod.Parser(entry_to_parse_into=self)
-        parser.parse(star_buffer.read(), source=self.source, convert_data_types=kwargs['convert_data_types'])
+        parser.parse(star_buffer.read(), source=self.source, convert_data_types=kwargs.get('convert_data_types', False))
 
     def __len__(self) -> int:
         """ Returns the number of saveframes in the entry."""
