@@ -94,15 +94,11 @@ def _build_extension() -> bool:
         os.chdir(cur_dir)
 
 
-# noinspection PyDefaultArgument
-def _get_cnmrstar(_module_cache: dict = {}) -> object:
-
-    if 'cnmrstar' in _module_cache:
-        return _module_cache['cnmrstar']
+def _ensure_cnmrstar() -> bool:
 
     # See if we can use the fast tokenizer
     try:
-        import cnmrstar
+        from . import cnmrstar
 
         if "version" not in dir(cnmrstar) or cnmrstar.version() < "2.2.8":
             print("Recompiling cnmrstar module due to API changes. You may experience a segmentation fault immediately "
@@ -110,17 +106,18 @@ def _get_cnmrstar(_module_cache: dict = {}) -> object:
             _build_extension()
             sys.exit(0)
 
+        return True
+
     except ImportError:
-        cnmrstar = None
 
         # Check for the 'no c module' file before continuing
         if not os.path.isfile(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".nocompile")):
 
             if _build_extension():
                 try:
-                    import cnmrstar
+                    from . import cnmrstar
+                    return True
                 except ImportError:
-                    cnmrstar = None
+                    return False
 
-    _module_cache['cnmrstar'] = cnmrstar
-    return cnmrstar
+        return False

@@ -7,7 +7,7 @@ import decimal
 
 from . import definitions
 from . import utils
-from ._internal import __version__, _get_cnmrstar
+from ._internal import __version__, _ensure_cnmrstar
 from .entry import Entry
 from .loop import Loop
 from .parser import Parser as _Parser
@@ -16,8 +16,8 @@ from .schema import Schema
 
 # This makes sure that when decimals are printed a lower case "e" is used
 decimal.getcontext().capitals = 0
-# In order to export it
-cnmrstar = _get_cnmrstar()
+# Make sure the cnmstar module is compiled
+_ensure_cnmrstar()
 del loop
 del entry
 del saveframe
