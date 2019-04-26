@@ -80,7 +80,7 @@ class Parser(object):
         return self.token
 
     @staticmethod
-    def index_handle(haystack: Any, needle: Any, start_pos: Optional[int] = None):
+    def index_handle(haystack: Any, needle: Any, start_pos: Optional[int] = None) -> Optional[int]:
         """ Finds the index while catching ValueError and returning
         None instead."""
 
@@ -109,7 +109,7 @@ class Parser(object):
         # Fix DOS line endings
         data = data.replace("\r\n", "\n").replace("\r", "\n")
 
-        # Change '\n; data ' started multilines to '\n;\ndata'
+        # Change '\n; data ' started multi-lines to '\n;\ndata'
         data = re.sub(r'\n;([^\n]+?)\n', r'\n;\n\1\n', data)
 
         if cnmrstar is not None:
@@ -131,7 +131,7 @@ class Parser(object):
         * A loop with no data was found.
         * A loop with no tags or values was found.
         * A tag with an improper multi-line value was found.
-        Multiline values should look like this:
+        Multi-line values should look like this:
         \n;\nThe multi-line\nvalue here.\n;\n
         but the tag looked like this:
         \n; The multi-line\nvalue here.\n;\n"""
@@ -170,9 +170,8 @@ class Parser(object):
                                    self.get_line_number())
 
             if len(self.token) < 6:
-                raise ParsingError(
-                    "'save_' must be followed by saveframe name. You have a 'save_' tag which is illegal "
-                    "without a specified saveframe name.", self.get_line_number())
+                raise ParsingError("'save_' must be followed by saveframe name. You have a 'save_' tag which is "
+                                   "illegal without a specified saveframe name.", self.get_line_number())
 
             if self.delimiter != " ":
                 raise ParsingError("The save_ keyword may not be quoted or semicolon-delineated.",

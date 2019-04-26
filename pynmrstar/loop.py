@@ -949,7 +949,7 @@ class Loop(object):
                     if datum == "a":
                         pass
                     errors.extend(my_schema.val_type(self.category + "." + self.tags[pos], datum, category=category,
-                                                     linenum=line_no))
+                                                     line_number=line_no))
 
         if validate_star:
             # Check for wrong data size

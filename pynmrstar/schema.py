@@ -6,8 +6,7 @@ import re
 from csv import reader as csv_reader
 from datetime import date
 from io import StringIO
-from typing import TextIO, BinaryIO
-from typing import Union
+from typing import Union, List, Optional, Any, Dict
 
 from . import definitions
 from . import utils
@@ -17,26 +16,25 @@ from ._internal import _json_serialize
 class Schema(object):
     """A BMRB schema. Used to validate STAR files."""
 
-    def __init__(self, schema_file: Union[str, TextIO, BinaryIO] = None):
+    def __init__(self, schema_file: str = None) -> None:
         """Initialize a BMRB schema. With no arguments the most
         up-to-date schema will be fetched from the BMRB FTP site.
         Otherwise pass a URL or a file to load a schema from using the
         schema_file keyword argument."""
 
-        self.headers = []
-        self.schema = {}
-        self.schema_order = []
-        self.category_order = []
-        self.version = "unknown"
-        self.data_types = {}
+        self.headers: List[str] = []
+        self.schema: Dict[str, Dict[str, str]] = {}
+        self.schema_order: List[str] = []
+        self.category_order: List[str] = []
+        self.version: str = "unknown"
+        self.data_types: Dict[str, str] = {}
 
         # Try loading from the internet first
         if schema_file is None:
             schema_file = definitions.SCHEMA_URL
         self.schema_file = schema_file
 
-        # Get the schema from the internet, wrap in StringIO and pass that
-        #  to the csv reader
+        # Get whatever schema they specified, wrap in StringIO and pass that to the csv reader
         schema_stream = utils.interpret_file(schema_file)
         fix_newlines = StringIO('\n'.join(schema_stream.read().splitlines()))
 
@@ -91,17 +89,17 @@ class Schema(object):
         for item in csv_reader_instance:
             self.data_types[item[0]] = "^" + item[1] + "$"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Return how we can be initialized."""
 
         return "pynmrstar.Schema(schema_file='%s') version %s" % (self.schema_file, self.version)
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Print the schema that we are adhering to."""
 
         return self.string_representation()
 
-    def string_representation(self, search=None):
+    def string_representation(self, search: bool = None) -> str:
         """ Prints all the tags in the schema if search is not specified
         and prints the tags that contain the search string if it is."""
 
@@ -144,8 +142,8 @@ class Schema(object):
 
         return text
 
-    def add_tag(self, tag, tag_type, null_allowed, sf_category, loop_flag,
-                after=None):
+    def add_tag(self, tag: str, tag_type: str, null_allowed: bool, sf_category: bool, loop_flag: bool,
+                after: str = None):
         """ Adds the specified tag to the tag dictionary. You must provide:
 
         1) The full tag as such:
@@ -176,22 +174,19 @@ class Schema(object):
         tag_type = tag_type.upper()
         if tag_type not in ["INTEGER", "FLOAT", "TEXT", "DATETIME year to day"]:
             if tag_type.startswith("CHAR(") or tag_type.startswith("VARCHAR("):
-                # This will allow things through that have extra junk on the
-                #  end, but in general it is okay to be forgiving as long as we
-                #   can guess what they mean.
+                # This will allow things through that have extra junk on the end, but in general it is
+                # okay to be forgiving as long as we can guess what they mean.
                 length = tag_type[tag_type.index("(") + 1:tag_type.index(")")]
                 # Check the length for non-numbers and 0
                 try:
                     1 / int(length)
                 except (ValueError, ZeroDivisionError):
-                    raise ValueError("Illegal length specified in tag type: "
-                                     "%s " % length)
+                    raise ValueError("Illegal length specified in tag type:%s " % length)
 
                 # Cut off anything that might be at the end
                 tag_type = tag_type[0:tag_type.index(")") + 1]
             else:
-                raise ValueError("The tag type you provided is not valid. "
-                                 "Please use a type as specified in the help "
+                raise ValueError("The tag type you provided is not valid. Please use a type as specified in the help "
                                  "for this method.")
 
         # Check the null allowed
@@ -200,13 +195,11 @@ class Schema(object):
         if str(null_allowed).lower() == "true":
             null_allowed = True
         if not (null_allowed is True or null_allowed is False):
-            raise ValueError("Please specify whether null is allowed with True/"
-                             "False")
+            raise ValueError("Please specify whether null is allowed with True/False")
 
         # Check the category
         if not sf_category:
-            raise ValueError("Please provide the sf_category of the parent "
-                             "saveframe.")
+            raise ValueError("Please provide the sf_category of the parent saveframe.")
 
         # Check the loop flag
         if loop_flag is not True and loop_flag:
@@ -224,8 +217,7 @@ class Schema(object):
                     new_tag_pos = [x.lower() for x in
                                    self.schema_order].index(after.lower()) + 1
                 except ValueError:
-                    raise ValueError("The tag you specified to insert this tag "
-                                     "after does not exist in the schema.")
+                    raise ValueError("The tag you specified to insert this tag after does not exist in the schema.")
         else:
             # Determine a sensible place to put the new tag
             search = utils.format_category(tag.lower())
@@ -253,7 +245,8 @@ class Schema(object):
                                     "SFCategory": sf_category, "Tag": tag,
                                     "Dictionary sequence": new_tag_pos}
 
-    def convert_tag(self, tag, value, line_num=None):
+    def convert_tag(self, tag: str, value: Any, line_num: int = None) -> \
+            Optional[Union[str, int, decimal.Decimal, date]]:
         """ Converts the provided tag from string to the appropriate
         type as specified in this schema."""
 
@@ -265,50 +258,53 @@ class Schema(object):
         full_tag = self.schema[tag.lower()]
 
         # Get the type
-        valtype, null_allowed = full_tag["Data Type"], full_tag["Nullable"]
+        value_type, null_allowed = full_tag["Data Type"], full_tag["Nullable"]
 
         # Check for null
         if value in definitions.NULL_VALUES:
             return None
 
         # Keep strings strings
-        if "CHAR" in valtype or "VARCHAR" in valtype or "TEXT" in valtype:
+        if "CHAR" in value_type or "VARCHAR" in value_type or "TEXT" in value_type:
             return value
 
         # Convert ints
-        if "INTEGER" in valtype:
+        if "INTEGER" in value_type:
             try:
                 return int(value)
             except (ValueError, TypeError):
-                raise ValueError("Could not parse the file because a value that should be an INTEGER is not. Please "
-                                 "turn off CONVERT_DATATYPES or fix the file. Tag: '%s' on line '%s'" % (tag, line_num))
+                raise ValueError("Could not parse the file because a value that should be an INTEGER is not. Either "
+                                 "do not specify convert_data_types or fix the file. Tag: '%s' on line '%s'" %
+                                 (tag, line_num))
 
         # Convert floats
-        if "FLOAT" in valtype:
+        if "FLOAT" in value_type:
             try:
                 # If we used int() we would lose the precision
                 return decimal.Decimal(value)
             except (decimal.InvalidOperation, TypeError):
-                raise ValueError("Could not parse the file because a value that should be a FLOAT is not. Please turn "
-                                 "off CONVERT_DATATYPES or fix the file. Tag: '%s' on line '%s'" % (tag, line_num))
+                raise ValueError("Could not parse the file because a value that should be a FLOAT is not. Either "
+                                 "do not specify convert_data_types or fix the file. Tag: '%s' on line '%s'" %
+                                 (tag, line_num))
 
-        if "DATETIME year to day" in valtype:
+        if "DATETIME year to day" in value_type:
             try:
                 year, month, day = [int(x) for x in value.split("-")]
                 return date(year, month, day)
             except (ValueError, TypeError):
                 raise ValueError("Could not parse the file because a value that should be a DATETIME is not. Please "
-                                 "turn off CONVERT_DATATYPES or fix the file. Tag: '%s' on line '%s'" % (tag, line_num))
+                                 "do not specify convert_data_types or fix the file. Tag: '%s' on line '%s'" %
+                                 (tag, line_num))
 
         # We don't know the data type, so just keep it a string
         return value
 
-    def val_type(self, tag, value, category=None, linenum=None):
+    def val_type(self, tag: str, value: Any, category: str = None, line_number: int = None):
         """ Validates that a tag matches the type it should have
         according to this schema."""
 
         if tag.lower() not in self.schema:
-            return ["Tag '%s' not found in schema. Line '%s'." % (tag, linenum)]
+            return ["Tag '%s' not found in schema. Line '%s'." % (tag, line_number)]
 
         # We will skip type checks for None's
         is_none = value is None
@@ -341,32 +337,29 @@ class Schema(object):
 
         if is_none:
             if not null_allowed:
-                return ["Value cannot be NULL but is: '%s':'%s' on line '%s'."
-                        % (capitalized_tag, value, linenum)]
+                return ["Value cannot be NULL but is: '%s':'%s' on line '%s'." % (capitalized_tag, value, line_number)]
             return []
         else:
             # Don't run these checks on unassigned tags
             if "CHAR" in val_type:
                 length = int(val_type[val_type.index("(") + 1:val_type.index(")")])
                 if len(str(value)) > length:
-                    return ["Length of '%d' is too long for %s: "
-                            "'%s':'%s' on line '%s'." %
-                            (len(value), val_type, capitalized_tag, value, linenum)]
+                    return ["Length of '%d' is too long for %s: '%s':'%s' on line '%s'." %
+                            (len(value), val_type, capitalized_tag, value, line_number)]
 
             # Check that the value matches the regular expression for the type
             if not re.match(self.data_types[bmrb_type], str(value)):
-                return ["Value does not match specification: '%s':'%s' on line '%s'"
-                        ".\n     Type specified: %s\n     Regular expression for "
-                        "type: '%s'" % (capitalized_tag, value, linenum, bmrb_type,
-                                        self.data_types[bmrb_type])]
+                return ["Value does not match specification: '%s':'%s' on line '%s'.\n     Type specified: %s\n     "
+                        "Regular expression for type: '%s'" % (capitalized_tag, value, line_number, bmrb_type,
+                                                               self.data_types[bmrb_type])]
 
         # Check the tag capitalization
         if tag != capitalized_tag:
-            return ["The tag '%s' is improperly capitalized but otherwise "
-                    "valid. Should be '%s'." % (tag, capitalized_tag)]
+            return ["The tag '%s' is improperly capitalized but otherwise valid. Should be '%s'." %
+                    (tag, capitalized_tag)]
         return []
 
-    def get_json(self, serialize=True, full=False):
+    def get_json(self, serialize: bool = True, full: bool = False) -> Union[str, dict]:
         """ Returns the schema in JSON format. """
 
         s = {'data_types': self.data_types,
@@ -374,10 +367,8 @@ class Schema(object):
              'version': self.version}
 
         if not full:
-            s['headers'] = ['Tag', 'SFCategory', 'BMRB data type',
-                            'Prompt', 'Interface', 'default value', 'Example',
-                            'ADIT category view name', 'User full view',
-                            'Foreign Table', 'Sf pointer']
+            s['headers'] = ['Tag', 'SFCategory', 'BMRB data type', 'Prompt', 'Interface', 'default value', 'Example',
+                            'ADIT category view name', 'User full view', 'Foreign Table', 'Sf pointer']
 
         compacted_schema = []
         for tag in self.schema_order:

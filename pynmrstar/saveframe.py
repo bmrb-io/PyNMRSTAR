@@ -695,7 +695,7 @@ class Saveframe(object):
             for tag in self.tags:
                 line_number = str(tag[2]) + " of original file" if len(tag) > 2 else None
                 formatted_tag = self.tag_prefix + "." + tag[0]
-                cur_errors = my_schema.val_type(formatted_tag, tag[1], category=my_category, linenum=line_number)
+                cur_errors = my_schema.val_type(formatted_tag, tag[1], category=my_category, line_number=line_number)
                 errors.extend(cur_errors)
 
         # Check the loops for errors
