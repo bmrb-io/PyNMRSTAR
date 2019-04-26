@@ -406,7 +406,8 @@ class Saveframe(object):
 
         self.loops.append(loop_to_add)
 
-    def add_tag(self, name: str, value: Any, line_num: Optional[int] = None, update: bool = False) -> None:
+    def add_tag(self, name: str, value: Any, line_num: Optional[int] = None, update: bool = False,
+                convert_data_types: bool = False) -> None:
         """Add a tag to the tag list. Does a bit of validation and
         parsing. Set update to true to update a tag if it exists rather
         than raise an exception."""
@@ -437,7 +438,7 @@ class Saveframe(object):
             raise ValueError("Tag names can not contain spaces.")
 
         # See if we need to convert the data type
-        if utils.CONVERT_DATATYPES:
+        if convert_data_types:
             new_tag = [name, utils.get_schema().convert_tag(
                 self.tag_prefix + "." + name, value, line_num=line_num)]
         else:

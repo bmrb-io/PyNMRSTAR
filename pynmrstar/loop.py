@@ -92,7 +92,7 @@ class Loop(object):
             csv_file = csv_reader(star_buffer)
             self.add_tag(next(csv_file))
             for row in csv_file:
-                self.add_data(row)
+                self.add_data(row, convert_data_types=kwargs['convert_data_types'])
             self.source = "from_csv('%s')" % kwargs['csv']
             return
 
@@ -102,7 +102,7 @@ class Loop(object):
         star_buffer = StringIO("data_0 save_internaluseyoushouldntseethis_frame _internal.use internal %s save_" %
                                star_buffer.read())
         parser = parser_mod.Parser(entry_to_parse_into=tmp_entry)
-        parser.parse(star_buffer.read(), source=self.source)
+        parser.parse(star_buffer.read(), source=self.source, convert_data_types=kwargs['convert_data_types'])
 
         # Check that there was only one loop here
         if len(tmp_entry[0].loops) > 1:
@@ -247,13 +247,23 @@ class Loop(object):
         return True
 
     @classmethod
-    def from_file(cls, the_file: Union[str, TextIO, BinaryIO], csv: bool = False):
+    def from_file(cls, the_file: Union[str, TextIO, BinaryIO], csv: bool = False, convert_data_types: bool = False):
         """Create a saveframe by loading in a file. Specify csv=True if
         the file is a CSV file. If the_file starts with http://,
         https://, or ftp:// then we will use those protocols to attempt
-        to open the file."""
+        to open the file.
 
-        return cls(file_name=the_file, csv=csv)
+        Setting convert_data_types to True will automatically convert
+        the data loaded from the file into the corresponding python type as
+        determined by loading the standard BMRB schema. This would mean that
+        all floats will be represented as decimal.Decimal objects, all integers
+        will be python int objects, strings and vars will remain strings, and
+        dates will become datetime.date objects. When printing str() is called
+        on all objects. Other that converting uppercase "E"s in scientific
+        notation floats to lowercase "e"s this should not cause any change in
+        the way re-printed NMR-STAR objects are displayed."""
+
+        return cls(file_name=the_file, csv=csv, convert_data_types=convert_data_types)
 
     @classmethod
     def from_json(cls, json_dict: Union[dict, str]):
@@ -284,7 +294,7 @@ class Loop(object):
 
     @classmethod
     def from_scratch(cls, category: str = None, source: str = "from_scratch()"):
-        """Create an empty saveframe that you can programatically add
+        """Create an empty saveframe that you can programmatically add
         to. You may also pass the tag prefix as the second argument. If
         you do not pass the tag prefix it will be set the first time you
         add a tag."""
@@ -292,11 +302,21 @@ class Loop(object):
         return cls(category=category, source=source)
 
     @classmethod
-    def from_string(cls, the_string: str, csv: bool = False):
+    def from_string(cls, the_string: str, csv: bool = False, convert_data_types: bool = False):
         """Create a saveframe by parsing a string. Specify csv=True is
-        the string is in CSV format and not NMR-STAR format."""
+        the string is in CSV format and not NMR-STAR format.
 
-        return cls(the_string=the_string, csv=csv)
+        Setting convert_data_types to True will automatically convert
+        the data loaded from the file into the corresponding python type as
+        determined by loading the standard BMRB schema. This would mean that
+        all floats will be represented as decimal.Decimal objects, all integers
+        will be python int objects, strings and vars will remain strings, and
+        dates will become datetime.date objects. When printing str() is called
+        on all objects. Other that converting uppercase "E"s in scientific
+        notation floats to lowercase "e"s this should not cause any change in
+        the way re-printed NMR-STAR objects are displayed."""
+
+        return cls(the_string=the_string, csv=csv, convert_data_types=convert_data_types)
 
     @classmethod
     def from_template(cls, tag_prefix: str, all_tags: bool = False, schema: schema_mod.Schema = None):
@@ -368,7 +388,7 @@ class Loop(object):
 
         return True
 
-    def add_data(self, the_list: List[Any], rearrange: bool = False):
+    def add_data(self, the_list: List[Any], rearrange: bool = False, convert_data_types: bool = False):
         """Add a list to the data field. Items in list can be any type,
         they will be converted to string and formatted correctly. The
         list must have the same cardinality as the tag names or you
@@ -392,7 +412,7 @@ class Loop(object):
                              self.category)
 
         # Auto convert data types if option set
-        if utils.CONVERT_DATATYPES:
+        if convert_data_types:
             schema = utils.get_schema()
             for row in processed_data:
                 for tag_id, datum in enumerate(row):

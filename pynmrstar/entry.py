@@ -117,7 +117,7 @@ class Entry(object):
 
         # Load the BMRB entry from the file
         parser: parser_mod.Parser = parser_mod.Parser(entry_to_parse_into=self)
-        parser.parse(star_buffer.read(), source=self.source)
+        parser.parse(star_buffer.read(), source=self.source, convert_data_types=kwargs['convert_data_types'])
 
     def __len__(self) -> int:
         """ Returns the number of saveframes in the entry."""
@@ -222,10 +222,20 @@ class Entry(object):
         return frame_dict
 
     @classmethod
-    def from_database(cls, entry_num: Union[str, int]):
+    def from_database(cls, entry_num: Union[str, int], convert_data_types: bool = False):
         """Create an entry corresponding to the most up to date entry on
         the public BMRB server. (Requires ability to initiate outbound
-        HTTP connections.)"""
+        HTTP connections.)
+
+        Setting convert_data_types to True will automatically convert
+        the data loaded from the file into the corresponding python type as
+        determined by loading the standard BMRB schema. This would mean that
+        all floats will be represented as decimal.Decimal objects, all integers
+        will be python int objects, strings and vars will remain strings, and
+        dates will become datetime.date objects. When printing str() is called
+        on all objects. Other that converting uppercase "E"s in scientific
+        notation floats to lowercase "e"s this should not cause any change in
+        the way re-printed NMR-STAR objects are displayed."""
 
         # Try to load the entry using JSON
         try:
@@ -270,7 +280,7 @@ class Entry(object):
                 for each_loop in each_saveframe:
                     each_loop.source = ent_source
 
-            if utils.CONVERT_DATATYPES:
+            if convert_data_types:
                 schema = utils.get_schema()
                 for each_saveframe in ent:
                     for tag in each_saveframe.tags:
@@ -292,12 +302,22 @@ class Entry(object):
             return cls(entry_num=entry_num)
 
     @classmethod
-    def from_file(cls, the_file: Union[str, TextIO, BinaryIO]):
+    def from_file(cls, the_file: Union[str, TextIO, BinaryIO], convert_data_types: bool = False):
         """Create an entry by loading in a file. If the_file starts with
         http://, https://, or ftp:// then we will use those protocols to
-        attempt to open the file."""
+        attempt to open the file.
+        
+        Setting convert_data_types to True will automatically convert
+        the data loaded from the file into the corresponding python type as
+        determined by loading the standard BMRB schema. This would mean that
+        all floats will be represented as decimal.Decimal objects, all integers
+        will be python int objects, strings and vars will remain strings, and
+        dates will become datetime.date objects. When printing str() is called
+        on all objects. Other that converting uppercase "E"s in scientific
+        notation floats to lowercase "e"s this should not cause any change in
+        the way re-printed NMR-STAR objects are displayed."""
 
-        return cls(file_name=the_file)
+        return cls(file_name=the_file, convert_data_types=convert_data_types)
 
     @classmethod
     def from_json(cls, json_dict: Union[dict, str]):
@@ -331,10 +351,21 @@ class Entry(object):
         return ret
 
     @classmethod
-    def from_string(cls, the_string: str):
-        """Create an entry by parsing a string."""
+    def from_string(cls, the_string: str, convert_data_types: bool = False):
+        """Create an entry by parsing a string.
 
-        return cls(the_string=the_string)
+
+        Setting convert_data_types to True will automatically convert
+        the data loaded from the file into the corresponding python type as
+        determined by loading the standard BMRB schema. This would mean that
+        all floats will be represented as decimal.Decimal objects, all integers
+        will be python int objects, strings and vars will remain strings, and
+        dates will become datetime.date objects. When printing str() is called
+        on all objects. Other that converting uppercase "E"s in scientific
+        notation floats to lowercase "e"s this should not cause any change in
+        the way re-printed NMR-STAR objects are displayed."""
+
+        return cls(the_string=the_string, convert_data_types=convert_data_types)
 
     @classmethod
     def from_scratch(cls, entry_id: Union[str, int]):
