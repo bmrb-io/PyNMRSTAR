@@ -74,7 +74,7 @@ def get_schema(passed_schema: 'schema_mod.Schema' = None, _cached_schema: Dict[s
         # Try to load the local file first
         try:
             schema_file = os.path.join(os.path.dirname(os.path.realpath(__file__)))
-            schema_file = os.path.join(schema_file, "../reference_files/schema.csv")
+            schema_file = os.path.join(schema_file, "reference_files/schema.csv")
             _cached_schema['schema'] = schema_mod.Schema(schema_file=schema_file)
         except IOError:
             # Try to load from the internet

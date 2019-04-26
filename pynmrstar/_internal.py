@@ -81,7 +81,7 @@ def _get_comments(_comment_cache: Dict[str, Dict[str, str]] = {}) -> Dict[str, D
         return _comment_cache
 
     file_to_load = os.path.join(os.path.dirname(os.path.realpath(__file__)))
-    file_to_load = os.path.join(file_to_load, "../reference_files/comments.str")
+    file_to_load = os.path.join(file_to_load, "reference_files/comments.str")
 
     try:
         comment_entry = entry_mod.Entry.from_file(file_to_load)
