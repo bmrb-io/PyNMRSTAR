@@ -181,7 +181,7 @@ class TestPyNMRSTAR(unittest.TestCase):
     def test_init(self):
         # Make sure the correct errors are raised
         self.assertRaises(ValueError, Entry)
-        self.assertRaises(ValueError, Entry, the_string="test", entry_num="test")
+        self.assertRaises(ParsingError, Entry, the_string="test", entry_num="test")
         # Make sure string parsing is correct
         self.assertEqual(self.entry, Entry.from_string(str(self.entry)))
         self.assertEqual(str(self.entry), str(Entry.from_string(str(self.entry))))
