@@ -9,7 +9,7 @@ import os
 from gzip import GzipFile
 from io import StringIO, BytesIO
 from typing import IO
-from typing import Union, Optional, Iterable, Any
+from typing import Union, Iterable, Any, Dict
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
@@ -28,8 +28,6 @@ except ImportError:
 
 # Set this to allow import * from pynmrstar to work sensibly
 __all__ = ['diff', 'validate', 'interpret_file', 'get_schema', 'format_category', 'format_tag']
-
-_STANDARD_SCHEMA: Optional['schema_mod.Schema'] = None
 
 
 def clean_value(value: Any) -> str:
@@ -161,7 +159,9 @@ def format_tag(tag: str) -> str:
     return tag
 
 
-def get_schema(passed_schema: 'schema_mod.Schema' = None) -> 'schema_mod.Schema':
+# noinspection PyDefaultArgument
+def get_schema(passed_schema: 'schema_mod.Schema' = None, _cached_schema: Dict[str, schema_mod.Schema] = {}) \
+        -> 'schema_mod.Schema':
     """If passed a schema (not None) it returns it. If passed none,
     it checks if the default schema has been initialized. If not
     initialized, it initializes it. Then it returns the default schema."""
@@ -169,23 +169,21 @@ def get_schema(passed_schema: 'schema_mod.Schema' = None) -> 'schema_mod.Schema'
     if passed_schema:
         return passed_schema
 
-    global _STANDARD_SCHEMA
-    if _STANDARD_SCHEMA is None:
+    if not _cached_schema:
 
         # Try to load the local file first
         try:
             schema_file = os.path.join(os.path.dirname(os.path.realpath(__file__)))
             schema_file = os.path.join(schema_file, "../reference_files/schema.csv")
-            _STANDARD_SCHEMA = schema_mod.Schema(schema_file=schema_file)
+            _cached_schema['schema'] = schema_mod.Schema(schema_file=schema_file)
         except IOError:
             # Try to load from the internet
             try:
-                _STANDARD_SCHEMA = schema_mod.Schema()
+                _cached_schema['schema'] = schema_mod.Schema()
             except (HTTPError, URLError):
-                raise ValueError("Could not load a BMRB schema from the "
-                                 "internet or from the local repository.")
+                raise ValueError("Could not load a BMRB schema from the internet or from the local repository.")
 
-    return _STANDARD_SCHEMA
+    return _cached_schema['schema']
 
 
 def interpret_file(the_file: Union[str, IO]) -> StringIO:
