@@ -694,9 +694,10 @@ PARSE_get_token_full(PyObject *self)
     parser_data * my_parser = &parser;
 
     // Skip comments
+    /*
     while (my_parser->last_delineator == '#'){
         token = get_token(&parser);
-    }
+    }*/
 
     // Pass errors up the chain
     if (token == NULL){
