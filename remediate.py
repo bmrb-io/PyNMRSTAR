@@ -10,7 +10,7 @@ patch_parser(pynmrstar)
 for file_name in sys.argv[1:]:
     try:
         comments = []
-        pynmrstar.cnmrstar.load(sys.argv[1])
+        pynmrstar.cnmrstar.load(file_name)
 
         # Get rid of the data line
         token = pynmrstar.cnmrstar.get_token_full()[0]
@@ -23,7 +23,7 @@ for file_name in sys.argv[1:]:
         cnmrstar_ref = pynmrstar.cnmrstar
         pynmrstar.cnmrstar = None
 
-        entry = pynmrstar.Entry.from_file(sys.argv[1])
+        entry = pynmrstar.Entry.from_file(file_name)
         pynmrstar.cnmrstar = cnmrstar_ref
         del entry['constraint_statistics']
         entry.rename_saveframe('global_Org_file_characteristics', 'constraint_statistics')
@@ -39,9 +39,9 @@ for file_name in sys.argv[1:]:
 
         clean_string = "data_%s\n%s\n\n%s" % (entry.entry_id, comment_str, "\n".join(sf_strings))
     except Exception as err:
-        print("Warning! Something went wrong for file %s: %s" % (sys.argv[1], err))
+        print("Warning! Something went wrong for file %s: %s" % (file_name, err))
         continue
 
-    with open(sys.argv[1], 'w') as fixed:
+    with open(file_name, 'w') as fixed:
         fixed.write(clean_string)
 
