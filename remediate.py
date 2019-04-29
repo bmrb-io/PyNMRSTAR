@@ -20,9 +20,11 @@ for file_name in sys.argv[1:]:
                 comments.append(token)
         comment_str = "\n".join(comments)
 
+        cnmrstar_ref = pynmrstar.cnmrstar
         pynmrstar.cnmrstar = None
 
         entry = pynmrstar.Entry.from_file(sys.argv[1])
+        pynmrstar.cnmrstar = cnmrstar_ref
         del entry['constraint_statistics']
         entry.rename_saveframe('global_Org_file_characteristics', 'constraint_statistics')
 
