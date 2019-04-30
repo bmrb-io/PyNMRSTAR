@@ -48,7 +48,8 @@ for file_name in sys.argv[1:]:
 
         clean_string = "data_%s\n\n%s\n\n%s" % (entry.entry_id, comment_str, "\n".join(sf_strings))
     except Exception as err:
-        print("Warning! Something went wrong for file %s: %s" % (file_name, err))
+        if 'global_Org_file_characteristics' not in str(err):
+            print("Warning! Something went wrong for file %s: %s" % (file_name, err))
         continue
 
     if file_name.endswith('.gz'):
