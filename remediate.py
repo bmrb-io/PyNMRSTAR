@@ -8,6 +8,8 @@ import gzip
 from monkeypatch import patch_parser
 patch_parser(pynmrstar)
 
+if not pynmrstar.cnmrstar:
+    raise ValueError('The cnmrstar tokenizer must be compiled and available.')
 
 for file_name in sys.argv[1:]:
 
