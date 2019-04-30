@@ -693,7 +693,7 @@ PARSE_get_token_full(PyObject *self)
     token = get_token(&parser);
     parser_data * my_parser = &parser;
 
-    // Skip comments
+    // Don't skip comments
     /*
     while (my_parser->last_delineator == '#'){
         token = get_token(&parser);

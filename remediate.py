@@ -9,7 +9,7 @@ patch_parser(pynmrstar)
 
 for file_name in sys.argv[1:]:
     try:
-        comments = []
+        comment_lines = []
         pynmrstar.cnmrstar.load(file_name)
 
         # Get rid of the data line
@@ -17,14 +17,10 @@ for file_name in sys.argv[1:]:
         while token:
             token, line_number, delimiter = pynmrstar.cnmrstar.get_token_full()
             if delimiter == '#':
-                comments.append(token)
-        comment_str = "\n".join(comments)
-
-        cnmrstar_ref = pynmrstar.cnmrstar
-        pynmrstar.cnmrstar = None
+                comment_lines.append(token)
+        comment_str = "\n".join(comment_lines)
 
         entry = pynmrstar.Entry.from_file(file_name)
-        pynmrstar.cnmrstar = cnmrstar_ref
         del entry['constraint_statistics']
         entry.rename_saveframe('global_Org_file_characteristics', 'constraint_statistics')
 
@@ -37,7 +33,7 @@ for file_name in sys.argv[1:]:
                 sf_strings.append(saveframe.__str__(first_in_category=True))
                 seen_saveframes[saveframe.category] = True
 
-        clean_string = "data_%s\n%s\n\n%s" % (entry.entry_id, comment_str, "\n".join(sf_strings))
+        clean_string = "data_%s\n\n%s\n\n%s" % (entry.entry_id, comment_str, "\n".join(sf_strings))
     except Exception as err:
         print("Warning! Something went wrong for file %s: %s" % (file_name, err))
         continue

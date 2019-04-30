@@ -40,6 +40,8 @@ def patch_parser(pynmstar_instance):
 
         # We are expecting to get saveframes
         while self.get_token() is not None:
+            if self.delimiter == '#':
+                continue
 
             if not self.token.startswith("save_"):
                 raise ValueError("Only 'save_NAME' is valid in the body of a "
