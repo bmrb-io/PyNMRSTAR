@@ -9,7 +9,7 @@ from . import saveframe as saveframe_mod
 from .exceptions import ParsingError
 
 try:
-    from . import cnmrstar
+    import cnmrstar
 except ImportError:
     cnmrstar = None
 

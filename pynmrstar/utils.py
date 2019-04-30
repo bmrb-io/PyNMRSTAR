@@ -15,7 +15,7 @@ from . import schema as schema_mod
 from ._internal import _interpret_file
 
 try:
-    from . import cnmrstar
+    import cnmrstar
 except ImportError:
     cnmrstar = None
 
