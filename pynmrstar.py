@@ -915,9 +915,9 @@ class _Parser(object):
         self.index += len(raw_tmp) - len(tmp)
 
         # Skip comments
-        if tmp.startswith("#"):
-            self.index += len(tmp)
-            return self.get_token()
+        #if tmp.startswith("#"):
+#            self.index += len(tmp)
+#            return self.get_token()
 
         # Handle multi-line values
         if tmp.startswith(";\n"):
