@@ -4,23 +4,34 @@ from __future__ import print_function
 
 import sys
 import pynmrstar
+import gzip
 from monkeypatch import patch_parser
 patch_parser(pynmrstar)
 
-for file_name in sys.argv[1:]:
-    try:
-        comment_lines = []
-        pynmrstar.cnmrstar.load(file_name)
 
-        # Get rid of the data line
+for file_name in sys.argv[1:]:
+
+    try:
+
+        # Get the file contents
+        if file_name.endswith('.gz'):
+            file_data = gzip.GzipFile(file_name, 'r').read()
+        else:
+            file_data = open(file_name, 'r').read()
+        pynmrstar.cnmrstar.load_string(file_data)
+
+        # Get the comment at the beginning
+        comment_lines = []
         token = pynmrstar.cnmrstar.get_token_full()[0]
         while token:
             token, line_number, delimiter = pynmrstar.cnmrstar.get_token_full()
             if delimiter == '#':
                 comment_lines.append(token)
         comment_str = "\n".join(comment_lines)
+        pynmrstar.cnmrstar.reset()
 
-        entry = pynmrstar.Entry.from_file(file_name)
+        # Get the entry
+        entry = pynmrstar.Entry.from_string(file_data)
         del entry['constraint_statistics']
         entry.rename_saveframe('global_Org_file_characteristics', 'constraint_statistics')
 
@@ -38,6 +49,10 @@ for file_name in sys.argv[1:]:
         print("Warning! Something went wrong for file %s: %s" % (file_name, err))
         continue
 
-    with open(file_name, 'w') as fixed:
-        fixed.write(clean_string)
+    if file_name.endswith('.gz'):
+        with gzip.GzipFile(file_name, 'w') as fixed:
+            fixed.write(clean_string)
+    else:
+        with open(file_name, 'w') as fixed:
+            fixed.write(clean_string)
 
