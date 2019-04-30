@@ -671,6 +671,8 @@ _Entry.multi2
         parser.get_token()
         self.assertEqual((parser.token, parser.delimiter), ('value', ' '))
         parser.get_token()
+        self.assertEqual((parser.token, parser.delimiter), ('#ignore this all', '#'))
+        parser.get_token()
         self.assertEqual((parser.token, parser.delimiter), ('_Entry.ID', ' '))
         parser.get_token()
         self.assertEqual((parser.token, parser.delimiter), ('.-!?', '"'))
