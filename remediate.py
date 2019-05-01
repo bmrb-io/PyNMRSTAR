@@ -63,8 +63,6 @@ for file_name in sys.argv[1:]:
 
         if not changes_made:
             continue
-        else:
-            print('Making changes...')
 
         sf_strings = []
         seen_saveframes = {}
