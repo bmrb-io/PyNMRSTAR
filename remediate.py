@@ -21,9 +21,13 @@ def get_comment(file_data_local):
     pynmrstar.cnmrstar.load_string(file_data_local)
     pynmrstar.cnmrstar.get_token_full()
     token, line_number, delimiter = pynmrstar.cnmrstar.get_token_full()
-    while token and delimiter == '#':
-        comment_lines.append(token)
+    while token:
+        if token.count('#') > 1:
+            break
+        if delimiter == '#':
+            comment_lines.append(token)
         token, line_number, delimiter = pynmrstar.cnmrstar.get_token_full()
+
     pynmrstar.cnmrstar.reset()
     return "\n".join(comment_lines)
 
