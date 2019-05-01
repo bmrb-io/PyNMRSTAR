@@ -1,4 +1,5 @@
 #!/usr/bin/env python2
+# -*- coding: utf-8 -*-
 
 from __future__ import print_function
 
@@ -29,7 +30,7 @@ for file_name in sys.argv[1:]:
             token, line_number, delimiter = pynmrstar.cnmrstar.get_token_full()
             if delimiter == '#':
                 comment_lines.append(token)
-        comment_str = "\n".join(comment_lines)
+        comment_str = ("\n".join(comment_lines)).replace("–", '-')
         pynmrstar.cnmrstar.reset()
 
         # Get the entry
