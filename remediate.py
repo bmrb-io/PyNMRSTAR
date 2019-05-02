@@ -4,9 +4,11 @@
 from __future__ import print_function
 
 import sys
+import re
 import pynmrstar
 import gzip
 from monkeypatch import patch_parser
+
 patch_parser(pynmrstar)
 
 if not pynmrstar.cnmrstar:
@@ -18,6 +20,12 @@ def get_comment(file_data_local):
 
     # Get the comment at the beginning
     comment_lines = []
+
+    # Remove the wrong newlines
+    file_data_local = file_data_local.replace("\r\n", "\n").replace("\r", "\n")
+    # Change '\n; data ' started multilines to '\n;\ndata'
+    file_data_local = re.sub(r'\n;([^\n]+?)\n', r'\n;\n\1\n', file_data_local)
+
     pynmrstar.cnmrstar.load_string(file_data_local)
     pynmrstar.cnmrstar.get_token_full()
     token, line_number, delimiter = pynmrstar.cnmrstar.get_token_full()
@@ -88,4 +96,3 @@ for file_name in sys.argv[1:]:
     else:
         with open(file_name, 'w') as fixed:
             fixed.write(clean_string)
-
