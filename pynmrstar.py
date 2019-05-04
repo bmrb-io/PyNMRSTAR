@@ -92,6 +92,14 @@ try:
 except ImportError:
     zlib = None
 
+try:
+    import warnings
+except ImportError:
+    class WarningsImposter:
+        def warn(self, warning_message, warning_type):
+            sys.stderr.write("%s\n" % warning_message)
+    warnings = WarningsImposter()
+
 # Determine if we are running in python3
 PY3 = (sys.version_info[0] == 3)
 
@@ -3284,10 +3292,9 @@ class Loop(object):
                                      self.category)
 
     def add_column(self, name, ignore_duplicates=False, update_data=False):
-        """ Depreciated, please use add_tag() instead. """
-
-        sys.stderr.write("NOTICE: add_column() is depreciated. Please use"
-                         " add_tag() instead.\n")
+        """ Deprecated, please use add_tag() instead. """
+        warnings.warn("add_column() is deprecated. Please use add_tag() "
+                      "instead.", DeprecationWarning)
         return self.add_tag(name, ignore_duplicates, update_data)
 
     def add_data(self, the_list, rearrange=False):
@@ -3330,10 +3337,10 @@ class Loop(object):
         self.data.extend(processed_data)
 
     def add_data_by_column(self, column_id, value):
-        """ Depreciated, please use add_data_by_tag() instead. """
+        """ Deprecated, please use add_data_by_tag() instead. """
 
-        sys.stderr.write("NOTICE: add_data_by_column() is depreciated. Please "
-                         " use add_data_by_tag() instead.\n")
+        warnings.warn("add_data_by_column() is deprecated. Please "
+                      " use add_data_by_tag() instead.", DeprecationWarning)
         return self.add_data_by_tag(column_id, value)
 
     def add_data_by_tag(self, tag_id, value):
@@ -3549,10 +3556,10 @@ class Loop(object):
         return result
 
     def get_columns(self):
-        """ Depreciated alias for get_tags() """
+        """ Deprecated alias for get_tags() """
 
-        sys.stderr.write("NOTICE: get_columns() is depreciated. Please use"
-                         " get_tag_names() instead.\n")
+        warnings.warn("aget_columns() is deprecated. Please use"
+                      " get_tag_names() instead.", DeprecationWarning)
         return self.get_tag_names()
 
     def get_data_as_csv(self, header=True, show_category=True):
