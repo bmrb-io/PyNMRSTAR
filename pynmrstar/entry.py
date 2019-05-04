@@ -124,14 +124,6 @@ class Entry(object):
 
         return len(self.frame_list)
 
-    def __lt__(self, other) -> bool:
-        """Returns true if this entry is less than another entry."""
-
-        if not isinstance(other, Entry):
-            return NotImplemented
-
-        return self.entry_id > other.entry_id
-
     def __repr__(self) -> str:
         """Returns a description of the entry."""
 
@@ -598,6 +590,7 @@ class Entry(object):
         the entry."""
 
         print(repr(self))
+        frame: saveframe_mod.Saveframe
         for pos, frame in enumerate(self):
             print("\t[%d] %s" % (pos, repr(frame)))
             for pos2, one_loop in enumerate(frame):
