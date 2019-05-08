@@ -1,7 +1,9 @@
-from pynmrstar import STR_CONVERSION_DICT, cnmrstar, _WHITESPACE
+import json
+
+from pynmrstar import STR_CONVERSION_DICT, cnmrstar, _WHITESPACE, _API_URL, _interpret_file, Entry
 
 
-def _format_tag(value):
+def format_tag(value):
     """Strips anything before the '.'"""
 
     if '.' in value:
@@ -9,7 +11,7 @@ def _format_tag(value):
     return value
 
 
-def _format_category(value):
+def format_category(value):
     """Adds a '_' to the front of a tag (if not present) and strips out
     anything after a '.'"""
 
@@ -118,3 +120,17 @@ def clean_value(value):
 
     # It's good to go
     return value
+
+
+def iter_entries(metabolomics=False):
+    """ Returns a generator that will yield an Entry object for every
+        macromolecule entry in the current BMRB database. Perfect for performing
+        an operation across the entire BMRB database. Set `metabolomics=True`
+        in order to get all the entries in the metabolomics database."""
+
+    api_url = "%s/list_entries?database=macromolecules" % _API_URL
+    if metabolomics:
+        api_url = "%s/list_entries?database=metabolomics" % _API_URL
+
+    for entry in json.loads(_interpret_file(api_url).read()):
+        yield Entry.from_database(entry)

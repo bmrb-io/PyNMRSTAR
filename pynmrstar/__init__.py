@@ -87,8 +87,6 @@ from datetime import date
 from gzip import GzipFile
 
 # See if we have zlib
-from pynmrstar import _format_category, clean_value
-from pynmrstar.utils import _format_category, clean_value
 from . import utils
 
 try:
@@ -295,21 +293,18 @@ def diff(entry1, entry2):
 
 
 def iter_entries(metabolomics=False):
-    """ Returns a generator that will yield an Entry object for every
-        macromolecule entry in the current BMRB database. Perfect for performing
-        an operation across the entire BMRB database. Set `metabolomics=True`
-        in order to get all the entries in the metabolomics database."""
+    """Deprecated. Please use utils.iter_entries() instead."""
 
-    api_url = "%s/list_entries?database=macromolecules" % _API_URL
-    if metabolomics:
-        api_url = "%s/list_entries?database=metabolomics" % _API_URL
-
-    for entry in json.loads(_interpret_file(api_url).read()):
-        yield Entry.from_database(entry)
+    warnings.warn('This function has moved to utils.iter_entries().', DeprecationWarning)
+    return utils.iter_entries(metabolomics=metabolomics)
 
 
 def validate(entry_to_validate, schema=None):
-    """Prints a validation report of an object."""
+    """Deprecated. Please call .validate() on the object for which you want
+    a validation report instead."""
+
+    warnings.warn('This function will be removed in a future release. Please call '
+                  '.validate() on the object instead.', DeprecationWarning)
 
     validation = entry_to_validate.validate(schema=schema)
     if len(validation) == 0:
@@ -321,6 +316,7 @@ def validate(entry_to_validate, schema=None):
 def clean_value(value):
     """Deprecated. Please use utils.clean_value() instead."""
 
+    warnings.warn('This function has moved to utils.clean_value().', DeprecationWarning)
     return utils.clean_value(value)
 
 
@@ -334,18 +330,18 @@ def _json_serialize(obj):
     raise TypeError("Type not serializable: %s" % type(obj))
 
 
-def _format_category(value):
+def format_category(value):
     """ Deprecated. Please use utils.format_category() instead. """
 
     warnings.warn('This function has moved to utils.format_category().', DeprecationWarning)
-    return utils._format_category(value)
+    return utils.format_category(value)
 
 
-def _format_tag(value):
+def format_tag(value):
     """ Deprecated. Please use utils.format_tag() instead. """
 
     warnings.warn('This function has moved to utils.format_tag().', DeprecationWarning)
-    return utils._format_tag(value)
+    return utils.format_tag(value)
 
 
 def _get_schema(passed_schema=None):
@@ -994,7 +990,7 @@ class Schema(object):
             self.schema[line[tag_field].lower()] = dict(zip(self.headers, line))
 
             self.schema_order.append(line[tag_field])
-            formatted = _format_category(line[tag_field])
+            formatted = utils.format_category(line[tag_field])
             if formatted not in self.category_order:
                 self.category_order.append(formatted)
 
@@ -1030,7 +1026,7 @@ class Schema(object):
         and prints the tags that contain the search string if it is."""
 
         # Get the longest lengths
-        lengths = [max([len(_format_tag(x)) for x in self.schema_order])]
+        lengths = [max([len(utils.format_tag(x)) for x in self.schema_order])]
 
         values = []
         for key in self.schema.keys():
@@ -1056,13 +1052,13 @@ class Schema(object):
             if search and search not in tag:
                 continue
             st = self.schema.get(tag.lower(), None)
-            tag_cat = _format_category(tag)
+            tag_cat = utils.format_category(tag)
             if st:
                 if tag_cat != last_tag:
                     last_tag = tag_cat
                     text += "\n%-30s\n" % tag_cat
 
-                text += "  %-*s %-*s %-*s  %-*s\n" % (lengths[0], _format_tag(tag),
+                text += "  %-*s %-*s %-*s  %-*s\n" % (lengths[0], utils.format_tag(tag),
                                                       lengths[1], st["Data Type"],
                                                       lengths[2], st["Nullable"],
                                                       lengths[3], st["SFCategory"])
@@ -1153,14 +1149,14 @@ class Schema(object):
                                      "after does not exist in the schema.")
         else:
             # Determine a sensible place to put the new tag
-            search = _format_category(tag.lower())
+            search = utils.format_category(tag.lower())
             for pos, stag in enumerate([x.lower() for x in self.schema_order]):
                 if stag.startswith(search):
                     new_tag_pos = pos + 1
 
         # Add the new tag to the tag order and tag list
         self.schema_order.insert(new_tag_pos, tag)
-        self.category_order.insert(new_tag_pos, "_" + _format_tag(tag))
+        self.category_order.insert(new_tag_pos, "_" + utils.format_tag(tag))
 
         # Calculate up the 'Dictionary Sequence' based on the tag position
         new_tag_pos = (new_tag_pos - 1) * 10
@@ -1787,7 +1783,7 @@ class Entry(object):
                         diffs.extend(comp)
 
         except AttributeError as err:
-            diffs.append("An exception occured while comparing: '%s'." % err)
+            diffs.append("An exception occurred while comparing: '%s'." % err)
 
         return diffs
 
@@ -1813,7 +1809,7 @@ class Entry(object):
     def get_loops_by_category(self, value):
         """Allows fetching loops by category."""
 
-        value = _format_category(value).lower()
+        value = utils.format_category(value).lower()
 
         results = []
         for frame in self.frame_list:
@@ -2205,7 +2201,7 @@ class Saveframe(object):
                     # It is a tag in this saveframe
                     if item["Loopflag"] == "N":
 
-                        ft = _format_tag(item["Tag"])
+                        ft = utils.format_tag(item["Tag"])
                         # Set the value for sf_category and sf_framecode
                         if ft == "Sf_category":
                             self.add_tag(item["Tag"], self.category)
@@ -2229,7 +2225,7 @@ class Saveframe(object):
 
                     # It is a contained loop tag
                     else:
-                        cat_formatted = _format_category(item["Tag"])
+                        cat_formatted = utils.format_category(item["Tag"])
                         if cat_formatted not in loops_added:
                             loops_added.append(cat_formatted)
                             try:
@@ -2244,7 +2240,7 @@ class Saveframe(object):
             # If they are creating from scratch, just get the saveframe name
             self.name = kwargs['saveframe_name']
             if 'tag_prefix' in kwargs:
-                self.tag_prefix = _format_category(kwargs['tag_prefix'])
+                self.tag_prefix = utils.format_category(kwargs['tag_prefix'])
             return
 
         # If we are reading from a CSV file, go ahead and parse it
@@ -2429,7 +2425,7 @@ class Saveframe(object):
 
         # Print the tags
         for each_tag in self.tags:
-            clean_tag = clean_value(each_tag[1])
+            clean_tag = utils.clean_value(each_tag[1])
 
             if ALLOW_V2_ENTRIES and self.tag_prefix is None:
                 if "\n" in clean_tag:
@@ -2475,7 +2471,7 @@ class Saveframe(object):
 
         if "." in name:
             if name[0] != ".":
-                prefix = _format_category(name)
+                prefix = utils.format_category(name)
                 if self.tag_prefix is None:
                     self.tag_prefix = prefix
                 elif self.tag_prefix != prefix:
@@ -2625,7 +2621,7 @@ class Saveframe(object):
     def delete_tag(self, tag):
         """Deletes a tag from the saveframe based on tag name."""
 
-        tag = _format_tag(tag).lower()
+        tag = utils.format_tag(tag).lower()
 
         for position, each_tag in enumerate(self.tags):
             # If the tag is a match, remove it
@@ -2679,7 +2675,7 @@ class Saveframe(object):
     def get_loop_by_category(self, name):
         """Return a loop based on the loop name (category)."""
 
-        name = _format_category(name).lower()
+        name = utils.format_category(name).lower()
         for each_loop in self.loops:
             if str(each_loop.category).lower() == name:
                 return each_loop
@@ -2695,7 +2691,7 @@ class Saveframe(object):
         # Make sure this is the correct saveframe if they specify a tag
         #  prefix
         if "." in query:
-            tag_prefix = _format_category(query)
+            tag_prefix = utils.format_category(query)
         else:
             tag_prefix = self.tag_prefix
 
@@ -2707,7 +2703,7 @@ class Saveframe(object):
                 results.extend(each_loop.get_tag(query, whole_tag=whole_tag))
 
         # Check our tags
-        query = _format_tag(query).lower()
+        query = utils.format_tag(query).lower()
         if (ALLOW_V2_ENTRIES or
                 (tag_prefix is not None and
                  tag_prefix.lower() == self.tag_prefix.lower())):
@@ -2737,7 +2733,7 @@ class Saveframe(object):
     def set_tag_prefix(self, tag_prefix):
         """Set the tag prefix for this saveframe."""
 
-        self.tag_prefix = _format_category(tag_prefix)
+        self.tag_prefix = utils.format_category(tag_prefix)
 
     def sort_tags(self, schema=None):
         """ Sort the tags so they are in the same order as a BMRB
@@ -2868,7 +2864,7 @@ class Loop(object):
 
         # Update our category if provided
         if 'category' in kwargs:
-            self.category = _format_category(kwargs['category'])
+            self.category = utils.format_category(kwargs['category'])
             return
 
         # They initialized us wrong
@@ -2959,7 +2955,7 @@ class Loop(object):
         If there are 5 rows of data in the loop, you will need to
         assign a list with 5 elements."""
 
-        tag = _format_tag(key)
+        tag = utils.format_tag(key)
 
         # Check that their tag is in the loop
         if tag not in self.tags:
@@ -3031,7 +3027,7 @@ class Loop(object):
             working_data = []
             # Put quotes as needed on the data
             for datum in self.data:
-                working_data.append([clean_value(x) for x in datum])
+                working_data.append([utils.clean_value(x) for x in datum])
 
             # The nightmare below creates a list of the maximum length of
             #  elements in each tag in the self.data matrix. Don't try to
@@ -3177,7 +3173,7 @@ class Loop(object):
 
         try:
             lc_col = [x.lower() for x in self.tags]
-            return lc_col.index(_format_tag(str(tag_name)).lower())
+            return lc_col.index(utils.format_tag(str(tag_name)).lower())
         except ValueError:
             return None
 
@@ -3254,7 +3250,7 @@ class Loop(object):
 
         # Make sure the category matches - if provided
         if "." in tag_id:
-            supplied_category = _format_category(str(tag_id))
+            supplied_category = utils.format_category(str(tag_id))
             if supplied_category.lower() != self.category.lower():
                 raise ValueError("Category provided in your tag '%s' does "
                                  "not match this loop's category '%s'." %
@@ -3398,7 +3394,7 @@ class Loop(object):
 
         # Make sure the category matches - if provided
         if "." in tag:
-            supplied_category = _format_category(str(tag))
+            supplied_category = utils.format_category(str(tag))
             if supplied_category.lower() != self.category.lower():
                 raise ValueError("Category provided in your tag '%s' does "
                                  "not match this loop's category '%s'." %
@@ -3561,11 +3557,11 @@ class Loop(object):
         #  it during the process)
         for pos, item in enumerate([str(x) for x in lower_tags]):
             if ("." in item and
-                    _format_category(item).lower() != self.category.lower()):
+                    utils.format_category(item).lower() != self.category.lower()):
                 raise ValueError("Cannot fetch data with tag '%s' because "
                                  "the category does not match the category of "
                                  "this loop '%s'." % (item, self.category))
-            lower_tags[pos] = _format_tag(item).lower()
+            lower_tags[pos] = utils.format_tag(item).lower()
 
         # Make a lower case copy of the tags
         tags_lower = [x.lower() for x in self.tags]
@@ -3649,7 +3645,7 @@ class Loop(object):
 
         # Make sure the category matches
         if "." in str(index_tag):
-            supplied_category = _format_category(str(index_tag))
+            supplied_category = utils.format_category(str(index_tag))
             if supplied_category.lower() != self.category.lower():
                 raise ValueError("Category provided in your tag '%s' does not "
                                  "match this loop's category '%s'." %
@@ -3708,7 +3704,7 @@ class Loop(object):
         """ Set the category of the loop. Useful if you didn't know the
         category at loop creation time."""
 
-        self.category = _format_category(category)
+        self.category = utils.format_category(category)
 
     def sort_tags(self, schema=None):
         """ Rearranges the tag names and data in the loop to match the order
@@ -3726,7 +3722,7 @@ class Loop(object):
             return
         else:
             self.data = self.get_tag(sorted_order)
-            self.tags = [_format_tag(x) for x in sorted_order]
+            self.tags = [utils.format_tag(x) for x in sorted_order]
 
     def sort_rows(self, tags, key=None):
         """ Sort the data in the rows by their values for a given tag
@@ -3755,7 +3751,7 @@ class Loop(object):
 
             # Make sure the category matches
             if "." in cur_tag:
-                supplied_category = _format_category(cur_tag)
+                supplied_category = utils.format_category(cur_tag)
                 if supplied_category.lower() != self.category.lower():
                     raise ValueError("Category provided in your tag '%s' does "
                                      "not match this loop's category '%s'." %
