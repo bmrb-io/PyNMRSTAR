@@ -593,12 +593,12 @@ class Entry(object):
                 elif tag_schema['Natural foreign key'] and tag_schema['entryIdFlg'] != 'Y':
                     label_tag = each_tag[:-2] + 'label'
                     if each_frame.get_tag(label_tag):
-                        link_name: str = each_frame[label_tag][0][1:]
+                        link_name: Optional[str] = each_frame[label_tag][0][1:]
                         try:
                             if link_name:
                                 each_frame.add_tag(each_tag, self.get_saveframe_by_name(link_name)['ID'][0],
                                                    update=True)
-                        except KeyError:
+                        except (KeyError, TypeError):
                             raise ValueError("A saveframe label is referenced for which no saveframe exists: %s" %
                                              link_name)
                     else:
