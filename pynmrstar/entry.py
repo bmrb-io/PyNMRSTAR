@@ -563,7 +563,7 @@ class Entry(object):
         for each_frame in self.frame_list:
             categories.add(each_frame.category)
 
-        # Update the SF IDs in each category
+        # Reassign the ID tags
         for each_category in categories:
             # Don't re-assign the Entry.ID tag, it is special
             if each_category == 'entry_information':
@@ -572,6 +572,10 @@ class Entry(object):
             for each_frame in self.get_saveframes_by_category(each_category):
                 each_frame.add_tag('ID', id_counter, update=True)
                 id_counter += 1
+        for each_frame in self.frame_list:
+            for each_loop in each_frame.loops:
+                if each_loop.tag_index('ID') is not None and each_loop.category != '_Experiment':
+                    each_loop.renumber_rows('ID')
 
         # Go through all the saveframes and loops, updating the references
         for each_frame in self.frame_list:
