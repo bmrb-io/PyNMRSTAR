@@ -79,7 +79,7 @@ class Schema(object):
                                                       "reference_files/data_types.csv"))
         except IOError:
             # Load the data types from Github if we can't find them locally
-            types_url = "https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v2/reference_files/data_types.csv"
+            types_url = "https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v3/pynmrstar/reference_files/data_types.csv"
             try:
                 types_file = _interpret_file(types_url)
             except Exception:
@@ -255,46 +255,6 @@ class Schema(object):
 
         # We don't know the data type, so just keep it a string
         return value
-
-    def get_json(self, serialize: bool = True, full: bool = False) -> Union[str, dict]:
-        """ Returns the schema in JSON format. """
-
-        s = {'data_types': self.data_types,
-             'headers': self.headers,
-             'version': self.version}
-
-        if not full:
-            s['headers'] = ['Tag', 'SFCategory', 'BMRB data type', 'Prompt', 'Interface', 'default value', 'Example',
-                            'ADIT category view name', 'User full view', 'Foreign Table', 'Sf pointer']
-
-        compacted_schema = []
-        for tag in self.schema_order:
-            stag = self.schema[tag.lower()]
-            compacted_tag = []
-            for header in s['headers']:
-                try:
-                    compacted_tag.append(stag[header].replace("$", ","))
-                except AttributeError:
-                    compacted_tag.append(stag[header])
-                except KeyError:
-                    if header == 'Sf pointer':
-                        try:
-                            compacted_tag.append(stag['Framecode value flag'])
-                        except KeyError:
-                            compacted_tag.append(None)
-                    elif header == 'BMRB data type':
-                        compacted_tag.append('any')
-                    else:
-                        compacted_tag.append(None)
-
-            compacted_schema.append(compacted_tag)
-
-        s['tags'] = compacted_schema
-
-        if serialize:
-            return json.dumps(s, default=_json_serialize)
-        else:
-            return s
 
     def string_representation(self, search: bool = None) -> str:
         """ Prints all the tags in the schema if search is not specified
