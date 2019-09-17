@@ -135,7 +135,7 @@ def _interpret_file(the_file: Union[str, IO]) -> StringIO:
         read_data: Union[bytes, str] = the_file.read()
         if type(read_data) == bytes:
             buffer: BytesIO = BytesIO(read_data)
-        elif type(read_data, str):
+        elif type(read_data) == str:
             buffer = BytesIO(read_data.encode())
         else:
             raise IOError("What did your file object return when .read() was called on it?")
