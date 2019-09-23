@@ -1,22 +1,20 @@
 import decimal
-import json
 import logging
 import os
 import re
 from csv import reader as csv_reader
 from datetime import date
 from io import StringIO
-from typing import Union, List, Optional, Any, Dict
+from typing import Union, List, Optional, Any, Dict, IO
 
-from . import definitions
-from . import utils
-from ._internal import _json_serialize, _interpret_file
+from . import definitions, utils
+from ._internal import _interpret_file
 
 
 class Schema(object):
     """A BMRB schema. Used to validate STAR files."""
 
-    def __init__(self, schema_file: str = None) -> None:
+    def __init__(self, schema_file: Union[str, IO] = None) -> None:
         """Initialize a BMRB schema. With no arguments the most
         up-to-date schema will be fetched from the BMRB FTP site.
         Otherwise pass a URL or a file to load a schema from using the
