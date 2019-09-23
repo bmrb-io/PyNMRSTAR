@@ -628,11 +628,14 @@ class Loop(object):
 
         # Add the data for the tags to the new loop
         results = self.get_tag(valid_tags)
-        if len(valid_tags) == 1:
-            results = [results]
 
-        for row in results:
-            result.add_data(row)
+        # If there is only a single tag, we can't add data the same way
+        if len(valid_tags) == 1:
+            for item in results:
+                result.add_data([item])
+        else:
+            for row in results:
+                result.add_data(row)
 
         # Assign the category of the new loop
         if result.category is None:
