@@ -576,7 +576,7 @@ class Entry(object):
             except ValueError:
                 # Generate an arbitrary sort order for loops that aren't in the schema but make sure that they
                 #  always come after loops in the schema
-                return len(ordering) + hash(x)
+                return len(ordering) + hash(x.category)
 
         # Go through all the saveframes
         for each_frame in self:
