@@ -16,6 +16,15 @@ from ._internal import _get_comments, _tag_key, _json_serialize, _interpret_file
 class Saveframe(object):
     """A saveframe object. Create using the class methods, see below."""
 
+    def __contains__(self, item: str) -> bool:
+        """ Check if the saveframe contains a tag or a loop name."""
+
+        try:
+            self.__getitem__(item)
+            return True
+        except KeyError:
+            return False
+
     def __delitem__(self, item: Union[int, str, 'loop_mod.Loop']) -> None:
         """Remove the indicated tag or loop."""
 
@@ -204,16 +213,6 @@ class Saveframe(object):
         self.tag_prefix = tmp_entry[0].tag_prefix
 
     @property
-    def loop_dict(self) -> Dict[str, 'loop_mod.Loop']:
-        """Returns a hash of loop category -> loop."""
-
-        res = {}
-        for each_loop in self.loops:
-            if each_loop.category is not None:
-                res[each_loop.category.lower()] = each_loop
-        return res
-
-    @property
     def empty(self) -> bool:
         """ Check if the saveframe has no data. Ignore the structural tags."""
 
@@ -229,6 +228,22 @@ class Saveframe(object):
                 return False
 
         return True
+
+    @property
+    def loop_dict(self) -> Dict[str, 'loop_mod.Loop']:
+        """Returns a hash of loop category -> loop."""
+
+        res = {}
+        for each_loop in self.loops:
+            if each_loop.category is not None:
+                res[each_loop.category.lower()] = each_loop
+        return res
+
+    @property
+    def tag_dict(self) -> Dict[str, str]:
+        """Returns a hash of (tag name).lower() -> tag value."""
+
+        return {x[0].lower(): x[1] for x in self.tags}
 
     @classmethod
     def from_scratch(cls, sf_name: str, tag_prefix: str = None, source: str = "from_scratch()"):
