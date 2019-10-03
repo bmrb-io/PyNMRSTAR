@@ -570,6 +570,24 @@ class Loop(object):
 
         return diffs
 
+    def delete_tag(self, tag: Union[str, List[str]]) -> None:
+        """Deletes one or more tags from the loop based on tag name. Provide either a tag or list of tags."""
+
+        if not isinstance(tag, list):
+            tag = [tag]
+
+        # Check if the tags exist first
+        for each_tag in tag:
+            if self.tag_index(each_tag) is None:
+                raise KeyError("There is no tag with name '%s' to remove." % each_tag)
+
+        # Calculate the tag position each time, because it will change as the previous tag is deleted
+        for each_tag in tag:
+            tag_position: int = self.tag_index(each_tag)
+            del self.tags[tag_position]
+            for row in self.data:
+                del row[tag_position]
+
     def delete_data_by_tag_value(self, tag: str, value: Any, index_tag: str = None) -> List[List[Any]]:
         """Deletes all rows which contain the provided value in the
         provided tag name. If index_tag is provided, that tag is
