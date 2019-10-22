@@ -584,6 +584,9 @@ class Entry(object):
             for each_tag in [x[0] for x in each_frame.tags]:
 
                 fqtn: str = f'{each_frame.tag_prefix}.{each_tag}'.lower()
+                # If the tag isn't in the dictionary, skip it
+                if not fqtn in my_schema.schema:
+                    continue
                 tag_schema = my_schema.schema[fqtn]
 
                 # The tag points to it's own ID
@@ -612,6 +615,9 @@ class Entry(object):
             for each_loop in each_frame.loops:
                 for tag_col, each_tag in enumerate(each_loop.tags):
                     fqtn: str = f'{each_loop.category}.{each_tag}'.lower()
+                    # If the tag isn't in the dictionary, skip it
+                    if not fqtn in my_schema.schema:
+                        continue
                     tag_schema = my_schema.schema[fqtn]
 
                     # The tag points to the parent SF
