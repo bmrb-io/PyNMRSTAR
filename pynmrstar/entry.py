@@ -544,7 +544,93 @@ class Entry(object):
 
     def normalize(self, schema: Optional['schema_mod.Schema'] = None) -> None:
         """ Sorts saveframes, loops, and tags according to the schema
-        provided (or BMRB default if none provided)."""
+        provided (or BMRB default if none provided).
+
+        Also re-assigns ID tag values and updates tag links to ID values."""
+
+        # Assign all the ID tags, and update all links to ID tags
+        my_schema = utils.get_schema(schema)
+        # Calculate all the categories present
+        categories: set = set()
+        for each_frame in self.frame_list:
+            categories.add(each_frame.category)
+
+        # Reassign the ID tags
+        for each_category in categories:
+            # Don't re-assign the Entry.ID tag, it is special
+            if each_category == 'entry_information':
+                continue
+            id_counter: int = 1
+            for each_frame in self.get_saveframes_by_category(each_category):
+                each_frame.add_tag('ID', id_counter, update=True)
+                id_counter += 1
+        for each_frame in self.frame_list:
+            for each_loop in each_frame.loops:
+                if each_loop.tag_index('ID') is not None and each_loop.category != '_Experiment':
+                    each_loop.renumber_rows('ID')
+
+        # Go through all the saveframes and loops, updating the references
+        for each_frame in self.frame_list:
+
+            # Assign the tags in the SFs
+            for each_tag in [x[0] for x in each_frame.tags]:
+
+                fqtn: str = f'{each_frame.tag_prefix}.{each_tag}'.lower()
+                # If the tag isn't in the dictionary, skip it
+                if not fqtn in my_schema.schema:
+                    continue
+                tag_schema = my_schema.schema[fqtn]
+
+                # The tag points to it's own ID
+                if tag_schema['lclSfIdFlg'] == 'Y':
+                    each_frame.add_tag(each_tag, each_frame.get_tag('ID')[0], update=True)
+                # The tag points elsewhere in the entry
+                elif tag_schema['Natural foreign key'] and tag_schema['entryIdFlg'] != 'Y':
+                    label_tag = each_tag[:-2] + 'label'
+                    if each_frame.get_tag(label_tag):
+                        link_name: Optional[str] = each_frame[label_tag][0]
+                        if link_name:
+                            # Shave off the $
+                            link_name = link_name[1:]
+                        try:
+                            if link_name:
+                                each_frame.add_tag(each_tag, self.get_saveframe_by_name(link_name)['ID'][0],
+                                                   update=True)
+                        except KeyError:
+                            raise ValueError("A saveframe label is referenced for which no saveframe exists: %s" %
+                                             link_name)
+                    else:
+                        # The tags that trigger this are ones like _Assigned_chem_shift_list.Data_file_name
+                        pass
+
+            # Assign the tags in the loops
+            for each_loop in each_frame.loops:
+                for tag_col, each_tag in enumerate(each_loop.tags):
+                    fqtn: str = f'{each_loop.category}.{each_tag}'.lower()
+                    # If the tag isn't in the dictionary, skip it
+                    if not fqtn in my_schema.schema:
+                        continue
+                    tag_schema = my_schema.schema[fqtn]
+
+                    # The tag points to the parent SF
+                    if tag_schema['lclSfIdFlg'] == 'Y':
+                        parent_id = each_frame['ID'][0]
+                        for row in each_loop.data:
+                            row[tag_col] = parent_id
+                    # The tag points elsewhere in the entry
+                    elif tag_schema['Natural foreign key'] and tag_schema['entryIdFlg'] != 'Y':
+                        label_tag = each_tag[:-2] + 'label'
+                        if label_tag in each_loop.tags:
+                            label_col = each_loop.tag_index(label_tag)
+                            for row in each_loop.data:
+                                try:
+                                    row[tag_col] = self.get_saveframe_by_name(row[label_col][1:])['ID'][0]
+                                except (KeyError, TypeError):
+                                    # No link established - "." sf link name
+                                    pass
+                        else:
+                            # The tags that trigger this are ones like _Assigned_chem_shift_list.Data_file_name
+                            pass
 
         # The saveframe/loop order
         ordering = utils.get_schema(schema).category_order
@@ -568,10 +654,10 @@ class Entry(object):
             except ValueError:
                 # Generate an arbitrary sort order for loops that aren't in the schema but make sure that they
                 #  always come after loops in the schema
-                return len(ordering) + hash(x)
+                return len(ordering) + hash(x.category)
 
         # Go through all the saveframes
-        for each_frame in self:
+        for each_frame in self.frame_list:
             each_frame.sort_tags()
             # Iterate through the loops
             for each_loop in each_frame:

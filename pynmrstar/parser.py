@@ -36,6 +36,7 @@ class Parser(object):
         """ Returns the current line number that is in the process of
         being parsed."""
 
+
         if cnmrstar is not None:
             return self.line_number
         else:
@@ -270,7 +271,7 @@ class Parser(object):
                     if cur_frame.tag_prefix is None:
                         raise ParsingError("The tag prefix was never set! Either the saveframe had no tags, you "
                                            "tried to read a version 2.1 file, or there is something else wrong with "
-                                           "your file. Saveframe error occurred: '%s'" % cur_frame.name)
+                                           "your file. Saveframe error occurred within: '%s'" % cur_frame.name)
                     break
 
                 # Invalid content in saveframe
