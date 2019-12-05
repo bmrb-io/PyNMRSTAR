@@ -791,17 +791,19 @@ class Entry(object):
 
         return errors
 
-    def write_to_file(self, file_name: str, format_: str = "nmrstar") -> None:
+    def write_to_file(self, file_name: str, format_: str = "nmrstar", show_comments: bool = True) -> None:
         """ Writes the entry to the specified file in NMR-STAR format.
 
-        Optionally specify format_=json to write to the file in JSON format."""
+        Optionally specify:
+        show_comments=False to disable the comments that are by default inserted. Ignored when writing json.
+        format_=json to write to the file in JSON format."""
 
         if format_ not in ["nmrstar", "json"]:
             raise ValueError("Invalid output format.")
 
         data_to_write = ''
         if format_ == "nmrstar":
-            data_to_write = str(self)
+            data_to_write = self.__str__(show_comments=show_comments)
         elif format_ == "json":
             data_to_write = self.get_json()
 
