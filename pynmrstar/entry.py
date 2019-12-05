@@ -124,14 +124,6 @@ class Entry(object):
 
         return len(self.frame_list)
 
-    def __lt__(self, other) -> bool:
-        """Returns true if this entry is less than another entry."""
-
-        if not isinstance(other, Entry):
-            return NotImplemented
-
-        return self.entry_id > other.entry_id
-
     def __repr__(self) -> str:
         """Returns a description of the entry."""
 
@@ -641,7 +633,7 @@ class Entry(object):
                             pass
 
         # The saveframe/loop order
-        ordering = utils.get_schema(schema).category_order
+        ordering = my_schema.category_order
 
         # Use these to sort saveframes and loops
         def sf_key(x):
@@ -666,10 +658,10 @@ class Entry(object):
 
         # Go through all the saveframes
         for each_frame in self.frame_list:
-            each_frame.sort_tags()
+            each_frame.sort_tags(schema=my_schema)
             # Iterate through the loops
             for each_loop in each_frame:
-                each_loop.sort_tags()
+                each_loop.sort_tags(schema=my_schema)
 
                 # See if we can sort the rows (in addition to tags)
                 try:
@@ -684,6 +676,7 @@ class Entry(object):
         the entry."""
 
         print(repr(self))
+        frame: saveframe_mod.Saveframe
         for pos, frame in enumerate(self):
             print("\t[%d] %s" % (pos, repr(frame)))
             for pos2, one_loop in enumerate(frame):
