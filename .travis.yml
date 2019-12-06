@@ -6,4 +6,4 @@ python:
   - "3.8"
 install: ignore
 # command to run tests
-script: touch "pynmrstar/.nocompile" && ./unit_tests/bmrb_test.py && rm pynmrstar/.nocompile && ./unit_tests/bmrb_test.py
+script: touch "pynmrstar/.nocompile" && python3 -m pynmrstar.unit_tests && rm pynmrstar/.nocompile && python3 -m pynmrstar.unit_tests
