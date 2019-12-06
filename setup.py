@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-import os
-
 try:
     from setuptools import setup, Extension
 except ImportError:
