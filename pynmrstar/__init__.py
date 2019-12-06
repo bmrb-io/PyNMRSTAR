@@ -8,7 +8,9 @@ Use python's built in help function for documentation."""
 
 import decimal as _decimal
 import logging
+import warnings
 
+from pynmrstar import utils
 from pynmrstar._internal import __version__, _get_cnmrstar
 from pynmrstar.entry import Entry
 from pynmrstar.loop import Loop
@@ -29,6 +31,34 @@ del entry
 del saveframe
 del schema
 del parser
+
+
+def clean_value(value):
+    """Deprecated. Please use utils.quote_value() instead."""
+    warnings.warn('This function has moved to utils.quote_value().', DeprecationWarning)
+    return utils.quote_value(value)
+
+
+def iter_entries(metabolomics=False):
+    """Deprecated. Please use utils.iter_entries() instead."""
+
+    warnings.warn('This function has moved to utils.iter_entries().', DeprecationWarning)
+    return utils.iter_entries(metabolomics=metabolomics)
+
+
+def format_category(value):
+    """ Deprecated. Please use utils.format_category() instead. """
+
+    warnings.warn('This function has moved to utils.format_category().', DeprecationWarning)
+    return utils.format_category(value)
+
+
+def format_tag(value):
+    """ Deprecated. Please use utils.format_tag() instead. """
+
+    warnings.warn('This function has moved to utils.format_tag().', DeprecationWarning)
+    return utils.format_tag(value)
+
 
 __all__ = ['Loop', 'Saveframe', 'Entry', 'Schema', 'definitions', 'utils', '__version__', 'exceptions', 'cnmrstar']
 
