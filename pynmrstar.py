@@ -190,7 +190,7 @@ except ImportError as e:
 # Set this to allow import * from bmrb to work sensibly
 __all__ = ['Entry', 'Saveframe', 'Loop', 'Schema', 'diff', 'validate',
            'enable_nef_defaults', 'enable_nmrstar_defaults',
-           'delete_empty_saveframes', 'PY3']
+           'delete_empty_saveframes', '__version__']
 
 # May be set by calling code
 VERBOSE = False
