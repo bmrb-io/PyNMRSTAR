@@ -3,7 +3,7 @@ from csv import reader as csv_reader, writer as csv_writer
 from io import StringIO
 from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Iterable
 
-from pynmrstar import definitions, entry as entry_mod, loop as loop_mod, utils
+from pynmrstar import definitions, entry as entry_mod, loop as loop_mod, parser as parser_mod, utils
 from pynmrstar._internal import _get_comments, _json_serialize, _interpret_file
 from pynmrstar.schema import Schema
 
