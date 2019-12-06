@@ -24,7 +24,7 @@ except ImportError:
 #############################################
 
 # Set this to allow import * from pynmrstar to work sensibly
-__all__ = ['diff', 'validate', 'get_schema', 'format_category', 'format_tag']
+__all__ = ['diff', 'format_category', 'format_tag', 'get_schema', 'iter_entries', 'quote_value', 'validate']
 
 
 def diff(entry1: 'entry_mod.Entry', entry2: 'entry_mod.Entry') -> None:
