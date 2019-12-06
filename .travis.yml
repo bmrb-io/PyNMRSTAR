@@ -9,4 +9,4 @@ python:
   - "3.8"
   - "nightly"
 # command to run tests
-script: touch ".nocompile" && ./pynmrstar.py && rm .nocompile && ./pynmrstar.py
+script: touch ".nocompile" && ./unit_tests/bmrb_test.py && rm .nocompile && ./unit_tests/bmrb_test.py
