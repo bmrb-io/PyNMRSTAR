@@ -97,7 +97,7 @@ def iter_entries(metabolomics: bool = False) -> Iterable['entry_mod.Entry']:
         api_url = "%s/list_entries?database=metabolomics" % definitions.API_URL
 
     for entry in json.loads(_interpret_file(api_url).read()):
-        yield entry.Entry.from_database(entry)
+        yield entry_mod.Entry.from_database(entry)
 
 
 def quote_value(value: Any) -> str:
