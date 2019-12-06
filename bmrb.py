@@ -1,1 +1,1 @@
-pynmrstar.py
+pynmrstar/__init__.py
