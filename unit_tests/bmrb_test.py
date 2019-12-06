@@ -11,8 +11,6 @@ from copy import deepcopy as copy
 import json
 
 # Local imports
-import pynmrstar.utils
-
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
 import pynmrstar
 
@@ -51,19 +49,19 @@ class TestPyNMRSTAR(unittest.TestCase):
 
     def test_clean_val(self):
         # Check tag cleaning
-        self.assertEqual(pynmrstar.utils.clean_value("single quote test"), "'single quote test'")
-        self.assertEqual(pynmrstar.utils.clean_value("double quote' test"), '"double quote\' test"')
-        self.assertEqual(pynmrstar.utils.clean_value("loop_"), "'loop_'")
-        self.assertEqual(pynmrstar.utils.clean_value("#comment"), "'#comment'")
-        self.assertEqual(pynmrstar.utils.clean_value("_tag"), "'_tag'")
-        self.assertEqual(pynmrstar.utils.clean_value("simple"), "simple")
-        self.assertEqual(pynmrstar.utils.clean_value("  "), "'  '")
-        self.assertEqual(pynmrstar.utils.clean_value("\nnewline\n"), "\nnewline\n")
-        self.assertEqual(pynmrstar.utils.clean_value(None), ".")
-        self.assertRaises(ValueError, pynmrstar.utils.clean_value, "")
+        self.assertEqual(pynmrstar.clean_value("single quote test"), "'single quote test'")
+        self.assertEqual(pynmrstar.clean_value("double quote' test"), '"double quote\' test"')
+        self.assertEqual(pynmrstar.clean_value("loop_"), "'loop_'")
+        self.assertEqual(pynmrstar.clean_value("#comment"), "'#comment'")
+        self.assertEqual(pynmrstar.clean_value("_tag"), "'_tag'")
+        self.assertEqual(pynmrstar.clean_value("simple"), "simple")
+        self.assertEqual(pynmrstar.clean_value("  "), "'  '")
+        self.assertEqual(pynmrstar.clean_value("\nnewline\n"), "\nnewline\n")
+        self.assertEqual(pynmrstar.clean_value(None), ".")
+        self.assertRaises(ValueError, pynmrstar.clean_value, "")
 
         pynmrstar.STR_CONVERSION_DICT = {"loop_": "noloop_"}
-        self.assertEqual(pynmrstar.utils.clean_value("loop_"), "noloop_")
+        self.assertEqual(pynmrstar.clean_value("loop_"), "noloop_")
         pynmrstar.STR_CONVERSION_DICT = {None: "."}
 
     def test__odd_strings(self):
@@ -81,14 +79,14 @@ class TestPyNMRSTAR(unittest.TestCase):
             self.assertEqual(saveframe, pynmrstar.Saveframe.from_string(str(saveframe)))
 
     def test__format_category(self):
-        self.assertEqual(pynmrstar.utils.format_category("test"), "_test")
-        self.assertEqual(pynmrstar.utils.format_category("_test"), "_test")
-        self.assertEqual(pynmrstar.utils.format_category("test.test"), "_test")
+        self.assertEqual(pynmrstar.format_category("test"), "_test")
+        self.assertEqual(pynmrstar.format_category("_test"), "_test")
+        self.assertEqual(pynmrstar.format_category("test.test"), "_test")
 
     def test__format_tag(self):
-        self.assertEqual(pynmrstar.utils.format_tag("test"), "test")
-        self.assertEqual(pynmrstar.utils.format_tag("_test.test"), "test")
-        self.assertEqual(pynmrstar.utils.format_tag("test.test"), "test")
+        self.assertEqual(pynmrstar.format_tag("test"), "test")
+        self.assertEqual(pynmrstar.format_tag("_test.test"), "test")
+        self.assertEqual(pynmrstar.format_tag("test.test"), "test")
 
     def test__InterpretFile(self):
         with open(sample_file_location, "r") as local_file:
