@@ -79,14 +79,14 @@ class TestPyNMRSTAR(unittest.TestCase):
             self.assertEqual(saveframe, pynmrstar.Saveframe.from_string(str(saveframe)))
 
     def test__format_category(self):
-        self.assertEqual(pynmrstar._format_category("test"), "_test")
-        self.assertEqual(pynmrstar._format_category("_test"), "_test")
-        self.assertEqual(pynmrstar._format_category("test.test"), "_test")
+        self.assertEqual(pynmrstar.format_category("test"), "_test")
+        self.assertEqual(pynmrstar.format_category("_test"), "_test")
+        self.assertEqual(pynmrstar.format_category("test.test"), "_test")
 
     def test__format_tag(self):
-        self.assertEqual(pynmrstar._format_tag("test"), "test")
-        self.assertEqual(pynmrstar._format_tag("_test.test"), "test")
-        self.assertEqual(pynmrstar._format_tag("test.test"), "test")
+        self.assertEqual(pynmrstar.format_tag("test"), "test")
+        self.assertEqual(pynmrstar.format_tag("_test.test"), "test")
+        self.assertEqual(pynmrstar.format_tag("test.test"), "test")
 
     def test__InterpretFile(self):
         with open(sample_file_location, "r") as local_file:
