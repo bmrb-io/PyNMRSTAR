@@ -1,8 +1,7 @@
 import json
 from csv import reader as csv_reader, writer as csv_writer
 from io import StringIO
-from typing import TextIO, BinaryIO
-from typing import Union, List, Optional, Any, Dict, Iterable
+from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Iterable
 
 from . import definitions
 from . import entry as entry_mod

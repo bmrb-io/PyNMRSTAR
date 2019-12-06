@@ -2,8 +2,7 @@ import json
 import logging
 import zlib
 from io import StringIO
-from typing import TextIO, BinaryIO
-from typing import Union, List, Optional, Dict, Any
+from typing import TextIO, BinaryIO, Union, List, Optional, Dict, Any
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen, Request
 
@@ -577,7 +576,7 @@ class Entry(object):
 
                 fqtn: str = f'{each_frame.tag_prefix}.{each_tag}'.lower()
                 # If the tag isn't in the dictionary, skip it
-                if not fqtn in my_schema.schema:
+                if fqtn not in my_schema.schema:
                     continue
                 tag_schema = my_schema.schema[fqtn]
 
@@ -608,7 +607,7 @@ class Entry(object):
                 for tag_col, each_tag in enumerate(each_loop.tags):
                     fqtn: str = f'{each_loop.category}.{each_tag}'.lower()
                     # If the tag isn't in the dictionary, skip it
-                    if not fqtn in my_schema.schema:
+                    if fqtn not in my_schema.schema:
                         continue
                     tag_schema = my_schema.schema[fqtn]
 

@@ -3,8 +3,7 @@ from copy import deepcopy
 from csv import reader as csv_reader, writer as csv_writer
 from io import StringIO
 from itertools import chain
-from typing import TextIO, BinaryIO
-from typing import Union, List, Optional, Any, Dict, Callable, Tuple
+from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Callable, Tuple
 
 from . import definitions
 from . import entry as entry_mod
@@ -653,6 +652,8 @@ class Loop(object):
                 result.add_data([item])
         else:
             for row in results:
+                # We know it's a row because we didn't specify dict_result=True to get_tag()
+                assert isinstance(row, list)
                 result.add_data(row)
 
         # Assign the category of the new loop
