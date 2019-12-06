@@ -7,8 +7,8 @@ from datetime import date
 from io import StringIO
 from typing import Union, List, Optional, Any, Dict, IO
 
-from . import definitions, utils
-from ._internal import _interpret_file
+from pynmrstar import definitions, utils
+from pynmrstar._internal import _interpret_file
 
 
 class Schema(object):
@@ -356,3 +356,14 @@ class Schema(object):
             return ["The tag '%s' is improperly capitalized but otherwise valid. Should be '%s'." %
                     (tag, capitalized_tag)]
         return []
+
+    def tag_key(self, x) -> int:
+        """ Helper function to figure out how to sort the tags."""
+
+        try:
+            return self.schema_order.index(x)
+        except ValueError:
+            # Generate an arbitrary sort order for tags that aren't in the
+            #  schema but make sure that they always come after tags in the
+            #   schema
+            return len(self.schema_order) + abs(hash(x))

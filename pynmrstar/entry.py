@@ -6,12 +6,9 @@ from typing import TextIO, BinaryIO, Union, List, Optional, Dict, Any
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen, Request
 
-from . import definitions, utils
-from . import loop as loop_mod
-from . import parser as parser_mod
-from . import saveframe as saveframe_mod
-from . import schema as schema_mod
-from ._internal import __version__, _json_serialize, _interpret_file
+from pynmrstar import definitions, utils, loop as loop_mod, parser as parser_mod, saveframe as saveframe_mod
+from pynmrstar._internal import __version__, _json_serialize, _interpret_file
+from pynmrstar.schema import Schema
 
 
 class Entry(object):
@@ -435,7 +432,7 @@ class Entry(object):
 
         return diffs
 
-    def add_missing_tags(self, schema: 'schema_mod.Schema' = None, all_tags: bool = False) -> None:
+    def add_missing_tags(self, schema: 'Schema' = None, all_tags: bool = False) -> None:
         """ Automatically adds any missing tags (according to the schema)
         to all saveframes and loops and sorts the tags. """
 
@@ -541,7 +538,7 @@ class Entry(object):
 
         return results
 
-    def normalize(self, schema: Optional['schema_mod.Schema'] = None) -> None:
+    def normalize(self, schema: Optional['Schema'] = None) -> None:
         """ Sorts saveframes, loops, and tags according to the schema
         provided (or BMRB default if none provided).
 
@@ -727,7 +724,7 @@ class Entry(object):
                         if val == old_reference:
                             each_row[pos] = new_reference
 
-    def validate(self, validate_schema: bool = True, schema: 'schema_mod.Schema' = None,
+    def validate(self, validate_schema: bool = True, schema: 'Schema' = None,
                  validate_star: bool = True) -> List[str]:
         """Validate an entry in a variety of ways. Returns a list of
         errors found. 0-length list indicates no errors found. By

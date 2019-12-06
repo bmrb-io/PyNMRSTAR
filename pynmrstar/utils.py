@@ -9,10 +9,9 @@ import os
 from typing import Iterable, Any, Dict
 from urllib.error import HTTPError, URLError
 
-from . import definitions
-from . import entry as entry_mod
-from . import schema as schema_mod
-from ._internal import _interpret_file
+from pynmrstar import definitions, entry as entry_mod
+from pynmrstar._internal import _interpret_file
+from pynmrstar.schema import Schema
 
 try:
     import cnmrstar
@@ -60,8 +59,8 @@ def format_tag(tag: str) -> str:
 
 
 # noinspection PyDefaultArgument
-def get_schema(passed_schema: 'schema_mod.Schema' = None, _cached_schema: Dict[str, schema_mod.Schema] = {}) \
-        -> 'schema_mod.Schema':
+def get_schema(passed_schema: 'Schema' = None, _cached_schema: Dict[str, Schema] = {}) \
+        -> 'Schema':
     """If passed a schema (not None) it returns it. If passed none,
     it checks if the default schema has been initialized. If not
     initialized, it initializes it. Then it returns the default schema."""
@@ -75,11 +74,11 @@ def get_schema(passed_schema: 'schema_mod.Schema' = None, _cached_schema: Dict[s
         try:
             schema_file = os.path.join(os.path.dirname(os.path.realpath(__file__)))
             schema_file = os.path.join(schema_file, "reference_files/schema.csv")
-            _cached_schema['schema'] = schema_mod.Schema(schema_file=schema_file)
+            _cached_schema['schema'] = Schema(schema_file=schema_file)
         except IOError:
             # Try to load from the internet
             try:
-                _cached_schema['schema'] = schema_mod.Schema()
+                _cached_schema['schema'] = Schema()
             except (HTTPError, URLError):
                 raise ValueError("Could not load a BMRB schema from the internet or from the local repository.")
 
@@ -197,7 +196,7 @@ def quote_value(value: Any) -> str:
     return value
 
 
-def validate(entry_to_validate: 'entry_mod.Entry', schema: 'schema_mod.Schema' = None) -> None:
+def validate(entry_to_validate: 'entry_mod.Entry', schema: 'Schema' = None) -> None:
     """Prints a validation report of an object."""
 
     validation = entry_to_validate.validate(schema=schema)

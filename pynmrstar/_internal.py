@@ -1,4 +1,5 @@
 import decimal
+import logging
 import os
 import sys
 from datetime import date
@@ -6,10 +7,6 @@ from gzip import GzipFile
 from io import StringIO, BytesIO
 from typing import Dict, Union, IO
 from urllib.request import urlopen
-
-from . import entry as entry_mod
-from . import schema as schema_mod
-from . import utils
 
 __version__: str = "3.0"
 
@@ -25,49 +22,64 @@ def _build_extension() -> bool:
 
         # Use the appropriate build command
         process = subprocess.Popen(['make', 'python3'], stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
-        process.communicate()
+        stdout, stderr = process.communicate()
         ret_code = process.poll()
         # The make command exited with a non-zero status
         if ret_code:
+            logging.warning('Compiling cnmrstar failed with error code %s and stderr: %s', ret_code, stderr)
             return False
 
         # We were able to build the extension?
         return True
     except OSError:
         # There was an error going into the c dir
+        logging.warning('Could not find a directory with c source code.')
         return False
     finally:
         # Go back to the directory we were in before exiting
         os.chdir(cur_dir)
 
 
-def _ensure_cnmrstar() -> bool:
+def _get_cnmrstar() -> Union[None, object]:
+    """ Returns the cnmrstar module, or returns None if it isn't available. """
 
-    # See if we can use the fast tokenizer
+    # First see if it's installed via pip
     try:
-        from . import cnmrstar
-
-        if "version" not in dir(cnmrstar) or cnmrstar.version() < "2.2.8":
-            print("Recompiling cnmrstar module due to API changes. You may experience a segmentation fault immediately "
-                  "following this message but should have no issues the next time you run your script or this program.")
-            _build_extension()
-            sys.exit(0)
-
-        return True
-
+        import cnmrstar
+        logging.debug('Imported cnmrstar via installed package.')
+        return cnmrstar
     except ImportError:
 
-        # Check for the 'no c module' file before continuing
-        if not os.path.isfile(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".nocompile")):
+        # See if it is compiled locally
+        try:
+            import pynmrstar.cnmrstar as cnmrstar
+            logging.debug('Imported cnmrstar from locally compiled file.')
 
-            if _build_extension():
-                try:
-                    from . import cnmrstar
-                    return True
-                except ImportError:
-                    return False
+            if "version" not in dir(cnmrstar) or cnmrstar.version() < "2.2.8":
+                logging.warning("Recompiling cnmrstar module due to API changes. You may experience a segmentation "
+                                "fault immediately following this message but should have no issues the next time you "
+                                "run your script or this program.")
+                _build_extension()
+                sys.exit(0)
 
-        return False
+            return cnmrstar
+
+        except ImportError:
+
+            # Try to compile cnmrstar, but check for the 'no c module' file before continuing
+            if not os.path.isfile(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".nocompile")):
+                logging.info('Compiling local cnmrstar module...')
+
+                if _build_extension():
+                    try:
+                        import pynmrstar.cnmrstar as cnmrstar
+                        logging.debug('Imported cnmrstar from locally compiled file.')
+                        return cnmrstar
+                    except ImportError:
+                        return
+            else:
+                logging.debug("Not compiling cnmrstar due to presence of '.nocompile' file")
+                return
 
 
 # noinspection PyDefaultArgument
@@ -83,13 +95,15 @@ def _get_comments(_comment_cache: Dict[str, Dict[str, str]] = {}) -> Dict[str, D
     file_to_load = os.path.join(os.path.dirname(os.path.realpath(__file__)))
     file_to_load = os.path.join(file_to_load, "reference_files/comments.str")
 
+    # The import needs to be here to avoid import errors due to circular imports
+    from pynmrstar.entry import Entry
     try:
-        comment_entry = entry_mod.Entry.from_file(file_to_load)
+        comment_entry = Entry.from_file(file_to_load)
     except IOError:
         # Load the comments from Github if we can't find them locally
         try:
             comment_url = "https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v2/reference_files/comments.str"
-            comment_entry = entry_mod.Entry.from_file(_interpret_file(comment_url))
+            comment_entry = Entry.from_file(_interpret_file(comment_url))
         except Exception:
             # No comments will be printed
             return {}
@@ -112,18 +126,6 @@ def _json_serialize(obj: object) -> str:
     if isinstance(obj, (date, decimal.Decimal)):
         return str(obj)
     raise TypeError("Type not serializable: %s" % type(obj))
-
-
-def _tag_key(x, schema: 'schema_mod.Schema' = None) -> int:
-    """ Helper function to figure out how to sort the tags."""
-
-    try:
-        return utils.get_schema(schema).schema_order.index(x)
-    except ValueError:
-        # Generate an arbitrary sort order for tags that aren't in the
-        #  schema but make sure that they always come after tags in the
-        #   schema
-        return len(utils.get_schema(schema).schema_order) + abs(hash(x))
 
 
 def _interpret_file(the_file: Union[str, IO]) -> StringIO:

@@ -5,12 +5,10 @@ from io import StringIO
 from itertools import chain
 from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Callable, Tuple
 
-from . import definitions
-from . import entry as entry_mod
-from . import parser as parser_mod
-from . import schema as schema_mod
-from . import utils
-from ._internal import _tag_key, _json_serialize, _interpret_file
+from pynmrstar import definitions, utils, entry as entry_mod
+from pynmrstar._internal import _json_serialize, _interpret_file
+from pynmrstar.parser import Parser
+from pynmrstar.schema import Schema
 
 
 class Loop(object):
@@ -100,7 +98,7 @@ class Loop(object):
         # Load the BMRB entry from the file
         star_buffer = StringIO("data_0 save_internaluseyoushouldntseethis_frame _internal.use internal %s save_" %
                                star_buffer.read())
-        parser = parser_mod.Parser(entry_to_parse_into=tmp_entry)
+        parser = Parser(entry_to_parse_into=tmp_entry)
         parser.parse(star_buffer.read(), source=self.source, convert_data_types=kwargs.get('convert_data_types', False))
 
         # Check that there was only one loop here
@@ -318,7 +316,7 @@ class Loop(object):
         return cls(the_string=the_string, csv=csv, convert_data_types=convert_data_types)
 
     @classmethod
-    def from_template(cls, tag_prefix: str, all_tags: bool = False, schema: schema_mod.Schema = None):
+    def from_template(cls, tag_prefix: str, all_tags: bool = False, schema: Schema = None):
         """ Create a loop that has all of the tags from the schema present.
         No values will be assigned. Specify the tag prefix of the loop.
 
@@ -330,7 +328,7 @@ class Loop(object):
                    schema=schema, source="from_template(%s)" % schema.version)
 
     @staticmethod
-    def _get_tags_from_schema(category: str, schema: schema_mod.Schema = None, all_tags: bool = False) -> List[str]:
+    def _get_tags_from_schema(category: str, schema: Schema = None, all_tags: bool = False) -> List[str]:
         """ Returns the tags from the schema for the category of this
         loop. """
 
@@ -432,7 +430,7 @@ class Loop(object):
             raise ValueError("You cannot add data out of tag order.")
         self.data[-1].append(value)
 
-    def add_missing_tags(self, schema: 'schema_mod.Schema' = None, all_tags: bool = False) -> None:
+    def add_missing_tags(self, schema: 'Schema' = None, all_tags: bool = False) -> None:
         """ Automatically adds any missing tags (according to the schema),
         sorts the tags, and renumbers the tags by ordinal. """
 
@@ -856,15 +854,16 @@ class Loop(object):
 
         self.category = utils.format_category(category)
 
-    def sort_tags(self, schema: 'schema_mod.Schema' = None) -> None:
+    def sort_tags(self, schema: 'Schema' = None) -> None:
         """ Rearranges the tag names and data in the loop to match the order
         from the schema. Uses the BMRB schema unless one is provided."""
 
+        schema = utils.get_schema(schema)
         current_order = self.get_tag_names()
 
         # Sort the tags
         def sort_key(_):
-            return _tag_key(_, schema=schema)
+            return schema.tag_key(_)
 
         sorted_order = sorted(current_order, key=sort_key)
 
@@ -949,7 +948,7 @@ class Loop(object):
         except ValueError:
             return None
 
-    def validate(self, validate_schema: bool = True, schema: 'schema_mod.Schema' = None,
+    def validate(self, validate_schema: bool = True, schema: 'Schema' = None,
                  validate_star: bool = True, category: str = None) -> List[str]:
         """Validate a loop in a variety of ways. Returns a list of
         errors found. 0-length list indicates no errors found. By

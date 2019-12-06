@@ -3,13 +3,9 @@ from csv import reader as csv_reader, writer as csv_writer
 from io import StringIO
 from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Iterable
 
-from . import definitions
-from . import entry as entry_mod
-from . import loop as loop_mod
-from . import parser as parser_mod
-from . import schema as schema_mod
-from . import utils
-from ._internal import _get_comments, _tag_key, _json_serialize, _interpret_file
+from pynmrstar import definitions, entry as entry_mod, loop as loop_mod, utils
+from pynmrstar._internal import _get_comments, _json_serialize, _interpret_file
+from pynmrstar.schema import Schema
 
 
 class Saveframe(object):
@@ -320,7 +316,7 @@ class Saveframe(object):
 
     @classmethod
     def from_template(cls, category: str, name: str = None, entry_id: Union[str, int] = None, all_tags: bool = False,
-                      default_values: bool = False, schema: schema_mod.Schema = None):
+                      default_values: bool = False, schema: Schema = None):
         """ Create a saveframe that has all of the tags and loops from the
         schema present. No values will be assigned. Specify the category
         when calling this method. Optionally also provide the name of the
@@ -482,7 +478,7 @@ class Saveframe(object):
             else:
                 raise ValueError("You provided an invalid tag/value to add: '%s'." % tag_pair)
 
-    def add_missing_tags(self, schema: 'schema_mod.Schema' = None, all_tags: bool = False,
+    def add_missing_tags(self, schema: 'Schema' = None, all_tags: bool = False,
                          recursive: bool = True) -> None:
         """ Automatically adds any missing tags (according to the schema)
         and sorts the tags.
@@ -710,13 +706,15 @@ class Saveframe(object):
 
         self.tag_prefix = utils.format_category(tag_prefix)
 
-    def sort_tags(self, schema: schema_mod.Schema = None) -> None:
+    def sort_tags(self, schema: Schema = None) -> None:
         """ Sort the tags so they are in the same order as a BMRB
         schema. Will automatically use the standard schema if none
         is provided."""
 
+        schema = utils.get_schema(schema)
+
         def sort_key(x):
-            return _tag_key(self.tag_prefix + "." + x[0], schema=schema)
+            return schema.tag_key(self.tag_prefix + "." + x[0])
 
         self.tags.sort(key=sort_key)
 
@@ -725,7 +723,7 @@ class Saveframe(object):
 
         return iter(self.tags)
 
-    def validate(self, validate_schema: bool = True, schema: schema_mod.Schema = None, validate_star: bool = True):
+    def validate(self, validate_schema: bool = True, schema: Schema = None, validate_star: bool = True):
         """Validate a saveframe in a variety of ways. Returns a list of
         errors found. 0-length list indicates no errors found. By
         default all validation modes are enabled.

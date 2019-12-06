@@ -7,23 +7,28 @@ It also provides some utility functions in pynmrstar.utils
 Use python's built in help function for documentation."""
 
 import decimal as _decimal
+import logging
 
-from . import utils
-from ._internal import __version__, _ensure_cnmrstar
-from .entry import Entry
-from .loop import Loop
-from .parser import Parser as _Parser
-from .saveframe import Saveframe
-from .schema import Schema
+from pynmrstar._internal import __version__, _get_cnmrstar
+from pynmrstar.entry import Entry
+from pynmrstar.loop import Loop
+from pynmrstar.parser import Parser as _Parser
+from pynmrstar.saveframe import Saveframe
+from pynmrstar.schema import Schema
+
+# Set up logging
+logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s')
+logging.getLogger().setLevel(logging.INFO)
 
 # This makes sure that when decimals are printed a lower case "e" is used
 _decimal.getcontext().capitals = 0
 # Make sure the cnmstar module is compiled
-_ensure_cnmrstar()
+cnmrstar = _get_cnmrstar()
 del loop
 del entry
 del saveframe
 del schema
 del parser
 
-__all__ = ['Loop', 'Saveframe', 'Entry', 'Schema', 'definitions', 'utils', '__version__', 'exceptions']
+__all__ = ['Loop', 'Saveframe', 'Entry', 'Schema', 'definitions', 'utils', '__version__', 'exceptions', 'cnmrstar']
+

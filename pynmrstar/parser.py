@@ -2,16 +2,11 @@ import logging
 import re
 from typing import Optional, Any
 
-from . import definitions
-from . import entry as entry_mod
-from . import loop as loop_mod
-from . import saveframe as saveframe_mod
-from .exceptions import ParsingError
+from pynmrstar import definitions, entry as entry_mod, loop as loop_mod, saveframe as saveframe_mod
+from pynmrstar._internal import _get_cnmrstar
+from pynmrstar.exceptions import ParsingError
 
-try:
-    import cnmrstar
-except ImportError:
-    cnmrstar = None
+cnmrstar = _get_cnmrstar()
 
 
 class Parser(object):
