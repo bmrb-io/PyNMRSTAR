@@ -213,7 +213,7 @@ _COMMENT_DICTIONARY = {}
 _API_URL = "http://webapi.bmrb.wisc.edu/v2"
 _SCHEMA_URL = 'https://raw.githubusercontent.com/uwbmrb/nmr-star-dictionary/master/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
-__version__ = "2.6.4"
+__version__ = "2.6.5"
 
 
 #############################################
@@ -301,6 +301,8 @@ def iter_entries(metabolomics=False):
         an operation across the entire BMRB database. Set `metabolomics=True`
         in order to get all the entries in the metabolomics database."""
 
+    warnings.warn('This function will move to utils.iter_entries() in version 3.0.', DeprecationWarning)
+
     api_url = "%s/list_entries?database=macromolecules" % _API_URL
     if metabolomics:
         api_url = "%s/list_entries?database=metabolomics" % _API_URL
@@ -341,6 +343,8 @@ def clean_value(value):
     way the value is converted to a string.
 
     """
+
+    warnings.warn('This function will move to utils.quote_value() in release 3.0.', DeprecationWarning)
 
     # Allow manual specification of conversions for booleans, Nones, etc.
     if value in STR_CONVERSION_DICT:
@@ -435,6 +439,8 @@ def _json_serialize(obj):
 def format_tag(value):
     """Strips anything before the '.'"""
 
+    warnings.warn('This function will move to utils.format_tag() in version 3.0.', DeprecationWarning)
+
     if '.' in value:
         value = value[value.index('.') + 1:]
     return value
@@ -443,6 +449,8 @@ def format_tag(value):
 def format_category(value):
     """Adds a '_' to the front of a tag (if not present) and strips out
     anything after a '.'"""
+
+    warnings.warn('This function will move to utils.format_category() in version 3.0.', DeprecationWarning)
 
     if value:
         if not value.startswith("_"):
@@ -487,7 +495,7 @@ def _interpret_file(the_file):
 
     if hasattr(the_file, 'read') and hasattr(the_file, 'readline'):
         star_buffer = the_file
-    elif isinstance(the_file, str) or isinstance(the_file, unicode):
+    elif isinstance(the_file, (str, unicode)):
         if (the_file.startswith("http://") or the_file.startswith("https://") or
                 the_file.startswith("ftp://")):
             url_data = urlopen(the_file)
