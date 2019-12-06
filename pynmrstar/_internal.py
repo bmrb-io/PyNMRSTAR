@@ -8,6 +8,8 @@ from io import StringIO, BytesIO
 from typing import Dict, Union, IO
 from urllib.request import urlopen
 
+from pynmrstar import definitions
+
 __version__: str = "3.0"
 
 
@@ -102,8 +104,7 @@ def _get_comments(_comment_cache: Dict[str, Dict[str, str]] = {}) -> Dict[str, D
     except IOError:
         # Load the comments from Github if we can't find them locally
         try:
-            comment_url = "https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v2/reference_files/comments.str"
-            comment_entry = Entry.from_file(_interpret_file(comment_url))
+            comment_entry = Entry.from_file(_interpret_file(definitions.COMMENT_URL))
         except Exception:
             # No comments will be printed
             return {}

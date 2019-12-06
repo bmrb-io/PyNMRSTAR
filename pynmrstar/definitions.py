@@ -19,3 +19,4 @@ STR_CONVERSION_DICT: dict = {None: "."}
 
 API_URL: str = "http://webapi.bmrb.wisc.edu/v2"
 SCHEMA_URL: str = 'https://raw.githubusercontent.com/uwbmrb/nmr-star-dictionary/master/xlschem_ann.csv'
+COMMENT_URL: str = "https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v3/reference_files/comments.str"
