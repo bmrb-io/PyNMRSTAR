@@ -104,8 +104,10 @@ def _get_comments(_comment_cache: Dict[str, Dict[str, str]] = {}) -> Dict[str, D
     except IOError:
         # Load the comments from Github if we can't find them locally
         try:
+            logging.warning('Could not load comments from disk. Loading from web...')
             comment_entry = Entry.from_file(_interpret_file(definitions.COMMENT_URL))
         except Exception:
+            logging.exception('Could not load comments from web. No comments will be shown.')
             # No comments will be printed
             return {}
 

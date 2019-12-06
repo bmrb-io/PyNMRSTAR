@@ -10,7 +10,6 @@ import sys
 import unittest
 from copy import deepcopy as copy
 
-sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
 from pynmrstar import Entry, Loop, Saveframe, Schema, definitions, utils, _Parser
 from pynmrstar.exceptions import ParsingError
 from pynmrstar._internal import _interpret_file
