@@ -509,33 +509,31 @@ Loop.from_template()
 Loop.from_file()
 Loop.from_json()
 
-##### def `add_column(name, ignore_duplicates=False)`
+##### def `add_tag(name, ignore_duplicates=False)`
 
-Add a column to the column list. Does a bit of validation
+Add a tag to the tag name list. Does a bit of validation
 and parsing. Set ignore_duplicates to true to ignore attempts
 to add the same tag more than once rather than raise an
 exception.
 
-You can also pass a list of column names to add more than one
-column at a time.
+You can also pass a list of tag names to add more than one
+tag at a time.
 
-Note that adding a column only adds a new tag to the list of
-tags present in this loop. It does not automatically add a column
-of None values to the data array if the loop is already populated
-with data.
+Adding a tag will update the data array to match by adding
+None values to the rows if you specify update_data=True.
 
 ##### def `add_data(the_list, rearrange=False)`
 
 Add a list to the data field. Items in list can be any type,
 they will be converted to string and formatted correctly. The
-list must have the same cardinality as the column names or you
+list must have the same cardinality as the tag names or you
 must set the rearrange variable to true and have already set all
-the columns in the loop. Rearrange will break a longer list into
-rows based on the number of columns.
+the tag names in the loop. Rearrange will break a longer list into
+rows based on the number of tags.
 
-##### def `add_data_by_column(column_id, value)`
+##### def `add_data_by_tag(column_id, value)`
 
-Add data to the loop one element at a time, based on column.
+Add data to the loop one element at a time, based on tag.
 Useful when adding data from SANS parsers.
 
 ##### def `clear_data()`
@@ -592,7 +590,7 @@ No values will be assigned. Specify the tag prefix of the loop.
 The optional argument all_tags forces all tags to be included
 rather than just the mandatory tags.
 
-##### def `get_columns()`
+##### def `get_tags()`
 
 Return the columns for this entry with the category
 included. Throws ValueError if the category was never set.
