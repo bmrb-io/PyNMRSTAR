@@ -2011,8 +2011,10 @@ class Entry(object):
         provided (or BMRB default if none provided) and according
         to the assigned ID."""
 
+        my_schema = _get_schema(schema)
+
         # The saveframe/loop order
-        ordering = _get_schema(schema).category_order
+        ordering = my_schema.category_order
 
         # Use these to sort saveframes and loops
         def sf_key(x):
@@ -2039,10 +2041,10 @@ class Entry(object):
 
         # Go through all the saveframes
         for each_frame in self:
-            each_frame.sort_tags()
+            each_frame.sort_tags(schema=my_schema)
             # Iterate through the loops
             for each_loop in each_frame:
-                each_loop.sort_tags()
+                each_loop.sort_tags(schema=my_schema)
 
                 # See if we can sort the rows (in addition to tags)
                 try:
