@@ -2057,6 +2057,16 @@ class Entry(object):
     def nef_string(self):
         """ Returns a string representation of the entry in NEF. """
 
+        warnings.warn("""Specifically:
+
+Before writing out objects as strings, perform these two steps:
+
+Update the global string conversion dictionary:
+pynmrstar.definitions.STR_CONVERSION_DICT = {None: ".", True: "true", False: "false"}
+
+Rather than using str(obj) to render as a string, use obj.format(show_comments=False, skip_empty_loops=True).""",
+                      DeprecationWarning)
+
         # Store the current values of these module variables
         global STR_CONVERSION_DICT, SKIP_EMPTY_LOOPS, DONT_SHOW_COMMENTS
         tmp_dict, tmp_loops_state = STR_CONVERSION_DICT, SKIP_EMPTY_LOOPS
