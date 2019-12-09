@@ -1,5 +1,6 @@
 # PyNMRSTAR
-A Python module for reading, writing, and manipulating NMR-STAR files. [![BuildStatus](https://travis-ci.org/uwbmrb/PyNMRSTAR.svg?branch=v3)](https://travis-ci.org/uwbmrb/PyNMRSTAR)
+A Python module for reading, writing, and manipulating NMR-STAR files.
+[![BuildStatus](https://travis-ci.org/uwbmrb/PyNMRSTAR.svg?branch=v3)](https://travis-ci.org/uwbmrb/PyNMRSTAR)
 
 Python versions supported: 3.6, 3.7, and 3.8
 
@@ -7,18 +8,26 @@ Previous python versions (back to 2.6) are supported by the v2 branch (version 2
 
 ## Overview
 
-This library was developed by the BMRB to give the Python-using NMR community tools to work with the NMR-STAR data format. It is used internally and is actively maintained. The library is thoroughly documented such that calling  `help(object_or_method)` from an interactive python session will print the documentation for the object or method.
+This library was developed by the BMRB to give the Python-using NMR community tools to work with the NMR-STAR
+data format. It is used internally and is actively maintained. The library is thoroughly documented such that
+calling  `help(object_or_method)` from an interactive python session will print the documentation for the object
+or method.
 
 That same documentation, as well as some notes on module-level variables is located [here](documentation/full.md).
-Finally, there are several command-line based tools developed to enable simple queries to pull data out of an NMR-STAR file. Those tools also serve as great examples of how to use the library. You can view those [here](cmdline).
+Finally, there are several command-line based tools developed to enable simple queries to pull data out of an
+NMR-STAR file. Those tools also serve as great examples of how to use the library. You can view those [here](cmdline).
 
 ## Introduction to NMR-STAR
 
-To understand how the library works, you first need to understand the NMR-STAR terminology and file format. If you are already familiar with NMR-STAR, feel free to [jump ahead](#quick-start-to-pynmrstar) to the section on this library.
+To understand how the library works, you first need to understand the NMR-STAR terminology and file format. If you
+are already familiar with NMR-STAR, feel free to [jump ahead](#quick-start-to-pynmrstar) to the section on this library.
 
-A NMR-STAR entry/file is componsed of one or more saveframes (conceptually you should think of a saveframe as a data block), each of which contain tags and loops. There can only be one of each tag in a saveframe. If a tag has multiple values, the only way to represent it is to place it inside a loop. A loop is simply a set of tags with multiple values.
+A NMR-STAR entry/file is composed of one or more saveframes (conceptually you should think of a saveframe as a data
+block), each of which contain tags and loops. There can only be one of each tag in a saveframe. If a tag has multiple
+values, the only way to represent it is to place it inside a loop. A loop is simply a set of tags with multiple values.
 
-Therefore, hierarchically, you can picture a NMR-STAR file as a tree where the entry is the trunk, the large branches are the saveframes, and each saveframe may contain one or more loops - the branches.
+Therefore, hierarchically, you can picture a NMR-STAR file as a tree where the entry is the trunk, the large branches
+are the saveframes, and each saveframe may contain one or more loops - the branches.
 
 Here is a very simple example of a NMR-STAR file:
 
@@ -35,30 +44,37 @@ data_dates
     save_
 ```
 
-In the previous example, the entry name is `dates` because that is what follows the `data_` tag. Next, there is one saveframe, with a name of `special_dates_saveframe_1` and a tag prefix (which corresponds to the saveframe category) of `Special_Dates`. There is one tag in the saveframe, with a tag name of `Type` and a value of `Holidays`. There is also one loop of category `events` that has information about two different events (though an unlimited number of events could be present).
+In the previous example, the entry name is `dates` because that is what follows the `data_` tag.
+Next, there is one saveframe, with a name of `special_dates_saveframe_1` and a tag prefix (which
+corresponds to the saveframe category) of `Special_Dates`. There is one tag in the saveframe, with
+a tag name of `Type` and a value of `Holidays`. There is also one loop of category `events` that has
+information about two different events (though an unlimited number of events could be present).
 
-The first datum in each row corresponds to the first tag, `Date`, and the second corresponds to the second tag, `Description`.
+The first datum in each row corresponds to the first tag, `Date`, and the second corresponds to the 
+second tag, `Description`.
 
-Values in NMR-STAR format need to be quoted if they contain a space, tab, vertical tab, or newline in the value. This library takes care of that for you, but it is worth knowing. That is why in the example the dates are not quoted, but the event descriptions are.
+Values in NMR-STAR format need to be quoted if they contain a space, tab, vertical tab, or newline
+in the value. This library takes care of that for you, but it is worth knowing. That is why in the 
+example the dates are not quoted, but the event descriptions are.
 
 # Quick Start to PyNMRSTAR
 
 First, pull up an interactive python session and import the module:
 ```python
->>> import pynmrstar
+import pynmrstar
 ```
 
 There are many ways to load an NMR-STAR entry, but lets focus on the most common two.
 
 From the BMRB API (loads the most up to date version of an entry from the BMRB API):
 ```python
->>> entry15000 = pynmrstar.Entry.from_database(15000)
+entry15000 = pynmrstar.Entry.from_database(15000)
 ```
 
 From a file:
 
 ```python
->>> entry = pynmrstar.Entry.from_file("/location/of/the/file.str")
+entry = pynmrstar.Entry.from_file("/location/of/the/file.str")
 ```
 
 Continuing on we will assume you have loaded entry 15000 from the API using the from_database command.
@@ -66,13 +82,13 @@ Continuing on we will assume you have loaded entry 15000 from the API using the 
 Writing out a modified entry or saveframe to file is just as easy:
 
 ```python
->>> entry15000.write_to_file("output_file_name.str")
+entry15000.write_to_file("output_file_name.str")
 ```
 
 ### Viewing the structure of the entry
 To see the overall structure of the entry, use the `print_tree()` method.
 ```python
->>> entry15000.print_tree()
+entry15000.print_tree()
 <pynmrstar.Entry '15000' from_database(15000)>
     [0] <pynmrstar.Saveframe 'entry_information'>
         [0] <pynmrstar.Loop '_Entry_author'>
@@ -143,18 +159,24 @@ You can see that there are 24 saveframes, and each saveframe contains some numbe
 There are several ways to access saveframes and loops depending on what you hope to accomplish.
 
 #### The interactive session way
-When playing with the library, debugging, or learning about NMR-STAR you will most likely find the following method most convenient. Note that it is not the correct pattern to use if you want to iterate all of the data in an entry (for reasons that will be explained below).
+When playing with the library, debugging, or learning about NMR-STAR you will most likely find the following method
+most convenient. Note that it is not the correct pattern to use if you want to iterate all of the data in an entry
+(for reasons that will be explained below).
 
-You can access the saveframes in an entry directly using their *names*. For example, to get a reference to the spectrometer saveframe named `spectrometer_1` you can simply do the following:
+You can access the saveframes in an entry directly using their *names*. For example, to get a reference to the
+spectrometer saveframe named `spectrometer_1` you can simply do the following:
 ```python
->>> a_spectrometer = entry15000['spectrometer_1']
+a_spectrometer = entry15000['spectrometer_1']
 ```
 Note that you can see the saveframe names in the tree printout above.
 
-You can do the same for loops within a saveframe, but for loops you must use their tag category (the part before the period) to access them (note that to get to the `Vendor` loop we first had to go through its parent saveframe, named `X-PLOR_NIH` (the `X-PLOR_NIH` saveframe is of the category `software` - you'll see where you access the category later and why accessing by category is preferrable).
+You can do the same for loops within a saveframe, but for loops you must use their tag category
+(the part before the period) to access them (note that to get to the `Vendor` loop we first had
+to go through its parent saveframe, named `X-PLOR_NIH` (the `X-PLOR_NIH` saveframe is of the
+category `software` - you'll see where you access the category later and why accessing by category is preferable).
 ```python
->>> explor_nih_vendor = entry15000['X-PLOR_NIH']['_Vendor']
->>> print explor_nih_vendor
+explor_nih_vendor = entry15000['X-PLOR_NIH']['_Vendor']
+print(explor_nih_vendor)
    loop_
       _Vendor.Name
       _Vendor.Address
@@ -168,13 +190,20 @@ You can do the same for loops within a saveframe, but for loops you must use the
 
 ```
 
-These shortcuts are there for your convenience when writing code. The reason you shouldn't use them in production code is because the saveframe names - what you use as a reference - can actually have any arbitrary value. They are fairly consistent, and for certain saveframes are always the same, but for other saveframes users can set them to whatever value they want during the deposition. Therefore the much better way to access data is via the *category*. Note that only one saveframe in an entry can have a given name, but multiple saveframes may be of the same category.
+These shortcuts are there for your convenience when writing code. The reason you shouldn't use them in
+production code is because the saveframe names - what you use as a reference - can actually have any 
+arbitrary value. They are fairly consistent, and for certain saveframes are always the same, but for 
+other saveframes users can set them to whatever value they want during the deposition. Therefore the 
+much better way to access data is via the *category*. Note that only one saveframe in an entry can have 
+a given name, but multiple saveframes may be of the same category.
 
-The `_` prior to the `Vendor` loop category is to make it clear you want to access the loop and not a saveframe tag with the name `Vendor`.
+The `_` prior to the `Vendor` loop category is to make it clear you want to access the loop and not a 
+saveframe tag with the name `Vendor`.
 
 #### The robust (and recommended) way
 
-A better way to access data is via the category of the data you want to read, or by searching for it with a full tag name. Before going into detail, take a look at what one saveframe from the entry above looks like:
+A better way to access data is via the category of the data you want to read, or by searching for it with 
+a full tag name. Before going into detail, take a look at what one saveframe from the entry above looks like:
 
 ```data
 ############################
@@ -214,15 +243,20 @@ save_X-PLOR_NIH
 save_
 ```
 
-This is a saveframe describing software that was used during an NMR study. You can see from the saveframe tags that the name of this software package is X-PLOR-NIH. You can see from the tag `ID` that it is the fifth software saveframe in this entry. The category of this saveframe is "software" which you can see in the `Sf_category` (short for saveframe category) tag.
+This is a saveframe describing software that was used during an NMR study. You can see from the saveframe tags 
+that the name of this software package is X-PLOR-NIH. You can see from the tag `ID` that it is the fifth software 
+saveframe in this entry. The category of this saveframe is "software" which you can see in the `Sf_category` 
+(short for saveframe category) tag.
 
-This saveframe also has two loops, a vendor loop and a task loop. These are loops rather than free tags as a given software package can have more than one vendor and more than one task it performs.
+This saveframe also has two loops, a vendor loop and a task loop. These are loops rather than free tags as a given 
+software package can have more than one vendor and more than one task it performs.
 
 #### Reading the software packages
-The more robust way to access the data in the software saveframes is by iterating over all of the software saveframes in the entry and pulling out the data we want. To do this for software, we would write the following:
+The more robust way to access the data in the software saveframes is by iterating over all of the software saveframes 
+in the entry and pulling out the data we want. To do this for software, we would write the following:
 ```python
->>> software_saveframes = entry15000.get_saveframes_by_category('software')
->>> software_saveframes
+software_saveframes = entry15000.get_saveframes_by_category('software')
+software_saveframes
 [<pynmrstar.Saveframe 'NMRPipe'>,
  <pynmrstar.Saveframe 'PIPP'>,
  <pynmrstar.Saveframe 'SPARKY'>,
@@ -230,29 +264,36 @@ The more robust way to access the data in the software saveframes is by iteratin
  <pynmrstar.Saveframe 'X-PLOR_NIH'>]
 ```
 
-You can see that this method, `get_saveframes_by_category` returned all of the software saveframes in the entry. Now we can iterate through them to either pull out data, modify data, or remove data. (One note, each loop category - the text before the period in the loop tags - is unique to its parent saveframe. Therefore you will never find a `Task` loop in a saveframe with a category of anything other than `software`. Furthermore, a saveframe can only have one loop of a given category. This means that accessing loops within a saveframe using the category notation is robust and will not lead to you missing a loop.)
+You can see that this method, `get_saveframes_by_category` returned all of the software saveframes in the entry.
+Now we can iterate through them to either pull out data, modify data, or remove data. (One note, each loop 
+category - the text before the period in the loop tags - is unique to its parent saveframe. Therefore you
+will never find a `Task` loop in a saveframe with a category of anything other than `software`. Furthermore,
+a saveframe can only have one loop of a given category. This means that accessing loops within a saveframe
+using the category notation is robust and will not lead to you missing a loop.)
 
 The following will combine all the task loops in the entry into CSV format.
 ```python
->>> csv_data = ""
->>> for software_sf in software_saveframes:
->>>     print_header = True
->>>    # Wrap this in try/catch because it is not gauranteed a software saveframe will have a task loop
->>>    try:
->>>        csv_data += software_sf['_Task'].get_data_as_csv(header=print_header)
->>>        print_header = False
->>>    except KeyError:
->>>        continue
->>> csv_data
+csv_data = ""
+for software_sf in software_saveframes:
+    print_header = True
+    # Wrap this in try/catch because it is not guaranteed a software saveframe will have a task loop
+    try:
+        csv_data += software_sf['_Task'].get_data_as_csv(header=print_header)
+        print_header = False
+    except KeyError:
+        continue
+print(csv_data)
 '_Task.Task,_Task.Entry_ID,_Task.Software_ID\nprocessing,15000,1\n_Task.Task,_Task.Entry_ID,_Task.Software_ID\nchemical shift assignment,15000,2\ndata analysis,15000,2\npeak picking,15000,2\n_Task.Task,_Task.Entry_ID,_Task.Software_ID\nchemical shift assignment,15000,3\n_Task.Task,_Task.Entry_ID,_Task.Software_ID\nstructure solution,15000,4\n_Task.Task,_Task.Entry_ID,_Task.Software_ID\nrefinement,15000,5\nstructure solution,15000,5\n'
 ```
 
 #### Using get_tag to pull tags directly from an entry
-Another way to access data in by using the full tag name. Keep in mind that a full tag contains a category first, a period, and then a tag name. So if we wanted to see all of the various `_Task.Task` that the software packages associated with this entry performed, a simple way to do so is with the `get_tag()` method of the entry:
+Another way to access data in by using the full tag name. Keep in mind that a full tag contains a category
+first, a period, and then a tag name. So if we wanted to see all of the various `_Task.Task` that the 
+software packages associated with this entry performed, a simple way to do so is with the `get_tag()` 
+method of the entry:
 ```python
->>> entry15000.get_tag('Task.Task')
-[u'processing',
- u'chemical shift assignment',
+entry15000.get_tag('Task.Task')
+[u'processing','chemical shift assignment',
  u'data analysis',
  u'peak picking',
  u'chemical shift assignment',
@@ -260,9 +301,10 @@ Another way to access data in by using the full tag name. Keep in mind that a fu
  u'refinement',
  u'structure solution']
 ```
-Or to get all of the spectrometer information - `get_tags()` accepts a list of tags to fetch and returns a dictionary pointing to all the values of each tag, with the order preserved:
+Or to get all of the spectrometer information - `get_tags()` accepts a list of tags to fetch and returns a
+dictionary pointing to all the values of each tag, with the order preserved:
 ```python
->>> entry15000.get_tags(['_NMR_spectrometer.Manufacturer', '_NMR_spectrometer.Model', '_NMR_spectrometer.Field_strength'])
+entry15000.get_tags(['_NMR_spectrometer.Manufacturer', '_NMR_spectrometer.Model', '_NMR_spectrometer.Field_strength'])
 {'_NMR_spectrometer.Field_strength': [u'500',
   u'500',
   u'750',
@@ -287,13 +329,15 @@ To view all of the tags in the NMR-STAR schema and their meanings, please go [he
 
 *"I just want to get the chemical shift data as an array - how do I do that?"*
 
-Keep in mind that an entry may have multiple sets of assigned chemical shifts. (For examples, there made be two sets of assignments that were made under two differerent sample conditions.) So to get the chemical shifts it is best to iterate through all the assigned chemical shift loops:
+Keep in mind that an entry may have multiple sets of assigned chemical shifts. (For examples, there 
+may be two sets of assignments that were made under two different sample conditions.) So to get the
+chemical shifts it is best to iterate through all the assigned chemical shift loops:
 
 ```python
->>> cs_result_sets = []
->>> for chemical_shift_loop in entry15000.get_loops_by_category("Atom_chem_shift"):
->>>     cs_result_sets.append(chemical_shift_loop.get_tag(['Comp_index_ID', 'Comp_ID', 'Atom_ID', 'Atom_type', 'Val', 'Val_err']))
->>> cs_result_sets
+cs_result_sets = []
+for chemical_shift_loop in entry15000.get_loops_by_category("Atom_chem_shift"):
+    cs_result_sets.append(chemical_shift_loop.get_tag(['Comp_index_ID', 'Comp_ID', 'Atom_ID', 'Atom_type', 'Val', 'Val_err']))
+cs_result_sets
 [[[u'2', u'SER', u'H', u'H', u'9.3070', u'0.01'],
   [u'2', u'SER', u'HA', u'H', u'4.5970', u'0.01'],
   [u'2', u'SER', u'HB2', u'H', u'4.3010', u'0.01'],
@@ -306,10 +350,12 @@ Keep in mind that an entry may have multiple sets of assigned chemical shifts. (
   ...
 ```
 
-Note that we used the `get_tag()` method of the loop to only pull out the tags we were concerned with. `get_tag()` accepts an array of tags in addition to a single tag. The full assigned chemical saveframe loop will contain extra tags you may not need. For example:
+Note that we used the `get_tag()` method of the loop to only pull out the tags we were concerned with.
+`get_tag()` accepts an array of tags in addition to a single tag. The full assigned chemical saveframe
+loop will contain extra tags you may not need. For example:
 
 ```python
->>> print entry15000.get_loops_by_category("Atom_chem_shift")[0]
+print(entry15000.get_loops_by_category("Atom_chem_shift")[0])
    loop_
       _Atom_chem_shift.ID
       _Atom_chem_shift.Assembly_atom_ID
@@ -344,15 +390,16 @@ Note that we used the `get_tag()` method of the loop to only pull out the tags w
 
 *"But I want to access the chemical shifts as numbers, not strings!"*
 
-That is easy to do. When you first load an entry it is by default loaded with all values as strings. To instead load it such that the values match the schema, simply turn on CONVERT_DATATYPES prior to loading it.
+That is easy to do. When you first load an entry it is by default loaded with all values as strings.
+To instead load it such that the values match the schema, simply set `convert_data_types=True` when you load
+the file using `Entry.from_file()`.
 
 ```python
->>> pynmrstar.CONVERT_DATATYPES = True
->>> ent15000 = pynmrstar.Entry.from_database(15000)
->>> cs_result_sets = []
->>> for chemical_shift_loop in entry15000.get_loops_by_category("Atom_chem_shift"):
->>>     cs_result_sets.append(chemical_shift_loop.get_tag(['Comp_index_ID', 'Comp_ID', 'Atom_ID', 'Atom_type', 'Val', 'Val_err']))
->>> cs_result_sets
+entry15000 = pynmrstar.Entry.from_database(15000, convert_data_types=True)
+cs_result_sets = []
+for chemical_shift_loop in entry15000.get_loops_by_category("Atom_chem_shift"):
+     cs_result_sets.append(chemical_shift_loop.get_tag(['Comp_index_ID', 'Comp_ID', 'Atom_ID', 'Atom_type', 'Val', 'Val_err']))
+print(cs_result_sets)
 [[[2, u'SER', u'H', u'H', Decimal('9.3070'), Decimal('0.01')],
   [2, u'SER', u'HA', u'H', Decimal('4.5970'), Decimal('0.01')],
   [2, u'SER', u'HB2', u'H', Decimal('4.3010'), Decimal('0.01')],
@@ -368,28 +415,38 @@ That is easy to do. When you first load an entry it is by default loaded with al
    ...
 ```
 
-This is a great opportunity to point out that if all you want is the chemical shifts, or one or two tags, you may find it significantly easier to use the [BMRB API](https://github.com/uwbmrb/BMRB-API#bmrb-api) ([chemical shift endpoint](https://github.com/uwbmrb/BMRB-API#get-assigned-chemical-shift-list-get)) to fetch that data directly and on-demand rather than dealing directly with NMR-STAR at all.
+This is a great opportunity to point out that if all you want is the chemical shifts, or one or two tags, 
+you may find it significantly easier to use the [BMRB API](https://github.com/uwbmrb/BMRB-API#bmrb-api)
+([chemical shift endpoint](https://github.com/uwbmrb/BMRB-API#get-assigned-chemical-shift-list-get)) to
+fetch that data directly and on-demand rather than dealing directly with NMR-STAR at all.
 
 # Creating new loops and saveframes
 
-This tutorial has so far focused on how to read and access data. This section will focus on how to create new loop and saveframe objects.
+This tutorial has so far focused on how to read and access data. This section will focus on how to create
+new loop and saveframe objects.
 
 ## Loops
 
-There are five ways to make a new loop: `from_file()`, `from_json()`, `from_scratch()`, `from_string()`, and `from_template()`. All of these are classmethods. `from_scratch()` makes a new loop, `from_string()` parses an NMR-STAR loop from a python string containing NMR-STAR data, `from_json()` parses a JSON object (reversely, `get_json()` will get a JSON representation of the loop), `from_scratch()` makes a completely empty loop, and `from_template()` makes a loop with the tags prefilled from the BMRB schema based on the provided category. `from_file`, `from_json`, and `from_string` are fairly self-explanatory - see the full documentation if needed for usage.
+There are five ways to make a new loop: `from_file()`, `from_json()`, `from_scratch()`, `from_string()`, 
+and `from_template()`. All of these are classmethods. `from_scratch()` makes a new loop, `from_string()`
+parses an NMR-STAR loop from a python string containing NMR-STAR data, `from_json()` parses a JSON object
+(reversely, `get_json()` will get a JSON representation of the loop), `from_scratch()` makes a completely
+empty loop, and `from_template()` makes a loop with the tags pre-filled from the BMRB schema based on the
+provided category. `from_file`, `from_json`, and `from_string` are fairly self-explanatory - see the full
+documentation if needed for usage.
 
 #### `from_scratch()`
 
 ```python
->>> lp = pynmrstar.Loop.from_scratch()
->>> print lp
+lp = pynmrstar.Loop.from_scratch()
+print(lp)
 
    loop_
 
    stop_
 
->>> lp.add_tag(['loop_category.tag1', 'loop_category.tag2', 'loop_category.tag3'])
->>> print lp
+lp.add_tag(['loop_category.tag1', 'loop_category.tag2', 'loop_category.tag3'])
+print(lp)
 
    loop_
       _loop_category.tag1
@@ -400,8 +457,8 @@ There are five ways to make a new loop: `from_file()`, `from_json()`, `from_scra
    stop_
 
 # Note that when calling add_data the length of the array must match the number of tags in the loop
->>> lp.add_data(['value_1', 2, 'value 3'])
->>> print lp
+lp.add_data(['value_1', 2, 'value 3'])
+print(lp)
    loop_
       _loop_category.tag1
       _loop_category.tag2
@@ -412,8 +469,8 @@ There are five ways to make a new loop: `from_file()`, `from_json()`, `from_scra
    stop_
 
 # Alternatively, you can (with caution) directly modify the array corresponding to the loop data
->>> lp.data = [[1,2,3],[4,5,6]]
->>> print lp
+lp.data = [[1,2,3],[4,5,6]]
+print(lp)
    loop_
       _loop_category.tag1
       _loop_category.tag2
@@ -425,15 +482,17 @@ There are five ways to make a new loop: `from_file()`, `from_json()`, `from_scra
    stop_
 ```
 
-Note that the loop category was set automatically when the tag `loop_category.tag1` was added. You could have also provided the tag when creating the loop by providing it as an argument to the optional `category` argument to the constructor.
+Note that the loop category was set automatically when the tag `loop_category.tag1` was added. You could
+have also provided the tag when creating the loop by providing it as an argument to the optional `category` 
+argument to the constructor.
 
 #### `from_template()`
 
 This method will create a new loop ready for data with the tags from the BMRB schema corresponding to that loop category.
 
 ```python
->>> chemical_shifts = pynmrstar.Loop.from_template('atom_chem_shift_list')
->>> print chemical_shifts
+chemical_shifts = pynmrstar.Loop.from_template('atom_chem_shift_list')
+print(chemical_shifts)
    loop_
       _Atom_chem_shift.ID
       _Atom_chem_shift.Assembly_atom_ID
@@ -467,38 +526,46 @@ This method will create a new loop ready for data with the tags from the BMRB sc
 
 ## Saveframes
 
-There are five ways to make a new loop: `from_file()`, `from_json()`, `from_scratch()`, `from_string()`, and `from_template()`. All of these are classmethods. `from_scratch()` makes a new saveframe, `from_string()` parses an NMR-STAR saveframe from a python string containing NMR-STAR data, `from_json()` parses a JSON object (reversely, `get_json()` will get a JSON representation of the saveframe), `from_scratch()` makes a completely empty saveframe, and `from_template()` makes a saveframe with the tags prefilled from the BMRB schema based on the provided category. `from_file`, `from_json`, and `from_string` are fairly self-explanatory - see the full documentation if needed for usage.
+There are five ways to make a new loop: `from_file()`, `from_json()`, `from_scratch()`, `from_string()`,
+and `from_template()`. All of these are classmethods. `from_scratch()` makes a new saveframe, `from_string()`
+parses an NMR-STAR saveframe from a python string containing NMR-STAR data, `from_json()` parses a JSON
+object (reversely, `get_json()` will get a JSON representation of the saveframe), `from_scratch()` 
+makes a completely empty saveframe, and `from_template()` makes a saveframe with the tags pre-filled from
+the BMRB schema based on the provided category. `from_file`, `from_json`, and `from_string` are fairly
+self-explanatory - see the full documentation if needed for usage.
 
 #### `from_scratch()`
 ```python
-# You must provide the saveframe name (the value that comes after "save_" at the start of the saveframe and saveframe tag prefix (the value before the "." in a tag name) when creating a saveframe this way
->>> my_sf = pynmrstar.Saveframe.from_scratch("sf_name", "example_sf_category")
->>> print my_sf
+# You must provide the saveframe name (the value that comes after "save_" at the start of the saveframe and saveframe 
+# tag prefix (the value before the "." in a tag name) when creating a saveframe this way
+my_sf = pynmrstar.Saveframe.from_scratch("sf_name", "example_sf_category")
+print(my_sf)
 save_sf_name
 
 save_
 
-# Add a tag using the add_tag() method. Update=True will override existing tag with the same name. Update=False will raise an exception if the tag already exists
->>> my_sf.add_tag("tagName1", "tagValue1")
->>> print my_sf
+# Add a tag using the add_tag() method. Update=True will override existing tag with the same name.
+# Update=False will raise an exception if the tag already exists
+my_sf.add_tag("tagName1", "tagValue1")
+print(my_sf)
 save_sf_name
    _example_sf_category.tagName1  tagValue1
 
 save_
 
->>> my_sf.add_tag("tagName1", "tagValue2", update=False)
+my_sf.add_tag("tagName1", "tagValue2", update=False)
 ValueError: There is already a tag with the name 'tagName1'.
->>> my_sf.add_tag("tagName1", "tagValue2", update=True)
->>> print my_sf
+my_sf.add_tag("tagName1", "tagValue2", update=True)
+print(my_sf)
 save_sf_name
    _example_sf_category.tagName1  tagValue1
 
 save_
 # Alternatively, you can access or write tag values using direct subset access:
->>> my_sf['tagName1']
+my_sf['tagName1']
 ['tagValue2']
->>> my_sf['tagName2'] = "some value"
->>> print my_sf
+my_sf['tagName2'] = "some value"
+print(my_sf)
 save_sf_name
    _example_sf_category.tagName1  tagValue2
    _example_sf_category.tagName2  'some value'
@@ -506,8 +573,8 @@ save_sf_name
 save_
 
 # Now add the loop we created before
->>> my_sf.add_loop(lp)
->>> print my_sf
+my_sf.add_loop(lp)
+print(my_sf)
 save_sf_name
    _example_sf_category.tagName1  tagValue2
    _example_sf_category.tagName2  'some value'
@@ -525,16 +592,15 @@ save_sf_name
 save_
 
 # Now write out our saveframe to a file. Optionally specify format="json" to write in JSON format.
->>> my_sf.write_to_file("file_name.str")
->>> my_sf.write_to_file("file_name.json", format_="json")
+my_sf.write_to_file("file_name.str")
+my_sf.write_to_file("file_name.json", format_="json")
 ```
 
 #### `from_template()`
 ```python
 
->>> my_sf = pynmrstar.Saveframe.from_template("assigned_chemical_shifts")
->>> print my_sf
-print my_sf
+my_sf = pynmrstar.Saveframe.from_template("assigned_chemical_shifts")
+print(my_sf)
      ###################################
      #  Assigned chemical shift lists  #
      ###################################
@@ -673,13 +739,17 @@ save_
 
 # Schema methods
 
-The library makes it easy to add missing tags, sort the tags according to the BMRB schema, and validate the data against the schema. Let's do a simple example of creating a chemical shift loop, adding any missing tags, ordering the tags in the standard order (not required), and then checking for errors.
+The library makes it easy to add missing tags, sort the tags according to the BMRB schema,
+and validate the data against the schema. Let's do a simple example of creating a chemical 
+shift loop, adding any missing tags, ordering the tags in the standard order (not required), 
+and then checking for errors.
 
 ```python
 # Create the loop with the proper category
->>> my_cs_loop = pynmrstar.Loop.from_scratch("Atom_chem_shift")
+my_cs_loop = pynmrstar.Loop.from_scratch("Atom_chem_shift")
 # Add the tags we will fill
->>> my_cs_loop.add_tag(['Comp_ID', 'Atom_ID', 'Comp_index_ID', 'Atom_type', 'Val', 'Val_err'])
+my_cs_loop.add_tag(['Comp_ID', 'Atom_ID', 'Comp_index_ID', 'Atom_type', 'Val', 'Val_err'])
+print(my_cs_loop)
    loop_
       _Atom_chem_shift.Comp_ID
       _Atom_chem_shift.Atom_ID
@@ -691,10 +761,10 @@ The library makes it easy to add missing tags, sort the tags according to the BM
 
    stop_
 # Populate the data array
->>> my_cs_loop.data = [['SER', 'H',  '2', 'H', '9.3070', '0.01'],
+my_cs_loop.data = [['SER', 'H',  '2', 'H', '9.3070', '0.01'],
                        ['SER', 'HA', '2', 'H', '4.5970', '0.01'],
                        ['SER', 'HB2', '2', 'H', '4.3010', '0.01']]
->>> print my_cs_loop
+print(my_cs_loop)
    loop_
       _Atom_chem_shift.Comp_ID
       _Atom_chem_shift.Atom_ID
@@ -710,9 +780,9 @@ The library makes it easy to add missing tags, sort the tags according to the BM
    stop_
 
 # Now lets sort the tags to match the BMRB schema
->>> my_cs_loop.sort_tags()
+my_cs_loop.sort_tags()
 # You can see that the Comp_index_ID tag has been moved to the front to match the BMRB standard
->>> print my_cs_loop
+print(my_cs_loop)
    loop_
       _Atom_chem_shift.Comp_index_ID
       _Atom_chem_shift.Comp_ID
@@ -728,23 +798,24 @@ The library makes it easy to add missing tags, sort the tags according to the BM
    stop_
 
 # Check for any errors - returns a list of errors. No errors here:
->>> print my_cs_loop.validate()
+print(my_cs_loop.validate())
 []
 # Let us now set 'Comp_index_ID' to have an invalid value
->>> my_cs_loop.data[0][0] = "invalid"
+my_cs_loop.data[0][0] = "invalid"
 # You can see that there is now a validation error - the data doesn't match the specified type
->>> print my_cs_loop.validate()
+print(my_cs_loop.validate())
 ["Value does not match specification: '_Atom_chem_shift.Comp_index_ID':'invalid' on line '0 tag 0 of loop'.\n     Type specified: int\n     Regular expression for type: '-?[0-9]+'"]
 # If you use the pynmrstar.validate(object) function, it will print the report in a human-readable format
->>> pynmrstar.validate(my_cs_loop)
+pynmrstar.validate(my_cs_loop)
 1: Value does not match specification: '_Atom_chem_shift.Comp_index_ID':'invalid' on line '0 tag 0 of loop'.
      Type specified: int
      Regular expression for type: '-?[0-9]+'
 
 # Finally, add in any tags that you didn't have a value for
->>> my_cs_loop.add_missing_tags()
-# You can see that all the standard "Atom_chem_shift" loop tags have been added, and their values all set to a logical null value - "."
->>> print my_cs_loop
+my_cs_loop.add_missing_tags()
+# You can see that all the standard "Atom_chem_shift" loop tags have been added, and their values
+# all set to a logical null value - "."
+print(my_cs_loop)
 
    loop_
       _Atom_chem_shift.ID
