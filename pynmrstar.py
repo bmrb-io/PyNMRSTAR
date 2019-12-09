@@ -3592,8 +3592,15 @@ class Loop(object):
             result.add_tag(tag)
 
         # Add the data for the tags to the new loop
-        for row in self.get_data_by_tag(valid_tags):
-            result.add_data(row)
+        results = self.get_tag(valid_tags)
+
+        # If there is only a single tag, we can't add data the same way
+        if len(valid_tags) == 1:
+            for item in results:
+                result.add_data([item])
+        else:
+            for row in results:
+                result.add_data(row)
 
         # Assign the category of the new loop
         if result.category is None:
