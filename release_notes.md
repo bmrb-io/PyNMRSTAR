@@ -10,6 +10,7 @@ Changes:
 rather than provided schema.
 * Added DeprecationWarning to methods and functions that are removed in v3.x releases or will
 be removed in the future.
+* Fix a bug in Loop.filter() triggered when a loop only has one tag.
 
 ### 2.6.4
 
