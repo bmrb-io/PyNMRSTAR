@@ -3592,8 +3592,7 @@ class Loop(object):
     def get_columns(self):
         """ Deprecated alias for get_tags() """
 
-        warnings.warn("aget_columns() is deprecated. Please use"
-                      " get_tag_names() instead.", DeprecationWarning)
+        warnings.warn("get_columns() is deprecated. Please use get_tag_names() instead.", DeprecationWarning)
         return self.get_tag_names()
 
     def get_data_as_csv(self, header=True, show_category=True):
