@@ -396,7 +396,7 @@ class Saveframe(object):
 
         # Print any loops
         for each_loop in self.loops:
-            ret_string += each_loop.__str__(skip_empty_loops=skip_empty_loops)
+            ret_string += each_loop.format(skip_empty_loops=skip_empty_loops)
 
         # Close the saveframe
         ret_string += "\nsave_\n"
@@ -630,6 +630,12 @@ class Saveframe(object):
         csv_buffer.seek(0)
         return csv_buffer.read().replace('\r\n', '\n')
 
+    def format(self, skip_empty_loops: bool = False, show_comments: bool = True) -> str:
+        """ The same as calling str(Saveframe), except that you can pass options
+        to customize how the saveframe is printed."""
+
+        return self.__str__(skip_empty_loops=skip_empty_loops, show_comments=show_comments)
+
     def get_json(self, serialize: bool = True) -> Union[dict, str]:
         """ Returns the saveframe in JSON format. If serialize is set to
         False a dictionary representation of the saveframe that is
@@ -770,7 +776,7 @@ class Saveframe(object):
 
         data_to_write = ''
         if format_ == "nmrstar":
-            data_to_write = self.__str__(show_comments=show_comments)
+            data_to_write = self.format(show_comments=show_comments)
         elif format_ == "json":
             data_to_write = self.get_json()
 

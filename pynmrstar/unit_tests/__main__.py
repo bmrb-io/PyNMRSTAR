@@ -459,7 +459,7 @@ class TestPyNMRSTAR(unittest.TestCase):
         utils.SKIP_EMPTY_LOOPS = False
         self.assertEqual(str(Loop.from_scratch()), "\n   loop_\n\n   stop_\n")
         utils.SKIP_EMPTY_LOOPS = True
-        self.assertEqual(Loop.from_scratch().__str__(skip_empty_loops=True), "")
+        self.assertEqual(Loop.from_scratch().format(skip_empty_loops=True), "")
         tmp_loop = Loop.from_scratch()
         tmp_loop.data = [[1, 2, 3]]
         self.assertRaises(ValueError, tmp_loop.__str__)

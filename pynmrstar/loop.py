@@ -660,6 +660,12 @@ class Loop(object):
 
         return result
 
+    def format(self, skip_empty_loops: bool = False) -> str:
+        """ The same as calling str(Loop), except that you can pass options
+        to customize how the loop is printed. """
+
+        return self.__str__(skip_empty_loops=skip_empty_loops)
+
     def get_data_as_csv(self, header: bool = True, show_category: bool = True) -> str:
         """Return the data contained in the loops, properly CSVd, as a
         string. Set header to False to omit the header. Set

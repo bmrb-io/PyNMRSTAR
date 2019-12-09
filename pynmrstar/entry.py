@@ -158,11 +158,9 @@ class Entry(object):
         seen_saveframes = {}
         for saveframe_obj in self:
             if saveframe_obj.category in seen_saveframes:
-                sf_strings.append(saveframe_obj.__str__(first_in_category=False, skip_empty_loops=skip_empty_loops,
-                                                        show_comments=show_comments))
+                sf_strings.append(saveframe_obj.format(skip_empty_loops=skip_empty_loops, show_comments=False))
             else:
-                sf_strings.append(saveframe_obj.__str__(first_in_category=True, skip_empty_loops=skip_empty_loops,
-                                                        show_comments=show_comments))
+                sf_strings.append(saveframe_obj.format(skip_empty_loops=skip_empty_loops, show_comments=show_comments))
                 seen_saveframes[saveframe_obj.category] = True
 
         return "data_%s\n\n%s" % (self.entry_id, "\n".join(sf_strings))
@@ -792,7 +790,7 @@ class Entry(object):
 
         data_to_write = ''
         if format_ == "nmrstar":
-            data_to_write = self.__str__(show_comments=show_comments)
+            data_to_write = self.format(show_comments=show_comments)
         elif format_ == "json":
             data_to_write = self.get_json()
 
