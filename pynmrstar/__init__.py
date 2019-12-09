@@ -46,19 +46,6 @@ def iter_entries(metabolomics=False):
     return utils.iter_entries(metabolomics=metabolomics)
 
 
-def format_category(value):
-    """ Deprecated. Please use utils.format_category() instead. """
-
-    warnings.warn('This function has moved to utils.format_category().', DeprecationWarning)
-    return utils.format_category(value)
-
-
-def format_tag(value):
-    """ Deprecated. Please use utils.format_tag() instead. """
-
-    warnings.warn('This function has moved to utils.format_tag().', DeprecationWarning)
-    return utils.format_tag(value)
-
 
 __all__ = ['Loop', 'Saveframe', 'Entry', 'Schema', 'definitions', 'utils', '__version__', 'exceptions', 'cnmrstar']
 
