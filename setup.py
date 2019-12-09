@@ -10,6 +10,11 @@ cnmrstar = Extension('cnmrstar',
                      extra_compile_args=["-funroll-loops", "-O3"],
                      optional=True)
 
+try:
+    long_description = open('README.md', 'r').read()
+except IOError:
+    long_description = open('pynmrstar/README.md', 'r').read()
+
 setup(name='pynmrstar',
       version=__version__,
       packages=['pynmrstar'],
@@ -18,7 +23,7 @@ setup(name='pynmrstar',
       author_email='wedell@bmrb.wisc.edu',
       description='PyNMR-STAR provides tools for reading, writing, modifying, and interacting with NMR-STAR files. '
                   'Maintained by the BMRB.',
-      long_description=open('README.md', 'r').read(),
+      long_description=long_description,
       long_description_content_type='text/markdown',
       keywords=['bmrb', 'parser', 'nmr', 'nmrstar', 'biomagresbank', 'biological magnetic resonance bank'],
       url='https://github.com/uwbmrb/PyNMRSTAR',
