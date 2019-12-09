@@ -226,6 +226,18 @@ def enable_nef_defaults():
     standard. Specifically, suppress printing empty loops by default and
     convert True -> "true" and False -> "false" when printing."""
 
+    warnings.warn("""This feature will be removed in the v3 branch. You can still work with NEF files by using
+the appropriate parameters when writing out files. Specifically:
+
+Before writing out objects as strings, perform these two steps:
+
+Update the global string conversion dictionary:
+pynmrstar.definitions.STR_CONVERSION_DICT = {None: ".", True: "true", False: "false"}
+
+Rather than using str(obj) to render as a string, use obj.format(show_comments=False, skip_empty_loops=True).
+
+""", DeprecationWarning)
+
     global STR_CONVERSION_DICT, SKIP_EMPTY_LOOPS, DONT_SHOW_COMMENTS
     STR_CONVERSION_DICT = {None: ".", True: "true", False: "false"}
     SKIP_EMPTY_LOOPS = True
@@ -236,6 +248,9 @@ def enable_nmrstar_defaults():
     """ Sets the module variables such that our behavior matches the
     BMRB standard (NMR-STAR). This is the default behavior of this module.
     This method only exists to revert after calling enable_nef_defaults()."""
+
+    warnings.warn("This feature has been removed from the v3 branch. You can still work with NEF files by using"
+                  "the appropriate parameters when loading and writing out files.", DeprecationWarning)
 
     global STR_CONVERSION_DICT, SKIP_EMPTY_LOOPS, DONT_SHOW_COMMENTS
     STR_CONVERSION_DICT = {None: "."}
