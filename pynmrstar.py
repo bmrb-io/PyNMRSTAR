@@ -92,6 +92,16 @@ try:
 except ImportError:
     zlib = None
 
+try:
+    import warnings
+except ImportError:
+    class WarningsImposter:
+        def warn(self, warning_message, warning_type):
+            sys.stderr.write("%s\n" % warning_message)
+
+
+    warnings = WarningsImposter()
+
 # Determine if we are running in python3
 PY3 = (sys.version_info[0] == 3)
 
@@ -105,7 +115,15 @@ if PY3:
 else:
     from urllib2 import urlopen, HTTPError, URLError, Request
     from cStringIO import StringIO
+
     BytesIO = StringIO
+
+if PY3:
+    class _NeverMatches:
+        pass
+
+
+    unicode = _NeverMatches
 
 
 # This is an odd place for this, but it can't really be avoided if
@@ -148,6 +166,7 @@ def _build_extension():
 # See if we can use the fast tokenizer
 try:
     import cnmrstar
+
     if "version" not in dir(cnmrstar) or cnmrstar.version() < "2.2.8":
         print("Recompiling cnmrstar module due to API changes. You may "
               "experience a segmentation fault immediately following this "
@@ -169,7 +188,6 @@ except ImportError as e:
             except ImportError:
                 cnmrstar = None
 
-
 #############################################
 #            Global Variables               #
 #############################################
@@ -177,7 +195,7 @@ except ImportError as e:
 # Set this to allow import * from bmrb to work sensibly
 __all__ = ['Entry', 'Saveframe', 'Loop', 'Schema', 'diff', 'validate',
            'enable_nef_defaults', 'enable_nmrstar_defaults',
-           'delete_empty_saveframes', 'PY3']
+           'delete_empty_saveframes', '__version__']
 
 # May be set by calling code
 VERBOSE = False
@@ -200,7 +218,7 @@ _COMMENT_DICTIONARY = {}
 _API_URL = "http://webapi.bmrb.wisc.edu/v2"
 _SCHEMA_URL = 'https://raw.githubusercontent.com/uwbmrb/nmr-star-dictionary/master/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
-__version__ = "2.6.4"
+__version__ = "2.6.5"
 
 
 #############################################
@@ -213,6 +231,18 @@ def enable_nef_defaults():
     standard. Specifically, suppress printing empty loops by default and
     convert True -> "true" and False -> "false" when printing."""
 
+    warnings.warn("""This feature will be removed in the v3 branch. You can still work with NEF files by using
+the appropriate parameters when writing out files. Specifically:
+
+Before writing out objects as strings, perform these two steps:
+
+Update the global string conversion dictionary:
+pynmrstar.definitions.STR_CONVERSION_DICT = {None: ".", True: "true", False: "false"}
+
+Rather than using str(obj) to render as a string, use obj.format(show_comments=False, skip_empty_loops=True).
+
+""", DeprecationWarning)
+
     global STR_CONVERSION_DICT, SKIP_EMPTY_LOOPS, DONT_SHOW_COMMENTS
     STR_CONVERSION_DICT = {None: ".", True: "true", False: "false"}
     SKIP_EMPTY_LOOPS = True
@@ -223,6 +253,9 @@ def enable_nmrstar_defaults():
     """ Sets the module variables such that our behavior matches the
     BMRB standard (NMR-STAR). This is the default behavior of this module.
     This method only exists to revert after calling enable_nef_defaults()."""
+
+    warnings.warn("This feature has been removed from the v3 branch. You can still work with NEF files by using"
+                  "the appropriate parameters when loading and writing out files.", DeprecationWarning)
 
     global STR_CONVERSION_DICT, SKIP_EMPTY_LOOPS, DONT_SHOW_COMMENTS
     STR_CONVERSION_DICT = {None: "."}
@@ -288,6 +321,8 @@ def iter_entries(metabolomics=False):
         an operation across the entire BMRB database. Set `metabolomics=True`
         in order to get all the entries in the metabolomics database."""
 
+    warnings.warn('This function will move to utils.iter_entries() in version 3.0.', DeprecationWarning)
+
     api_url = "%s/list_entries?database=macromolecules" % _API_URL
     if metabolomics:
         api_url = "%s/list_entries?database=metabolomics" % _API_URL
@@ -297,7 +332,11 @@ def iter_entries(metabolomics=False):
 
 
 def validate(entry_to_validate, schema=None):
-    """Prints a validation report of an object."""
+    """Deprecated. Please call .validate() on the object for which you want
+    a validation report instead."""
+
+    warnings.warn('This function will be removed in a future release. Please call '
+                  '.validate() on the object instead.', DeprecationWarning)
 
     validation = entry_to_validate.validate(schema=schema)
     if len(validation) == 0:
@@ -324,6 +363,8 @@ def clean_value(value):
     way the value is converted to a string.
 
     """
+
+    warnings.warn('This function will move to utils.quote_value() in release 3.0.', DeprecationWarning)
 
     # Allow manual specification of conversions for booleans, Nones, etc.
     if value in STR_CONVERSION_DICT:
@@ -369,7 +410,7 @@ def clean_value(value):
         can_wrap_double = True
 
         for pos, char in enumerate(value):
-            next_char = value[pos+1:pos+2]
+            next_char = value[pos + 1:pos + 2]
 
             if next_char != "" and next_char in _WHITESPACE:
                 if char == "'":
@@ -415,6 +456,14 @@ def _json_serialize(obj):
     raise TypeError("Type not serializable: %s" % type(obj))
 
 
+def _format_tag(value):
+    """Strips anything before the '.'"""
+
+    if '.' in value:
+        value = value[value.index('.') + 1:]
+    return value
+
+
 def _format_category(value):
     """Adds a '_' to the front of a tag (if not present) and strips out
     anything after a '.'"""
@@ -424,14 +473,6 @@ def _format_category(value):
             value = "_" + value
         if "." in value:
             value = value[:value.index(".")]
-    return value
-
-
-def _format_tag(value):
-    """Strips anything before the '.'"""
-
-    if '.' in value:
-        value = value[value.index('.')+1:]
     return value
 
 
@@ -470,7 +511,7 @@ def _interpret_file(the_file):
 
     if hasattr(the_file, 'read') and hasattr(the_file, 'readline'):
         star_buffer = the_file
-    elif isinstance(the_file, str) or isinstance(the_file, unicode):
+    elif isinstance(the_file, (str, unicode)):
         if (the_file.startswith("http://") or the_file.startswith("https://") or
                 the_file.startswith("ftp://")):
             url_data = urlopen(the_file)
@@ -573,7 +614,7 @@ class _Parser(object):
         if cnmrstar is not None:
             return self.line_number
         else:
-            return self.full_data[0:self.index].count("\n")+1
+            return self.full_data[0:self.index].count("\n") + 1
 
     def get_token(self):
         """ Returns the next token in the parsing process."""
@@ -593,7 +634,7 @@ class _Parser(object):
                         trim = True
                         for pos in range(1, len(self.token) - 4):
                             if self.token[pos] == "\n":
-                                if self.token[pos+1:pos+4] != "   ":
+                                if self.token[pos + 1:pos + 4] != "   ":
                                     trim = False
 
                         if trim and "\n   ;" in self.token:
@@ -884,7 +925,7 @@ class _Parser(object):
             self.index += len(raw_tmp)
 
             try:
-                newline_index = self.full_data.index("\n", self.index+1)
+                newline_index = self.full_data.index("\n", self.index + 1)
                 raw_tmp = self.full_data[self.index:newline_index]
             except ValueError:
                 # End of file
@@ -894,8 +935,8 @@ class _Parser(object):
                 self.index = len(self.full_data)
                 return
 
-            newline_index = self.full_data.index("\n", self.index+1)
-            raw_tmp = self.full_data[self.index:newline_index+1]
+            newline_index = self.full_data.index("\n", self.index + 1)
+            raw_tmp = self.full_data[self.index:newline_index + 1]
             tmp = raw_tmp.lstrip(_WHITESPACE)
 
         # If it is a multi-line comment, recalculate our viewing window
@@ -928,14 +969,14 @@ class _Parser(object):
 
                 # The line is terminated properly
                 if valid == until:
-                    self.token = tmp[0:until+1]
-                    self.index += until+4
+                    self.token = tmp[0:until + 1]
+                    self.index += until + 4
                     self.delimiter = ";"
                     return
 
                 # The line was terminated improperly
                 else:
-                    if self.next_whitespace(tmp[until+2:]) == 0:
+                    if self.next_whitespace(tmp[until + 2:]) == 0:
                         if (RAISE_PARSE_WARNINGS and
                                 "bad-multiline" not in WARNINGS_TO_IGNORE):
                             raise ValueError("Warning: Technically invalid line"
@@ -945,7 +986,7 @@ class _Parser(object):
                                              "non-return whitespace following "
                                              "was found.",
                                              self.get_line_number())
-                        self.token = tmp[0:until+1]
+                        self.token = tmp[0:until + 1]
                         self.index += until + 4
                         self.delimiter = ";"
                         return
@@ -973,14 +1014,14 @@ class _Parser(object):
             # Make sure we don't stop for quotes that are not followed
             #  by whitespace
             try:
-                while tmp[until+1:until+2] not in _WHITESPACE:
-                    until = self.index_handle(tmp, "'", until+1)
+                while tmp[until + 1:until + 2] not in _WHITESPACE:
+                    until = self.index_handle(tmp, "'", until + 1)
             except TypeError:
                 raise ValueError("Invalid file. Single quoted value was never "
                                  "terminated.", self.get_line_number())
 
             self.token = tmp[1:until]
-            self.index += until+1
+            self.index += until + 1
             self.delimiter = "'"
             return
 
@@ -995,14 +1036,14 @@ class _Parser(object):
             # Make sure we don't stop for quotes that are not followed
             #  by whitespace
             try:
-                while tmp[until+1:until+2] not in _WHITESPACE:
-                    until = self.index_handle(tmp, '"', until+1)
+                while tmp[until + 1:until + 2] not in _WHITESPACE:
+                    until = self.index_handle(tmp, '"', until + 1)
             except TypeError:
                 raise ValueError("Invalid file. Double quoted value was never "
                                  "terminated.", self.get_line_number())
 
             self.token = tmp[1:until]
-            self.index += until+1
+            self.index += until + 1
             self.delimiter = '"'
             return
 
@@ -1088,7 +1129,7 @@ class Schema(object):
         try:
             # Read in the data types
             types_file = _interpret_file(os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                         "reference_files/data_types.csv"))
+                                                      "reference_files/data_types.csv"))
         except IOError:
             # Load the data types from Github if we can't find them locally
             types_url = "https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v2/reference_files/data_types.csv"
@@ -1129,7 +1170,7 @@ class Schema(object):
             lengths.append(max([len(str(x[y])) for x in values]))
 
         format_parameters = (self.schema_file, self.version, "Tag_Prefix", lengths[0],
-                             "Tag", lengths[1]-6, "Type", lengths[2], "Null_Allowed",
+                             "Tag", lengths[1] - 6, "Type", lengths[2], "Null_Allowed",
                              lengths[3], "SF_Category")
         text = """BMRB schema from: '%s' version '%s'
 %s
@@ -1191,16 +1232,16 @@ class Schema(object):
                 # This will allow things through that have extra junk on the
                 #  end, but in general it is okay to be forgiving as long as we
                 #   can guess what they mean.
-                length = tag_type[tag_type.index("(")+1:tag_type.index(")")]
+                length = tag_type[tag_type.index("(") + 1:tag_type.index(")")]
                 # Check the length for non-numbers and 0
                 try:
-                    1/int(length)
+                    1 / int(length)
                 except (ValueError, ZeroDivisionError):
                     raise ValueError("Illegal length specified in tag type: "
                                      "%s " % length)
 
                 # Cut off anything that might be at the end
-                tag_type = tag_type[0:tag_type.index(")")+1]
+                tag_type = tag_type[0:tag_type.index(")") + 1]
             else:
                 raise ValueError("The tag type you provided is not valid. "
                                  "Please use a type as specified in the help "
@@ -1379,7 +1420,7 @@ class Schema(object):
         else:
             # Don't run these checks on unassigned tags
             if "CHAR" in val_type:
-                length = int(val_type[val_type.index("(")+1:val_type.index(")")])
+                length = int(val_type[val_type.index("(") + 1:val_type.index(")")])
                 if len(str(value)) > length:
                     return ["Length of '%d' is too long for %s: "
                             "'%s':'%s' on line '%s'." %
@@ -1726,7 +1767,7 @@ class Entry(object):
                         cur_tag = each_saveframe.tag_prefix + "." + tag[0]
                         tag[1] = schema.convert_tag(cur_tag, tag[1],
                                                     line_num="SF %s" %
-                                                    each_saveframe.name)
+                                                             each_saveframe.name)
                     for loop in each_saveframe:
                         for row in loop.data:
                             for pos in range(0, len(row)):
@@ -1874,7 +1915,7 @@ class Entry(object):
                         diffs.extend(comp)
 
         except AttributeError as err:
-            diffs.append("An exception occured while comparing: '%s'." % err)
+            diffs.append("An exception occurred while comparing: '%s'." % err)
 
         return diffs
 
@@ -1970,8 +2011,10 @@ class Entry(object):
         provided (or BMRB default if none provided) and according
         to the assigned ID."""
 
+        my_schema = _get_schema(schema)
+
         # The saveframe/loop order
-        ordering = _get_schema(schema).category_order
+        ordering = my_schema.category_order
 
         # Use these to sort saveframes and loops
         def sf_key(x):
@@ -1998,10 +2041,10 @@ class Entry(object):
 
         # Go through all the saveframes
         for each_frame in self:
-            each_frame.sort_tags()
+            each_frame.sort_tags(schema=my_schema)
             # Iterate through the loops
             for each_loop in each_frame:
-                each_loop.sort_tags()
+                each_loop.sort_tags(schema=my_schema)
 
                 # See if we can sort the rows (in addition to tags)
                 try:
@@ -2013,6 +2056,16 @@ class Entry(object):
 
     def nef_string(self):
         """ Returns a string representation of the entry in NEF. """
+
+        warnings.warn("""Specifically:
+
+Before writing out objects as strings, perform these two steps:
+
+Update the global string conversion dictionary:
+pynmrstar.definitions.STR_CONVERSION_DICT = {None: ".", True: "true", False: "false"}
+
+Rather than using str(obj) to render as a string, use obj.format(show_comments=False, skip_empty_loops=True).""",
+                      DeprecationWarning)
 
         # Store the current values of these module variables
         global STR_CONVERSION_DICT, SKIP_EMPTY_LOOPS, DONT_SHOW_COMMENTS
@@ -2111,8 +2164,8 @@ class Entry(object):
 
             # Check for saveframes with same name
             saveframe_names = sorted(x.name for x in self)
-            for ordinal in range(0, len(saveframe_names)-2):
-                if saveframe_names[ordinal] == saveframe_names[ordinal+1]:
+            for ordinal in range(0, len(saveframe_names) - 2):
+                if saveframe_names[ordinal] == saveframe_names[ordinal + 1]:
                     errors.append("Multiple saveframes with same name: '%s'" %
                                   saveframe_names[ordinal])
 
@@ -2489,14 +2542,14 @@ class Saveframe(object):
             if self.tag_prefix is None:
                 width = max([len(x[0]) for x in self.tags])
             else:
-                width = max([len(self.tag_prefix+"."+x[0]) for x in self.tags])
+                width = max([len(self.tag_prefix + "." + x[0]) for x in self.tags])
         else:
             if self.tag_prefix is None:
                 raise ValueError("The tag prefix was never set!")
 
             # Make sure this isn't a dummy saveframe before proceeding
             try:
-                width = max([len(self.tag_prefix+"."+x[0]) for x in self.tags])
+                width = max([len(self.tag_prefix + "." + x[0]) for x in self.tags])
             except ValueError:
                 return "\nsave_%s\n\nsave_\n" % self.name
 
@@ -2570,7 +2623,7 @@ class Saveframe(object):
                                      "different categories (or tags that don't "
                                      "match the set category)! '%s' vs '%s'." %
                                      (self.tag_prefix, prefix))
-                name = name[name.index(".")+1:]
+                name = name[name.index(".") + 1:]
             else:
                 name = name[1:]
 
@@ -2732,7 +2785,7 @@ class Saveframe(object):
         if header:
             if show_category:
                 cwriter.writerow(
-                    [str(self.tag_prefix)+"."+str(x[0]) for x in self.tags])
+                    [str(self.tag_prefix) + "." + str(x[0]) for x in self.tags])
             else:
                 cwriter.writerow([str(x[0]) for x in self.tags])
 
@@ -2833,6 +2886,7 @@ class Saveframe(object):
 
         def sort_key(x):
             return _tag_key(self.tag_prefix + "." + x[0], schema=schema)
+
         self.tags.sort(key=sort_key)
 
     def tag_iterator(self):
@@ -3123,7 +3177,7 @@ class Loop(object):
             # The nightmare below creates a list of the maximum length of
             #  elements in each tag in the self.data matrix. Don't try to
             #   understand it. It's an incomprehensible list comprehension.
-            title_widths = [max([len(str(x))+3 for x in col]) for
+            title_widths = [max([len(str(x)) + 3 for x in col]) for
                             col in [[row[x] for row in working_data] for
                                     x in range(0, len(working_data[0]))]]
 
@@ -3132,7 +3186,7 @@ class Loop(object):
             # own line...
 
             # Generate the format string
-            format_string = "     " + "%-*s"*len(self.tags) + " \n"
+            format_string = "     " + "%-*s" * len(self.tags) + " \n"
 
             # Print the data, with the tags sized appropriately
             for datum in working_data:
@@ -3284,10 +3338,9 @@ class Loop(object):
                                      self.category)
 
     def add_column(self, name, ignore_duplicates=False, update_data=False):
-        """ Depreciated, please use add_tag() instead. """
-
-        sys.stderr.write("NOTICE: add_column() is depreciated. Please use"
-                         " add_tag() instead.\n")
+        """ Deprecated, please use add_tag() instead. """
+        warnings.warn("add_column() is deprecated. Please use add_tag() "
+                      "instead.", DeprecationWarning)
         return self.add_tag(name, ignore_duplicates, update_data)
 
     def add_data(self, the_list, rearrange=False):
@@ -3330,10 +3383,10 @@ class Loop(object):
         self.data.extend(processed_data)
 
     def add_data_by_column(self, column_id, value):
-        """ Depreciated, please use add_data_by_tag() instead. """
+        """ Deprecated, please use add_data_by_tag() instead. """
 
-        sys.stderr.write("NOTICE: add_data_by_column() is depreciated. Please "
-                         " use add_data_by_tag() instead.\n")
+        warnings.warn("add_data_by_column() is deprecated. Please "
+                      " use add_data_by_tag() instead.", DeprecationWarning)
         return self.add_data_by_tag(column_id, value)
 
     def add_data_by_tag(self, tag_id, value):
@@ -3395,7 +3448,7 @@ class Loop(object):
                     raise ValueError("One loop cannot have tags with "
                                      "different categories (or tags that "
                                      "don't match the loop category)!")
-                name = name[name.index(".")+1:]
+                name = name[name.index(".") + 1:]
             else:
                 name = name[1:]
 
@@ -3539,8 +3592,15 @@ class Loop(object):
             result.add_tag(tag)
 
         # Add the data for the tags to the new loop
-        for row in self.get_data_by_tag(valid_tags):
-            result.add_data(row)
+        results = self.get_tag(valid_tags)
+
+        # If there is only a single tag, we can't add data the same way
+        if len(valid_tags) == 1:
+            for item in results:
+                result.add_data([item])
+        else:
+            for row in results:
+                result.add_data(row)
 
         # Assign the category of the new loop
         if result.category is None:
@@ -3549,10 +3609,9 @@ class Loop(object):
         return result
 
     def get_columns(self):
-        """ Depreciated alias for get_tags() """
+        """ Deprecated alias for get_tags() """
 
-        sys.stderr.write("NOTICE: get_columns() is depreciated. Please use"
-                         " get_tag_names() instead.\n")
+        warnings.warn("get_columns() is deprecated. Please use get_tag_names() instead.", DeprecationWarning)
         return self.get_tag_names()
 
     def get_data_as_csv(self, header=True, show_category=True):
@@ -3567,7 +3626,7 @@ class Loop(object):
         if header:
             if show_category:
                 cwriter.writerow(
-                    [str(self.category)+"."+str(x) for x in self.tags])
+                    [str(self.category) + "." + str(x) for x in self.tags])
             else:
                 cwriter.writerow([str(x) for x in self.tags])
 
@@ -3683,7 +3742,7 @@ class Loop(object):
             # Use a list comprehension to pull the correct tags out of the rows
             if whole_tag:
                 result = [[[self.category + "." + self.tags[col_id], row[col_id]]
-                          for col_id in tag_ids] for row in self.data]
+                           for col_id in tag_ids] for row in self.data]
             else:
                 result = [[row[col_id] for col_id in tag_ids] for
                           row in self.data]
@@ -3759,7 +3818,7 @@ class Loop(object):
         if renumber_tag >= len(self.tags) or renumber_tag < 0:
             raise ValueError("The renumbering tag ID you provided '%s' is "
                              "too large or too small! Valid tag ids are"
-                             "0-%d." % (index_tag, len(self.tags)-1))
+                             "0-%d." % (index_tag, len(self.tags) - 1))
 
         # Do nothing if we have no data
         if len(self.data) == 0:
@@ -3807,6 +3866,7 @@ class Loop(object):
         # Sort the tags
         def sort_key(_):
             return _tag_key(_, schema=schema)
+
         sorted_order = sorted(current_order, key=sort_key)
 
         # Don't touch the data if the tags are already in order
@@ -3864,7 +3924,7 @@ class Loop(object):
             if renumber_tag >= len(self.tags) or renumber_tag < 0:
                 raise ValueError("The sorting tag ID you provided '%s' is "
                                  "too large or too small! Valid tag ids"
-                                 " are 0-%d." % (cur_tag, len(self.tags)-1))
+                                 " are 0-%d." % (cur_tag, len(self.tags) - 1))
 
             sort_ordinals.append(renumber_tag)
 
