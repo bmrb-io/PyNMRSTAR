@@ -15,7 +15,7 @@ Finally, there are several command-line based tools developed to enable simple q
 
 To understand how the library works, you first need to understand the NMR-STAR terminology and file format. If you are already familiar with NMR-STAR, feel free to [jump ahead](#quick-start-to-pynmrstar) to the section on this library.
 
-A NMR-STAR entry/file is componsed of one or more saveframes (conceptually you should think of a saveframe as a data block), each of which contain tags and loops. There can only be one of each tag in a saveframe. If a tag has multiple values, the only way to represent it is to place it inside a loop. A loop is simply a set of tags with multiple values.
+A NMR-STAR entry/file is composed of one or more saveframes (conceptually you should think of a saveframe as a data block), each of which contain tags and loops. There can only be one of each tag in a saveframe. If a tag has multiple values, the only way to represent it is to place it inside a loop. A loop is simply a set of tags with multiple values.
 
 Therefore, hierarchically, you can picture a NMR-STAR file as a tree where the entry is the trunk, the large branches are the saveframes, and each saveframe may contain one or more loops - the branches.
 
@@ -150,7 +150,7 @@ You can access the saveframes in an entry directly using their *names*. For exam
 ```
 Note that you can see the saveframe names in the tree printout above.
 
-You can do the same for loops within a saveframe, but for loops you must use their tag category (the part before the period) to access them (note that to get to the `Vendor` loop we first had to go through its parent saveframe, named `X-PLOR_NIH` (the `X-PLOR_NIH` saveframe is of the category `software` - you'll see where you access the category later and why accessing by category is preferrable).
+You can do the same for loops within a saveframe, but for loops you must use their tag category (the part before the period) to access them (note that to get to the `Vendor` loop we first had to go through its parent saveframe, named `X-PLOR_NIH` (the `X-PLOR_NIH` saveframe is of the category `software` - you'll see where you access the category later and why accessing by category is preferable).
 ```python
 >>> explor_nih_vendor = entry15000['X-PLOR_NIH']['_Vendor']
 >>> print explor_nih_vendor
@@ -236,7 +236,7 @@ The following will combine all the task loops in the entry into CSV format.
 >>> csv_data = ""
 >>> for software_sf in software_saveframes:
 >>>     print_header = True
->>>    # Wrap this in try/catch because it is not gauranteed a software saveframe will have a task loop
+>>>    # Wrap this in try/catch because it is not guaranteed a software saveframe will have a task loop
 >>>    try:
 >>>        csv_data += software_sf['_Task'].get_data_as_csv(header=print_header)
 >>>        print_header = False
@@ -286,7 +286,7 @@ To view all of the tags in the NMR-STAR schema and their meanings, please go [he
 
 *"I just want to get the chemical shift data as an array - how do I do that?"*
 
-Keep in mind that an entry may have multiple sets of assigned chemical shifts. (For examples, there made be two sets of assignments that were made under two differerent sample conditions.) So to get the chemical shifts it is best to iterate through all the assigned chemical shift loops:
+Keep in mind that an entry may have multiple sets of assigned chemical shifts. (For examples, there may be two sets of assignments that were made under two different sample conditions.) So to get the chemical shifts it is best to iterate through all the assigned chemical shift loops:
 
 ```python
 >>> cs_result_sets = []
@@ -375,7 +375,7 @@ This tutorial has so far focused on how to read and access data. This section wi
 
 ## Loops
 
-There are five ways to make a new loop: `from_file()`, `from_json()`, `from_scratch()`, `from_string()`, and `from_template()`. All of these are classmethods. `from_scratch()` makes a new loop, `from_string()` parses an NMR-STAR loop from a python string containing NMR-STAR data, `from_json()` parses a JSON object (reversely, `get_json()` will get a JSON representation of the loop), `from_scratch()` makes a completely empty loop, and `from_template()` makes a loop with the tags prefilled from the BMRB schema based on the provided category. `from_file`, `from_json`, and `from_string` are fairly self-explanatory - see the full documentation if needed for usage.
+There are five ways to make a new loop: `from_file()`, `from_json()`, `from_scratch()`, `from_string()`, and `from_template()`. All of these are classmethods. `from_scratch()` makes a new loop, `from_string()` parses an NMR-STAR loop from a python string containing NMR-STAR data, `from_json()` parses a JSON object (reversely, `get_json()` will get a JSON representation of the loop), `from_scratch()` makes a completely empty loop, and `from_template()` makes a loop with the tags pre-filled from the BMRB schema based on the provided category. `from_file`, `from_json`, and `from_string` are fairly self-explanatory - see the full documentation if needed for usage.
 
 #### `from_scratch()`
 
@@ -466,7 +466,7 @@ This method will create a new loop ready for data with the tags from the BMRB sc
 
 ## Saveframes
 
-There are five ways to make a new loop: `from_file()`, `from_json()`, `from_scratch()`, `from_string()`, and `from_template()`. All of these are classmethods. `from_scratch()` makes a new saveframe, `from_string()` parses an NMR-STAR saveframe from a python string containing NMR-STAR data, `from_json()` parses a JSON object (reversely, `get_json()` will get a JSON representation of the saveframe), `from_scratch()` makes a completely empty saveframe, and `from_template()` makes a saveframe with the tags prefilled from the BMRB schema based on the provided category. `from_file`, `from_json`, and `from_string` are fairly self-explanatory - see the full documentation if needed for usage.
+There are five ways to make a new loop: `from_file()`, `from_json()`, `from_scratch()`, `from_string()`, and `from_template()`. All of these are classmethods. `from_scratch()` makes a new saveframe, `from_string()` parses an NMR-STAR saveframe from a python string containing NMR-STAR data, `from_json()` parses a JSON object (reversely, `get_json()` will get a JSON representation of the saveframe), `from_scratch()` makes a completely empty saveframe, and `from_template()` makes a saveframe with the tags pre-filled from the BMRB schema based on the provided category. `from_file`, `from_json`, and `from_string` are fairly self-explanatory - see the full documentation if needed for usage.
 
 #### `from_scratch()`
 ```python
