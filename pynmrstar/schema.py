@@ -64,7 +64,10 @@ class Schema(object):
             else:
                 line[nullable] = True
 
-            self.schema[line[tag_field].lower()] = dict(zip(self.headers, line))
+            single_tag_data = dict(zip(self.headers, line))
+            if '' in single_tag_data:
+                del single_tag_data['']
+            self.schema[line[tag_field].lower()] = single_tag_data
 
             self.schema_order.append(line[tag_field])
             formatted = utils.format_category(line[tag_field])
