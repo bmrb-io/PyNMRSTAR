@@ -556,8 +556,10 @@ class Entry(object):
                 continue
             id_counter: int = 1
             for each_frame in self.get_saveframes_by_category(each_category):
-                each_frame.add_tag('ID', id_counter, update=True)
-                id_counter += 1
+                frame_id_tag = (each_frame.tag_prefix + ".id").lower()
+                if my_schema.schema[frame_id_tag]["BMRB data type"] == "int":
+                    each_frame.add_tag('ID', id_counter, update=True)
+                    id_counter += 1
         for each_frame in self.frame_list:
             for each_loop in each_frame.loops:
                 if each_loop.tag_index('ID') is not None and each_loop.category != '_Experiment':
