@@ -768,8 +768,8 @@ class Loop(object):
             elif isinstance(query, int):
                 tag_ids.append(query)
             else:
-                raise ValueError("Could not locate the tag with name or ID: '%s' in loop '%s'." %
-                                 (query, str(self.category)))
+                raise KeyError("Could not locate the tag with name or ID: '%s' in loop '%s'." %
+                               (query, str(self.category)))
 
         # First build the tags as a list
         if not dict_result:
