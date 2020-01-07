@@ -580,6 +580,7 @@ class Entry(object):
                 # The tag points to it's own ID
                 if tag_schema['lclSfIdFlg'] == 'Y':
                     each_frame.add_tag(each_tag, each_frame.get_tag('ID')[0], update=True)
+                # Check 'Sf pointer'='Y' then look up 'Foreign Table' and 'Foreign Column'
                 # The tag points elsewhere in the entry
                 elif tag_schema['Natural foreign key'] and tag_schema['entryIdFlg'] != 'Y':
                     label_tag = each_tag[:-2] + 'label'
@@ -614,7 +615,7 @@ class Entry(object):
                         for row in each_loop.data:
                             row[tag_col] = parent_id
                     # The tag points elsewhere in the entry
-                    elif tag_schema['Natural foreign key'] and tag_schema['entryIdFlg'] != 'Y':
+                    elif tag_schema['Foreign Table'] and tag_schema['entryIdFlg'] != 'Y':
                         label_tag = each_tag[:-2] + 'label'
                         if label_tag in each_loop.tags:
                             label_col = each_loop.tag_index(label_tag)
@@ -626,7 +627,7 @@ class Entry(object):
                                     pass
                         else:
                             # The tags that trigger this are ones like _Assigned_chem_shift_list.Data_file_name
-                            pass
+                            print(fqtn, self.get_tag(tag_schema['Natural foreign key']))
 
         # The saveframe/loop order
         ordering = my_schema.category_order

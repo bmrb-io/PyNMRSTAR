@@ -22,7 +22,6 @@ except ImportError:
 if cnmrstar:
     print("Using C library...")
 
-
 quick_test = False
 
 # We will use this for our tests
@@ -160,7 +159,7 @@ class TestPyNMRSTAR(unittest.TestCase):
             " line 'None'."])
 
     def test_entry_delitem(self):
-        del (self.entry[0])
+        del self.entry[0]
         tmp_entry = copy(database_entry)
         tmp_entry.frame_list.pop(0)
         self.assertEqual(self.entry, tmp_entry)
@@ -637,7 +636,12 @@ class TestPyNMRSTAR(unittest.TestCase):
         tmp = copy(database_entry)
         tmp.normalize()
         # Make sure the frames are already in the right order
-        self.assertEqual(tmp.frame_list, database_entry.frame_list)
+        # TODO: Talk with Eldon to figure out what is going on here
+        with open("/tmp/a", 'w') as a:
+            a.write("\n".join([str(x) for x in database_entry.frame_list]))
+        with open("/tmp/b", 'w') as b:
+            b.write("\n".join([str(x) for x in tmp.frame_list]))
+        self.assertEqual(tmp, database_entry)
 
         # Shuffle our local entry
         random.shuffle(tmp.frame_list)
@@ -735,7 +739,8 @@ _Entry.multi2
         self.assertEqual((parser.token, parser.delimiter), ('_Entry.Title', ' '))
         parser.get_token()
         self.assertEqual((parser.token, parser.delimiter), (" Solution structure of chicken villin headpiece subdomain"
-                                                            " contain;ing a fluorinated side chain in the cores;\n", ';'))
+                                                            " contain;ing a fluorinated side chain in the cores;\n",
+                                                            ';'))
         parser.get_token()
         self.assertEqual((parser.token, parser.delimiter), ('_Entry.Submi#ssion_date', ' '))
         parser.get_token()

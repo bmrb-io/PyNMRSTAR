@@ -1,7 +1,6 @@
 # PyNMRSTAR
-A Python module for reading, writing, and manipulating NMR-STAR files. [![Build Status](https://travis-ci.org/uwbmrb/PyNMRSTAR.svg?branch=v2)](https://travis-ci.org/uwbmrb/PyNMRSTAR)
-
-Python versions supported: 2.6, 2.7, 3.3, 3.4, 3.5, and 3.6
+A Python module for reading, writing, and manipulating NMR-STAR files.
+[![Build Status](https://travis-ci.org/uwbmrb/PyNMRSTAR.svg?branch=v3)](https://travis-ci.org/uwbmrb/PyNMRSTAR)
 
 ====
 
