@@ -1,5 +1,5 @@
 class ParsingError(Exception):
-    """ Something is wrong with the server. """
+    """ Something went wrong when parsing. """
 
     def __init__(self, message, line_number: int = None):
         Exception.__init__(self)
