@@ -39,6 +39,7 @@ class TestPyNMRSTAR(unittest.TestCase):
 
     def setUp(self):
         self.entry = copy(database_entry)
+        self.maxDiff = None
 
     def test_clean_val(self):
         # Check tag cleaning
@@ -92,7 +93,8 @@ class TestPyNMRSTAR(unittest.TestCase):
             self.assertEqual(_interpret_file(tmp).read(), local_version)
 
         # Test reading from http (ftp doesn't work on TravisCI)
-        self.assertEqual(_interpret_file("http://rest.bmrb.wisc.edu/bmrb/NMR-STAR3/15000").read(), local_version)
+        self.assertEqual(Entry.from_string(_interpret_file("http://rest.bmrb.wisc.edu/bmrb/NMR-STAR3/15000").read()),
+                         Entry.from_string(local_version))
 
         # Test reading from https locations
         self.assertEqual(Entry.from_string(
@@ -633,30 +635,32 @@ class TestPyNMRSTAR(unittest.TestCase):
 
     def test_normalize(self):
 
-        tmp = copy(database_entry)
-        tmp.normalize()
-        # Make sure the frames are already in the right order
-        # TODO: Talk with Eldon to figure out what is going on here
-        with open("/tmp/a", 'w') as a:
-            a.write("\n".join([str(x) for x in database_entry.frame_list]))
-        with open("/tmp/b", 'w') as b:
-            b.write("\n".join([str(x) for x in tmp.frame_list]))
-        self.assertEqual(tmp, database_entry)
+        db_tmp = copy(database_entry)
+        denormalized = Entry.from_file(os.path.join(our_path, "sample_files", "bmr15000_3_denormalized.str"))
+        denormalized.normalize()
+        self.assertEqual(db_tmp, denormalized)
 
         # Shuffle our local entry
-        random.shuffle(tmp.frame_list)
-        for frame in tmp:
+        random.shuffle(db_tmp.frame_list)
+        for frame in db_tmp:
             random.shuffle(frame.loops)
             random.shuffle(frame.tags)
 
         # Might as well test equality testing while shuffled:
-        self.assertEqual(tmp, database_entry)
+        self.assertEqual(db_tmp, database_entry)
 
         # Test that the frames are in a different order
-        self.assertNotEqual(tmp.frame_list, database_entry.frame_list)
-        tmp.normalize()
+        self.assertNotEqual(db_tmp.frame_list, database_entry.frame_list)
+        db_tmp.normalize()
+
+        db_tmp.write_to_file('/tmp/1')
+        denormalized.write_to_file('/tmp/2')
+
+
         # And test they have been put back together
-        self.assertEqual(tmp.frame_list, database_entry.frame_list)
+        self.assertEqual(db_tmp.frame_list, database_entry.frame_list)
+
+
 
     def test_syntax_outliers(self):
         """ Make sure the case of semi-colon delineated data in a data
@@ -788,7 +792,7 @@ _Entry.multi2
         if not os.path.exists("/bmrb/linux/bin/stardiff"):
             return
 
-        start, end = 15000, 15500
+        start, end = 15000, 15000
 
         # Allow for quick tests
         if quick_test:

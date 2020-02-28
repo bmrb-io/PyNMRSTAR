@@ -35,11 +35,11 @@ Solution structure of chicken villin headpiece subdomain containing a fluorinate
       _Entry_author.Family_title
       _Entry_author.Entry_ID
 
-     1   Claudia   Cornilescu   .   C.   .   15000    
-     2   Gabriel   Cornilescu   .   .    .   15000    
-     3   Erik      Hadley       .   B.   .   15000    
-     4   Samuel    Gellman      .   H.   .   15000    
-     5   John      Markley      .   L.   .   15000    
+     1   Claudia   Cornilescu   .   C.   .   1    
+     2   Gabriel   Cornilescu   .   .    .   invalid    
+     3   Erik      Hadley       .   B.   .   15000
+     4   Samuel    Gellman      .   H.   .   15000
+     5   John      Markley      .   L.   .   15000
 
    stop_
 
@@ -225,7 +225,7 @@ save_assembly
       _Entity_assembly.Entry_ID
       _Entity_assembly.Assembly_ID
 
-     1   F5-Phe-cVHP   1   $F5-Phe-cVHP   K   .   yes   native   no   no   .   .   .   15000   1    
+     1  F5-Phe-cVHP   1   $F5-Phe-cVHP   K   .   yes   native   no   no   .   .   .   15000   1
 
    stop_
 
@@ -451,7 +451,7 @@ save_natural_source
       _Entity_natural_src.Entry_ID
       _Entity_natural_src.Entity_natural_src_list_ID
 
-     1   1   $F5-Phe-cVHP   .   9031   organism   .   'Gallus gallus'   chicken   .   .   Eukaryota   Metazoa   Gallus   gallus   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   15000   1    
+     1   1   $F5-Phe-cVHP   .   9031   organism   .   'Gallus gallus'   chicken   .   .   Eukaryota   Metazoa   Gallus   gallus   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   15000   1
 
    stop_
 
@@ -638,8 +638,8 @@ Downloaded on Thu Sep 29 18:11:24 2011
       _Chem_comp_atom.Entry_ID
       _Chem_comp_atom.Comp_ID
 
-     HFA    .   HFA    .   .   HF   .   .   N   0   .   .   .   .   no   no   .   .   .   .   -10.501   .   -11.870   .   9.645    .   .   .   .   1    .   15000   PHF    
-     O01    .   O01    .   .   O    .   .   N   0   .   .   .   .   no   no   .   .   .   .   -12.002   .   -10.296   .   9.470    .   .   .   .   2    .   15000   PHF    
+     HFA    .   HFA    .   .   HF   .   .   N   0   .   .   .   .   no   no   .   .   .   .   -10.501   .   -11.870   .   9.645    .   .   .   .   1    .   15000   1    
+     O01    .   O01    .   .   O    .   .   N   0   .   .   .   .   no   no   .   .   .   .   -12.002   .   -10.296   .   9.470    .   .   .   .   2    .   15000   BAD    
      O02    .   O02    .   .   O    .   .   N   0   .   .   .   .   no   no   .   .   .   .   -9.956    .   -9.953    .   8.205    .   .   .   .   3    .   15000   PHF    
      OAE    .   OAE    .   .   O    .   .   N   0   .   .   .   .   no   no   .   .   .   .   -12.170   .   -12.520   .   11.479   .   .   .   .   4    .   15000   PHF    
      OA1    .   OA1    .   .   O    .   .   N   0   .   .   .   .   no   no   .   .   .   .   -9.667    .   -13.395   .   11.503   .   .   .   .   5    .   15000   PHF    
@@ -819,7 +819,7 @@ save_selectively_labeled_sample
    _Sample.Sf_category                     sample
    _Sample.Sf_framecode                    selectively_labeled_sample
    _Sample.Entry_ID                        15000
-   _Sample.ID                              2
+   _Sample.ID                              3
    _Sample.Type                            solution
    _Sample.Sub_type                        .
    _Sample.Details                         .
@@ -869,7 +869,7 @@ save_selectively_labeled_sample
       _Sample_component.Entry_ID
       _Sample_component.Sample_ID
 
-     1   F5-Phe-cVHP   '[15N]-Ala, Phe, Leu'   .   .   1   $F5-Phe-cVHP   .   .   2   .   .   mM   .   .   .   .   15000   2    
+     1   F5-Phe-cVHP   '[15N]-Ala, Phe, Leu'   .   .   1   $F5-Phe-cVHP   .   .   2   .   .   mM   .   .   .   .   15000   3   
 
    stop_
 
@@ -1242,11 +1242,11 @@ save_experiment_list
      3    '2D COSY'          no   .   .   .   .   .   .   .   .   .   .   1   $unlabeled_sample             isotropic   .   .   1   $sample_conditions   .   .   .   4   $spectrometer_4   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   15000   1    
      4    '2D TOCSY'         no   .   .   .   .   .   .   .   .   .   .   1   $unlabeled_sample             isotropic   .   .   1   $sample_conditions   .   .   .   2   $spectrometer_2   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   15000   1    
      5    '2D NOESY'         no   .   .   .   .   .   .   .   .   .   .   1   $unlabeled_sample             isotropic   .   .   1   $sample_conditions   .   .   .   2   $spectrometer_2   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   15000   1    
-     6    '2D 1H-15N HSQC'   no   .   .   .   .   .   .   .   .   .   .   2   $selectively_labeled_sample   isotropic   .   .   1   $sample_conditions   .   .   .   2   $spectrometer_2   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   15000   1    
-     7    '2D HNCO'          no   .   .   .   .   .   .   .   .   .   .   2   $selectively_labeled_sample   isotropic   .   .   1   $sample_conditions   .   .   .   2   $spectrometer_2   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   15000   1    
-     8    '2D HNCACB'        no   .   .   .   .   .   .   .   .   .   .   2   $selectively_labeled_sample   isotropic   .   .   1   $sample_conditions   .   .   .   5   $spectrometer_5   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   15000   1    
-     9    '2D HNHA'          no   .   .   .   .   .   .   .   .   .   .   2   $selectively_labeled_sample   isotropic   .   .   1   $sample_conditions   .   .   .   5   $spectrometer_5   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   15000   1    
-     10   '2D HNHB'          no   .   .   .   .   .   .   .   .   .   .   2   $selectively_labeled_sample   isotropic   .   .   1   $sample_conditions   .   .   .   5   $spectrometer_5   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   15000   1    
+     6    '2D 1H-15N HSQC'   no   .   .   .   .   .   .   .   .   .   .   3   $selectively_labeled_sample   isotropic   .   .   1   $sample_conditions   .   .   .   2   $spectrometer_2   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   15000   1    
+     7    '2D HNCO'          no   .   .   .   .   .   .   .   .   .   .   3   $selectively_labeled_sample   isotropic   .   .   1   $sample_conditions   .   .   .   2   $spectrometer_2   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   15000   1    
+     8    '2D HNCACB'        no   .   .   .   .   .   .   .   .   .   .   3   $selectively_labeled_sample   isotropic   .   .   1   $sample_conditions   .   .   .   5   $spectrometer_5   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   15000   1    
+     9    '2D HNHA'          no   .   .   .   .   .   .   .   .   .   .   3   $selectively_labeled_sample   isotropic   .   .   1   $sample_conditions   .   .   .   5   $spectrometer_5   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   15000   1    
+     10   '2D HNHB'          no   .   .   .   .   .   .   .   .   .   .   3   $selectively_labeled_sample   isotropic   .   .   1   $sample_conditions   .   .   .   5   $spectrometer_5   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   15000   1    
      11   19F-HOESY          no   .   .   .   .   .   .   .   .   .   .   1   $unlabeled_sample             isotropic   .   .   1   $sample_conditions   .   .   .   1   $spectrometer_1   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   15000   1    
 
    stop_
@@ -1378,10 +1378,10 @@ save_assigned_chem_shift_list_1
      3    '2D COSY'          1   $unlabeled_sample             isotropic   15000   1    
      4    '2D TOCSY'         1   $unlabeled_sample             isotropic   15000   1    
      5    '2D NOESY'         1   $unlabeled_sample             isotropic   15000   1    
-     7    '2D HNCO'          2   $selectively_labeled_sample   isotropic   15000   1    
-     8    '2D HNCACB'        2   $selectively_labeled_sample   isotropic   15000   1    
-     9    '2D HNHA'          2   $selectively_labeled_sample   isotropic   15000   1    
-     10   '2D HNHB'          2   $selectively_labeled_sample   isotropic   15000   1    
+     7    '2D HNCO'          3   $selectively_labeled_sample   isotropic   15000   1    
+     8    '2D HNCACB'        3   $selectively_labeled_sample   isotropic   15000   1    
+     9    '2D HNHA'          3   $selectively_labeled_sample   isotropic   15000   1    
+     10   '2D HNHB'          3   $selectively_labeled_sample   isotropic   15000   1    
      11   19F-HOESY          1   $unlabeled_sample             isotropic   15000   1    
 
    stop_
