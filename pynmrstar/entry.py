@@ -546,8 +546,8 @@ class Entry(object):
         # Assign all the ID tags, and update all links to ID tags
         my_schema = utils.get_schema(schema)
 
-        # Sort the saveframes according to ID, if the IDs are assigned
-        if '.' not in [_['ID'][0] for _ in self]:
+        # Sort the saveframes according to ID, if the IDs are not a null value
+        if len(set(definitions.NULL_VALUES).intersection([_['ID'][0] for _ in self])) == 0:
 
             # The saveframe/loop order
             ordering = my_schema.category_order
