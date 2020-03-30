@@ -6,7 +6,7 @@ from io import StringIO
 from itertools import chain
 from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Callable, Tuple
 
-from pynmrstar import definitions, utils, entry as entry_mod
+from pynmrstar import definitions, utils, entry as entry_mod, exceptions
 from pynmrstar._internal import _json_serialize, _interpret_file
 from pynmrstar.parser import Parser
 from pynmrstar.schema import Schema
@@ -100,7 +100,17 @@ class Loop(object):
         star_buffer = StringIO("data_0 save_internaluseyoushouldntseethis_frame _internal.use internal %s save_" %
                                star_buffer.read())
         parser = Parser(entry_to_parse_into=tmp_entry)
-        parser.parse(star_buffer.read(), source=self.source, convert_data_types=kwargs.get('convert_data_types', False))
+        try:
+            parser.parse(star_buffer.read(), source=self.source,
+                         convert_data_types=kwargs.get('convert_data_types', False))
+        except exceptions.ParsingError as err:
+            str_err = str(err)
+            if 'internaluseyoushouldntseethis' in str_err:
+                line = str_err[str_err.index('on line ')+8:]
+                raise exceptions.ParsingError("Invalid loop. Loops must start with the 'loop_' keyword. Error on "
+                                              "line %s." % line)
+            else:
+                raise err
 
         # Check that there was only one loop here
         if len(tmp_entry[0].loops) > 1:
