@@ -218,7 +218,7 @@ _COMMENT_DICTIONARY = {}
 _API_URL = "http://webapi.bmrb.wisc.edu/v2"
 _SCHEMA_URL = 'https://raw.githubusercontent.com/uwbmrb/nmr-star-dictionary/master/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
-__version__ = "2.6.5"
+__version__ = "2.6.5.1"
 
 
 #############################################
@@ -3056,7 +3056,13 @@ class Loop(object):
                                " _internal.use internal " + star_buffer.read() +
                                " save_")
         parser = _Parser(entry_to_parse_into=tmp_entry)
-        parser.parse(star_buffer.read(), source=self.source)
+        try:
+            parser.parse(star_buffer.read(), source=self.source)
+        except ValueError as err:
+            if 'internaluseyoushouldntseethis' in str(err):
+                raise ValueError("Invalid loop. Loops must start with the 'loop_' keyword.", err.args[1])
+            else:
+                raise err
 
         # Check that there was only one loop here
         if len(tmp_entry[0].loops) > 1:
