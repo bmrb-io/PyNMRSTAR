@@ -547,46 +547,50 @@ class Entry(object):
         my_schema = utils.get_schema(schema)
 
         # Sort the saveframes according to ID, if the IDs are not a null value
-        if len(set(definitions.NULL_VALUES).intersection([_['ID'][0] for _ in self])) == 0:
+        try:
+            ids = [_['ID'][0] for _ in self]
+            if len(set(definitions.NULL_VALUES).intersection(ids)) == 0:
 
-            # The saveframe/loop order
-            ordering = my_schema.category_order
+                # The saveframe/loop order
+                ordering = my_schema.category_order
 
-            # Use these to sort saveframes and loops
-            def sf_key(_):
-                """ Helper function to sort the saveframes."""
+                # Use these to sort saveframes and loops
+                def sf_key(_):
+                    """ Helper function to sort the saveframes."""
 
-                try:
-                    return ordering.index(_.tag_prefix), _.get_tag("ID")
-                except ValueError:
-                    # Generate an arbitrary sort order for saveframes that aren't in the schema but make sure that they
-                    # always come after saveframes in the schema
-                    return len(ordering) + hash(_), _.get_tag("ID")
-
-            def loop_key(_):
-                """ Helper function to sort the loops."""
-
-                try:
-                    return ordering.index(_.category)
-                except ValueError:
-                    # Generate an arbitrary sort order for loops that aren't in the schema but make sure that they
-                    #  always come after loops in the schema
-                    return len(ordering) + hash(_.category)
-
-            # Go through all the saveframes
-            for each_frame in self.frame_list:
-                each_frame.sort_tags(schema=my_schema)
-                # Iterate through the loops
-                for each_loop in each_frame:
-                    each_loop.sort_tags(schema=my_schema)
-
-                    # See if we can sort the rows (in addition to tags)
                     try:
-                        each_loop.sort_rows("Ordinal")
+                        return ordering.index(_.tag_prefix), _.get_tag("ID")
                     except ValueError:
-                        pass
-                each_frame.loops.sort(key=loop_key)
-            self.frame_list.sort(key=sf_key)
+                        # Generate an arbitrary sort order for saveframes that aren't in the schema but make sure that they
+                        # always come after saveframes in the schema
+                        return len(ordering) + hash(_), _.get_tag("ID")
+
+                def loop_key(_):
+                    """ Helper function to sort the loops."""
+
+                    try:
+                        return ordering.index(_.category)
+                    except ValueError:
+                        # Generate an arbitrary sort order for loops that aren't in the schema but make sure that they
+                        #  always come after loops in the schema
+                        return len(ordering) + hash(_.category)
+
+                # Go through all the saveframes
+                for each_frame in self.frame_list:
+                    each_frame.sort_tags(schema=my_schema)
+                    # Iterate through the loops
+                    for each_loop in each_frame:
+                        each_loop.sort_tags(schema=my_schema)
+
+                        # See if we can sort the rows (in addition to tags)
+                        try:
+                            each_loop.sort_rows("Ordinal")
+                        except ValueError:
+                            pass
+                    each_frame.loops.sort(key=loop_key)
+                self.frame_list.sort(key=sf_key)
+        except KeyError:
+            pass
 
         # Calculate all the categories present
         categories: set = set()
