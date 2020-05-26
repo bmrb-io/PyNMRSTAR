@@ -559,11 +559,11 @@ class Entry(object):
                     """ Helper function to sort the saveframes."""
 
                     try:
-                        return ordering.index(_.tag_prefix), _.get_tag("ID")
+                        return str(ordering.index(_.tag_prefix)), str(_.get_tag("ID")[0])
                     except ValueError:
                         # Generate an arbitrary sort order for saveframes that aren't in the schema but make sure that they
                         # always come after saveframes in the schema
-                        return len(ordering) + hash(_), _.get_tag("ID")
+                        return str(len(ordering) + hash(_)), str(_.get_tag("ID")[0])
 
                 def loop_key(_):
                     """ Helper function to sort the loops."""
