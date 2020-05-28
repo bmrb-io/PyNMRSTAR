@@ -869,6 +869,7 @@ class Entry(object):
 
         Optionally specify:
         show_comments=False to disable the comments that are by default inserted. Ignored when writing json.
+        skip_empty_loops=False to force printing loops with no tags at all (loops with null tags are still printed)
         format_=json to write to the file in JSON format."""
 
         if format_ not in ["nmrstar", "json"]:
