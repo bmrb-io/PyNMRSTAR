@@ -4,7 +4,27 @@ A Python module for reading, writing, and manipulating NMR-STAR files.
 
 Python versions supported: 3.6, 3.7, and 3.8
 
-Previous python versions (back to 2.6) are supported by the v2 branch (version 2.x releases on PyPI)
+Previous python versions (back to 2.6) are supported by the v2 branch (version 2.x releases on PyPI) -
+ using that branch is explained in the section below.
+
+### Version 3 released
+Note that the recently released version 3 has some backwards-incompatible changes, but also comes with
+some major improvements. Specifically:
+
+1. Type annotations for all functions and classes
+2. Classes are broken out into their own files
+3. More consistent method naming in a few places
+4. A lot of minor improvements and cleanup
+
+As much as possible, old method and functions have been preserved with a DeprecationWarning to help
+you migrate to version 3. Using an editor like PyCharm will show where your code using the PyNMR-STAR
+v2 library may be using deprecated methods/functions or have other incompatibilities with version 3.
+
+If you do not have the time to make the minor changes that may be needed to start working with version 3, you
+can continue using the version 2 branch, which will no longer receive updates, but will still 
+have any major bugs fixed. To do that, either checkout the v2 branch from GitHub, or if using PyPI,
+simply specify `pynmrstar<=3` rather than `pynmrstar` when using `pip install` or a `requirements.txt`
+file.
 
 ## Overview
 
@@ -13,8 +33,7 @@ data format. It is used internally and is actively maintained. The library is th
 calling  `help(object_or_method)` from an interactive python session will print the documentation for the object
 or method.
 
-That same documentation, as well as some notes on module-level variables is located [here](documentation/full.md).
-Finally, there are several command-line based tools developed to enable simple queries to pull data out of an
+There are several command-line based tools developed to enable simple queries to pull data out of an
 NMR-STAR file. Those tools also serve as great examples of how to use the library. You can view those [here](cmdline).
 
 ## Introduction to NMR-STAR
