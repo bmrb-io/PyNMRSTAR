@@ -37,6 +37,14 @@ preserved where possible:
 refer to [this resource](http://www.bmrb.wisc.edu/bmrb/news/20200407.shtml) if you still have 2.1 files you 
 need to convert.
 
+Other changes:
+* Entry, Saveframe, and Loop have a .format() method to customize how the entry is formatted. Use this if you
+want to only show tags with values, hide comments, etc. The `skip_empty_tags` argument will only print
+tags with non-null values.
+* Entry.entry_id is now a property rather than a variable. When set, it will update the "Entry_ID" tags
+throughout the entry automatically
+* The `normalize` function has been made more robust and fully featured than in v2.
+
 ### 2.6.5
 
 Releases from this point forward will only fix bugs, no new features will be added

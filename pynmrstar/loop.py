@@ -166,7 +166,7 @@ class Loop(object):
         for pos, row in enumerate(self.data):
             row[tag_id] = item[pos]
 
-    def __str__(self, skip_empty_loops: bool = True) -> str:
+    def __str__(self, skip_empty_loops: bool = True, skip_empty_tags: bool = False) -> str:
         """Returns the loop in STAR format as a string."""
 
         # Check if there is any data in this loop
@@ -184,6 +184,11 @@ class Loop(object):
 
         # Make sure the tags and data match
         self._check_tags_match_data()
+
+        # If skipping null tags, it's easier to filter out a loop with only real tags and then print
+        if skip_empty_tags:
+            has_data = [not all([_ in definitions.NULL_VALUES for _ in column]) for column in zip(*self.data)]
+            return self.filter([tag for x, tag in enumerate(self.tags) if has_data[x]]).format()
 
         # Start the loop
         ret_string = "\n   loop_\n"
@@ -671,11 +676,14 @@ class Loop(object):
 
         return result
 
-    def format(self, skip_empty_loops: bool = True) -> str:
+    def format(self, skip_empty_loops: bool = True, skip_empty_tags: bool = False) -> str:
         """ The same as calling str(Loop), except that you can pass options
-        to customize how the loop is printed. """
+        to customize how the loop is printed.
 
-        return self.__str__(skip_empty_loops=skip_empty_loops)
+        skip_empty_loops will omit printing loops with no tags at all. (A loop with null tags is not "empty".)
+        skip_empty_tags will omit tags in the loop which have no non-null values."""
+
+        return self.__str__(skip_empty_loops=skip_empty_loops, skip_empty_tags=skip_empty_tags)
 
     def get_data_as_csv(self, header: bool = True, show_category: bool = True) -> str:
         """Return the data contained in the loops, properly CSVd, as a

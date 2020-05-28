@@ -215,7 +215,7 @@ class Saveframe(object):
             tag_lower = tag[0].lower()
             if tag_lower not in ['sf_category', 'sf_framecode', 'id', 'entry_id', 'nmr_star_version',
                                  'original_nmr_star_version']:
-                if tag[1] not in [None, '', '.', '?']:
+                if tag[1] not in definitions.NULL_VALUES:
                     return False
 
         for loop in self.loops:
@@ -359,7 +359,7 @@ class Saveframe(object):
             self.add_tag(key, item, update=True)
 
     def __str__(self, first_in_category: bool = True, skip_empty_loops: bool = True,
-                show_comments: bool = True) -> str:
+                skip_empty_tags: bool = False, show_comments: bool = True) -> str:
         """Returns the saveframe in STAR format as a string."""
 
         if self.tag_prefix is None:
@@ -387,6 +387,8 @@ class Saveframe(object):
 
         # Print the tags
         for each_tag in self.tags:
+            if skip_empty_tags and each_tag[1] in definitions.NULL_VALUES:
+                continue
             clean_tag = utils.quote_value(each_tag[1])
             formatted_tag = self.tag_prefix + "." + each_tag[0]
             if "\n" in clean_tag:
@@ -396,7 +398,7 @@ class Saveframe(object):
 
         # Print any loops
         for each_loop in self.loops:
-            ret_string += each_loop.format(skip_empty_loops=skip_empty_loops)
+            ret_string += each_loop.format(skip_empty_loops=skip_empty_loops, skip_empty_tags=skip_empty_tags)
 
         # Close the saveframe
         ret_string += "\nsave_\n"
@@ -630,11 +632,16 @@ class Saveframe(object):
         csv_buffer.seek(0)
         return csv_buffer.read().replace('\r\n', '\n')
 
-    def format(self, skip_empty_loops: bool = True, show_comments: bool = True) -> str:
+    def format(self, skip_empty_loops: bool = True, skip_empty_tags: bool = False, show_comments: bool = True) -> str:
         """ The same as calling str(Saveframe), except that you can pass options
-        to customize how the saveframe is printed."""
+        to customize how the saveframe is printed.
 
-        return self.__str__(skip_empty_loops=skip_empty_loops, show_comments=show_comments)
+        skip_empty_loops will omit printing loops with no tags at all. (A loop with null tags is not "empty".)
+        skip_empty_tags will omit tags in the saveframe and child loops which have no non-null values.
+        show_comments will show the standard comments before a saveframe."""
+
+        return self.__str__(skip_empty_loops=skip_empty_loops, show_comments=show_comments,
+                            skip_empty_tags=skip_empty_tags)
 
     def get_json(self, serialize: bool = True) -> Union[dict, str]:
         """ Returns the saveframe in JSON format. If serialize is set to

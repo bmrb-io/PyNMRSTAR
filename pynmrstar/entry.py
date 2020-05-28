@@ -152,16 +152,18 @@ class Entry(object):
         else:
             raise ValueError("You can only assign a saveframe to an entry splice.")
 
-    def __str__(self, skip_empty_loops: bool = True, show_comments: bool = True) -> str:
+    def __str__(self, skip_empty_loops: bool = True, skip_empty_tags: bool = False, show_comments: bool = True) -> str:
         """Returns the entire entry in STAR format as a string."""
 
         sf_strings = []
         seen_saveframes = {}
         for saveframe_obj in self:
             if saveframe_obj.category in seen_saveframes:
-                sf_strings.append(saveframe_obj.format(skip_empty_loops=skip_empty_loops, show_comments=False))
+                sf_strings.append(saveframe_obj.format(skip_empty_loops=skip_empty_loops,
+                                                       skip_empty_tags=skip_empty_tags, show_comments=False))
             else:
-                sf_strings.append(saveframe_obj.format(skip_empty_loops=skip_empty_loops, show_comments=show_comments))
+                sf_strings.append(saveframe_obj.format(skip_empty_loops=skip_empty_loops,
+                                                       skip_empty_tags=skip_empty_tags, show_comments=show_comments))
                 seen_saveframes[saveframe_obj.category] = True
 
         return "data_%s\n\n%s" % (self.entry_id, "\n".join(sf_strings))
@@ -475,11 +477,16 @@ class Entry(object):
             if entry.empty:
                 del self.frame_list[pos]
 
-    def format(self, skip_empty_loops: bool = True, show_comments: bool = True) -> str:
+    def format(self, skip_empty_loops: bool = True, skip_empty_tags: bool = False, show_comments: bool = True) -> str:
         """ The same as calling str(Entry), except that you can pass options
-        to customize how the entry is printed. """
+        to customize how the entry is printed.
 
-        return self.__str__(skip_empty_loops=skip_empty_loops, show_comments=show_comments)
+        skip_empty_loops will omit printing loops with no tags at all. (A loop with null tags is not "empty".)
+        skip_empty_tags will omit tags in the saveframes and loops which have no non-null values.
+        show_comments will show the standard comments before a saveframe."""
+
+        return self.__str__(skip_empty_loops=skip_empty_loops, skip_empty_tags=skip_empty_tags,
+                            show_comments=show_comments)
 
     def get_json(self, serialize: bool = True) -> Union[dict, str]:
         """ Returns the entry in JSON format. If serialize is set to
