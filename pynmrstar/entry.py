@@ -10,6 +10,7 @@ from urllib.request import urlopen, Request
 from pynmrstar import definitions, utils, loop as loop_mod, parser as parser_mod, saveframe as saveframe_mod
 from pynmrstar._internal import __version__, _json_serialize, _interpret_file
 from pynmrstar.schema import Schema
+from sys import maxsize
 
 
 class Entry(object):
@@ -546,51 +547,55 @@ class Entry(object):
         # Assign all the ID tags, and update all links to ID tags
         my_schema = utils.get_schema(schema)
 
-        # Sort the saveframes according to ID, if the IDs are not a null value
-        try:
-            ids = [_['ID'][0] for _ in self]
-            if len(set(definitions.NULL_VALUES).intersection(ids)) == 0:
+        # Sort the saveframes according to ID, if an ID exists. Otherwise, still sort by category
+        ordering = my_schema.category_order
 
-                # The saveframe/loop order
-                ordering = my_schema.category_order
+        def sf_key(_: saveframe_mod.Saveframe) -> [int, int]:
+            """ Helper function to sort the saveframes.
+            Returns (category order, saveframe order) """
 
-                # Use these to sort saveframes and loops
-                def sf_key(_):
-                    """ Helper function to sort the saveframes."""
+            # If not a real category, generate an artificial but stable order > the real saveframes
+            try:
+                category_order: int = ordering.index(_.tag_prefix)
+            except (ValueError, KeyError):
+                category_order = len(ordering) + abs(hash(_.category))
 
-                    try:
-                        return str(ordering.index(_.tag_prefix)), str(_.get_tag("ID")[0])
-                    except ValueError:
-                        # Generate an arbitrary sort order for saveframes that aren't in the schema but make sure that they
-                        # always come after saveframes in the schema
-                        return str(len(ordering) + hash(_)), str(_.get_tag("ID")[0])
+            # See if there is an ID tag, and it is a number
+            saveframe_id: int = maxsize
+            try:
+                saveframe_id = int(_.get_tag("ID")[0])
+            except (ValueError, KeyError, IndexError):
+                # Either there is no ID, or it is not a number. By default it will sort at the end of saveframes of its
+                # category. Note that the entry_information ID tag has a different meaning, but since there should
+                # only ever be one saveframe of that category, the sort order for it can be any value.
+                pass
 
-                def loop_key(_):
-                    """ Helper function to sort the loops."""
+            return category_order, saveframe_id
 
-                    try:
-                        return ordering.index(_.category)
-                    except ValueError:
-                        # Generate an arbitrary sort order for loops that aren't in the schema but make sure that they
-                        #  always come after loops in the schema
-                        return len(ordering) + hash(_.category)
+        def loop_key(_):
+            """ Helper function to sort the loops."""
 
-                # Go through all the saveframes
-                for each_frame in self.frame_list:
-                    each_frame.sort_tags(schema=my_schema)
-                    # Iterate through the loops
-                    for each_loop in each_frame:
-                        each_loop.sort_tags(schema=my_schema)
+            try:
+                return ordering.index(_.category)
+            except ValueError:
+                # Generate an arbitrary sort order for loops that aren't in the schema but make sure that they
+                #  always come after loops in the schema
+                return len(ordering) + abs(hash(_.category))
 
-                        # See if we can sort the rows (in addition to tags)
-                        try:
-                            each_loop.sort_rows("Ordinal")
-                        except ValueError:
-                            pass
-                    each_frame.loops.sort(key=loop_key)
-                self.frame_list.sort(key=sf_key)
-        except KeyError:
-            pass
+        # Go through all the saveframes
+        for each_frame in self.frame_list:
+            each_frame.sort_tags(schema=my_schema)
+            # Iterate through the loops
+            for each_loop in each_frame:
+                each_loop.sort_tags(schema=my_schema)
+
+                # See if we can sort the rows (in addition to tags)
+                try:
+                    each_loop.sort_rows("Ordinal")
+                except ValueError:
+                    pass
+            each_frame.loops.sort(key=loop_key)
+        self.frame_list.sort(key=sf_key)
 
         # Calculate all the categories present
         categories: set = set()
