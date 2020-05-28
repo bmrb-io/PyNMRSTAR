@@ -54,7 +54,7 @@ class Entry(object):
               Entry.from_template()"""
 
         # Default initializations
-        self.entry_id: Union[str, int] = 0
+        self._entry_id: Union[str, int] = 0
         self.frame_list: List[saveframe_mod.Saveframe] = []
         self.source: Optional[str] = None
 
@@ -87,7 +87,7 @@ class Entry(object):
                 raise IOError("You don't appear to have an active internet connection. Cannot fetch entry.")
         # Creating from template (schema)
         elif 'all_tags' in kwargs:
-            self.entry_id = kwargs['entry_id']
+            self._entry_id = kwargs['entry_id']
 
             saveframe_categories: dict = {}
             schema = utils.get_schema(kwargs['schema'])
@@ -97,7 +97,7 @@ class Entry(object):
                 if category not in saveframe_categories:
                     saveframe_categories[category] = True
                     templated_saveframe = saveframe_mod.Saveframe.from_template(category, category + "_1",
-                                                                                entry_id=self.entry_id,
+                                                                                entry_id=self._entry_id,
                                                                                 all_tags=kwargs['all_tags'],
                                                                                 default_values=kwargs['default_values'],
                                                                                 schema=schema)
@@ -108,7 +108,7 @@ class Entry(object):
             return
         else:
             # Initialize a blank entry
-            self.entry_id = kwargs['entry_id']
+            self._entry_id = kwargs['entry_id']
             self.source = "from_scratch()"
             return
 
@@ -124,7 +124,7 @@ class Entry(object):
     def __repr__(self) -> str:
         """Returns a description of the entry."""
 
-        return "<pynmrstar.Entry '%s' %s>" % (self.entry_id, self.source)
+        return "<pynmrstar.Entry '%s' %s>" % (self._entry_id, self.source)
 
     def __setitem__(self, key: Union[int, str], item: 'saveframe_mod.Saveframe') -> None:
         """Set the indicated saveframe."""
@@ -186,6 +186,34 @@ class Entry(object):
                 return False
 
         return True
+
+    @property
+    def entry_id(self) -> Union[str, int]:
+        return self._entry_id
+
+    @entry_id.setter
+    def entry_id(self, value: Union[str, int]) -> None:
+        self._entry_id = value
+
+        schema = utils.get_schema()
+        for saveframe in self.frame_list:
+            for tag in saveframe.tags:
+                fqtn = (saveframe.tag_prefix + "." + tag[0]).lower()
+
+                try:
+                    if schema.schema[fqtn]['entryIdFlg'] == 'Y':
+                        tag[1] = self._entry_id
+                except KeyError:
+                    pass
+
+            for loop in saveframe.loops:
+                for tag in loop.tags:
+                    fqtn = (loop.category + "." + tag).lower()
+                    try:
+                        if schema.schema[fqtn]['entryIdFlg'] == 'Y':
+                            loop[tag] = [self._entry_id] * len(loop[tag])
+                    except KeyError:
+                        pass
 
     @property
     def frame_dict(self) -> Dict[str, 'saveframe_mod.Saveframe']:
@@ -621,8 +649,8 @@ class Entry(object):
                     if tag_schema['lclSfIdFlg'] == 'Y':
                         # If it's an Entry_ID tag, set it that way
                         if tag_schema['entryIdFlg'] == 'Y':
-                            mapping[f'{each_frame.tag_prefix[1:]}.{tag[0]}.{tag[1]}'] = self.entry_id
-                            tag[1] = self.entry_id
+                            mapping[f'{each_frame.tag_prefix[1:]}.{tag[0]}.{tag[1]}'] = self._entry_id
+                            tag[1] = self._entry_id
                         # Must be an integer to avoid renumbering the chem_comp ID, for example
                         elif tag_schema['BMRB data type'] == "int":
                             mapping[f'{each_frame.tag_prefix[1:]}.{tag[0]}.{tag[1]}'] = id_counter
