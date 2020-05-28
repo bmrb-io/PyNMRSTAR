@@ -755,8 +755,6 @@ loop_
         db_tmp = copy(self.file_entry)
         denormalized = Entry.from_file(os.path.join(our_path, "sample_files", "bmr15000_3_denormalized.str"))
         denormalized.normalize()
-        db_tmp.write_to_file('/Users/jon/norm.str')
-        denormalized.write_to_file('/Users/jon/denorm.str')
         self.assertEqual(db_tmp, denormalized)
 
         # Shuffle our local entry
