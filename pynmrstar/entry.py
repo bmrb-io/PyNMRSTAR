@@ -1,7 +1,7 @@
+import hashlib
 import json
 import logging
 import zlib
-from collections import defaultdict
 from io import StringIO
 from typing import TextIO, BinaryIO, Union, List, Optional, Dict, Any
 from urllib.error import HTTPError, URLError
@@ -10,7 +10,6 @@ from urllib.request import urlopen, Request
 from pynmrstar import definitions, utils, loop as loop_mod, parser as parser_mod, saveframe as saveframe_mod
 from pynmrstar._internal import __version__, _json_serialize, _interpret_file
 from pynmrstar.schema import Schema
-from sys import maxsize
 
 
 class Entry(object):
@@ -550,18 +549,21 @@ class Entry(object):
         # Sort the saveframes according to ID, if an ID exists. Otherwise, still sort by category
         ordering = my_schema.category_order
 
-        def sf_key(_: saveframe_mod.Saveframe) -> [int, int]:
+        def sf_key(_: saveframe_mod.Saveframe) -> [int, Union[int, float]]:
             """ Helper function to sort the saveframes.
             Returns (category order, saveframe order) """
 
             # If not a real category, generate an artificial but stable order > the real saveframes
             try:
-                category_order: int = ordering.index(_.tag_prefix)
+                category_order = ordering.index(_.tag_prefix)
             except (ValueError, KeyError):
-                category_order = len(ordering) + abs(hash(_.category))
+                if _.category is None:
+                    category_order = float('infinity')
+                else:
+                    category_order = len(ordering) + abs(int(hashlib.sha1(str(_.category).encode()).hexdigest(), 16))
 
             # See if there is an ID tag, and it is a number
-            saveframe_id: int = maxsize
+            saveframe_id = float('infinity')
             try:
                 saveframe_id = int(_.get_tag("ID")[0])
             except (ValueError, KeyError, IndexError):
@@ -572,7 +574,7 @@ class Entry(object):
 
             return category_order, saveframe_id
 
-        def loop_key(_):
+        def loop_key(_) -> Union[int, float]:
             """ Helper function to sort the loops."""
 
             try:
@@ -580,7 +582,7 @@ class Entry(object):
             except ValueError:
                 # Generate an arbitrary sort order for loops that aren't in the schema but make sure that they
                 #  always come after loops in the schema
-                return len(ordering) + abs(hash(_.category))
+                return len(ordering) + abs(int(hashlib.sha1(str(_.category).encode()).hexdigest(), 16))
 
         # Go through all the saveframes
         for each_frame in self.frame_list:
