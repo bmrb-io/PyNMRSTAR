@@ -863,7 +863,8 @@ class Entry(object):
 
         return errors
 
-    def write_to_file(self, file_name: str, format_: str = "nmrstar", show_comments: bool = True) -> None:
+    def write_to_file(self, file_name: str, format_: str = "nmrstar", show_comments: bool = True,
+                      skip_empty_loops: bool = True) -> None:
         """ Writes the entry to the specified file in NMR-STAR format.
 
         Optionally specify:
@@ -875,7 +876,7 @@ class Entry(object):
 
         data_to_write = ''
         if format_ == "nmrstar":
-            data_to_write = self.format(show_comments=show_comments)
+            data_to_write = self.format(show_comments=show_comments, skip_empty_loops=skip_empty_loops)
         elif format_ == "json":
             data_to_write = self.get_json()
 

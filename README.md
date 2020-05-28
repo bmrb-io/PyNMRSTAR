@@ -26,6 +26,26 @@ have any major bugs fixed. To do that, either checkout the v2 branch from GitHub
 simply specify `pynmrstar<=3` rather than `pynmrstar` when using `pip install` or a `requirements.txt`
 file.
 
+Breaking changes:
+
+1. Saveframe.get_tag() now returns a list of values rather than a single value. This
+is to be consistent with Loop.get_tag() and Entry.get_tag(). Furthermore, calling get_tag() on an Entry
+or Saveframe will return all values for that tag within any children objects. (For example, you can get the
+values of loop tags within a loop in a specific saveframe by calling get_tag() on the Saveframe rather than
+first getting a reference to the Loop and then calling get_tag().)
+2. Global variables to control behavior have been removed, and definitions that under certain circumstances
+might be edited have been moved to the definitions submodule. Those previous module-level features have been
+preserved where possible:
+   * pynmrstar.VERBOSE has been replaced with setting the log level using the standard logging module
+   * pynmrstar.RAISE_PARSE_WARNINGS has been moved to the raise_parse_warnings argument of the parse() function
+   in the parser module
+   * pynmrstar.SKIP_EMPTY_LOOPS is now the default behavior, but empty loops can be printed by specifying 
+   skip_empty_loops=True as an argument to Entry.format(), Entry.write_to_file(), Saveframe.format(),
+   Saveframe.write_to_file(), or Loop.format()
+3. NMR-STAR 2.1 files are no longer supported. NMR-STAR 2.1 is no longer officially supported by the BMRB. Please
+refer to [this resource](http://www.bmrb.wisc.edu/bmrb/news/20200407.shtml) if you still have 2.1 files you 
+need to convert.
+
 ## Overview
 
 This library was developed by the BMRB to give the Python-using NMR community tools to work with the NMR-STAR
