@@ -22,59 +22,6 @@ the methods where appropriate. For example, the global CONVERT_DATATYPES
 variable is removed, and instead all of the parse/load functions have a
 convert_datatypes optional argument.
 
-* Setting pynmrstar.VERBOSE to True will print some of what is going on to
-the terminal.
-
-* Setting pynmrstar.RAISE_PARSE_WARNINGS to True will raise an exception if
-the parser encounters something problematic. Normally warnings are
-suppressed.
-
-* In addition, if you want to ignore some parse warnings but allow the
-rest, you can specify warnings to ignore by adding the warning to ignore
-to the "WARNINGS_TO_IGNORE" list.
-
-Here are descriptions of the parse warnings that can be suppressed:
-
-* "tag-only-loop": A loop with no data was found.
-* "empty-loop": A loop with no tags or values was found.
-* "tag-not-in-schema": A tag was found in the entry that was not present
-in the schema.
-* "invalid-null-value": A tag for which the schema disallows null values
-had a null value.
-* "bad-multiline": A tag with an improper multi-line value was found.
-Multiline values should look like this:
-
-```code
-;
-The multi-line
-value here.
-;
-```
-
-
-but the tag looked like this:
-
-```code
-; The multi-line
-value here.
-;
-```
-
-* Setting pynmrstar.SKIP_EMPTY_LOOPS to True will suppress the printing of empty
-loops when calling __str__ methods.
-
-* Adding key->value pairs to pynmrstar.STR_CONVERSION_DICT will automatically
-convert tags whose value matches "key" to the string "value" when
-printing. This allows you to set the default conversion value for
-Booleans or other objects.
-
-* Setting pynmrstar.ALLOW_V2_ENTRIES will allow parsing of NMR-STAR version
-2.1 entries. Most other methods will not operate correctly on parsed
-2.1 entries. This is only to allow you parse and access the data in
-these entries - nothing else. Only set this if you have a really good
-reason to. Attempting to print a 2.1 entry will 'work' but tags that
-were after loops will be moved to before loops.
-
 * Setting pynmrstar.DONT_SHOW_COMMENTS to True will supress the printing of
 comments before saveframes.
 

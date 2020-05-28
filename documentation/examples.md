@@ -267,7 +267,7 @@ We can see what loops this peak list saveframe contains
 ```
 Let's see what the `_Peak_char` loop looks like in NMR-STAR format
 ```python
->>> print peak1['_Peak_char']
+>>> print(peak1['_Peak_char'])
    loop_
       _Peak_char.Peak_ID
       _Peak_char.Spectral_dim_ID
@@ -298,7 +298,7 @@ Let's see what the `_Peak_char` loop looks like in NMR-STAR format
 That is more information than we want right now. Lets get just the columns we need (we'll get a list of lists, each inner list corresponds to a row:
 ```python
 >>> our_data = peak1['_Peak_char'].get_data_by_tag(['Peak_ID','Chem_shift_val'])
->>> print our_data
+>>> print(our_data)
 [[u'1', u'9.857'],
  [u'1', u'4.922'],
  [u'2', u'9.857'],
@@ -310,7 +310,7 @@ That is more information than we want right now. Lets get just the columns we ne
 Excellent! Now we can iterate through each spectral peak and corresponding shift easily. The data is stored as a python list of lists (2 dimensional array) and we can modify or access it any of the normal ways python allows.
 ```python
 >>> for x in our_data:
->>>    print "Sprectral chemical shift value is: " + str(x[1])
+>>>    print("Sprectral chemical shift value is: " + str(x[1]))
 Sprectral chemical shift value is: 9.857
 Sprectral chemical shift value is: 4.922
 Sprectral chemical shift value is: 9.857
@@ -319,7 +319,7 @@ Sprectral chemical shift value is: 9.857
 
 It is also easy to dump the table in a loop as a CSV
 ```python
->>> print peak1['_Peak_char'].get_data_as_csv()
+>>> print(peak1['_Peak_char'].get_data_as_csv())
 _Peak_char.Peak_ID,_Peak_char.Spectral_dim_ID,_Peak_char.Chem_shift_val,_Peak_char.Chem_shift_val_err,_Peak_char.Line_width_val,_Peak_char.Line_width_val_err,_Peak_char.Phase_val,_Peak_char.Phase_val_err,_Peak_char.Decay_rate_val,_Peak_char.Decay_rate_val_err,_Peak_char.Coupling_pattern,_Peak_char.Bounding_box_upper_val,_Peak_char.Bounding_box_lower_val,_Peak_char.Bounding_box_range_val,_Peak_char.Details,_Peak_char.Derivation_method_ID,_Peak_char.Entry_ID,_Peak_char.Spectral_peak_list_ID
 1,1,9.857,.,.,.,.,.,.,.,.,.,.,.,.,.,6577,1
 1,2,4.922,.,.,.,.,.,.,.,.,.,.,.,.,.,6577,1
