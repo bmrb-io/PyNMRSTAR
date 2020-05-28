@@ -153,7 +153,7 @@ Now let's add data to the loop
 ```
 Notice that data is automatically encapsulated as necessary to meet the NMR-STAR format (quotes around the data containing a space). You never have to worry about encapsulating data you insert to make it syntactically valid STAR. Notice also that python None types are automatically converted to the NMR-STAR "null" value, ".".
 ```python
->>> print new_loop
+>>> print(new_loop)
    loop_
       _Example.age
       _Example.name
@@ -188,7 +188,7 @@ View the value of the tag `ID` in the assembly saveframe
 ```
 To get the NMR-STAR representation of any object, just request its string representation:
 ```python
->>> print ent15000['assembly']
+>>> print(ent15000['assembly'])
 #############################################
 #  Molecular system (assembly) description  #
 #############################################

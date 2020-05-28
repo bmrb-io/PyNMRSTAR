@@ -17,7 +17,10 @@ please go [here](cmdline/README.md).
 This module provides Entry, Saveframe, and Loop objects. Use python's
 built in help function for documentation.
 
-There are eight module variables you can set to control our behavior.
+The previous global variables from v2 have been removed, and refactored into
+the methods where appropriate. For example, the global CONVERT_DATATYPES
+variable is removed, and instead all of the parse/load functions have a
+convert_datatypes optional argument.
 
 * Setting pynmrstar.VERBOSE to True will print some of what is going on to
 the terminal.
