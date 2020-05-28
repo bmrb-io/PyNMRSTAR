@@ -732,9 +732,6 @@ loop_
         self.assertNotEqual(db_tmp.frame_list, self.file_entry.frame_list)
         db_tmp.normalize()
 
-        db_tmp.write_to_file('/tmp/1')
-        denormalized.write_to_file('/tmp/2')
-
         # And test they have been put back together
         self.assertEqual(db_tmp.frame_list, self.file_entry.frame_list)
 
