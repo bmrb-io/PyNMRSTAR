@@ -774,12 +774,13 @@ class Saveframe(object):
         return errors
 
     def write_to_file(self, file_name: str, format_: str = "nmrstar", show_comments: bool = True,
-                      skip_empty_loops: bool = True):
+                      skip_empty_loops: bool = True, skip_empty_tags: bool = False):
         """ Writes the saveframe to the specified file in NMR-STAR format.
 
         Optionally specify:
         show_comments=False to disable the comments that are by default inserted. Ignored when writing json.
         skip_empty_loops=False to force printing loops with no tags at all (loops with null tags are still printed)
+        skip_empty_tags=True will omit tags in the saveframes and loops which have no non-null values.
         format_=json to write to the file in JSON format."""
 
         if format_ not in ["nmrstar", "json"]:
@@ -787,7 +788,8 @@ class Saveframe(object):
 
         data_to_write = ''
         if format_ == "nmrstar":
-            data_to_write = self.format(show_comments=show_comments, skip_empty_loops=skip_empty_loops)
+            data_to_write = self.format(show_comments=show_comments, skip_empty_loops=skip_empty_loops,
+                                        skip_empty_tags=skip_empty_tags)
         elif format_ == "json":
             data_to_write = self.get_json()
 
