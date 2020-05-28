@@ -1,3 +1,9 @@
+### 3.0.1
+
+Changes:
+* Added support for skip_empty_tags in `write_to_file()`. Originally it was only available
+in `format()`.
+
 ### 3.0
 
 3.0 has been a long time coming! There are some major improvements, specifically:
