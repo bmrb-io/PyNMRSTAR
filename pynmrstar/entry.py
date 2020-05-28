@@ -152,7 +152,7 @@ class Entry(object):
         else:
             raise ValueError("You can only assign a saveframe to an entry splice.")
 
-    def __str__(self, skip_empty_loops: bool = False, show_comments: bool = True) -> str:
+    def __str__(self, skip_empty_loops: bool = True, show_comments: bool = True) -> str:
         """Returns the entire entry in STAR format as a string."""
 
         sf_strings = []
@@ -447,7 +447,7 @@ class Entry(object):
             if entry.empty:
                 del self.frame_list[pos]
 
-    def format(self, skip_empty_loops: bool = False, show_comments: bool = True) -> str:
+    def format(self, skip_empty_loops: bool = True, show_comments: bool = True) -> str:
         """ The same as calling str(Entry), except that you can pass options
         to customize how the entry is printed. """
 

@@ -358,7 +358,7 @@ class Saveframe(object):
             # If the tag already exists, set its value
             self.add_tag(key, item, update=True)
 
-    def __str__(self, first_in_category: bool = True, skip_empty_loops: bool = False,
+    def __str__(self, first_in_category: bool = True, skip_empty_loops: bool = True,
                 show_comments: bool = True) -> str:
         """Returns the saveframe in STAR format as a string."""
 
@@ -630,7 +630,7 @@ class Saveframe(object):
         csv_buffer.seek(0)
         return csv_buffer.read().replace('\r\n', '\n')
 
-    def format(self, skip_empty_loops: bool = False, show_comments: bool = True) -> str:
+    def format(self, skip_empty_loops: bool = True, show_comments: bool = True) -> str:
         """ The same as calling str(Saveframe), except that you can pass options
         to customize how the saveframe is printed."""
 

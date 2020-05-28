@@ -166,7 +166,7 @@ class Loop(object):
         for pos, row in enumerate(self.data):
             row[tag_id] = item[pos]
 
-    def __str__(self, skip_empty_loops: bool = False) -> str:
+    def __str__(self, skip_empty_loops: bool = True) -> str:
         """Returns the loop in STAR format as a string."""
 
         # Check if there is any data in this loop
@@ -671,7 +671,7 @@ class Loop(object):
 
         return result
 
-    def format(self, skip_empty_loops: bool = False) -> str:
+    def format(self, skip_empty_loops: bool = True) -> str:
         """ The same as calling str(Loop), except that you can pass options
         to customize how the loop is printed. """
 
