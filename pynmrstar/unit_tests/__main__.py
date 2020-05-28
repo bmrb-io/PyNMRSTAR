@@ -201,11 +201,9 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertEqual(self.file_entry.compare(self.file_entry), [])
 
         mutated = copy(self.file_entry)
-        mutated.entry_id = 14999
         mutated.frame_list.pop()
         self.assertEqual(self.file_entry.compare(mutated),
-                         ["Entry ID does not match between entries: '15000' vs '14999'.",
-                          "The number of saveframes in the entries are not equal: '25' vs '24'.",
+                         ["The number of saveframes in the entries are not equal: '25' vs '24'.",
                           "No saveframe with name 'assigned_chem_shift_list_1' in other entry."])
 
     def test_getmethods(self):
