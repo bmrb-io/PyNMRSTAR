@@ -391,7 +391,7 @@ class Entry(object):
         return cls(entry_id=entry_id)
 
     @classmethod
-    def from_template(cls, entry_id, all_tags=False, default_values=False, schema=None):
+    def from_template(cls, entry_id, all_tags=False, default_values=False, schema=None) -> 'Entry':
         """ Create an entry that has all of the saveframes and loops from the
         schema present. No values will be assigned. Specify the entry
         ID when calling this method.
@@ -466,7 +466,7 @@ class Entry(object):
         for saveframe in self.frame_list:
             saveframe.add_missing_tags(schema=schema, all_tags=all_tags)
 
-    def delete_empty_saveframes(self):
+    def delete_empty_saveframes(self) -> None:
         """ This method will delete all empty saveframes in an entry
         (the loops in the saveframe must also be empty for the saveframe
         to be deleted). "Empty" means no values in tags, not no tags present."""

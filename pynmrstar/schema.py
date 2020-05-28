@@ -190,7 +190,7 @@ class Schema(object):
         # Calculate up the 'Dictionary Sequence' based on the tag position
         new_tag_pos = (new_tag_pos - 1) * 10
 
-        def _test_pos(position, schema):
+        def _test_pos(position, schema) -> int:
             for item in schema.schema.values():
                 if float(item["Dictionary sequence"]) == position:
                     return _test_pos(position + 1, schema)

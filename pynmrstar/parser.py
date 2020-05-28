@@ -31,7 +31,6 @@ class Parser(object):
         """ Returns the current line number that is in the process of
         being parsed."""
 
-
         if cnmrstar is not None:
             return self.line_number
         else:
@@ -155,7 +154,7 @@ class Parser(object):
             raise ParsingError("The data_ keyword may not be quoted or semicolon-delineated.")
 
         # Set the entry_id
-        self.ent.entry_id = self.token[5:]
+        self.ent._entry_id = self.token[5:]
         self.source = source
 
         # We are expecting to get saveframes

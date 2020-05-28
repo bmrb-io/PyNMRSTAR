@@ -68,7 +68,7 @@ class Saveframe(object):
 
         return len(self.loops)
 
-    def __lt__(self, other):
+    def __lt__(self, other) -> bool:
         """Returns True if this saveframe sorts lower than the compared
         saveframe, false otherwise. The alphabetical ordering of the
         saveframe category is used to perform the comparison."""
@@ -78,7 +78,7 @@ class Saveframe(object):
 
         return self.tag_prefix < other.tag_prefix
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         """Don't use this directly. Use the class methods to construct:
              Saveframe.from_scratch()
              Saveframe.from_string()
@@ -721,7 +721,7 @@ class Saveframe(object):
 
         schema = utils.get_schema(schema)
 
-        def sort_key(x):
+        def sort_key(x) -> int:
             return schema.tag_key(self.tag_prefix + "." + x[0])
 
         self.tags.sort(key=sort_key)

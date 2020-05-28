@@ -15,7 +15,7 @@ from pynmrstar.schema import Schema
 class Loop(object):
     """A BMRB loop object. Create using the class methods, see below."""
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         """Returns True if this loop is equal to another loop, False if
         it is different."""
 
@@ -34,7 +34,7 @@ class Loop(object):
                 item = list(item)
             return self.get_tag(tags=item)
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         """ You should not directly instantiate a Loop using this method.
             Instead use the class methods:
               Loop.from_scratch()
@@ -128,7 +128,7 @@ class Loop(object):
 
         return len(self.data)
 
-    def __lt__(self, other):
+    def __lt__(self, other) -> bool:
         """Returns True if this loop sorts lower than the compared
         loop, false otherwise."""
 
@@ -879,7 +879,7 @@ class Loop(object):
         current_order = self.get_tag_names()
 
         # Sort the tags
-        def sort_key(_):
+        def sort_key(_) -> int:
             return schema.tag_key(_)
 
         sorted_order = sorted(current_order, key=sort_key)
@@ -1003,19 +1003,19 @@ class Loop(object):
 
         return errors
 
-    def add_column(self, name, ignore_duplicates=False, update_data=False):
+    def add_column(self, name, ignore_duplicates=False, update_data=False) -> None:
         """ Deprecated, please use add_tag() instead. """
 
         warnings.warn("add_column() is deprecated. Please use add_tag() instead.", DeprecationWarning)
         return self.add_tag(name, ignore_duplicates, update_data)
 
-    def add_data_by_column(self, column_id, value):
+    def add_data_by_column(self, column_id, value) -> None:
         """ Deprecated, please use add_data_by_tag() instead. """
 
         warnings.warn("add_data_by_column() is deprecated. Please  use add_data_by_tag() instead.", DeprecationWarning)
         return self.add_data_by_tag(column_id, value)
 
-    def get_columns(self):
+    def get_columns(self) -> List[str]:
         """ Deprecated alias for get_tags() """
 
         warnings.warn("get_columns() is deprecated. Please use get_tag_names() instead.", DeprecationWarning)
