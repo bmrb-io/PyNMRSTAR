@@ -664,9 +664,11 @@ class Saveframe(object):
         raise KeyError("No loop with category '%s'." % name)
 
     def get_tag(self, query: str, whole_tag: bool = False) -> list:
-        """Allows fetching the value of a tag by tag name. Specify
-        whole_tag=True and the [tag_name, tag_value] pair will be
-        returned."""
+        """Allows fetching the value of a tag by tag name. Returns
+        a list of all matching tag values.
+
+        Specify whole_tag=True and the [tag_name, tag_value] pair will be
+        returned instead of just the value"""
 
         results = []
 
