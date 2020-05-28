@@ -9,7 +9,7 @@ Previous python versions (back to 2.6) are supported by the v2 branch (version 2
 ### Version 3 released
 Note that the recently released version 3 has some backwards-incompatible changes, but also comes with
 some major improvements. For the full details, including notes on migration or downgrading to v2, refer
-to the [release notes](/documentation/release_notes.md#3.0) 
+to the [release notes](https://github.com/uwbmrb/PyNMRSTAR/blob/v3/documentation/release_notes.md#30) 
 
 ## Overview
 
@@ -19,7 +19,8 @@ calling  `help(object_or_method)` from an interactive python session will print 
 or method.
 
 There are several command-line based tools developed to enable simple queries to pull data out of an
-NMR-STAR file. Those tools also serve as great examples of how to use the library. You can view those [here](cmdline).
+NMR-STAR file. Those tools also serve as great examples of how to use the library. You can view those
+[here](https://github.com/uwbmrb/PyNMRSTAR/tree/v3/cmdline).
 
 ## Introduction to NMR-STAR
 
