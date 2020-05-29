@@ -772,12 +772,13 @@ class Entry(object):
                                                          "Foreign saveframe: "
                                                          f"{tag_schema['Foreign Table']}.{tag_schema['Foreign Column']}"
                                                          )
+                                            continue
                                     try:
                                         row[tag_pos] = self.get_saveframe_by_name(row[x][1:])['ID'][0]
                                     except IndexError:
-                                        print(f"Getting {self.get_saveframe_by_name(row[x][1:])['ID']}")
+                                        logging.info(f"Getting {self.get_saveframe_by_name(row[x][1:])['ID']}")
                                     except KeyError:
-                                        print(f"Missing frame of type {tag} pointed to by {conditional_tag}")
+                                        logging.warning(f"Missing frame of type {tag} pointed to by {conditional_tag}")
 
         # Renumber the 'ID' column in a loop
         for each_frame in self.frame_list:

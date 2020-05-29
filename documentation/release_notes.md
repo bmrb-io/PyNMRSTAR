@@ -1,3 +1,8 @@
+### 3.0.2
+
+Changes:
+* Minor bug fix to normalize()
+
 ### 3.0.1
 
 Changes:
