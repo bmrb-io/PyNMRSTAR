@@ -601,7 +601,7 @@ class Entry(object):
             saveframe_id = float('infinity')
             try:
                 saveframe_id = int(_.get_tag("ID")[0])
-            except (ValueError, KeyError, IndexError):
+            except (ValueError, KeyError, IndexError, TypeError):
                 # Either there is no ID, or it is not a number. By default it will sort at the end of saveframes of its
                 # category. Note that the entry_information ID tag has a different meaning, but since there should
                 # only ever be one saveframe of that category, the sort order for it can be any value.
