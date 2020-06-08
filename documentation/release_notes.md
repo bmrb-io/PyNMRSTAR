@@ -1,3 +1,8 @@
+### 3.0.4
+
+Changes:
+* Update packaging to mark that the 3.x branch is only for Python3.
+
 ### 3.0.2, 3.03
 
 Changes:
