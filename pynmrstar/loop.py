@@ -8,6 +8,7 @@ from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Callable,
 
 from pynmrstar import definitions, utils, entry as entry_mod, exceptions
 from pynmrstar._internal import _json_serialize, _interpret_file
+from pynmrstar.exceptions import FormattingError
 from pynmrstar.parser import Parser
 from pynmrstar.schema import Schema
 
@@ -217,8 +218,18 @@ class Loop(object):
             # Make a copy of the data
             working_data = []
             # Put quotes as needed on the data
-            for datum in self.data:
-                working_data.append([utils.quote_value(x) for x in datum])
+            for row_pos, datum in enumerate(self.data):
+                clean_row = []
+                for col_pos, x in enumerate(datum):
+                    try:
+                        clean_row.append(utils.quote_value(x))
+                    except ValueError:
+                        raise FormattingError('Cannot generate NMR-STAR for entry, as empty strings are not valid '
+                                              'tag values in NMR-STAR. Please either replace the empty strings with'
+                                              ' None objects, or set pynmrstar.definitions.STR_CONVERSION_DICT[\'\'] ='
+                                              ' None.\n Loop: {self.category} Row: {row_pos} Column: {col_pos}')
+
+                working_data.append(clean_row)
 
             # The nightmare below creates a list of the maximum length of
             #  elements in each tag in the self.data matrix. Don't try to

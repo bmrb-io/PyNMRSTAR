@@ -5,6 +5,7 @@ from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Iterable
 
 from pynmrstar import definitions, entry as entry_mod, loop as loop_mod, parser as parser_mod, utils
 from pynmrstar._internal import _get_comments, _json_serialize, _interpret_file
+from pynmrstar.exceptions import FormattingError
 from pynmrstar.schema import Schema
 
 
@@ -389,7 +390,14 @@ class Saveframe(object):
         for each_tag in self.tags:
             if skip_empty_tags and each_tag[1] in definitions.NULL_VALUES:
                 continue
-            clean_tag = utils.quote_value(each_tag[1])
+            try:
+                clean_tag = utils.quote_value(each_tag[1])
+            except ValueError:
+                raise FormattingError('Cannot generate NMR-STAR for entry, as empty strings are not valid tag values '
+                                      'in NMR-STAR. Please either replace the empty strings with None objects, '
+                                      'or set pynmrstar.definitions.STR_CONVERSION_DICT[\'\'] = None.\n'
+                                      f'Saveframe: {self.name} Tag: {each_tag[0]}')
+
             formatted_tag = self.tag_prefix + "." + each_tag[0]
             if "\n" in clean_tag:
                 ret_string += mstring % (formatted_tag, clean_tag)

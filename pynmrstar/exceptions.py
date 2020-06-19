@@ -17,3 +17,17 @@ class ParsingError(Exception):
             return "%s on line %d" % (self.message, self.line_number)
         else:
             return self.message
+
+
+class FormattingError(Exception):
+    """ Something went wrong when formatting a file. """
+
+    def __init__(self, message):
+        Exception.__init__(self)
+        self.message = message
+
+    def __repr__(self) -> str:
+        return 'FormattingError("%s")' % self.message
+
+    def __str__(self) -> str:
+        return self.message
