@@ -653,6 +653,9 @@ class Entry(object):
                     if not tag_schema:
                         continue
 
+                    # Make sure the capitalization of the tag is correct
+                    tag[0] = tag_schema['Tag field']
+
                     if tag_schema['lclSfIdFlg'] == 'Y':
                         # If it's an Entry_ID tag, set it that way
                         if tag_schema['entryIdFlg'] == 'Y':
@@ -674,6 +677,9 @@ class Entry(object):
                         tag_schema = my_schema.schema.get(f"{loop.category}.{tag}".lower())
                         if not tag_schema:
                             continue
+
+                        # Make sure the tags have the proper capitalization
+                        loop.tags[x] = tag_schema['Tag field']
 
                         for row in loop.data:
                             # We don't re-map loop IDs, but we should still store them
