@@ -152,7 +152,7 @@ class Entry(object):
         else:
             raise ValueError("You can only assign a saveframe to an entry splice.")
 
-    def __str__(self, skip_empty_loops: bool = True, skip_empty_tags: bool = False, show_comments: bool = True) -> str:
+    def __str__(self, skip_empty_loops: bool = False, skip_empty_tags: bool = False, show_comments: bool = True) -> str:
         """Returns the entire entry in STAR format as a string."""
 
         sf_strings = []
