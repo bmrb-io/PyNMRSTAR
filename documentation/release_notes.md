@@ -1,3 +1,14 @@
+### 3.0.5
+
+Changes:
+* Add new FormattingException, and throw it when formatting an entry with an empty string
+ as a tag value with context information, rather than just allowing the ValueError from
+  quote_value to go uncaught.
+* \_\_str__ shows empty loops to help development, but  format() and write_to_file() still do not
+* Update to Entry.normalize() to ensure that all tags have the proper capitalization.
+* Minor improvement in behavior of Loop.filter() to preserve the case of the
+existing tags if the filtered tags were the same but with different capitalization.
+
 ### 3.0.4
 
 Changes:
