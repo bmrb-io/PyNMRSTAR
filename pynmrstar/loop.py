@@ -649,13 +649,14 @@ class Loop(object):
         for tag in tag_list:
 
             # Handle an invalid tag
-            if self.tag_index(tag) is None:
+            tag_match_index = self.tag_index(tag)
+            if tag_match_index is None:
                 if not ignore_missing_tags:
                     raise ValueError("Cannot filter tag '%s' as it isn't present in this loop." % tag)
                 continue
 
             valid_tags.append(tag)
-            result.add_tag(tag)
+            result.add_tag(self.tags[tag_match_index])
 
         # Add the data for the tags to the new loop
         results = self.get_tag(valid_tags)
