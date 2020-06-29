@@ -1,3 +1,11 @@
+### 3.0.6
+
+Changes:
+
+* If there is an issue with the number of data elements in a loop during
+parsing, raise a `ParsingError` rather than the `ValueError` that would be raised
+normally.
+
 ### 3.0.5
 
 Changes:

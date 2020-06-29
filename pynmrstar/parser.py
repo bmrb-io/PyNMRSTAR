@@ -229,8 +229,14 @@ class Parser(object):
                                             logging.warning("Loop with no data on line: %s" % self.get_line_number())
 
                                     if len(cur_data) > 0:
-                                        cur_loop.add_data(cur_data, rearrange=True,
-                                                          convert_data_types=convert_data_types)
+                                        try:
+                                            cur_loop.add_data(cur_data, rearrange=True,
+                                                              convert_data_types=convert_data_types)
+                                        # If there is an issue with the loops during parsing, raise a parse error
+                                        #  rather than the ValueError that would be raised if they made the mistake
+                                        #   directly
+                                        except ValueError as e:
+                                            raise ParsingError(str(e))
                                     cur_data = []
 
                                     cur_loop = None
