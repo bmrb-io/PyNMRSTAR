@@ -5,6 +5,9 @@ Changes:
 * If there is an issue with the number of data elements in a loop during
 parsing, raise a `ParsingError` rather than the `ValueError` that would be raised
 normally.
+* Entry.write_to_file() had a default value of `True` for `skip_empty_tags` - 
+this value has been changed to a default of `False` to match the default for
+Saveframe.write_to_file().
 
 ### 3.0.5
 
