@@ -27,8 +27,7 @@ NMR-STAR file. Those tools also serve as great examples of how to use the librar
 To understand how the library works, you first need to understand the NMR-STAR terminology and file format. If you
 are already familiar with NMR-STAR, feel free to [jump ahead](#quick-start-to-pynmrstar) to the section on this library.
 
-A NMR-STAR entry/file is composed of one or more saveframes (conceptually you should think of a saveframe as a data
-block), each of which contain tags and loops. There can only be one of each tag in a saveframe. If a tag has multiple
+A NMR-STAR entry/file is composed of one or more saveframes (conceptually you should think of a saveframe as loosely resembling objects in an object-relational data model), each of which contain tags and loops. There can only be one of each tag in a saveframe. If a tag has multiple
 values, the only way to represent it is to place it inside a loop. A loop is simply a set of tags with multiple values.
 
 Therefore, hierarchically, you can picture a NMR-STAR file as a tree where the entry is the trunk, the large branches
