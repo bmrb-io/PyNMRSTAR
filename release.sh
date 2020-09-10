@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export GPG_TTY=$(tty)
+
 while true; do
     read -p "Have you updated the version number in pynmrstar/_internal.py? " yn
     case ${yn} in
