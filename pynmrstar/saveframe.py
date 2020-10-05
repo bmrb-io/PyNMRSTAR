@@ -478,6 +478,8 @@ class Saveframe(object):
         for char in str(name):
             if char in utils.definitions.WHITESPACE:
                 raise ValueError("Tag names can not contain whitespace characters.")
+        if name == '':
+            raise ValueError('Cannot use the empty string as a tag name.')
 
         # See if we need to convert the data type
         if convert_data_types:
