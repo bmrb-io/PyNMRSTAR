@@ -10,7 +10,7 @@ from urllib.request import urlopen
 
 from pynmrstar import definitions
 
-__version__: str = "3.0.5"
+__version__: str = "3.0.7"
 
 
 def _build_extension() -> bool:

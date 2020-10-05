@@ -1,3 +1,17 @@
+### 3.0.7
+
+Changes:
+
+* Extra validation of tag names in saveframes and loops to ensure that users do not
+create tag names which contain whitespace or are the empty string.
+* Saveframe.name has been converted to a property. This allows extra verification of the
+saveframe name, so that it can also be checked to ensure it does not contain whitespace or
+the empty string. This should generally not affect calling code.
+
+Potentially breaking change: When the name of a saveframe is reassigned, if the tag
+`sf_framecode`, if present, it is automatically updated. Also, if the tag `sf_framecode`
+is assigned, then the saveframe name is updated.
+
 ### 3.0.6
 
 Changes:
