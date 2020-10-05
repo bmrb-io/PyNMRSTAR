@@ -822,14 +822,7 @@ class Entry(object):
         #  of a saveframe that doesn't exist in the entry.
         change_frame = self.get_saveframe_by_name(original_name)
 
-        # Make sure the new saveframe name is valid
-        for char in new_name:
-            if char in definitions.WHITESPACE:
-                raise ValueError("You cannot have whitespace characters in a saveframe name. Illegal character: '%s'" %
-                                 char)
-
         # Update the saveframe
-        change_frame['Sf_framecode'] = new_name
         change_frame.name = new_name
 
         # What the new references should look like
