@@ -122,6 +122,9 @@ class Saveframe(object):
 
             self.name = self.category
             if 'saveframe_name' in kwargs and kwargs['saveframe_name']:
+                for char in utils.definitions.WHITESPACE:
+                    if char in kwargs['saveframe_name']:
+                        raise ValueError("Saveframe names can not contain whitespace characters.")
                 self.name = kwargs['saveframe_name']
 
             # Make sure it is a valid category
@@ -175,6 +178,11 @@ class Saveframe(object):
 
         elif 'saveframe_name' in kwargs:
             # If they are creating from scratch, just get the saveframe name
+            for char in utils.definitions.WHITESPACE:
+                if char in kwargs['saveframe_name']:
+                    raise ValueError("Saveframe names can not contain whitespace characters.")
+            if kwargs['saveframe_name'] == '':
+                raise ValueError('Cannot create saveframes with the empty string as a name.')
             self.name = kwargs['saveframe_name']
             if 'tag_prefix' in kwargs:
                 self.tag_prefix = utils.format_category(kwargs['tag_prefix'])
@@ -302,7 +310,7 @@ class Saveframe(object):
     def from_string(cls, the_string: str, csv: bool = False, convert_data_types: bool = False):
         """Create a saveframe by parsing a string. Specify csv=True is
         the string is in CSV format and not NMR-STAR format.
-        
+
         Setting convert_data_types to True will automatically convert
         the data loaded from the file into the corresponding python type as
         determined by loading the standard BMRB schema. This would mean that
