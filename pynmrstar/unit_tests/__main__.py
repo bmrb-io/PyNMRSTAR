@@ -295,7 +295,6 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertEqual(str(Saveframe.from_scratch("test", tag_prefix="test")), "\nsave_test\n\nsave_\n")
         tmp = copy(frame)
         tmp.loops = []
-        tmp.name = ""
         self.assertEqual(Saveframe.from_string(frame.get_data_as_csv(frame), csv=True).compare(tmp), [])
         self.assertRaises(ValueError, Saveframe.from_string, "test.1,test.2\n2,3,4", csv=True)
 
