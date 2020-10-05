@@ -454,8 +454,9 @@ class Saveframe(object):
 
         if "." in name:
             raise ValueError("There cannot be more than one '.' in a tag name.")
-        if " " in name:
-            raise ValueError("Tag names can not contain spaces.")
+        for char in utils.definitions.WHITESPACE:
+            if char in name:
+                raise ValueError("Tag names can not contain whitespace characters.")
 
         # See if we need to convert the data type
         if convert_data_types:
