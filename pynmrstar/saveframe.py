@@ -245,8 +245,8 @@ class Saveframe(object):
     def name(self, name):
         """ Updates the saveframe name. """
 
-        for char in utils.definitions.WHITESPACE:
-            if char in str(name):
+        for char in str(name):
+            if char in utils.definitions.WHITESPACE:
                 raise ValueError("Saveframe names can not contain whitespace characters.")
         if name == '':
             raise ValueError('Cannot create saveframes with the empty string as a name.')
@@ -475,8 +475,8 @@ class Saveframe(object):
 
         if "." in name:
             raise ValueError("There cannot be more than one '.' in a tag name.")
-        for char in utils.definitions.WHITESPACE:
-            if char in name:
+        for char in str(name):
+            if char in utils.definitions.WHITESPACE:
                 raise ValueError("Tag names can not contain whitespace characters.")
 
         # See if we need to convert the data type

@@ -524,8 +524,8 @@ class Loop(object):
         if " " in name:
             raise ValueError("Tag names can not contain spaces.")
 
-        for char in utils.definitions.WHITESPACE:
-            if char in name:
+        for char in str(name):
+            if char in utils.definitions.WHITESPACE:
                 raise ValueError("Tag names can not contain whitespace characters.")
 
         # Add the tag
