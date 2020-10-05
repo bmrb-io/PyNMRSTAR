@@ -96,7 +96,7 @@ class Saveframe(object):
         # Initialize our local variables
         self.tags: List[Any] = []
         self.loops: List[loop_mod.Loop] = []
-        self.name: str = ""
+        self._name: str = ""
         self.source: str = "unknown"
         self.category: Optional[str] = None
         self.tag_prefix: Optional[str] = None
@@ -122,9 +122,6 @@ class Saveframe(object):
 
             self.name = self.category
             if 'saveframe_name' in kwargs and kwargs['saveframe_name']:
-                for char in utils.definitions.WHITESPACE:
-                    if char in kwargs['saveframe_name']:
-                        raise ValueError("Saveframe names can not contain whitespace characters.")
                 self.name = kwargs['saveframe_name']
 
             # Make sure it is a valid category
@@ -178,11 +175,6 @@ class Saveframe(object):
 
         elif 'saveframe_name' in kwargs:
             # If they are creating from scratch, just get the saveframe name
-            for char in utils.definitions.WHITESPACE:
-                if char in kwargs['saveframe_name']:
-                    raise ValueError("Saveframe names can not contain whitespace characters.")
-            if kwargs['saveframe_name'] == '':
-                raise ValueError('Cannot create saveframes with the empty string as a name.')
             self.name = kwargs['saveframe_name']
             if 'tag_prefix' in kwargs:
                 self.tag_prefix = utils.format_category(kwargs['tag_prefix'])
@@ -242,6 +234,27 @@ class Saveframe(object):
             if each_loop.category is not None:
                 res[each_loop.category.lower()] = each_loop
         return res
+
+    @property
+    def name(self) -> Any:
+        """ Returns the name of the saveframe."""
+
+        return self._name
+
+    @name.setter
+    def name(self, name):
+        """ Updates the saveframe name. """
+
+        for char in utils.definitions.WHITESPACE:
+            if char in str(name):
+                raise ValueError("Saveframe names can not contain whitespace characters.")
+        if name == '':
+            raise ValueError('Cannot create saveframes with the empty string as a name.')
+
+        # Update the sf_framecode tag too
+        if 'sf_framecode' in self:
+            self['sf_framecode'] = name
+        self._name = name
 
     @property
     def tag_dict(self) -> Dict[str, str]:
@@ -477,6 +490,8 @@ class Saveframe(object):
         tag_name_lower = name.lower()
         if tag_name_lower == "sf_category":
             self.category = value
+        if tag_name_lower == "sf_framecode":
+            self.name = value
 
         if line_num:
             new_tag.append(line_num)
