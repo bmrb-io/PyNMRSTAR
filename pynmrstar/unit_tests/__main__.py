@@ -86,7 +86,7 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertEqual(Entry.from_string(_interpret_file(entry_url).read()), database_entry)
 
         # Test reading from https locations
-        raw_api_url = "https://bmrb.io/v2/entry/15000?format=rawnmrstar"
+        raw_api_url = "https://api.bmrb.io/v2/entry/15000?format=rawnmrstar"
         self.assertEqual(Entry.from_string(_interpret_file(raw_api_url).read()), database_entry)
 
     # Test the parser
