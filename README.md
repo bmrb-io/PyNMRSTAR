@@ -328,7 +328,7 @@ entry15000.get_tags(['_NMR_spectrometer.Manufacturer', '_NMR_spectrometer.Model'
   u'INOVA',
   u'INOVA']}
 ```
-To view all of the tags in the NMR-STAR schema and their meanings, please go [here](http://www.bmrb.wisc.edu/dictionary/tag.php).
+To view all of the tags in the NMR-STAR schema and their meanings, please go [here](https://bmrb.io/dictionary/tag.php).
 # Assigned Chemical Shifts
 
 *"I just want to get the chemical shift data as an array - how do I do that?"*

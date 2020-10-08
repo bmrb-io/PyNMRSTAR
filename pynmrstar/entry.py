@@ -76,7 +76,7 @@ class Entry(object):
 
             # The location to fetch entries from
             entry_number = kwargs['entry_num']
-            url = 'http://rest.bmrb.wisc.edu/bmrb/NMR-STAR3/%s' % entry_number
+            url = f'https://bmrb.io/ftp/pub/bmrb/entry_directories/bmr{entry_number}/bmr{entry_number}_3.str'
 
             # Parse from the official BMRB library
             try:

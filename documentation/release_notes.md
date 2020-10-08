@@ -1,4 +1,4 @@
-### 3.0.7
+### 3.0.8
 
 Changes:
 
@@ -7,10 +7,15 @@ create tag names which contain whitespace or are the empty string.
 * Saveframe.name has been converted to a property. This allows extra verification of the
 saveframe name, so that it can also be checked to ensure it does not contain whitespace or
 the empty string. This should generally not affect calling code.
+* Updated code to use new api.bmrb.io domain when fetching entries
 
 Potentially breaking change: When the name of a saveframe is reassigned, if the tag
 `sf_framecode`, if present, it is automatically updated. Also, if the tag `sf_framecode`
 is assigned, then the saveframe name is updated.
+
+### 3.0.7
+
+Yanked due to a packaging error.
 
 ### 3.0.6
 
@@ -83,7 +88,7 @@ preserved where possible:
    skip_empty_loops=True as an argument to Entry.format(), Entry.write_to_file(), Saveframe.format(),
    Saveframe.write_to_file(), or Loop.format()
 3. NMR-STAR 2.1 files are no longer supported. NMR-STAR 2.1 is no longer officially supported by the BMRB. Please
-refer to [this resource](http://www.bmrb.wisc.edu/bmrb/news/20200407.shtml) if you still have 2.1 files you 
+refer to [this resource](https://bmrb.io/bmrb/news/20200407.shtml) if you still have 2.1 files you 
 need to convert.
 
 Other changes:
