@@ -96,7 +96,7 @@ class Saveframe(object):
         # Initialize our local variables
         self.tags: List[Any] = []
         self.loops: List[loop_mod.Loop] = []
-        self.name: str = ""
+        self._name: str = ""
         self.source: str = "unknown"
         self.category: Optional[str] = None
         self.tag_prefix: Optional[str] = None
@@ -236,6 +236,27 @@ class Saveframe(object):
         return res
 
     @property
+    def name(self) -> Any:
+        """ Returns the name of the saveframe."""
+
+        return self._name
+
+    @name.setter
+    def name(self, name):
+        """ Updates the saveframe name. """
+
+        for char in str(name):
+            if char in utils.definitions.WHITESPACE:
+                raise ValueError("Saveframe names can not contain whitespace characters.")
+        if name == '':
+            raise ValueError('Cannot create saveframes with the empty string as a name.')
+
+        # Update the sf_framecode tag too
+        if 'sf_framecode' in self:
+            self['sf_framecode'] = name
+        self._name = name
+
+    @property
     def tag_dict(self) -> Dict[str, str]:
         """Returns a hash of (tag name).lower() -> tag value."""
 
@@ -302,7 +323,7 @@ class Saveframe(object):
     def from_string(cls, the_string: str, csv: bool = False, convert_data_types: bool = False):
         """Create a saveframe by parsing a string. Specify csv=True is
         the string is in CSV format and not NMR-STAR format.
-        
+
         Setting convert_data_types to True will automatically convert
         the data loaded from the file into the corresponding python type as
         determined by loading the standard BMRB schema. This would mean that
@@ -454,8 +475,11 @@ class Saveframe(object):
 
         if "." in name:
             raise ValueError("There cannot be more than one '.' in a tag name.")
-        if " " in name:
-            raise ValueError("Tag names can not contain spaces.")
+        for char in str(name):
+            if char in utils.definitions.WHITESPACE:
+                raise ValueError("Tag names can not contain whitespace characters.")
+        if name == '':
+            raise ValueError('Cannot use the empty string as a tag name.')
 
         # See if we need to convert the data type
         if convert_data_types:
@@ -468,6 +492,8 @@ class Saveframe(object):
         tag_name_lower = name.lower()
         if tag_name_lower == "sf_category":
             self.category = value
+        if tag_name_lower == "sf_framecode":
+            self.name = value
 
         if line_num:
             new_tag.append(line_num)

@@ -82,13 +82,12 @@ class TestPyNMRSTAR(unittest.TestCase):
             self.assertEqual(_interpret_file(tmp).read(), local_version)
 
         # Test reading from http (ftp doesn't work on TravisCI)
-        self.assertEqual(Entry.from_string(_interpret_file("http://rest.bmrb.wisc.edu/bmrb/NMR-STAR3/15000").read()),
-                         database_entry)
+        entry_url = 'https://bmrb.io/ftp/pub/bmrb/entry_directories/bmr15000/bmr15000_3.str'
+        self.assertEqual(Entry.from_string(_interpret_file(entry_url).read()), database_entry)
 
         # Test reading from https locations
-        self.assertEqual(Entry.from_string(
-            _interpret_file("https://webapi.bmrb.wisc.edu/v2/entry/15000?format=rawnmrstar").read()),
-            database_entry)
+        raw_api_url = "https://api.bmrb.io/v2/entry/15000?format=rawnmrstar"
+        self.assertEqual(Entry.from_string(_interpret_file(raw_api_url).read()), database_entry)
 
     # Test the parser
     def test___Parser(self):
@@ -295,7 +294,6 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertEqual(str(Saveframe.from_scratch("test", tag_prefix="test")), "\nsave_test\n\nsave_\n")
         tmp = copy(frame)
         tmp.loops = []
-        tmp.name = ""
         self.assertEqual(Saveframe.from_string(frame.get_data_as_csv(frame), csv=True).compare(tmp), [])
         self.assertRaises(ValueError, Saveframe.from_string, "test.1,test.2\n2,3,4", csv=True)
 

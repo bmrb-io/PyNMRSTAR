@@ -13,7 +13,7 @@ cnmrstar = Extension('cnmrstar',
                      optional=True)
 
 # Should fail if the readme is missing
-long_des = open('README.md', 'r').read()
+long_des = open('README.rst', 'r').read()
 
 setup(name='pynmrstar',
       version=__version__,
@@ -21,7 +21,7 @@ setup(name='pynmrstar',
       ext_modules=[cnmrstar],
       python_requires='>=3',
       author='Jon Wedell',
-      author_email='wedell@bmrb.wisc.edu',
+      author_email='wedell@uchc.edu',
       description='PyNMR-STAR provides tools for reading, writing, modifying, and interacting with NMR-STAR files. '
                   'Maintained by the BMRB.',
       long_description=long_des,
@@ -30,8 +30,7 @@ setup(name='pynmrstar',
       url='https://github.com/uwbmrb/PyNMRSTAR',
       license='MIT',
       package_data={'pynmrstar': ['reference_files/schema.csv', 'reference_files/comments.str',
-                                  'reference_files/data_types.csv', 'README.md',
-                                  '.nocompile']},
+                                  'reference_files/data_types.csv', '.nocompile']},
       classifiers=[
           'Development Status :: 5 - Production/Stable',
           'Environment :: Console',

@@ -521,8 +521,11 @@ class Loop(object):
                 raise ValueError("There is already a tag with the name '%s'." % name)
         if "." in name:
             raise ValueError("There cannot be more than one '.' in a tag name.")
-        if " " in name:
-            raise ValueError("Tag names can not contain spaces.")
+        for char in str(name):
+            if char in utils.definitions.WHITESPACE:
+                raise ValueError("Tag names can not contain whitespace characters.")
+        if name == '':
+            raise ValueError('Cannot use the empty string as a tag name.')
 
         # Add the tag
         self.tags.append(name)
