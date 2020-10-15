@@ -227,7 +227,7 @@ class Loop(object):
                         raise FormattingError('Cannot generate NMR-STAR for entry, as empty strings are not valid '
                                               'tag values in NMR-STAR. Please either replace the empty strings with'
                                               ' None objects, or set pynmrstar.definitions.STR_CONVERSION_DICT[\'\'] ='
-                                              ' None.\n Loop: {self.category} Row: {row_pos} Column: {col_pos}')
+                                              f' None.\n Loop: {self.category} Row: {row_pos} Column: {col_pos}')
 
                 working_data.append(clean_row)
 
