@@ -1,3 +1,7 @@
+### 2.6.6
+
+Updated URLs now that BMRB has moved to BMRB.io.
+
 ### 2.6.5
 
 Releases from this point forward will only fix bugs, no new features will be added

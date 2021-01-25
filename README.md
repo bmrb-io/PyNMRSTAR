@@ -281,7 +281,7 @@ Or to get all of the spectrometer information - `get_tags()` accepts a list of t
   u'INOVA',
   u'INOVA']}
 ```
-To view all of the tags in the NMR-STAR schema and their meanings, please go [here](http://www.bmrb.wisc.edu/dictionary/tag.php).
+To view all of the tags in the NMR-STAR schema and their meanings, please go [here](https://bmrb.io/dictionary/tag.php).
 # Assigned Chemical Shifts
 
 *"I just want to get the chemical shift data as an array - how do I do that?"*

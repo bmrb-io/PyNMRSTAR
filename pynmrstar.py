@@ -215,10 +215,10 @@ STR_CONVERSION_DICT = {None: "."}
 # Used internally
 _STANDARD_SCHEMA = None
 _COMMENT_DICTIONARY = {}
-_API_URL = "http://webapi.bmrb.wisc.edu/v2"
+_API_URL = "http://api.bmrb.io/v2"
 _SCHEMA_URL = 'https://raw.githubusercontent.com/uwbmrb/nmr-star-dictionary/master/xlschem_ann.csv'
 _WHITESPACE = " \t\n\v"
-__version__ = "2.6.5.1"
+__version__ = "2.6.6"
 
 
 #############################################
@@ -1553,7 +1553,7 @@ class Entry(object):
 
             # The location to fetch entries from
             entry_number = kwargs['entry_num']
-            url = 'http://rest.bmrb.wisc.edu/bmrb/NMR-STAR3/%s' % entry_number
+            url = 'https://bmrb.io/ftp/pub/bmrb/entry_directories/bmr%s/bmr%s_3.str' % (entry_number, entry_number)
 
             # Parse from the official BMRB library
             try:
