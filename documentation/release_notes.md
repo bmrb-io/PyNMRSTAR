@@ -1,5 +1,10 @@
 ### 3.0.9
 
+Changes:
+* The library now tolerates keywords (save_, stop_, etc.) that are not entirely lowercase which
+is technically according to the STAR specification.
+* Minor improvements to the c module
+
 Breaking changes:
 * When calling .filter() on a Loop with ignore_missing_tags=False, the Loop will now throw a KeyError
 rather than a ValueError.
