@@ -34,7 +34,7 @@ typedef struct {
     long index;
     long length;
     long line_no;
-    char last_delineator;
+    char last_delimiter;
 } parser_data;
 
 // Initialize the parser
@@ -54,7 +54,7 @@ void reset_parser(parser_data * parser){
     parser->index = 0;
     parser->length = 0;
     parser->line_no = 0;
-    parser->last_delineator = ' ';
+    parser->last_delimiter = ' ';
 }
 
 static PyObject *
@@ -275,7 +275,7 @@ void update_line_number(parser_data * parser, long start_pos, long length){
 }
 
 /* Returns a new token char * */
-char * update_token(parser_data * parser, long length, char delineator){
+char * update_token(parser_data * parser, long length, char delimiter){
 
     if (parser->token != done_parsing){
         free(parser->token);
@@ -286,20 +286,20 @@ char * update_token(parser_data * parser, long length, char delineator){
     memcpy(parser->token, &parser->full_data[parser->index], length);
     parser->token[length] = '\0';
 
-    // Figure out what to set the last delineator as
+    // Figure out what to set the last delimiter as
     if (parser->index == 0){
-        if (delineator == '#') {
-            parser->last_delineator = '#';
+        if (delimiter == '#') {
+            parser->last_delimiter = '#';
         } else {
-            parser->last_delineator = ' ';
+            parser->last_delimiter = ' ';
         }
     } else {
-        parser->last_delineator = delineator;
+        parser->last_delimiter = delimiter;
     }
 
     // Check if reference
-    if ((parser->token[0] == '$') && (parser->last_delineator == ' ') && (length >1)) {
-        parser->last_delineator = '$';
+    if ((parser->token[0] == '$') && (parser->last_delimiter == ' ') && (length >1)) {
+        parser->last_delimiter = '$';
     }
 
     // Update the line number
@@ -328,8 +328,8 @@ char * get_token(parser_data * parser){
 
     //printf("Cur index: %ld\n", parser->index + 1);
 
-    // Reset the delineator
-    parser->last_delineator = '?';
+    // Reset the delimiter
+    parser->last_delimiter = '?';
 
     // Set up a tmp str pointer to use for searches
     char * search;
@@ -718,7 +718,7 @@ PARSE_get_token_full(PyObject *self)
     parser_data * my_parser = &parser;
 
     // Skip comments
-    while (my_parser->last_delineator == '#'){
+    while (my_parser->last_delimiter == '#'){
         token = get_token(&parser);
     }
 
@@ -728,7 +728,7 @@ PARSE_get_token_full(PyObject *self)
     }
 
     // Unwrap embedded STAR if all lines start with three spaces
-    if ((my_parser->last_delineator == ';') && (starts_with(token, "\n   "))){
+    if ((my_parser->last_delimiter == ';') && (starts_with(token, "\n   "))){
         bool shift_over = true;
 
         size_t token_len = strlen(token);
@@ -754,14 +754,14 @@ PARSE_get_token_full(PyObject *self)
         Py_INCREF(Py_None);
 
     #if PY_MAJOR_VERSION >= 3
-        return Py_BuildValue("OlC", Py_None, my_parser->line_no, my_parser->last_delineator);
+        return Py_BuildValue("OlC", Py_None, my_parser->line_no, my_parser->last_delimiter);
     }
-    return Py_BuildValue("slC", token, my_parser->line_no, my_parser->last_delineator);
+    return Py_BuildValue("slC", token, my_parser->line_no, my_parser->last_delimiter);
 
     #else
-        return Py_BuildValue("Olc", Py_None, my_parser->line_no, my_parser->last_delineator);
+        return Py_BuildValue("Olc", Py_None, my_parser->line_no, my_parser->last_delimiter);
     }
-    return Py_BuildValue("slc", token, my_parser->line_no, my_parser->last_delineator);
+    return Py_BuildValue("slc", token, my_parser->line_no, my_parser->last_delimiter);
     #endif
 }
 
@@ -782,7 +782,7 @@ static PyMethodDef cnmrstar_methods[] = {
      "Load a string in preparation to tokenize."},
 
      {"get_token_full",  (PyCFunction)PARSE_get_token_full, METH_NOARGS,
-     "Get one token from the file as well as the line number and delineator."},
+     "Get one token from the file as well as the line number and delimiter."},
 
      {"reset",  (PyCFunction)PARSE_reset, METH_NOARGS,
      "Reset the tokenizer state."},
