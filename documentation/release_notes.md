@@ -2,7 +2,7 @@
 
 Changes:
 * The library now tolerates keywords (save_, stop_, etc.) that are not entirely lowercase which
-is technically according to the STAR specification.
+is technically allowed according to the STAR specification.
 * Minor improvements to the c module
 
 Breaking changes:
