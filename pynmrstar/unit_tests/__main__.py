@@ -50,7 +50,7 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertEqual(utils.quote_value("loop_"), "noloop_")
         definitions.STR_CONVERSION_DICT = {None: "."}
 
-    def test__odd_strings(self):
+    def test_odd_strings(self):
         """ Make sure the library can handle odd strings. """
 
         saveframe = Saveframe.from_scratch('test', 'citations')
@@ -63,7 +63,7 @@ class TestPyNMRSTAR(unittest.TestCase):
 
         self.assertEqual(saveframe, Saveframe.from_string(str(saveframe)))
 
-    def test__edge_cases(self):
+    def test_edge_cases(self):
         """ Make sure that the various types of edge cases are properly handled. """
 
         Entry.from_file(os.path.join(our_path, 'sample_files', 'edge_cases.str'))
