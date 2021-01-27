@@ -1,9 +1,14 @@
+#define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <ctype.h>
 
 // Version number. Only need to update when
 // API changes.
-#define module_version "2.2.8"
+#define module_version "3.0.9"
 
 // Use for returning errors
 #define err_size 500
@@ -12,22 +17,11 @@
 // Check if a bit is set
 #define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
 
-// Check if py3
-#if PY_MAJOR_VERSION >= 3
-#define PyString_FromString PyUnicode_FromString
-#define PyString_FromFormat PyUnicode_FromFormat
-#endif
-
 struct module_state {
     PyObject *error;
 };
-
-#if PY_MAJOR_VERSION >= 3
 #define GETSTATE(m) ((struct module_state*)PyModule_GetState(m))
-#else
-#define GETSTATE(m) (&_state)
-static struct module_state _state;
-#endif
+
 
 // Our whitespace chars
 char whitespace[4] = " \n\t\v";
@@ -40,7 +34,7 @@ typedef struct {
     long index;
     long length;
     long line_no;
-    char last_delineator;
+    char last_delimiter;
 } parser_data;
 
 // Initialize the parser
@@ -60,7 +54,7 @@ void reset_parser(parser_data * parser){
     parser->index = 0;
     parser->length = 0;
     parser->line_no = 0;
-    parser->last_delineator = ' ';
+    parser->last_delimiter = ' ';
 }
 
 static PyObject *
@@ -136,6 +130,29 @@ char *str_replace(char *orig, char *rep, char *with) {
     return result;
 }
 
+// Creates a new string that is all lower-case
+// You must free the result if result is non-NULL.
+char *str_to_lowercase(char *orig) {
+    char *result; // the return string
+
+    // sanity checks and initialization
+    if (!orig)
+        return NULL;
+
+    result = malloc(strlen(orig) + 1);
+
+    if (!result)
+        return NULL;
+
+    for(int i = 0; orig[i]; i++){
+        result[i] = tolower(orig[i]);
+    }
+
+    return result;
+}
+
+
+
 /* Use to look for common unset bits between strings.
 void get_common_bits(void){
     char one[5] = "data_";
@@ -199,7 +216,7 @@ void get_file(char *fname, parser_data * parser){
 
 /* Determines if a character is whitespace */
 bool is_whitespace(char test){
-    int x;
+    unsigned long int x;
     for (x=0; x<sizeof(whitespace); x++){
         if (test == whitespace[x]){
             return true;
@@ -258,7 +275,7 @@ void update_line_number(parser_data * parser, long start_pos, long length){
 }
 
 /* Returns a new token char * */
-char * update_token(parser_data * parser, long length, char delineator){
+char * update_token(parser_data * parser, long length, char delimiter){
 
     if (parser->token != done_parsing){
         free(parser->token);
@@ -269,20 +286,20 @@ char * update_token(parser_data * parser, long length, char delineator){
     memcpy(parser->token, &parser->full_data[parser->index], length);
     parser->token[length] = '\0';
 
-    // Figure out what to set the last delineator as
+    // Figure out what to set the last delimiter as
     if (parser->index == 0){
-        if (delineator == '#') {
-            parser->last_delineator = '#';
+        if (delimiter == '#') {
+            parser->last_delimiter = '#';
         } else {
-            parser->last_delineator = ' ';
+            parser->last_delimiter = ' ';
         }
     } else {
-        parser->last_delineator = delineator;
+        parser->last_delimiter = delimiter;
     }
 
     // Check if reference
-    if ((parser->token[0] == '$') && (parser->last_delineator == ' ') && (length >1)) {
-        parser->last_delineator = '$';
+    if ((parser->token[0] == '$') && (parser->last_delimiter == ' ') && (length >1)) {
+        parser->last_delimiter = '$';
     }
 
     // Update the line number
@@ -311,8 +328,8 @@ char * get_token(parser_data * parser){
 
     //printf("Cur index: %ld\n", parser->index + 1);
 
-    // Reset the delineator
-    parser->last_delineator = '?';
+    // Reset the delimiter
+    parser->last_delimiter = '?';
 
     // Set up a tmp str pointer to use for searches
     char * search;
@@ -526,26 +543,27 @@ static PyObject * clean_string(PyObject *self, PyObject *args){
     if (strstr(str, "\n;") != NULL){
 
         // Insert the spaces
-        str = str_replace(str, "\n", "\n   ");
+        char * replaced_string;
+        replaced_string = str_replace(str, "\n", "\n   ");
 
         // But always newline terminate it
-        if (!ends_with(str, "\n")){
+        if (!ends_with(replaced_string, "\n")){
             // Must start with newline too
-            if (str[0] != '\n'){
+            if (replaced_string[0] != '\n'){
                 format = "\n   %s\n";
             } else {
                 format = "%s\n";
             }
         } else {
-            if (str[0] != '\n'){
+            if (replaced_string[0] != '\n'){
                 format = "\n   %s";
             } else {
                 format = "%s";
             }
         }
 
-        PyObject* result = PyString_FromFormat(format, str);
-        free(str);
+        PyObject* result = PyUnicode_FromFormat(format, replaced_string);
+        free(replaced_string);
         return(result);
     }
 
@@ -553,10 +571,10 @@ static PyObject * clean_string(PyObject *self, PyObject *args){
     if (strstr(str, "\n") != NULL){
         // But always newline terminate it
         if (str[len-1] != '\n'){
-            return PyString_FromFormat("%s\n", str);
+            return PyUnicode_FromFormat("%s\n", str);
         } else {
             // Return as is if it already ends with a newline
-            return PyString_FromString(str);
+            return PyUnicode_FromString(str);
         }
     }
 
@@ -584,11 +602,11 @@ static PyObject * clean_string(PyObject *self, PyObject *args){
 
         // Return the string with whatever type of quoting we are allowed
         if ((!can_wrap_single) && (!can_wrap_double))
-            return PyString_FromFormat("%s\n", str);
+            return PyUnicode_FromFormat("%s\n", str);
         if (can_wrap_single)
-            return PyString_FromFormat("'%s'", str);
+            return PyUnicode_FromFormat("'%s'", str);
         if (can_wrap_double)
-            return PyString_FromFormat("\"%s\"", str);
+            return PyUnicode_FromFormat("\"%s\"", str);
     }
 
     // Check for special characters in a tag that would require quoting.
@@ -601,44 +619,50 @@ static PyObject * clean_string(PyObject *self, PyObject *args){
         needs_wrapping = true;
     }
 
-    // If the third bit of the third char is 0 then it might be a reserved
-    //  keyword. (See get_common_bits to see how this was calculated.)
-    else if ((!CHECK_BIT(str[3], 3)) && (starts_with(str, "data_") || starts_with(str, "save_") || starts_with(str, "loop_") || starts_with(str, "stop_") || starts_with(str, "global_"))){
-        needs_wrapping = true;
-    }
+    if (!needs_wrapping) {
+        char *lower_case = str_to_lowercase(str);
 
-    // If we don't already know we need to wrap it, see if there is whitespace
-    //  or quotes
-    else {
-        long x;
-        for (x=0; x<len; x++){
-            // Check for whitespace chars
-            if (is_whitespace(str[x])){
-                needs_wrapping = true;
-                break;
-            }
-            // The pound sign only needs quotes if it is proceeded by whitespace
-            if (str[x] == '#'){
-                // A quote with whitespace before
-                if ((x==0) || (is_whitespace(str[x-1]))){
+        // If the third bit of the third char is 0 then it might be a reserved
+        //  keyword. (See get_common_bits to see how this was calculated.)
+        if ((starts_with(lower_case, "data_") || starts_with(lower_case, "save_") || starts_with(lower_case, "loop_") ||
+             starts_with(lower_case, "stop_") || starts_with(lower_case, "global_"))) {
+            needs_wrapping = true;
+        }
+
+        // If we don't already know we need to wrap it, see if there is whitespace
+        //  or quotes
+        else {
+            long x;
+            for (x = 0; x < len; x++) {
+                // Check for whitespace chars
+                if (is_whitespace(str[x])) {
                     needs_wrapping = true;
                     break;
                 }
+                // The pound sign only needs quotes if it is preceded by whitespace
+                if (str[x] == '#') {
+                    // A quote with whitespace before
+                    if ((x == 0) || (is_whitespace(str[x - 1]))) {
+                        needs_wrapping = true;
+                        break;
+                    }
+                }
             }
         }
+        free(lower_case);
     }
 
     if (needs_wrapping){
         // If there is a single quote wrap in double quotes
         if (has_single)
-            return PyString_FromFormat("\"%s\"", str);
+            return PyUnicode_FromFormat("\"%s\"", str);
         // Either there is a double quote or no quotes
         else
-            return PyString_FromFormat("'%s'", str);
+            return PyUnicode_FromFormat("'%s'", str);
     }
 
     // If we got here it's good to go as it is
-    return PyString_FromString(str);
+    return PyUnicode_FromString(str);
 }
 
 
@@ -694,7 +718,7 @@ PARSE_get_token_full(PyObject *self)
     parser_data * my_parser = &parser;
 
     // Skip comments
-    while (my_parser->last_delineator == '#'){
+    while (my_parser->last_delimiter == '#'){
         token = get_token(&parser);
     }
 
@@ -704,11 +728,11 @@ PARSE_get_token_full(PyObject *self)
     }
 
     // Unwrap embedded STAR if all lines start with three spaces
-    if ((my_parser->last_delineator == ';') && (starts_with(token, "\n   "))){
+    if ((my_parser->last_delimiter == ';') && (starts_with(token, "\n   "))){
         bool shift_over = true;
 
         size_t token_len = strlen(token);
-        long c;
+        unsigned long int c;
         for (c=0; c<token_len - 4; c++){
             if (token[c] == '\n'){
                 if (token[c+1] != ' ' || token[c+2] != ' ' || token[c+3] != ' '){
@@ -730,21 +754,21 @@ PARSE_get_token_full(PyObject *self)
         Py_INCREF(Py_None);
 
     #if PY_MAJOR_VERSION >= 3
-        return Py_BuildValue("OlC", Py_None, my_parser->line_no, my_parser->last_delineator);
+        return Py_BuildValue("OlC", Py_None, my_parser->line_no, my_parser->last_delimiter);
     }
-    return Py_BuildValue("slC", token, my_parser->line_no, my_parser->last_delineator);
+    return Py_BuildValue("slC", token, my_parser->line_no, my_parser->last_delimiter);
 
     #else
-        return Py_BuildValue("Olc", Py_None, my_parser->line_no, my_parser->last_delineator);
+        return Py_BuildValue("Olc", Py_None, my_parser->line_no, my_parser->last_delimiter);
     }
-    return Py_BuildValue("slc", token, my_parser->line_no, my_parser->last_delineator);
+    return Py_BuildValue("slc", token, my_parser->line_no, my_parser->last_delimiter);
     #endif
 }
 
 static PyObject *
 version(PyObject *self)
 {
-    return PyString_FromString(module_version);
+    return PyUnicode_FromString(module_version);
 }
 
 static PyMethodDef cnmrstar_methods[] = {
@@ -758,7 +782,7 @@ static PyMethodDef cnmrstar_methods[] = {
      "Load a string in preparation to tokenize."},
 
      {"get_token_full",  (PyCFunction)PARSE_get_token_full, METH_NOARGS,
-     "Get one token from the file as well as the line number and delineator."},
+     "Get one token from the file as well as the line number and delimiter."},
 
      {"reset",  (PyCFunction)PARSE_reset, METH_NOARGS,
      "Reset the tokenizer state."},
@@ -768,8 +792,6 @@ static PyMethodDef cnmrstar_methods[] = {
 
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
-
-#if PY_MAJOR_VERSION >= 3
 
 static int myextension_traverse(PyObject *m, visitproc visit, void *arg) {
     Py_VISIT(GETSTATE(m)->error);
@@ -796,20 +818,8 @@ static struct PyModuleDef moduledef = {
 #define INITERROR return NULL
 
 PyMODINIT_FUNC
-PyInit_cnmrstar(void)
-
-#else
-#define INITERROR return
-
-void
-initcnmrstar(void)
-#endif
-{
-#if PY_MAJOR_VERSION >= 3
+PyInit_cnmrstar(void){
     PyObject *module = PyModule_Create(&moduledef);
-#else
-    PyObject *module = Py_InitModule3("cnmrstar", cnmrstar_methods, "A NMR-STAR tokenizer implemented in C.");
-#endif
 
     if (module == NULL)
         INITERROR;
@@ -821,7 +831,5 @@ initcnmrstar(void)
         INITERROR;
     }
 
-#if PY_MAJOR_VERSION >= 3
     return module;
-#endif
 }

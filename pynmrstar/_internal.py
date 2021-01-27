@@ -10,7 +10,7 @@ from urllib.request import urlopen
 
 from pynmrstar import definitions
 
-__version__: str = "3.0.8"
+__version__: str = "3.0.9"
 
 
 def _build_extension() -> bool:
@@ -57,7 +57,7 @@ def _get_cnmrstar() -> Union[None, object]:
             import pynmrstar.cnmrstar as cnmrstar
             logging.debug('Imported cnmrstar from locally compiled file.')
 
-            if "version" not in dir(cnmrstar) or cnmrstar.version() < "2.2.8":
+            if "version" not in dir(cnmrstar) or cnmrstar.version() < "3.0.9":
                 logging.warning("Recompiling cnmrstar module due to API changes. You may experience a segmentation "
                                 "fault immediately following this message but should have no issues the next time you "
                                 "run your script or this program.")

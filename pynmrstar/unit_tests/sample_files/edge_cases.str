@@ -1,0 +1,45 @@
+dAta_#pound
+
+sAve_entry_information  _Entry.Sf_category  entry_information _Entry.Sf_framecode entry_information
+
+   _Entry.ID                             \".-!?\"
+   _Entry.Invalid_tag            "This tag doesn't exist."
+   _Entry.Title
+;
+Weird;title  test semicolon;
+;
+   _Entry.Hash#Tag                       .൲
+   _Entry.Type                           illegaluncode:β€𐍈¢
+   _Entry.Versio#n_type                   original
+   _Entry.Submission_date                "check inn"er "quoted vals"
+   _Entry.Accession_date                 'check inner quoted vals'
+   _Entry.Last_r'elease_date              .
+   _Entry.Original_release_date          .
+   _Entry.Origination                    'author #notcomment' #comment
+   _Entry.NMR_STAR_version               3.1.1.61
+   _Entry.Original_NMR_STAR_version      '_.'
+   _Entry.Experimental_method            $
+   _Entry.Details                        "1#"
+   _Entry.Experimental_method_subtype    solution
+   _Entry.BMRB_internal_directory_name   ;data;
+
+
+   lOop_
+      _Entry_author.Ordinal
+      _Entry_author.Given_name
+      _Entry_author.Family_name
+      _Entry_author.First_initial
+      _Entry_author.Middle_initials
+      _Entry_author.Family_title
+      _Entry_author.Entry_ID
+
+     1   One    Person   .   D.   .   15000
+   sTop_
+savE_
+
+save_dummy
+ _single.tag !
+ loop_
+  _single.val 1
+  sTop_
+savE_

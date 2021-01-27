@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import json
+import logging
 import os
 import random
 import unittest
@@ -17,6 +18,8 @@ except ImportError:
 
 if cnmrstar:
     print("Using C library...")
+
+logging.getLogger().setLevel(logging.ERROR)
 
 our_path = os.path.dirname(os.path.realpath(__file__))
 database_entry = Entry.from_database(15000)
@@ -59,6 +62,14 @@ class TestPyNMRSTAR(unittest.TestCase):
             saveframe.add_tag(str(x), string)
 
         self.assertEqual(saveframe, Saveframe.from_string(str(saveframe)))
+
+    def test__edge_cases(self):
+        """ Make sure that the various types of edge cases are properly handled. """
+
+        Entry.from_file(os.path.join(our_path, 'sample_files', 'edge_cases.str'))
+        Entry.from_file(os.path.join(our_path, 'sample_files', 'dos.str'))
+        Entry.from_file(os.path.join(our_path, 'sample_files', 'nonewlines.str'))
+        Entry.from_file(os.path.join(our_path, 'sample_files', 'onlynewlines.str'))
 
     def test__format_category(self):
         self.assertEqual(utils.format_category("test"), "_test")

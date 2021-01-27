@@ -666,7 +666,7 @@ class Loop(object):
             tag_match_index = self.tag_index(tag)
             if tag_match_index is None:
                 if not ignore_missing_tags:
-                    raise ValueError("Cannot filter tag '%s' as it isn't present in this loop." % tag)
+                    raise KeyError("Cannot filter tag '%s' as it isn't present in this loop." % tag)
                 continue
 
             valid_tags.append(tag)
@@ -795,14 +795,13 @@ class Loop(object):
 
         # Make sure their fields are actually present in the entry
         tag_ids = []
-        for query in lower_tags:
+        for pos, query in enumerate(lower_tags):
             if str(query) in tag_mapping:
                 tag_ids.append(tag_mapping[query])
             elif isinstance(query, int):
                 tag_ids.append(query)
             else:
-                raise KeyError("Could not locate the tag with name or ID: '%s' in loop '%s'." %
-                               (query, str(self.category)))
+                raise KeyError(f"Could not locate the tag with name or ID: '{tags[pos]}' in loop '{self.category}'.")
 
         # First build the tags as a list
         if not dict_result:
