@@ -456,6 +456,26 @@ entry_information,entry_information,15000,"Solution structure of chicken villin 
         frame.set_tag_prefix("new_prefix")
         self.assertEqual(frame.tag_prefix, "_new_prefix")
 
+    def test_Saveframe_add_tag(self):
+        """ Test the add_tag functionality of a saveframe. """
+
+        # Test that you cannot set the framecode to a null value
+        test_sf = Saveframe.from_scratch('test')
+
+        # Test that the initial setter can't set a null value
+        with self.assertRaises(ValueError):
+            test_sf.add_tag('sf_framecode', None)
+        test_sf.add_tag('sf_framecode', 'test')
+
+        # Test that updating both via add_tag(update=True) and .name= don't
+        # allow for setting a null value
+        for val in definitions.NULL_VALUES:
+            with self.assertRaises(ValueError):
+                test_sf.add_tag('sf_framecode', val, update=True)
+            with self.assertRaises(ValueError):
+                test_sf.name = val
+
+
     def test_category_list(self):
         """ Test the category list property. """
 

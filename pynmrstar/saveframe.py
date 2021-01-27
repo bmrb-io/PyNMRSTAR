@@ -248,8 +248,8 @@ class Saveframe(object):
         for char in str(name):
             if char in utils.definitions.WHITESPACE:
                 raise ValueError("Saveframe names can not contain whitespace characters.")
-        if name == '':
-            raise ValueError('Cannot create saveframes with the empty string as a name.')
+        if name in definitions.NULL_VALUES:
+            raise ValueError("Cannot set the saveframe name to a null-equivalent value.")
 
         # Update the sf_framecode tag too
         if 'sf_framecode' in self:
@@ -478,12 +478,14 @@ class Saveframe(object):
             if not update:
                 raise ValueError("There is already a tag with the name '%s'." % name)
             else:
-                self.get_tag(name, whole_tag=True)[0][1] = value
                 tag_name_lower = name.lower()
                 if tag_name_lower == "sf_category":
                     self.category = value
                 if tag_name_lower == "sf_framecode":
+                    if value in definitions.NULL_VALUES:
+                        raise ValueError("Cannot set the saveframe name to a null-equivalent value.")
                     self._name = value
+                self.get_tag(name, whole_tag=True)[0][1] = value
                 return
 
         # See if we need to convert the data type
