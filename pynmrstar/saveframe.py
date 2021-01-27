@@ -416,7 +416,7 @@ class Saveframe(object):
             except ValueError:
                 raise FormattingError('Cannot generate NMR-STAR for entry, as empty strings are not valid tag values '
                                       'in NMR-STAR. Please either replace the empty strings with None objects, '
-                                      'or set pynmrstar.definitions.STR_CONVERSION_DICT[\'\'] = None.\n'
+                                      'or set pynmrstar.definitions.STR_CONVERSION_DICT[\'\'] = None. '
                                       f'Saveframe: {self.name} Tag: {each_tag[0]}')
 
             formatted_tag = self.tag_prefix + "." + each_tag[0]
