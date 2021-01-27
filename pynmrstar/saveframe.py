@@ -510,7 +510,11 @@ class Saveframe(object):
         if tag_name_lower == "sf_category":
             self.category = value
         if tag_name_lower == "sf_framecode":
-            self.name = value
+            if not self.name:
+                self.name = value
+            elif self.name != value:
+                raise IllegalActionError('The Sf_framecode tag cannot be different from the saveframe name.',
+                                         line_num=line_num)
 
         if line_num:
             new_tag.append(line_num)

@@ -9,7 +9,7 @@ from copy import deepcopy as copy
 
 from pynmrstar import utils, definitions, Saveframe, Entry, Schema, Loop, _Parser
 from pynmrstar._internal import _interpret_file
-from pynmrstar.exceptions import ParsingError
+from pynmrstar.exceptions import ParsingError, IllegalActionError
 
 try:
     import pynmrstar.cnmrstar as cnmrstar
@@ -475,6 +475,11 @@ entry_information,entry_information,15000,"Solution structure of chicken villin 
             with self.assertRaises(ValueError):
                 test_sf.name = val
 
+        # Test that adding an sf_framecode with a different value than the
+        #  saveframe name throws an exception
+        with self.assertRaises(IllegalActionError):
+            test_sf_two = Saveframe.from_scratch('test')
+            test_sf_two.add_tag('sf_framecode', 'different')
 
     def test_category_list(self):
         """ Test the category list property. """
