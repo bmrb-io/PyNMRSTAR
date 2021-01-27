@@ -298,7 +298,7 @@ class Parser(object):
                                 "Cannot have a tag value start with an underscore unless the entire value "
                                 "is quoted. You may be missing a data value on the previous line. "
                                 "Illegal value: " + self.token, self.get_line_number())
-                    cur_frame.add_tag(cur_tag, self.token, self.get_line_number(),
+                    cur_frame.add_tag(cur_tag, self.token, line_num=self.get_line_number(),
                                       convert_data_types=convert_data_types)
 
             if not self.token or self.token.lower() != "save_":

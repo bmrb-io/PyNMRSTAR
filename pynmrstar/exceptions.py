@@ -1,4 +1,4 @@
-class ParsingError(Exception):
+class ParsingError(ValueError):
     """ Something went wrong when parsing. """
 
     def __init__(self, message, line_number: int = None):
@@ -28,6 +28,26 @@ class FormattingError(Exception):
 
     def __repr__(self) -> str:
         return 'FormattingError("%s")' % self.message
+
+    def __str__(self) -> str:
+        return self.message
+
+
+class IllegalActionError(ValueError):
+    """ The user tried to do something illegal.
+
+    Also supports intelligently formatting errors to show the line number
+    if the issue is in a file. """
+
+    def __init__(self, message, line_num=None):
+        Exception.__init__(self)
+        if line_num:
+            self.message = message + f" Error in parsed data on line number: {line_num}"
+        else:
+            self.message = message
+
+    def __repr__(self) -> str:
+        return 'ModificationError("%s")' % self.message
 
     def __str__(self) -> str:
         return self.message
