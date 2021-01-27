@@ -465,14 +465,6 @@ class Saveframe(object):
             else:
                 name = name[1:]
 
-        # No duplicate tags
-        if self.get_tag(name):
-            if not update:
-                raise ValueError("There is already a tag with the name '%s'." % name)
-            else:
-                self.get_tag(name, whole_tag=True)[0][1] = value
-                return
-
         if "." in name:
             raise ValueError("There cannot be more than one '.' in a tag name.")
         for char in str(name):
@@ -480,6 +472,19 @@ class Saveframe(object):
                 raise ValueError("Tag names can not contain whitespace characters.")
         if name == '':
             raise ValueError('Cannot use the empty string as a tag name.')
+
+        # No duplicate tags
+        if self.get_tag(name):
+            if not update:
+                raise ValueError("There is already a tag with the name '%s'." % name)
+            else:
+                self.get_tag(name, whole_tag=True)[0][1] = value
+                tag_name_lower = name.lower()
+                if tag_name_lower == "sf_category":
+                    self.category = value
+                if tag_name_lower == "sf_framecode":
+                    self._name = value
+                return
 
         # See if we need to convert the data type
         if convert_data_types:
