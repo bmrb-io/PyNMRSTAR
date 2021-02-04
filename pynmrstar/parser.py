@@ -66,11 +66,6 @@ class Parser(object):
                 except AttributeError:
                     pass
 
-        if self.token:
-            logging.debug("'%s': '%s'" % (self.delimiter, self.token))
-        else:
-            logging.debug("No more tokens.")
-
         # Return the token
         return self.token
 
