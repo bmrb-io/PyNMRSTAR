@@ -1,0 +1,4 @@
+# Note that this isn't actually a requirement - the code works without it,
+#  it's just significantly slower if you fetch a large number of entries and
+#   don't have requests installed
+requests~=2.21.0

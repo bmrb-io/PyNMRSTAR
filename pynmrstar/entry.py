@@ -1,14 +1,11 @@
 import hashlib
 import json
 import logging
-import zlib
 from io import StringIO
 from typing import TextIO, BinaryIO, Union, List, Optional, Dict, Any
-from urllib.error import HTTPError, URLError
-from urllib.request import urlopen, Request
 
 from pynmrstar import definitions, utils, loop as loop_mod, parser as parser_mod, saveframe as saveframe_mod
-from pynmrstar._internal import __version__, _json_serialize, _interpret_file
+from pynmrstar._internal import _json_serialize, _interpret_file, _get_entry_from_database
 from pynmrstar.schema import Schema
 
 
@@ -71,20 +68,6 @@ class Entry(object):
         elif 'file_name' in kwargs:
             star_buffer = _interpret_file(kwargs['file_name'])
             self.source = "from_file('%s')" % kwargs['file_name']
-        elif 'entry_num' in kwargs:
-            self.source = "from_database(%s)" % kwargs['entry_num']
-
-            # The location to fetch entries from
-            entry_number = kwargs['entry_num']
-            url = f'https://bmrb.io/ftp/pub/bmrb/entry_directories/bmr{entry_number}/bmr{entry_number}_3.str'
-
-            # Parse from the official BMRB library
-            try:
-                star_buffer = StringIO(urlopen(url).read().decode())
-            except HTTPError:
-                raise IOError("Entry '%s' does not exist in the public database." % entry_number)
-            except URLError:
-                raise IOError("You don't appear to have an active internet connection. Cannot fetch entry.")
         # Creating from template (schema)
         elif 'all_tags' in kwargs:
             self._entry_id = kwargs['entry_id']
@@ -254,69 +237,7 @@ class Entry(object):
         notation floats to lowercase "e"s this should not cause any change in
         the way re-printed NMR-STAR objects are displayed."""
 
-        # Try to load the entry using JSON
-        try:
-            entry_url: str = (definitions.API_URL + "/entry/%s?format=zlib") % entry_num
-
-            # Download the entry
-            try:
-                req = Request(entry_url)
-                req.add_header('Application', 'PyNMRSTAR %s' % __version__)
-                url_request = urlopen(req)
-
-                if url_request.getcode() == 404:
-                    raise IOError("Entry '%s' does not exist in the public database." % entry_num)
-                else:
-                    serialized_ent = url_request.read()
-
-                url_request.close()
-
-            except HTTPError as err:
-                if err.code == 404:
-                    raise IOError("Entry '%s' does not exist in the public database." % entry_num)
-                else:
-                    raise err
-
-            # Decompress and convert bytes to string
-            serialized_ent = zlib.decompress(serialized_ent).decode()
-
-            # Parse JSON string to dictionary
-            json_data = json.loads(serialized_ent)
-            if "error" in json_data:
-                # Something up with the API server, try the FTP site
-                return cls(entry_num=entry_num)
-
-            # Load the entry from the JSON
-            ent = Entry.from_json(json_data)
-
-            # Update the entry source
-            ent_source = "from_database(%s)" % entry_num
-            ent.source = ent_source
-            for each_saveframe in ent:
-                each_saveframe.source = ent_source
-                for each_loop in each_saveframe:
-                    each_loop.source = ent_source
-
-            if convert_data_types:
-                schema = utils.get_schema()
-                for each_saveframe in ent:
-                    for tag in each_saveframe.tags:
-                        cur_tag = each_saveframe.tag_prefix + "." + tag[0]
-                        tag[1] = schema.convert_tag(cur_tag, tag[1], line_num="SF %s" % each_saveframe.name)
-                    for loop in each_saveframe:
-                        for row in loop.data:
-                            for pos in range(0, len(row)):
-                                category = loop.category + "." + loop.tags[pos]
-                                line_num = "Loop %s" % loop.category
-                                row[pos] = schema.convert_tag(category, row[pos], line_num=line_num)
-
-            return ent
-        # The entry doesn't exist
-        except KeyError:
-            raise IOError("Entry '%s' does not exist in the public database." % entry_num)
-        except URLError:
-            logging.warning("BMRB API server appears to be down. Attempting to load from FTP site.")
-            return cls(entry_num=entry_num)
+        return _get_entry_from_database(entry_num, convert_data_types=convert_data_types)
 
     @classmethod
     def from_file(cls, the_file: Union[str, TextIO, BinaryIO], convert_data_types: bool = False):

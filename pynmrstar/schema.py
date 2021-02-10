@@ -80,9 +80,8 @@ class Schema(object):
                                                       "reference_files/data_types.csv"))
         except IOError:
             # Load the data types from Github if we can't find them locally
-            types_url = "https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v3/pynmrstar/reference_files/data_types.csv"
             try:
-                types_file = _interpret_file(types_url)
+                types_file = _interpret_file(definitions.TYPES_URL)
             except Exception:
                 raise ValueError("Could not load the data type definition file from disk or the internet!")
 

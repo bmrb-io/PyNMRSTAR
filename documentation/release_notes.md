@@ -1,7 +1,10 @@
-### 3.0.10
+### 3.1.0
 
 Changes:
-*
+* PyNMRSTAR automatically retries fetching an entry from the BMR API using an exponential backoff if rate limited.
+* PyNMRSTAR now lists the package `requests` as a requirement, which allows it to significantly speed up fetching entries
+  from the database. It will still work if requests is not installed though, as in the case where you have checked out
+  the code locally and don't have requests installed - you just won't get the enhanced performance.
 
 Breaking changes:
 * The default value of `skip_empty_loops` of the method `write_to_file()` for both `Entry` and `Saveframe` has 
