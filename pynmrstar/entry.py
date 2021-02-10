@@ -899,7 +899,7 @@ class Entry(object):
         return errors
 
     def write_to_file(self, file_name: str, format_: str = "nmrstar", show_comments: bool = True,
-                      skip_empty_loops: bool = True, skip_empty_tags: bool = False) -> None:
+                      skip_empty_loops: bool = False, skip_empty_tags: bool = False) -> None:
         """ Writes the entry to the specified file in NMR-STAR format.
 
         Optionally specify:

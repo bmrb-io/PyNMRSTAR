@@ -1,3 +1,16 @@
+### 3.0.10
+
+Changes:
+*
+
+Breaking changes:
+* The default value of `skip_empty_loops` of the method `write_to_file()` for both `Entry` and `Saveframe` has 
+  been changed to `True` to write out empty loops. Technically according to the NMR-STAR format, empty loops should
+  be omitted. In practice, many libraries fail to treat a missing tag as equivalent to a present but null tag, and 
+  would be confused by the fact that reading in a file and writing it back out again would cause these empty loops to
+  go missing. You can still manually specify `skip_empty_loops=True` to maintain the previous behavior.
+  
+
 ### 3.0.9
 
 Changes:
