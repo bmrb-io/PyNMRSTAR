@@ -9,7 +9,7 @@ from copy import deepcopy as copy
 
 from pynmrstar import utils, definitions, Saveframe, Entry, Schema, Loop, _Parser
 from pynmrstar._internal import _interpret_file
-from pynmrstar.exceptions import ParsingError
+from pynmrstar.exceptions import ParsingError, IllegalActionError
 
 try:
     import pynmrstar.cnmrstar as cnmrstar
@@ -50,7 +50,7 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertEqual(utils.quote_value("loop_"), "noloop_")
         definitions.STR_CONVERSION_DICT = {None: "."}
 
-    def test__odd_strings(self):
+    def test_odd_strings(self):
         """ Make sure the library can handle odd strings. """
 
         saveframe = Saveframe.from_scratch('test', 'citations')
@@ -63,7 +63,7 @@ class TestPyNMRSTAR(unittest.TestCase):
 
         self.assertEqual(saveframe, Saveframe.from_string(str(saveframe)))
 
-    def test__edge_cases(self):
+    def test_edge_cases(self):
         """ Make sure that the various types of edge cases are properly handled. """
 
         Entry.from_file(os.path.join(our_path, 'sample_files', 'edge_cases.str'))
@@ -455,6 +455,31 @@ entry_information,entry_information,15000,"Solution structure of chicken villin 
         # Test set_tag_prefix
         frame.set_tag_prefix("new_prefix")
         self.assertEqual(frame.tag_prefix, "_new_prefix")
+
+    def test_Saveframe_add_tag(self):
+        """ Test the add_tag functionality of a saveframe. """
+
+        # Test that you cannot set the framecode to a null value
+        test_sf = Saveframe.from_scratch('test')
+
+        # Test that the initial setter can't set a null value
+        with self.assertRaises(ValueError):
+            test_sf.add_tag('sf_framecode', None)
+        test_sf.add_tag('sf_framecode', 'test')
+
+        # Test that updating both via add_tag(update=True) and .name= don't
+        # allow for setting a null value
+        for val in definitions.NULL_VALUES:
+            with self.assertRaises(ValueError):
+                test_sf.add_tag('sf_framecode', val, update=True)
+            with self.assertRaises(ValueError):
+                test_sf.name = val
+
+        # Test that adding an sf_framecode with a different value than the
+        #  saveframe name throws an exception
+        with self.assertRaises(IllegalActionError):
+            test_sf_two = Saveframe.from_scratch('test')
+            test_sf_two.add_tag('sf_framecode', 'different')
 
     def test_category_list(self):
         """ Test the category list property. """

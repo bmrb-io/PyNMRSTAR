@@ -4,7 +4,7 @@ from typing import Optional, Any
 
 from pynmrstar import definitions, entry as entry_mod, loop as loop_mod, saveframe as saveframe_mod
 from pynmrstar._internal import _get_cnmrstar
-from pynmrstar.exceptions import ParsingError
+from pynmrstar.exceptions import ParsingError, IllegalActionError
 
 cnmrstar = _get_cnmrstar()
 
@@ -65,11 +65,6 @@ class Parser(object):
 
                 except AttributeError:
                     pass
-
-        if self.token:
-            logging.debug("'%s': '%s'" % (self.delimiter, self.token))
-        else:
-            logging.debug("No more tokens.")
 
         # Return the token
         return self.token
@@ -298,8 +293,11 @@ class Parser(object):
                                 "Cannot have a tag value start with an underscore unless the entire value "
                                 "is quoted. You may be missing a data value on the previous line. "
                                 "Illegal value: " + self.token, self.get_line_number())
-                    cur_frame.add_tag(cur_tag, self.token, self.get_line_number(),
-                                      convert_data_types=convert_data_types)
+                    try:
+                        cur_frame.add_tag(cur_tag, self.token, line_num=self.get_line_number(),
+                                          convert_data_types=convert_data_types)
+                    except IllegalActionError as err:
+                        raise ParsingError(str(err))
 
             if not self.token or self.token.lower() != "save_":
                 raise ParsingError("Saveframe improperly terminated at end of file.", self.get_line_number())

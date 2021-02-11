@@ -5,7 +5,7 @@ from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Iterable
 
 from pynmrstar import definitions, entry as entry_mod, loop as loop_mod, parser as parser_mod, utils
 from pynmrstar._internal import _get_comments, _json_serialize, _interpret_file
-from pynmrstar.exceptions import FormattingError
+from pynmrstar.exceptions import FormattingError, IllegalActionError
 from pynmrstar.schema import Schema
 
 
@@ -248,8 +248,8 @@ class Saveframe(object):
         for char in str(name):
             if char in utils.definitions.WHITESPACE:
                 raise ValueError("Saveframe names can not contain whitespace characters.")
-        if name == '':
-            raise ValueError('Cannot create saveframes with the empty string as a name.')
+        if name in definitions.NULL_VALUES:
+            raise ValueError("Cannot set the saveframe name to a null-equivalent value.")
 
         # Update the sf_framecode tag too
         if 'sf_framecode' in self:
@@ -416,7 +416,7 @@ class Saveframe(object):
             except ValueError:
                 raise FormattingError('Cannot generate NMR-STAR for entry, as empty strings are not valid tag values '
                                       'in NMR-STAR. Please either replace the empty strings with None objects, '
-                                      'or set pynmrstar.definitions.STR_CONVERSION_DICT[\'\'] = None.\n'
+                                      'or set pynmrstar.definitions.STR_CONVERSION_DICT[\'\'] = None. '
                                       f'Saveframe: {self.name} Tag: {each_tag[0]}')
 
             formatted_tag = self.tag_prefix + "." + each_tag[0]
@@ -447,11 +447,19 @@ class Saveframe(object):
 
         self.loops.append(loop_to_add)
 
-    def add_tag(self, name: str, value: Any, line_num: Optional[int] = None, update: bool = False,
-                convert_data_types: bool = False) -> None:
+    def add_tag(self, name: str, value: Any, update: bool = False, convert_data_types: bool = False,
+                line_num: Optional[int] = None) -> None:
         """Add a tag to the tag list. Does a bit of validation and
-        parsing. Set update to true to update a tag if it exists rather
-        than raise an exception."""
+        parsing.
+
+        Set update to True to update a tag if it exists rather
+        than raise an exception.
+
+        Set convert_data_types to True to convert the tag value from str to
+        whatever type the tag is as defined in the schema. """
+
+        if not isinstance(name, str):
+            raise IllegalActionError('Tag names must be strings.', line_num=line_num)
 
         if "." in name:
             if name[0] != ".":
@@ -459,27 +467,36 @@ class Saveframe(object):
                 if self.tag_prefix is None:
                     self.tag_prefix = prefix
                 elif self.tag_prefix != prefix:
-                    raise ValueError("One saveframe cannot have tags with different categories (or tags that don't "
-                                     "match the set category)! '%s' vs '%s'." % (self.tag_prefix, prefix))
+                    raise IllegalActionError(
+                        "One saveframe cannot have tags with different categories (or tags that don't "
+                        f"match the set category)! '{self.tag_prefix}' vs '{prefix}'.", line_num=line_num)
                 name = name[name.index(".") + 1:]
             else:
                 name = name[1:]
 
+        if name in definitions.NULL_VALUES:
+            raise IllegalActionError('Cannot use a null-equivalent value as a tag name.', line_num=line_num)
+        if "." in name:
+            raise IllegalActionError("There cannot be more than one '.' in a tag name.", line_num=line_num)
+        for char in name:
+            if char in utils.definitions.WHITESPACE:
+                raise IllegalActionError("Tag names can not contain whitespace characters.", line_num=line_num)
+
         # No duplicate tags
         if self.get_tag(name):
             if not update:
-                raise ValueError("There is already a tag with the name '%s'." % name)
+                raise IllegalActionError(f"There is already a tag with the name '{name}'. Set update=True if"
+                                         f" you want to override its value.", line_num=line_num)
             else:
+                tag_name_lower = name.lower()
+                if tag_name_lower == "sf_category":
+                    self.category = value
+                if tag_name_lower == "sf_framecode":
+                    if value in definitions.NULL_VALUES:
+                        raise IllegalActionError("Cannot set the saveframe name to a null-equivalent value.")
+                    self._name = value
                 self.get_tag(name, whole_tag=True)[0][1] = value
                 return
-
-        if "." in name:
-            raise ValueError("There cannot be more than one '.' in a tag name.")
-        for char in str(name):
-            if char in utils.definitions.WHITESPACE:
-                raise ValueError("Tag names can not contain whitespace characters.")
-        if name == '':
-            raise ValueError('Cannot use the empty string as a tag name.')
 
         # See if we need to convert the data type
         if convert_data_types:
@@ -493,7 +510,11 @@ class Saveframe(object):
         if tag_name_lower == "sf_category":
             self.category = value
         if tag_name_lower == "sf_framecode":
-            self.name = value
+            if not self.name:
+                self.name = value
+            elif self.name != value:
+                raise IllegalActionError('The Sf_framecode tag cannot be different from the saveframe name.',
+                                         line_num=line_num)
 
         if line_num:
             new_tag.append(line_num)
@@ -808,7 +829,7 @@ class Saveframe(object):
         return errors
 
     def write_to_file(self, file_name: str, format_: str = "nmrstar", show_comments: bool = True,
-                      skip_empty_loops: bool = True, skip_empty_tags: bool = False):
+                      skip_empty_loops: bool = False, skip_empty_tags: bool = False):
         """ Writes the saveframe to the specified file in NMR-STAR format.
 
         Optionally specify:

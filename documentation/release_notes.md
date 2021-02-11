@@ -1,3 +1,19 @@
+### 3.1.0
+
+Changes:
+* PyNMRSTAR automatically retries fetching an entry from the BMR API using an exponential backoff if rate limited.
+* PyNMRSTAR now lists the package `requests` as a requirement, which allows it to significantly speed up fetching entries
+  from the database. It will still work if requests is not installed though, as in the case where you have checked out
+  the code locally and don't have requests installed - you just won't get the enhanced performance.
+
+Breaking changes:
+* The default value of `skip_empty_loops` of the method `write_to_file()` for both `Entry` and `Saveframe` has 
+  been changed to `True` to write out empty loops. Technically according to the NMR-STAR format, empty loops should
+  be omitted. In practice, many libraries fail to treat a missing tag as equivalent to a present but null tag, and 
+  would be confused by the fact that reading in a file and writing it back out again would cause these empty loops to
+  go missing. You can still manually specify `skip_empty_loops=True` to maintain the previous behavior.
+  
+
 ### 3.0.9
 
 Changes:
