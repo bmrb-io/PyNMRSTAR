@@ -187,14 +187,12 @@ class Parser(object):
                     in_loop = True
                     while in_loop and self.get_token() is not None:
 
-                        # Add a tag
-                        if self.token.startswith("_"):
-                            if self.delimiter != " ":
-                                raise ParsingError("Loop tags may not be quoted or semicolon-delimited.",
-                                                   self.get_line_number())
-                            if seen_data:
-                                raise ParsingError("Cannot have more loop tags after loop data.")
-                            cur_loop.add_tag(self.token)
+                        # Add a tag if it isn't quoted - if quoted, it should be treated as a data value
+                        if self.token.startswith("_") and self.delimiter == " ":
+                            try:
+                                cur_loop.add_tag(self.token)
+                            except ValueError as err:
+                                raise ParsingError(str(err), self.get_line_number())
 
                         # On to data
                         else:
@@ -237,6 +235,10 @@ class Parser(object):
                                     cur_loop = None
                                     in_loop = False
                                     break
+                                elif self.token.startswith("_") and self.delimiter == " ":
+                                    raise ParsingError("Cannot have more loop tags after loop data. Or perhaps this "
+                                                       f"was a data value which was not quoted? Value: '{self.token}'.",
+                                                       self.get_line_number())
                                 else:
                                     if len(cur_loop.tags) == 0:
                                         raise ParsingError("Data found in loop before loop tags.",
