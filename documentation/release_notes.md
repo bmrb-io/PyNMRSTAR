@@ -1,3 +1,22 @@
+### 3.2
+
+Changes:
+* Significant extra detail added to most error messages.
+* A new exception called InvalidStateError is thrown when trying to perform actions which cannot be completed because
+  the current state of the objects cannot be properly mapped to NMR-STAR. When using the appropriate setters and getters
+  rather than directly modifying object attributes, it is somewhat hard to create such invalid states. The exception
+  inherits from ValueError (which is the exception that used to be thrown in these circumstances) so no code changes
+  should be necessary to catch these exceptions.
+* The parser now properly handles some ultra rare edge cases during loop parsing during which it previously either 
+  threw exceptions when it shouldn't have, or failed to throw an exception when it should have.
+
+Potentially breaking changes:
+* Saveframe tags no longer store the line number from which a tag was originally read. This was not
+  always set anyway, since saveframes could also be created from scratch. This was also never advertised to calling
+  code, so it's very unlikely this change will affect you.
+* Long deprecated methods Loop.add_column(), Loop.add_data_by_column(), and Loop.get_columns() were removed.
+
+
 ### 3.1.0
 
 Changes:
