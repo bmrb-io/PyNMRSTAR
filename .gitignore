@@ -69,3 +69,6 @@ pynmrstar/unit_tests/test.log
 
 # Ignore mypy cache
 .mypy_cache
+
+# Ignore sphinx build
+_build

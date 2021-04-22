@@ -11,9 +11,9 @@ from pynmrstar.schema import Schema
 
 
 class Entry(object):
-    """An OO representation of a BMRB entry. You can initialize this
+    """An object oriented representation of a BMRB entry. You can initialize this
     object several ways; (e.g. from a file, from the official database,
-    from scratch) see the class methods below."""
+    from scratch) see the class methods below. """
 
     def __delitem__(self, item: Union['saveframe_mod.Saveframe', int, str]) -> None:
         """Remove the indicated saveframe."""
