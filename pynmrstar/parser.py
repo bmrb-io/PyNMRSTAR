@@ -222,6 +222,12 @@ class Parser(object):
                                             logging.warning("Loop with no data on line: %s" % self.get_line_number())
 
                                     if len(cur_data) > 0:
+                                        if len(cur_data) % len(cur_loop.tags) != 0:
+                                            raise ParsingError(f"The loop being parsed, '{cur_loop.category}' does "
+                                                               f"not have the expected number of data elements. This "
+                                                               f"indicates that either one or more tag values are "
+                                                               f"either missing from or duplicated in this loop.",
+                                                               self.get_line_number())
                                         try:
                                             cur_loop.add_data(cur_data, rearrange=True,
                                                               convert_data_types=convert_data_types)
