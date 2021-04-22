@@ -4,7 +4,7 @@ from typing import Optional, Any
 
 from pynmrstar import definitions, entry as entry_mod, loop as loop_mod, saveframe as saveframe_mod
 from pynmrstar._internal import _get_cnmrstar
-from pynmrstar.exceptions import ParsingError, IllegalActionError
+from pynmrstar.exceptions import ParsingError
 
 cnmrstar = _get_cnmrstar()
 
@@ -129,16 +129,13 @@ class Parser(object):
         # Prepare the data for parsing
         self.load_data(data)
 
-        # Create the NMRSTAR object
-        cur_data = []
-
         # Get the first token
         self.get_token()
 
         # Make sure this is actually a STAR file
         if not self.token.lower().startswith("data_"):
             raise ParsingError("Invalid file. NMR-STAR files must start with 'data_'. Did you accidentally select the "
-                               "wrong file?", self.get_line_number())
+                               f"wrong file? Your file started with '{self.token}'.", self.get_line_number())
 
         # Make sure there is a data name
         elif len(self.token) < 6:
@@ -146,7 +143,8 @@ class Parser(object):
                                self.get_line_number())
 
         if self.delimiter != " ":
-            raise ParsingError("The data_ keyword may not be quoted or semicolon-delimited.")
+            raise ParsingError("The data_ keyword may not be quoted or semicolon-delimited.",
+                               self.get_line_number())
 
         # Set the entry_id
         self.ent._entry_id = self.token[5:]
@@ -156,7 +154,7 @@ class Parser(object):
         while self.get_token() is not None:
 
             if not self.token.lower().startswith("save_"):
-                raise ParsingError("Only 'save_NAME' is valid in the body of a NMR-STAR file. Found '%s'." % self.token,
+                raise ParsingError(f"Only 'save_NAME' is valid in the body of a NMR-STAR file. Found '{self.token}'.",
                                    self.get_line_number())
 
             if len(self.token) < 6:
@@ -183,6 +181,7 @@ class Parser(object):
                     cur_loop: Optional[loop_mod.Loop] = loop_mod.Loop.from_scratch(source=source)
 
                     # We are in a loop
+                    cur_data = []
                     seen_data = False
                     in_loop = True
                     while in_loop and self.get_token() is not None:
@@ -199,7 +198,10 @@ class Parser(object):
 
                             # Now that we have the tags we can add the loop
                             #  to the current saveframe
-                            cur_frame.add_loop(cur_loop)
+                            try:
+                                cur_frame.add_loop(cur_loop)
+                            except ValueError as err:
+                                raise ParsingError(str(err), self.get_line_number())
 
                             # We are in the data block of a loop
                             while self.token is not None:
@@ -212,14 +214,14 @@ class Parser(object):
                                         if raise_parse_warnings:
                                             raise ParsingError("Loop with no tags.", self.get_line_number())
                                         else:
-                                            logging.warning('Loop with no tags in parsed file on line: %s' %
+                                            logging.warning('Loop with no tags in parsed file on line: %s',
                                                             self.get_line_number())
                                         cur_loop = None
                                     if not seen_data:
                                         if raise_parse_warnings:
                                             raise ParsingError("Loop with no data.", self.get_line_number())
                                         else:
-                                            logging.warning("Loop with no data on line: %s" % self.get_line_number())
+                                            logging.warning("Loop with no data on line: %s", self.get_line_number())
 
                                     if len(cur_data) > 0:
                                         if len(cur_data) % len(cur_loop.tags) != 0:
@@ -243,27 +245,38 @@ class Parser(object):
                                     break
                                 elif self.token.startswith("_") and self.delimiter == " ":
                                     raise ParsingError("Cannot have more loop tags after loop data. Or perhaps this "
-                                                       f"was a data value which was not quoted? Value: '{self.token}'.",
+                                                       f"was a data value which was not quoted (but must be, "
+                                                       f"if it starts with '_')? Value: '{self.token}'.",
                                                        self.get_line_number())
                                 else:
                                     if len(cur_loop.tags) == 0:
-                                        raise ParsingError("Data found in loop before loop tags.",
+                                        raise ParsingError("Data value found in loop before any loop tags were "
+                                                           "defined. Value: '{self.token}'",
                                                            self.get_line_number())
 
-                                    if (self.token in definitions.RESERVED_KEYWORDS and
-                                            self.delimiter == " "):
-                                        raise ParsingError("Cannot use keywords as data values unless quoted or "
-                                                           "semi-colon delimited. Perhaps this is a loop that wasn't "
-                                                           "properly terminated? Illegal value: " + self.token,
-                                                           self.get_line_number())
+                                    if self.token in definitions.RESERVED_KEYWORDS and self.delimiter == " ":
+                                        error = "Cannot use keywords as data values unless quoted or semi-colon " \
+                                                "delimited. Perhaps this is a loop that wasn't properly terminated " \
+                                                "with a 'stop_' keyword before the saveframe ended or another loop " \
+                                                f"began? Value found where 'stop_' or another data value expected: " \
+                                                f"'{self.token}'."
+                                        if len(cur_data) > 0:
+                                            error += f" Last loop data element parsed: '{cur_data[-1]}'."
+                                        raise ParsingError(error, self.get_line_number())
                                     cur_data.append(self.token)
                                     seen_data = True
 
                                 # Get the next token
                                 self.get_token()
 
-                    if not self.token or self.token.lower() != "stop_":
-                        raise ParsingError("Loop improperly terminated at end of file.", self.get_line_number())
+                    if not self.token:
+                        raise ParsingError(f"Loop improperly terminated at end of file. Loops must end with the "
+                                           f"'stop_' token, but the file ended without the stop token.",
+                                           self.get_line_number())
+                    if self.token.lower() != 'stop_':
+                        raise ParsingError(f"Loop improperly terminated at end of file. Loops must end with the "
+                                           f"'stop_' token, but the token '{self.token}' was found instead.",
+                                           self.get_line_number())
 
                 # Close saveframe
                 elif self.token.lower() == "save_":
@@ -274,18 +287,25 @@ class Parser(object):
                     if cur_frame.tag_prefix is None:
                         raise ParsingError("The tag prefix was never set! Either the saveframe had no tags, you "
                                            "tried to read a version 2.1 file, or there is something else wrong with "
-                                           "your file. Saveframe error occurred within: '%s'" % cur_frame.name)
+                                           f"your file. Saveframe error occurred within: '{cur_frame.name}'",
+                                           line_number=self.get_line_number())
                     break
 
                 # Invalid content in saveframe
                 elif not self.token.startswith("_"):
-                    raise ParsingError("Invalid token found in saveframe '%s': '%s'" % (cur_frame.name, self.token),
-                                       self.get_line_number())
+                    if cur_frame.name == 'internaluseyoushouldntseethis_frame':
+                        raise ParsingError(f"Invalid token found in loop contents. Expecting 'loop_' "
+                                           f"but found: '{self.token}'", line_number=self.get_line_number())
+                    else:
+                        raise ParsingError(f"Invalid token found in saveframe '{cur_frame.name}'. Expecting a tag, "
+                                           f"loop, or 'save_' token but found: '{self.token}'",
+                                           line_number=self.get_line_number())
 
                 # Add a tag
                 else:
                     if self.delimiter != " ":
-                        raise ParsingError("Saveframe tags may not be quoted or semicolon-delimited.",
+                        raise ParsingError(f"Saveframe tags may not be quoted or semicolon-delimited. Quoted tag: '"
+                                           f"{self.token}'.",
                                            self.get_line_number())
                     cur_tag: Optional[str] = self.token
 
@@ -294,21 +314,21 @@ class Parser(object):
                     if self.delimiter == " ":
                         if self.token in definitions.RESERVED_KEYWORDS:
                             raise ParsingError("Cannot use keywords as data values unless quoted or semi-colon "
-                                               "delimited. Illegal value: " +
-                                               self.token, self.get_line_number())
+                                               f"delimited. Illegal value: '{self.token}'", self.get_line_number())
                         if self.token.startswith("_"):
                             raise ParsingError(
                                 "Cannot have a tag value start with an underscore unless the entire value "
                                 "is quoted. You may be missing a data value on the previous line. "
-                                "Illegal value: " + self.token, self.get_line_number())
+                                f"Illegal value: '{self.token}'", self.get_line_number())
                     try:
-                        cur_frame.add_tag(cur_tag, self.token, line_num=self.get_line_number(),
-                                          convert_data_types=convert_data_types)
-                    except IllegalActionError as err:
-                        raise ParsingError(str(err))
+                        cur_frame.add_tag(cur_tag, self.token, convert_data_types=convert_data_types)
+                    except ValueError as err:
+                        raise ParsingError(str(err), line_number=self.get_line_number())
 
             if not self.token or self.token.lower() != "save_":
-                raise ParsingError("Saveframe improperly terminated at end of file.", self.get_line_number())
+                raise ParsingError("Saveframe improperly terminated at end of file. Saveframes must be terminated "
+                                   "with the 'save_' token.",
+                                   self.get_line_number())
 
         # Free the memory of the original copy of the data we parsed
         self.full_data = None
@@ -400,7 +420,7 @@ class Parser(object):
                         else:
                             logging.warning("Technically invalid line found in file. Multi-line values "
                                             "should terminate with \\n;\\n but in this file only \\n; with non-return "
-                                            "whitespace following was found. Line: %s" % self.get_line_number())
+                                            "whitespace following was found. Line: %s", self.get_line_number())
                         self.token = tmp[0:until + 1]
                         self.index += until + 4
                         self.delimiter = ";"

@@ -9,7 +9,7 @@ from copy import deepcopy as copy
 
 from pynmrstar import utils, definitions, Saveframe, Entry, Schema, Loop, _Parser
 from pynmrstar._internal import _interpret_file
-from pynmrstar.exceptions import ParsingError, IllegalActionError
+from pynmrstar.exceptions import ParsingError
 
 try:
     import pynmrstar.cnmrstar as cnmrstar
@@ -149,16 +149,15 @@ class TestPyNMRSTAR(unittest.TestCase):
 
         self.assertEqual(default.val_type("_Entity.ID", 1), [])
         self.assertEqual(default.val_type("_Entity.ID", "test"), [
-            "Value does not match specification: '_Entity.ID':'test' on line 'None'.\n     Type specified: int\n     "
+            "Value does not match specification: '_Entity.ID':'test'.\n     Type specified: int\n     "
             "Regular expression for type: '^(?:-?[0-9]*)?$'"])
         self.assertEqual(default.val_type("_Atom_chem_shift.Val", float(1.2)), [])
         self.assertEqual(default.val_type("_Atom_chem_shift.Val", "invalid"), [
-            "Value does not match specification: '_Atom_chem_shift.Val':'invalid' on line 'None'.\n     Type "
+            "Value does not match specification: '_Atom_chem_shift.Val':'invalid'.\n     Type "
             "specified: float\n     Regular expression for type: '^(?:-?[0-9]*\\.?[0-9]+(?:[eE][-+]?[0-9]+)?)?$'"])
 
         self.assertEqual(default.val_type("_Entry.ID", "this should be far too long - much too long"), [
-            "Length of '43' is too long for CHAR(12): '_Entry.ID':'this should be far too long - much too long' on"
-            " line 'None'."])
+            "Length of '43' is too long for 'CHAR(12)': '_Entry.ID':'this should be far too long - much too long'."])
 
     def test_entry_delitem(self):
         tmp_entry = copy(self.file_entry)
@@ -202,7 +201,7 @@ class TestPyNMRSTAR(unittest.TestCase):
         tmp_entry['entry_information'] = tmp_entry.get_saveframe_by_name('entry_information')
         self.assertEqual(tmp_entry, self.file_entry)
 
-        self.assertRaises(KeyError, tmp_entry.__setitem__, 'entry_informations',
+        self.assertRaises(ValueError, tmp_entry.__setitem__, 'entry_informations',
                           tmp_entry.get_saveframe_by_name('entry_information'))
         self.assertRaises(ValueError, tmp_entry.__setitem__, 'entry_information', 1)
 
@@ -236,14 +235,14 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertRaises(ValueError, self.file_entry.get_tag, 'bad_tag')
         self.assertEqual(self.file_entry.get_tag("entry.Submission_date"), ['2006-09-07'])
         self.assertEqual(self.file_entry.get_tag("entry.Submission_date", whole_tag=True),
-                         [[u'Submission_date', u'2006-09-07', 17]])
+                         [[u'Submission_date', u'2006-09-07']])
 
     def test_validate(self):
         validation = []
         self.assertEqual(self.file_entry.validate(), [])
         self.file_entry[-1][-1][0][0] = 'a'
         validation.append(
-            "Value does not match specification: '_Atom_chem_shift.ID':'a' on line '0 tag 0 of loop'.\n     "
+            "Value does not match specification: '_Atom_chem_shift.ID':'a'.\n     "
             "Type specified: int\n     Regular expression for type: '^(?:-?[0-9]*)?$'")
         self.assertEqual(self.file_entry.validate(), validation)
         self.file_entry[-1][-1][0][0] = '1'
@@ -379,7 +378,7 @@ entry_information,entry_information,15000,"Solution structure of chicken villin 
         # Test get_tag - this is really already tested in the other tests here
         self.assertEqual(frame.get_tag("sf_category"), ['entry_information'])
         self.assertEqual(frame.get_tag("entry.sf_category"), ['entry_information'])
-        self.assertEqual(frame.get_tag("entry.sf_category", whole_tag=True), [['Sf_category', 'entry_information', 8]])
+        self.assertEqual(frame.get_tag("entry.sf_category", whole_tag=True), [['Sf_category', 'entry_information']])
 
         # Test sort
         self.assertEqual([[x[0], x[1]] for x in frame.tags], [['Sf_category', 'entry_information'],
@@ -471,15 +470,24 @@ entry_information,entry_information,15000,"Solution structure of chicken villin 
         # allow for setting a null value
         for val in definitions.NULL_VALUES:
             with self.assertRaises(ValueError):
-                test_sf.add_tag('sf_framecode', val, update=True)
+                test_sf.add_tag('sf_framecode', val)
             with self.assertRaises(ValueError):
                 test_sf.name = val
 
         # Test that adding an sf_framecode with a different value than the
         #  saveframe name throws an exception
-        with self.assertRaises(IllegalActionError):
+        with self.assertRaises(ValueError):
             test_sf_two = Saveframe.from_scratch('test')
             test_sf_two.add_tag('sf_framecode', 'different')
+
+    def test_Entry___setitem__(self):
+        """ Test the setting a tag functionality of an entry. """
+
+        test_entry = Entry.from_scratch('test')
+        test_saveframe = Saveframe.from_scratch('test', 'test')
+        test_entry.frame_list = [test_saveframe, test_saveframe]
+        with self.assertRaises(ValueError):
+            test_entry['test'] = test_saveframe
 
     def test_category_list(self):
         """ Test the category list property. """
@@ -494,6 +502,18 @@ entry_information,entry_information,15000,"Solution structure of chicken villin 
                                              'experimental_source', 'chem_comp', 'sample', 'sample_conditions',
                                              'software', 'NMR_spectrometer', 'NMR_spectrometer_list', 'experiment_list',
                                              'chem_shift_reference', 'assigned_chemical_shifts'])
+
+    def test_loop_parsing(self):
+        with self.assertRaises(ParsingError):
+            Loop.from_string("loop_ _test.one _test.two 1 loop_")
+        with self.assertRaises(ParsingError):
+            Loop.from_string("loop_ _test.one _test.two 1 stop_")
+        with self.assertRaises(ParsingError):
+            Loop.from_string("loop_ _test.one _test.two 1 2 3 stop_")
+        with self.assertRaises(ParsingError):
+            Loop.from_string("loop_ _test.one _test.two 1 2 3")
+        with self.assertRaises(ParsingError):
+            Loop.from_string("loop_ _test.one _test.two 1 save_ stop_")
 
     def test_loop(self):
         test_loop = self.file_entry[0][0]

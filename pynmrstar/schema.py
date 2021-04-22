@@ -46,7 +46,7 @@ class Schema(object):
             while tmp_line[0] != "TBL_BEGIN":
                 tmp_line = next(csv_reader_instance)
         except IndexError:
-            raise ValueError("Could not parse a schema from the specified URL: %s" % schema_file)
+            raise ValueError(f"Could not parse a schema from the specified URL: {schema_file}")
         self.version = tmp_line[3]
 
         # Determine the primary key field
@@ -92,7 +92,7 @@ class Schema(object):
     def __repr__(self) -> str:
         """Return how we can be initialized."""
 
-        return "pynmrstar.Schema(schema_file='%s') version %s" % (self.schema_file, self.version)
+        return f"pynmrstar.Schema(schema_file='{self.schema_file}') version {self.version}"
 
     def __str__(self) -> str:
         """Print the schema that we are adhering to."""
@@ -125,7 +125,7 @@ class Schema(object):
         # See if the tag is already in the schema
         if tag.lower() in self.schema:
             raise ValueError("Cannot add a tag to the schema that is already in"
-                             " the schema: %s" % tag)
+                             f" the schema: {tag}")
 
         # Check the tag type
         tag_type = tag_type.upper()
@@ -138,7 +138,7 @@ class Schema(object):
                 try:
                     1 / int(length)
                 except (ValueError, ZeroDivisionError):
-                    raise ValueError("Illegal length specified in tag type:%s " % length)
+                    raise ValueError(f"Illegal length specified in tag type: {length}")
 
                 # Cut off anything that might be at the end
                 tag_type = tag_type[0:tag_type.index(")") + 1]
@@ -202,14 +202,14 @@ class Schema(object):
                                     "SFCategory": sf_category, "Tag": tag,
                                     "Dictionary sequence": new_tag_pos}
 
-    def convert_tag(self, tag: str, value: Any, line_num: int = None) -> \
+    def convert_tag(self, tag: str, value: Any) -> \
             Optional[Union[str, int, decimal.Decimal, date]]:
         """ Converts the provided tag from string to the appropriate
         type as specified in this schema."""
 
         # If we don't know what the tag is, just return it
         if tag.lower() not in self.schema:
-            logging.warning("Couldn't convert tag data type because it is not in the dictionary: " + tag)
+            logging.warning(f"Couldn't convert tag data type because it is not in the dictionary: {tag}")
             return value
 
         full_tag = self.schema[tag.lower()]
@@ -231,8 +231,7 @@ class Schema(object):
                 return int(value)
             except (ValueError, TypeError):
                 raise ValueError("Could not parse the file because a value that should be an INTEGER is not. Either "
-                                 "do not specify convert_data_types or fix the file. Tag: '%s' on line '%s'" %
-                                 (tag, line_num))
+                                 f"do not specify convert_data_types or fix the file. Tag: '{tag}'.")
 
         # Convert floats
         if "FLOAT" in value_type:
@@ -241,8 +240,7 @@ class Schema(object):
                 return decimal.Decimal(value)
             except (decimal.InvalidOperation, TypeError):
                 raise ValueError("Could not parse the file because a value that should be a FLOAT is not. Either "
-                                 "do not specify convert_data_types or fix the file. Tag: '%s' on line '%s'" %
-                                 (tag, line_num))
+                                 f"do not specify convert_data_types or fix the file. Tag: '{tag}'.")
 
         if "DATETIME year to day" in value_type:
             try:
@@ -250,8 +248,7 @@ class Schema(object):
                 return date(year, month, day)
             except (ValueError, TypeError):
                 raise ValueError("Could not parse the file because a value that should be a DATETIME is not. Please "
-                                 "do not specify convert_data_types or fix the file. Tag: '%s' on line '%s'" %
-                                 (tag, line_num))
+                                 f"do not specify convert_data_types or fix the file. Tag: '{tag}'.")
 
         # We don't know the data type, so just keep it a string
         return value
@@ -299,12 +296,12 @@ class Schema(object):
 
         return text
 
-    def val_type(self, tag: str, value: Any, category: str = None, line_number: Union[int, str] = None):
+    def val_type(self, tag: str, value: Any, category: str = None):
         """ Validates that a tag matches the type it should have
         according to this schema."""
 
         if tag.lower() not in self.schema:
-            return ["Tag '%s' not found in schema. Line '%s'." % (tag, line_number)]
+            return [f"Tag '{tag}' not found in schema."]
 
         # We will skip type checks for None's
         is_none = value is None
@@ -332,31 +329,29 @@ class Schema(object):
 
         if category is not None:
             if category != allowed_category:
-                return ["The tag '%s' in category '%s' should be in category "
-                        "'%s'." % (capitalized_tag, category, allowed_category)]
+                return [f"The tag '{capitalized_tag}' in category '{category}' should be in category "
+                        f"'{allowed_category}'."]
 
         if is_none:
             if not null_allowed:
-                return ["Value cannot be NULL but is: '%s':'%s' on line '%s'." % (capitalized_tag, value, line_number)]
+                return [f"Value cannot be NULL but is: {capitalized_tag}':'{value}'."]
             return []
         else:
             # Don't run these checks on unassigned tags
             if "CHAR" in val_type:
                 length = int(val_type[val_type.index("(") + 1:val_type.index(")")])
                 if len(str(value)) > length:
-                    return ["Length of '%d' is too long for %s: '%s':'%s' on line '%s'." %
-                            (len(value), val_type, capitalized_tag, value, line_number)]
+                    return [f"Length of '{len(value)}' is too long for '{val_type}': '{capitalized_tag}':'{value}'."]
 
             # Check that the value matches the regular expression for the type
             if not re.match(self.data_types[bmrb_type], str(value)):
-                return ["Value does not match specification: '%s':'%s' on line '%s'.\n     Type specified: %s\n     "
-                        "Regular expression for type: '%s'" % (capitalized_tag, value, line_number, bmrb_type,
-                                                               self.data_types[bmrb_type])]
+                return [f"Value does not match specification: '{capitalized_tag}':'{value}'.\n"
+                        f"     Type specified: {bmrb_type}\n"
+                        f"     Regular expression for type: '{self.data_types[bmrb_type]}'"]
 
         # Check the tag capitalization
         if tag != capitalized_tag:
-            return ["The tag '%s' is improperly capitalized but otherwise valid. Should be '%s'." %
-                    (tag, capitalized_tag)]
+            return [f"The tag '{tag}' is improperly capitalized but otherwise valid. Should be '{capitalized_tag}'."]
         return []
 
     def tag_key(self, x) -> int:

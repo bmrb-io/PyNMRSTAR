@@ -59,8 +59,7 @@ def format_tag(tag: str) -> str:
 
 
 # noinspection PyDefaultArgument
-def get_schema(passed_schema: 'Schema' = None, _cached_schema: Dict[str, Schema] = {}) \
-        -> 'Schema':
+def get_schema(passed_schema: 'Schema' = None, _cached_schema: Dict[str, Schema] = {}) -> 'Schema':
     """If passed a schema (not None) it returns it. If passed none,
     it checks if the default schema has been initialized. If not
     initialized, it initializes it. Then it returns the default schema."""
@@ -91,9 +90,9 @@ def iter_entries(metabolomics: bool = False) -> Iterable['entry_mod.Entry']:
         an operation across the entire BMRB database. Set `metabolomics=True`
         in order to get all the entries in the metabolomics database."""
 
-    api_url = "%s/list_entries?database=macromolecules" % definitions.API_URL
+    api_url = f"{definitions.API_URL}/list_entries?database=macromolecules"
     if metabolomics:
-        api_url = "%s/list_entries?database=metabolomics" % definitions.API_URL
+        api_url = f"{definitions.API_URL}/list_entries?database=metabolomics"
 
     for entry in json.loads(_interpret_file(api_url).read()):
         yield entry_mod.Entry.from_database(entry)
@@ -170,27 +169,27 @@ def quote_value(value: Any) -> str:
                     can_wrap_double = False
 
         if not can_wrap_single and not can_wrap_double:
-            return '%s\n' % value
+            return f'{value}\n'
         elif can_wrap_single:
-            return "'%s'" % value
+            return f"'{value}'"
         elif can_wrap_double:
-            return '"%s"' % value
+            return f'"{value}"'
 
     # Check for special characters in a tag
     if any(x in value for x in definitions.WHITESPACE) or '#' in value or value in definitions.RESERVED_KEYWORDS or \
             value.startswith("_"):
         # If there is a single quote wrap in double quotes
         if "'" in value:
-            return '"%s"' % value
+            return f'"{value}"'
         # Either there is a double quote or no quotes
         else:
-            return "'%s'" % value
+            return f"'{value}'"
 
     # Quote if necessary
     if value[0] == "'":
-        return '"' + value + '"'
+        return f'"{value}"'
     if value[0] == '"':
-        return "'" + value + "'"
+        return f"'{value}'"
 
     # It's good to go
     return value
@@ -203,4 +202,4 @@ def validate(entry_to_validate: 'entry_mod.Entry', schema: 'Schema' = None) -> N
     if len(validation) == 0:
         print("No problems found during validation.")
     for pos, err in enumerate(validation):
-        print("%d: %s" % (pos + 1, err))
+        print(f"{pos + 1}: {err}")

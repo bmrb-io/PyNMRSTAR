@@ -535,7 +535,7 @@ static PyObject * clean_string(PyObject *self, PyObject *args){
 
     // Don't allow the empty string
     if (len == 0){
-        PyErr_SetString(PyExc_ValueError, "Empty strings are not allowed as values. Use a '.' or a '?' if needed.");
+        PyErr_SetString(PyExc_ValueError, "Empty strings are not allowed as values. Use the None singleton, or '.' to represent null values.");
         return NULL;
     }
 
