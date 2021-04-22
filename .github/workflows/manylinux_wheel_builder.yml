@@ -1,1 +1,7 @@
-uses: RalfG/python-wheels-manylinux-build@v0.3.3
+name: universal-wheel-builder
+on: [push]
+jobs:
+  build-wheels:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: RalfG/python-wheels-manylinux-build@v0.3.3
