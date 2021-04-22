@@ -8,7 +8,6 @@ Use python's built in help function for documentation."""
 
 import decimal as _decimal
 import logging
-import warnings
 
 from pynmrstar import utils
 from pynmrstar._internal import __version__, _get_cnmrstar
@@ -31,21 +30,6 @@ del entry
 del saveframe
 del schema
 del parser
-
-
-def clean_value(value):
-    """Deprecated. Please use utils.quote_value() instead."""
-    warnings.warn('This function has moved to utils.quote_value().', DeprecationWarning)
-    return utils.quote_value(value)
-
-
-def iter_entries(metabolomics=False):
-    """Deprecated. Please use utils.iter_entries() instead."""
-
-    warnings.warn('This function has moved to utils.iter_entries().', DeprecationWarning)
-    return utils.iter_entries(metabolomics=metabolomics)
-
-
 
 __all__ = ['Loop', 'Saveframe', 'Entry', 'Schema', 'definitions', 'utils', '__version__', 'exceptions', 'cnmrstar']
 
