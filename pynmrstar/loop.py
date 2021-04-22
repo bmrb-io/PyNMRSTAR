@@ -435,7 +435,8 @@ class Loop(object):
         Add data to the loop one element at a time, based on tag.
         Useful when adding data from SANS parsers."""
 
-        warnings.warn("Deprecated: It is recommended to use add_data() instead for most use cases.", DeprecationWarning)
+        warnings.warn("Deprecated: It is recommended to use Loop.add_data() instead for most use cases.",
+                      DeprecationWarning)
 
         # Make sure the category matches - if provided
         if "." in tag_name:

@@ -574,17 +574,7 @@ entry_information,entry_information,15000,"Solution structure of chicken villin 
         tmp_loop.add_data([4, 5, 6])
         self.assertEqual(tmp_loop.data, [[1, 2, 3], [4, 5, 6]])
 
-        # Check add_data_by_tag
-        # Wrong tag order
-        self.assertRaises(ValueError, tmp_loop.add_data_by_tag, "tag2", "data")
-        # Invalid tag_prefix
-        self.assertRaises(ValueError, tmp_loop.add_data_by_tag, "invalid.tag2", "data")
-        # tag doesn't exist
-        self.assertRaises(ValueError, tmp_loop.add_data_by_tag, "tag4", "data")
-        # Valid adds
-        tmp_loop.add_data_by_tag("tag1", 7)
-        tmp_loop.add_data_by_tag("test.tag2", 8)
-        tmp_loop.add_data_by_tag("tag3", 9)
+        tmp_loop.add_data([7, 8, 9])
         self.assertEqual(tmp_loop.data, [[1, 2, 3], [4, 5, 6], [7, 8, 9]])
 
         # Test delete_data_by_tag_value

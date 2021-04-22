@@ -9,6 +9,9 @@ Changes:
   should be necessary to catch these exceptions.
 * The parser now properly handles some ultra rare edge cases during loop parsing during which it previously either 
   threw exceptions when it shouldn't have, or failed to throw an exception when it should have.
+* Deprecated Loop.add_data_by_tag(). This was originally used internally when parsing an entry, but it is recommended
+  to use Loop.add_data() instead, or `loop[['Number', 'Unit']] = [[1,2,3],['db', 'atm', 'bar']]` style assignments.
+  New methods to make tag assignment in a loop easier are also being considered.
 
 Potentially breaking changes:
 * Saveframe tags no longer store the line number from which a tag was originally read. This was not
