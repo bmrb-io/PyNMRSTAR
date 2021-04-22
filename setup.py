@@ -13,7 +13,7 @@ cnmrstar = Extension('cnmrstar',
                      optional=True)
 
 # Should fail if the readme is missing
-long_des = open('README.md', 'r').read()
+long_des = open('README.rst', 'r').read()
 
 setup(name='pynmrstar',
       version=__version__,
