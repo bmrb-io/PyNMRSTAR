@@ -1,6 +1,15 @@
 name: Build
 
 on: [push, pull_request]
+# Trigger the workflow on push or pull request,
+# but only for the v3 (prod) branch
+#on:
+#  push:
+#    branches:
+#      - v3
+#  pull_request:
+#    branches:
+#      - v3
 
 jobs:
   build_wheels:
