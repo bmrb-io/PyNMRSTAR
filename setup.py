@@ -20,7 +20,7 @@ setup(name='pynmrstar',
       packages=['pynmrstar'],
       ext_modules=[cnmrstar],
       install_requires=['requests>=2.21.0,<=3'],
-      python_requires='>=3',
+      python_requires='>=3.6',
       author='Jon Wedell',
       author_email='wedell@uchc.edu',
       description='PyNMR-STAR provides tools for reading, writing, modifying, and interacting with NMR-STAR files. '
