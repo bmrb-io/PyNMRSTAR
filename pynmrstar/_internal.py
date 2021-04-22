@@ -14,7 +14,7 @@ from urllib.request import urlopen, Request
 
 import pynmrstar
 
-__version__: str = "3.1.0"
+__version__: str = "3.2.0.beta0"
 
 # If we have requests, open a session to reuse for the duration of the program run
 try:
