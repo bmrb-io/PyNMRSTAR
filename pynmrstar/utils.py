@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 
-#############################################
-#                 Imports                   #
-#############################################
+""" This file contains various helper functions."""
 
 import json
 import os
@@ -18,10 +16,6 @@ try:
 except ImportError:
     cnmrstar = None
 
-#############################################
-#            Global Variables               #
-#############################################
-
 # Set this to allow import * from pynmrstar to work sensibly
 __all__ = ['diff', 'format_category', 'format_tag', 'get_schema', 'iter_entries', 'quote_value', 'validate']
 
@@ -29,7 +23,7 @@ __all__ = ['diff', 'format_category', 'format_tag', 'get_schema', 'iter_entries'
 def diff(entry1: 'entry_mod.Entry', entry2: 'entry_mod.Entry') -> None:
     """Prints the differences between two entries. Non-equal entries
     will always be detected, but specific differences detected depends
-    on order of entries."""
+    on the order of entries."""
 
     diffs = entry1.compare(entry2)
     if len(diffs) == 0:

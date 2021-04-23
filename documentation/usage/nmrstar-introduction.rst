@@ -1,6 +1,6 @@
 
-Introduction to the NMR-STAR data format
-----------------------------------------
+Introduction to NMR-STAR
+------------------------
 
 To understand how the library works, you first need to understand the
 NMR-STAR terminology and file format. If you are already familiar with
@@ -49,3 +49,5 @@ Values in NMR-STAR format need to be quoted if they contain a space,
 tab, vertical tab, or newline in the value. This library takes care of
 that for you, but it is worth knowing. That is why in the example the
 dates are not quoted, but the event descriptions are.
+
+Go on to the :doc:`quick-start`.

@@ -8,14 +8,12 @@ Python versions supported: 3.6, 3.7, 3.8, and 3.9
 Previous python versions (back to 2.6) are supported by the v2 branch
 (version 2.x releases on PyPI).
 
-See the :doc:`release-notes` for release notes.
-
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
    usage/nmrstar-introduction
-   usage/tutorial
+   usage/quick-start
    usage/examples
    usage/full
    release-notes

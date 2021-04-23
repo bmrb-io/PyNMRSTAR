@@ -181,6 +181,12 @@ class Entry(object):
 
     @property
     def entry_id(self) -> Union[str, int]:
+        """ When read, fetches the entry ID.
+
+        When set, updates the entry ID for the Entry, and updates all the tags which
+        are foreign keys of the Entry_ID. (For example, Entry.ID and
+        Citation.Entry_ID will be updated, if present.)
+        """
         return self._entry_id
 
     @entry_id.setter
@@ -209,7 +215,7 @@ class Entry(object):
 
     @property
     def frame_dict(self) -> Dict[str, 'saveframe_mod.Saveframe']:
-        """Returns a dictionary of saveframe name -> saveframe object"""
+        """Returns a dictionary of saveframe name -> saveframe object mappings."""
 
         fast_dict = dict((frame.name, frame) for frame in self.frame_list)
 

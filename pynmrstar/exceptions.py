@@ -1,5 +1,9 @@
+""" Exceptions defined by PyNMR-STAR. """
+
 class ParsingError(ValueError):
-    """ Something went wrong when parsing. """
+    """ Indicates that something went wrong when parsing NMR-STAR data.
+    A line number on which the exception occurred will be provided if
+    possible. """
 
     def __init__(self, message, line_number: int = None):
         Exception.__init__(self)
@@ -20,11 +24,11 @@ class ParsingError(ValueError):
 
 
 class InvalidStateError(ValueError):
-    """ The data as exists in the PyNMRSTAR objects is not consistent with
-    the NMR-STAR format or dictionary. This often means that internal
-    PyNMRSTAR attributes were modified directly rather than using the
-    appropriate getters/setters, since the library attempts to prevent
-    actions which would lead to such states. """
+    """ Indicates that the data as exists in the PyNMRSTAR objects is not
+    consistent with the NMR-STAR format or dictionary. This often means that
+    internal PyNMRSTAR attributes were modified directly rather than using the
+    appropriate getters/setters, since the library attempts to prevent actions
+    which would lead to such states. """
 
     def __init__(self, message):
         Exception.__init__(self)

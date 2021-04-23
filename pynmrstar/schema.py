@@ -12,7 +12,11 @@ from pynmrstar._internal import _interpret_file
 
 
 class Schema(object):
-    """A BMRB schema. Used to validate STAR files."""
+    """A BMRB schema. Used to validate NMR-STAR files. Unless you need to
+       choose a specific schema version, PyNMR-STAR will automatically load
+       a schema for you. If you do need a specific schema version, you can
+       create an object of this class and then pass it to the methods
+       which allow the specification of a schema. """
 
     def __init__(self, schema_file: Union[str, IO] = None) -> None:
         """Initialize a BMRB schema. With no arguments the most

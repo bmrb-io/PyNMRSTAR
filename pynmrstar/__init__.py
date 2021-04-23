@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
-"""This module provides Entry, Saveframe, Loop, and Schema objects.
+"""This module provides :py:class:`pynmrstar.Entry`, :py:class:`pynmrstar.Saveframe`,
+   :py:class:`pynmrstar.Loop`, and :py:class:`pynmrstar.Schema` objects.
 
-It also provides some utility functions in pynmrstar.utils
+It also provides some utility functions in :py:obj:`pynmrstar.utils`
 
 Use python's built in help function for documentation."""
 

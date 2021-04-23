@@ -31,7 +31,9 @@ release = pynmrstar._internal.__version__
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ['sphinx.ext.autodoc']
+extensions = ['sphinx.ext.autodoc',
+              'sphinx.ext.intersphinx',
+              'sphinx.ext.imgconverter']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -52,3 +54,9 @@ html_theme = 'alabaster'
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
+
+# python3 -m sphinx.ext.intersphinx https://docs.python-requests.org/en/master/objects.inv
+intersphinx_mapping = {
+    'requests': ('https://docs.python-requests.org/en/master/', None),
+    'python': ('https://docs.python.org/3', None)
+}

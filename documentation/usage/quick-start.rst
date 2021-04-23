@@ -1,5 +1,5 @@
-Quick start to the PyNMR-STAR library
-=====================================
+PyNMR-STAR quick start
+======================
 
 First, pull up an interactive python session and import the module:
 
@@ -174,7 +174,7 @@ read, or by searching for it with a full tag name. Before going into
 detail, take a look at what one saveframe from the entry above looks
 like:
 
-.. code:: nmr-star
+.. code:: text
 
     ############################
     #  Computer software used  #
@@ -869,3 +869,5 @@ checking for errors.
          .   .   .   .   2         .   SER   HB2   H   .   4.3010   0.01   .   .   .   .   .   .   .   .   .   .   .   .   .
 
        stop_
+
+Go on to the full :doc:`class definitions <full>` or see more :doc:`examples <examples>`.
