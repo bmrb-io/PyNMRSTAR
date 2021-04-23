@@ -8,46 +8,31 @@ class ParsingError(ValueError):
 
     def __repr__(self) -> str:
         if self.line_number is not None:
-            return 'ParsingError("%s") on line %d' % (self.message, self.line_number)
+            return f'ParsingError("{self.message}") on line {self.line_number}'
         else:
-            return 'ParsingError("%s")' % self.message
+            return f'ParsingError("{self.message}")'
 
     def __str__(self) -> str:
         if self.line_number is not None:
-            return "%s on line %d" % (self.message, self.line_number)
+            return f"{self.message} Error detected on line {self.line_number}."
         else:
             return self.message
 
 
-class FormattingError(Exception):
-    """ Something went wrong when formatting a file. """
+class InvalidStateError(ValueError):
+    """ The data as exists in the PyNMRSTAR objects is not consistent with
+    the NMR-STAR format or dictionary. This often means that internal
+    PyNMRSTAR attributes were modified directly rather than using the
+    appropriate getters/setters, since the library attempts to prevent
+    actions which would lead to such states. """
 
     def __init__(self, message):
         Exception.__init__(self)
         self.message = message
 
     def __repr__(self) -> str:
-        return 'FormattingError("%s")' % self.message
+        return f'InvalidStateError("{self.message}")'
 
     def __str__(self) -> str:
         return self.message
 
-
-class IllegalActionError(ValueError):
-    """ The user tried to do something illegal.
-
-    Also supports intelligently formatting errors to show the line number
-    if the issue is in a file. """
-
-    def __init__(self, message, line_num=None):
-        Exception.__init__(self)
-        if line_num:
-            self.message = message + f" Error in parsed data on line number: {line_num}"
-        else:
-            self.message = message
-
-    def __repr__(self) -> str:
-        return 'ModificationError("%s")' % self.message
-
-    def __str__(self) -> str:
-        return self.message
