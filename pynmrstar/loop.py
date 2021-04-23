@@ -1021,21 +1021,3 @@ class Loop(object):
                                   f"row '{row_num}'.")
 
         return errors
-
-    def add_column(self, name, ignore_duplicates=False, update_data=False) -> None:
-        """ Deprecated, please use add_tag() instead. """
-
-        warnings.warn("add_column() is deprecated. Please use add_tag() instead.", DeprecationWarning)
-        return self.add_tag(name, ignore_duplicates, update_data)
-
-    def add_data_by_column(self, column_id, value) -> None:
-        """ Deprecated, please use add_data_by_tag() instead. """
-
-        warnings.warn("add_data_by_column() is deprecated. Please  use add_data_by_tag() instead.", DeprecationWarning)
-        return self.add_data_by_tag(column_id, value)
-
-    def get_columns(self) -> List[str]:
-        """ Deprecated alias for get_tags() """
-
-        warnings.warn("get_columns() is deprecated. Please use get_tag_names() instead.", DeprecationWarning)
-        return self.get_tag_names()
