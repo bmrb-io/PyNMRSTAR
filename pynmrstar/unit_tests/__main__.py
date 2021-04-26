@@ -53,6 +53,12 @@ class TestPyNMRSTAR(unittest.TestCase):
     def test_odd_strings(self):
         """ Make sure the library can handle odd strings. """
 
+        # Don't run the naughty strings test in GitHub, since it won't
+        # recursively checkout the "naughty strings" module on platforms
+        # other than linux.
+        if "GITHUB_WORKFLOW" in os.environ:
+            return
+
         saveframe = Saveframe.from_scratch('test', 'citations')
         with open(os.path.join(our_path, 'naughty-strings/blns.json')) as odd_string_file:
             odd_strings = json.load(odd_string_file)
