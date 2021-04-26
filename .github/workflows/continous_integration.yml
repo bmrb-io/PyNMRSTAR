@@ -1,4 +1,4 @@
-name: Test the python package
+name: Run self test
 
 on:
   push:
@@ -10,7 +10,7 @@ on:
 
 jobs:
   run_tests:
-    name: Test library on ${{ matrix.os }}
+    name: Testing on ${{ matrix.os }} with Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
