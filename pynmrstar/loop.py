@@ -6,9 +6,9 @@ from io import StringIO
 from itertools import chain
 from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Callable, Tuple
 
-from pynmrstar import definitions, utils, entry as entry_mod, exceptions
+from pynmrstar import definitions, utils, entry as entry_mod
 from pynmrstar._internal import _json_serialize, _interpret_file
-from pynmrstar.exceptions import FormattingError
+from pynmrstar.exceptions import InvalidStateError
 from pynmrstar.parser import Parser
 from pynmrstar.schema import Schema
 
@@ -63,8 +63,8 @@ class Loop(object):
 
         # They initialized us wrong
         if len(kwargs) == 0:
-            raise ValueError("You should not directly instantiate a Loop using this method. Instead use the class "
-                             "methods: Loop.from_scratch(), Loop.from_string(), Loop.from_template(), "
+            raise ValueError("You should not directly instantiate a Loop using this method. Instead use the "
+                             "class methods: Loop.from_scratch(), Loop.from_string(), Loop.from_template(), "
                              "Loop.from_file(), and Loop.from_json().")
 
         # Parsing from a string
@@ -75,7 +75,7 @@ class Loop(object):
         # Parsing from a file
         elif 'file_name' in kwargs:
             star_buffer = _interpret_file(kwargs['file_name'])
-            self.source = "from_file('%s')" % kwargs['file_name']
+            self.source = f"from_file('{kwargs['file_name']}')"
         # Creating from template (schema)
         elif 'tag_prefix' in kwargs:
 
@@ -92,26 +92,16 @@ class Loop(object):
             self.add_tag(next(csv_file))
             for row in csv_file:
                 self.add_data(row, convert_data_types=kwargs.get('convert_data_types', False))
-            self.source = "from_csv('%s')" % kwargs['csv']
+            self.source = f"from_csv('{kwargs['csv']}')"
             return
 
         tmp_entry = entry_mod.Entry.from_scratch(0)
 
         # Load the BMRB entry from the file
-        star_buffer = StringIO("data_0 save_internaluseyoushouldntseethis_frame _internal.use internal %s save_" %
-                               star_buffer.read())
+        star_buffer = StringIO(f"data_0 save_internaluseyoushouldntseethis_frame _internal.use internal "
+                               f"{star_buffer.read()} save_")
         parser = Parser(entry_to_parse_into=tmp_entry)
-        try:
-            parser.parse(star_buffer.read(), source=self.source,
-                         convert_data_types=kwargs.get('convert_data_types', False))
-        except exceptions.ParsingError as err:
-            str_err = str(err)
-            if 'internaluseyoushouldntseethis' in str_err:
-                line = str_err[str_err.index('on line ')+8:]
-                raise exceptions.ParsingError("Invalid loop. Loops must start with the 'loop_' keyword. Error on "
-                                              "line %s." % line)
-            else:
-                raise err
+        parser.parse(star_buffer.read(), source=self.source, convert_data_types=kwargs.get('convert_data_types', False))
 
         # Check that there was only one loop here
         if len(tmp_entry[0].loops) > 1:
@@ -141,7 +131,7 @@ class Loop(object):
     def __repr__(self) -> str:
         """Returns a description of the loop."""
 
-        return "<pynmrstar.Loop '%s'>" % self.category
+        return f"<pynmrstar.Loop '{self.category}'>"
 
     def __setitem__(self, key: str, item: Any) -> None:
         """Set all of the instances of a tag to the provided value.
@@ -152,7 +142,7 @@ class Loop(object):
 
         # Check that their tag is in the loop
         if tag not in self.tags:
-            raise ValueError("Cannot assign to tag '%s' as it does not exist in this loop." % key)
+            raise ValueError(f"Cannot assign to tag '{key}' as it does not exist in this loop.")
 
         # Determine where to assign
         tag_id = self.tags.index(tag)
@@ -160,8 +150,8 @@ class Loop(object):
         # Make sure they provide a list of the correct length
         if len(self[key]) != len(item):
             raise ValueError("To assign to a tag you must provide a list (or iterable) of a length equal to the "
-                             "number of values that currently exist for that tag. The tag '%s' current has %d "
-                             "values and you supplied %d values." % (key, len(self[key]), len(item)))
+                             f"number of values that currently exist for that tag. The tag '{key}' currently has"
+                             f" {len(self[key])} values and you supplied {len(item)} values.")
 
         # Do the assignment
         for pos, row in enumerate(self.data):
@@ -181,7 +171,8 @@ class Loop(object):
                     return "\n   loop_\n\n   stop_\n"
 
         if len(self.tags) == 0:
-            raise ValueError("Impossible to print data if there are no associated tags. Loop: '%s'." % self.category)
+            raise InvalidStateError("Impossible to print data if there are no associated tags. Error in loop "
+                                    f"'{self.category}' which contains data but hasn't had any tags added.")
 
         # Make sure the tags and data match
         self._check_tags_match_data()
@@ -198,8 +189,8 @@ class Loop(object):
 
         # Check to make sure our category is set
         if self.category is None:
-            raise ValueError("The category was never set for this loop. Either add a tag with the category intact, "
-                             "specify it when generating the loop, or set it using set_category.")
+            raise InvalidStateError("The category was never set for this loop. Either add a tag with the category "
+                                    "intact, specify it when generating the loop, or set it using Loop.set_category().")
 
         # Print the categories
         if self.category is None:
@@ -224,10 +215,11 @@ class Loop(object):
                     try:
                         clean_row.append(utils.quote_value(x))
                     except ValueError:
-                        raise FormattingError('Cannot generate NMR-STAR for entry, as empty strings are not valid '
-                                              'tag values in NMR-STAR. Please either replace the empty strings with'
-                                              ' None objects, or set pynmrstar.definitions.STR_CONVERSION_DICT[\'\'] ='
-                                              f' None.\n Loop: {self.category} Row: {row_pos} Column: {col_pos}')
+                        raise InvalidStateError('Cannot generate NMR-STAR for entry, as empty strings are not valid '
+                                                'tag values in NMR-STAR. Please either replace the empty strings with'
+                                                ' None objects, or set pynmrstar.definitions.STR_CONVERSION_DICT['
+                                                '\'\'] = None.\n'
+                                                f'Loop: {self.category} Row: {row_pos} Column: {col_pos}')
 
                 working_data.append(clean_row)
 
@@ -303,8 +295,8 @@ class Loop(object):
         # Make sure it has the correct keys
         for check in ['tags', 'category', 'data']:
             if check not in json_dict:
-                raise ValueError("The JSON you provide must be a dictionary and must contain the key '%s' - even if "
-                                 "the key points to None." % check)
+                raise ValueError(f"The JSON you provide must be a dictionary and must contain the key '{check}' - even"
+                                 f" if the key points to None.")
 
         # Create a loop from scratch and populate it
         ret = Loop.from_scratch()
@@ -352,7 +344,7 @@ class Loop(object):
 
         schema = utils.get_schema(schema)
         return cls(tag_prefix=tag_prefix, all_tags=all_tags,
-                   schema=schema, source="from_template(%s)" % schema.version)
+                   schema=schema, source=f"from_template({schema.version})")
 
     @staticmethod
     def _get_tags_from_schema(category: str, schema: Schema = None, all_tags: bool = False) -> List[str]:
@@ -381,7 +373,7 @@ class Loop(object):
                     if schema.schema[item.lower()]["public"] != "I":
                         tags.append(item)
         if len(tags) == 0:
-            raise ValueError("The tag prefix '%s' has no corresponding tags in the dictionary." % category)
+            raise InvalidStateError(f"The tag prefix '{category}' has no corresponding tags in the dictionary.")
 
         return tags
 
@@ -394,10 +386,11 @@ class Loop(object):
         # Make sure that if there is data, it is the same width as the
         #  tag names
         if len(self.data) > 0:
-            for row in self.data:
+            for x, row in enumerate(self.data):
                 if len(self.tags) != len(row):
-                    raise ValueError("The number of tags must match the width of the data. Loop: '%s'." %
-                                     self.category)
+                    raise InvalidStateError(f"The number of tags must match the width of the data. Error in loop "
+                                            f"'{self.category}'. In this case, there are {len(self.tags)} tags, and "
+                                            f"row number {x} has {len(row)} tags.")
 
         return True
 
@@ -412,8 +405,8 @@ class Loop(object):
         # Add one row of data
         if not rearrange:
             if len(the_list) != len(self.tags):
-                raise ValueError("The list must have the same number of elements as the number of tags! Insert tag "
-                                 "names first.")
+                raise ValueError("The list must have the same number of elements as the number of tags when adding a "
+                                 "single row of values! Insert tag names first by calling Loop.add_tag().")
             # Add the user data
             self.data.append(the_list)
             return
@@ -421,34 +414,41 @@ class Loop(object):
         # Break their data into chunks based on the number of tags
         processed_data = [the_list[x:x + len(self.tags)] for x in range(0, len(the_list), len(self.tags))]
         if len(processed_data[-1]) != len(self.tags):
-            raise ValueError("The number of data elements in the loop %s does not match the number of tags!" %
-                             self.category)
+            raise ValueError(f"The number of data elements in the list you provided is not an even multiple of the "
+                             f"number of tags which are set in the loop. Please either add missing tags using "
+                             f"Loop.add_tag() or modify the list of tag values you are adding to be an even multiple "
+                             f"of the number of tags. Error in loop '{self.category}'.")
 
         # Auto convert data types if option set
         if convert_data_types:
             schema = utils.get_schema()
             for row in processed_data:
                 for tag_id, datum in enumerate(row):
-                    row[tag_id] = schema.convert_tag(self.category + "." + self.tags[tag_id], datum,
-                                                     line_num="Loop %s" % self.category)
+                    row[tag_id] = schema.convert_tag(self.category + "." + self.tags[tag_id], datum)
 
         self.data.extend(processed_data)
 
     def add_data_by_tag(self, tag_name: str, value) -> None:
-        """Add data to the loop one element at a time, based on tag.
+        """Deprecated: It is recommended to use add_data() instead for most use
+        cases.
+
+        Add data to the loop one element at a time, based on tag.
         Useful when adding data from SANS parsers."""
+
+        warnings.warn("Deprecated: It is recommended to use Loop.add_data() instead for most use cases.",
+                      DeprecationWarning)
 
         # Make sure the category matches - if provided
         if "." in tag_name:
             supplied_category = utils.format_category(str(tag_name))
             if supplied_category.lower() != self.category.lower():
-                raise ValueError("Category provided in your tag '%s' does not match this loop's category '%s'." %
-                                 (supplied_category, self.category))
+                raise ValueError(f"Category provided in your tag '{supplied_category}' does not match this loop's "
+                                 f"category '{self.category}'.")
 
         pos = self.tag_index(tag_name)
         if pos is None:
-            raise ValueError("The tag '%s' to which you are attempting to add data does not yet exist. Create the "
-                             "tags before adding data." % tag_name)
+            raise ValueError(f"The tag '{tag_name}' to which you are attempting to add data does not yet exist. Create "
+                             f"the tags using Loop.add_tag() before adding data.")
         if len(self.data) == 0:
             self.data.append([])
         if len(self.data[-1]) == len(self.tags):
@@ -508,7 +508,8 @@ class Loop(object):
                     self.category = category
                 elif self.category.lower() != category.lower():
                     raise ValueError("One loop cannot have tags with different categories (or tags that don't "
-                                     "match the loop category)!")
+                                     f"match the loop category)! The loop category is '{self.category}' while "
+                                     f"the category in the tag was '{category}'.")
                 name = name[name.index(".") + 1:]
             else:
                 name = name[1:]
@@ -518,14 +519,14 @@ class Loop(object):
             if ignore_duplicates:
                 return
             else:
-                raise ValueError("There is already a tag with the name '%s'." % name)
+                raise ValueError(f"There is already a tag with the name '{name}' in the loop '{self.category}'.")
+        if name in definitions.NULL_VALUES:
+            raise ValueError(f"Cannot use a null-equivalent value as a tag name. Invalid tag name: '{name}'")
         if "." in name:
-            raise ValueError("There cannot be more than one '.' in a tag name.")
+            raise ValueError(f"There cannot be more than one '.' in a tag name. Invalid tag name: '{name}'")
         for char in str(name):
             if char in utils.definitions.WHITESPACE:
-                raise ValueError("Tag names can not contain whitespace characters.")
-        if name == '':
-            raise ValueError('Cannot use the empty string as a tag name.')
+                raise ValueError(f"Tag names can not contain whitespace characters. Invalid tag name: '{name}")
 
         # Add the tag
         self.tags.append(name)
@@ -569,14 +570,12 @@ class Loop(object):
         try:
             # Check category of loops
             if str(self.category).lower() != str(other.category).lower():
-                diffs.append("\t\tCategory of loops does not match: '%s' vs "
-                             "'%s'." % (self.category, other.category))
+                diffs.append(f"\t\tCategory of loops does not match: '{self.category}' vs '{other.category}'.")
 
             # Check tags of loops
             if ([x.lower() for x in self.tags] !=
                     [x.lower() for x in other.tags]):
-                diffs.append("\t\tLoop tag names do not match for loop with "
-                             "category '%s'." % self.category)
+                diffs.append(f"\t\tLoop tag names do not match for loop with category '{self.category}'.")
 
             # No point checking if data is the same if the tag names aren't
             else:
@@ -588,12 +587,10 @@ class Loop(object):
                     other_data = sorted(deepcopy(other.data))
 
                     if self_data != other_data:
-                        diffs.append("\t\tLoop data does not match for loop "
-                                     "with category '%s'." % self.category)
+                        diffs.append(f"\t\tLoop data does not match for loop with category '{self.category}'.")
 
         except AttributeError as err:
-            diffs.append("\t\tAn exception occured while comparing: '%s'." %
-                         err)
+            diffs.append(f"\t\tAn exception occurred while comparing: '{err}'.")
 
         return diffs
 
@@ -606,7 +603,7 @@ class Loop(object):
         # Check if the tags exist first
         for each_tag in tag:
             if self.tag_index(each_tag) is None:
-                raise KeyError("There is no tag with name '%s' to remove." % each_tag)
+                raise KeyError(f"There is no tag with name '{each_tag}' to remove in loop '{self.category}'.")
 
         # Calculate the tag position each time, because it will change as the previous tag is deleted
         for each_tag in tag:
@@ -624,12 +621,12 @@ class Loop(object):
         if "." in tag:
             supplied_category = utils.format_category(str(tag))
             if supplied_category.lower() != self.category.lower():
-                raise ValueError("Category provided in your tag '%s' does not match this loop's category '%s'." %
-                                 (supplied_category, self.category))
+                raise ValueError(f"The category provided in your tag '{supplied_category}' does not match this loop's "
+                                 f"category '{self.category}'.")
 
         search_tag = self.tag_index(tag)
         if search_tag is None:
-            raise ValueError("The tag you provided '%s' isn't in this loop!" % tag)
+            raise ValueError(f"The tag you provided '{tag}' isn't in this loop!")
 
         deleted = []
 
@@ -666,7 +663,7 @@ class Loop(object):
             tag_match_index = self.tag_index(tag)
             if tag_match_index is None:
                 if not ignore_missing_tags:
-                    raise KeyError("Cannot filter tag '%s' as it isn't present in this loop." % tag)
+                    raise KeyError(f"Cannot filter tag '{tag}' as it isn't present in this loop.")
                 continue
 
             valid_tags.append(tag)
@@ -750,7 +747,11 @@ class Loop(object):
         To fetch tag values use get_tag()."""
 
         if not self.category:
-            raise ValueError("You never set the category of this loop.")
+            raise InvalidStateError("You never set the category of this loop. You must set the category before calling "
+                                    "this method, either by setting the loop category directly when creating the loop "
+                                    "using the Loop.from_scratch() class method, by calling loop.set_category(), or by "
+                                    "adding a fully qualified tag which includes the loop category (for example, "
+                                    "adding '_Citation_author.Family_name' rather than just 'Family_name').")
 
         return [self.category + "." + x for x in self.tags]
 
@@ -783,8 +784,8 @@ class Loop(object):
         #  it during the process)
         for pos, item in enumerate([str(x) for x in lower_tags]):
             if "." in item and utils.format_category(item).lower() != self.category.lower():
-                raise ValueError("Cannot fetch data with tag '%s' because the category does not match the category of "
-                                 "this loop '%s'." % (item, self.category))
+                raise ValueError(f"Cannot fetch data with tag '{item}' because the category does not match the "
+                                 f"category of this loop '{self.category}'.")
             lower_tags[pos] = utils.format_tag(item).lower()
 
         # Make a lower case copy of the tags
@@ -844,8 +845,8 @@ class Loop(object):
         if "." in str(index_tag):
             supplied_category = utils.format_category(str(index_tag))
             if supplied_category.lower() != self.category.lower():
-                raise ValueError("Category provided in your tag '%s' does not match this loop's category '%s'." %
-                                 (supplied_category, self.category))
+                raise ValueError(f"Category provided in your tag '{supplied_category}' does not match this loop's "
+                                 f"category '{self.category}'.")
 
         # Determine which tag ID to renumber
         renumber_tag = self.tag_index(index_tag)
@@ -856,7 +857,7 @@ class Loop(object):
             try:
                 renumber_tag = int(index_tag)
             except ValueError:
-                raise ValueError("The renumbering tag you provided '%s' isn't in this loop!" % index_tag)
+                raise ValueError(f"The renumbering tag you provided '{index_tag}' isn't in this loop!")
 
         # Do nothing if we have no data
         if len(self.data) == 0:
@@ -879,8 +880,8 @@ class Loop(object):
                 except ValueError:
                     self.data = data_copy
                     raise ValueError("You can't renumber a row containing anything that can't be coerced into an "
-                                     "integer using maintain_ordering. I.e. what am I suppose to renumber '%s' to?" %
-                                     self.data[pos][renumber_tag])
+                                     "integer using maintain_ordering. I.e. what am I suppose to renumber "
+                                     f"'{self.data[pos][renumber_tag]}' to?")
 
         # Simple renumbering algorithm if we don't need to maintain the ordering
         else:
@@ -942,8 +943,8 @@ class Loop(object):
             if "." in cur_tag:
                 supplied_category = utils.format_category(cur_tag)
                 if supplied_category.lower() != self.category.lower():
-                    raise ValueError("Category provided in your tag '%s' does not match this loop's category '%s'." %
-                                     (supplied_category, self.category))
+                    raise ValueError(f"The category provided in your tag '{supplied_category}' does not match this "
+                                     f"loop's category '{self.category}'.")
 
             renumber_tag = self.tag_index(cur_tag)
 
@@ -953,7 +954,7 @@ class Loop(object):
                 try:
                     renumber_tag = int(cur_tag)
                 except ValueError:
-                    raise ValueError("The sorting tag you provided '%s' isn't in this loop!" % cur_tag)
+                    raise ValueError(f"The sorting tag you provided '{cur_tag}' isn't in this loop!")
 
             sort_ordinals.append(renumber_tag)
 
@@ -1008,11 +1009,7 @@ class Loop(object):
             # Check the data
             for row_num, row in enumerate(self.data):
                 for pos, datum in enumerate(row):
-                    line_no = str(row_num) + " tag " + str(pos) + " of loop"
-                    if datum == "a":
-                        pass
-                    errors.extend(my_schema.val_type(self.category + "." + self.tags[pos], datum, category=category,
-                                                     line_number=line_no))
+                    errors.extend(my_schema.val_type(f"{self.category}.{self.tags[pos]}", datum, category=category))
 
         if validate_star:
             # Check for wrong data size
@@ -1020,25 +1017,7 @@ class Loop(object):
             for row_num, row in enumerate(self.data):
                 # Make sure the width matches
                 if len(row) != num_cols:
-                    errors.append("Loop '%s' data width does not match it's tag width on row '%d'." %
-                                  (self.category, row_num))
+                    errors.append(f"Loop '{self.category}' data width does not match it's tag width on "
+                                  f"row '{row_num}'.")
 
         return errors
-
-    def add_column(self, name, ignore_duplicates=False, update_data=False) -> None:
-        """ Deprecated, please use add_tag() instead. """
-
-        warnings.warn("add_column() is deprecated. Please use add_tag() instead.", DeprecationWarning)
-        return self.add_tag(name, ignore_duplicates, update_data)
-
-    def add_data_by_column(self, column_id, value) -> None:
-        """ Deprecated, please use add_data_by_tag() instead. """
-
-        warnings.warn("add_data_by_column() is deprecated. Please  use add_data_by_tag() instead.", DeprecationWarning)
-        return self.add_data_by_tag(column_id, value)
-
-    def get_columns(self) -> List[str]:
-        """ Deprecated alias for get_tags() """
-
-        warnings.warn("get_columns() is deprecated. Please use get_tag_names() instead.", DeprecationWarning)
-        return self.get_tag_names()

@@ -6,13 +6,14 @@ from typing import TextIO, BinaryIO, Union, List, Optional, Dict, Any
 
 from pynmrstar import definitions, utils, loop as loop_mod, parser as parser_mod, saveframe as saveframe_mod
 from pynmrstar._internal import _json_serialize, _interpret_file, _get_entry_from_database
+from pynmrstar.exceptions import InvalidStateError
 from pynmrstar.schema import Schema
 
 
 class Entry(object):
-    """An OO representation of a BMRB entry. You can initialize this
+    """An object oriented representation of a BMRB entry. You can initialize this
     object several ways; (e.g. from a file, from the official database,
-    from scratch) see the class methods below."""
+    from scratch) see the class methods below. """
 
     def __delitem__(self, item: Union['saveframe_mod.Saveframe', int, str]) -> None:
         """Remove the indicated saveframe."""
@@ -57,8 +58,8 @@ class Entry(object):
 
         # They initialized us wrong
         if len(kwargs) == 0:
-            raise ValueError("You should not directly instantiate an Entry using this method. Instead use the class "
-                             "methods: Entry.from_database(), Entry.from_file(), Entry.from_string(), "
+            raise ValueError("You should not directly instantiate an Entry using this method. Instead use the "
+                             "class methods: Entry.from_database(), Entry.from_file(), Entry.from_string(), "
                              "Entry.from_scratch(), and Entry.from_json().")
 
         if 'the_string' in kwargs:
@@ -67,7 +68,7 @@ class Entry(object):
             self.source = "from_string()"
         elif 'file_name' in kwargs:
             star_buffer = _interpret_file(kwargs['file_name'])
-            self.source = "from_file('%s')" % kwargs['file_name']
+            self.source = f"from_file('{kwargs['file_name']}')"
         # Creating from template (schema)
         elif 'all_tags' in kwargs:
             self._entry_id = kwargs['entry_id']
@@ -107,7 +108,7 @@ class Entry(object):
     def __repr__(self) -> str:
         """Returns a description of the entry."""
 
-        return "<pynmrstar.Entry '%s' %s>" % (self._entry_id, self.source)
+        return f"<pynmrstar.Entry '{self._entry_id}' {self.source}>"
 
     def __setitem__(self, key: Union[int, str], item: 'saveframe_mod.Saveframe') -> None:
         """Set the indicated saveframe."""
@@ -117,23 +118,29 @@ class Entry(object):
             # Add by ordinal
             if isinstance(key, int):
                 self.frame_list[key] = item
+
+            # TODO: Consider stripping this behavior out - it isn't clear it is useful
             else:
                 # Add by key
                 contains_frame: bool = False
                 for pos, frame in enumerate(self.frame_list):
                     if frame.name == key:
                         if contains_frame:
-                            raise ValueError('Two saveframes with the same name in Entry (%s) - this entry is invalid'
-                                             ' NMR-STAR. Did you manually edit the frame_list? Please use the '
-                                             'add_saveframe() method to add new saveframes.' % frame.name)
+                            raise ValueError(f"Cannot replace the saveframe with the name '{frame.name} "
+                                             f"because multiple saveframes in the entry have the same name. "
+                                             f'This library does not allow that normally, as it is '
+                                             f'invalid NMR-STAR. Did you manually edit the Entry.frame_list '
+                                             f'object? Please use the Entry.add_saveframe() method instead to '
+                                             f'add new saveframes.')
                         self.frame_list[pos] = item
                         contains_frame = True
 
                 if not contains_frame:
-                    raise KeyError("Saveframe with name '%s' does not exist and therefore cannot be written to. Use "
-                                   "the add_saveframe() method to add new saveframes." % key)
+                    raise ValueError(f"Saveframe with name '{key}' does not exist and therefore cannot be "
+                                     f"written to. Use the add_saveframe() method to add new saveframes.")
         else:
-            raise ValueError("You can only assign a saveframe to an entry splice.")
+            raise ValueError("You can only assign a saveframe to an entry splice. You attempted to assign: "
+                             f"'{repr(item)}'")
 
     def __str__(self, skip_empty_loops: bool = False, skip_empty_tags: bool = False, show_comments: bool = True) -> str:
         """Returns the entire entry in STAR format as a string."""
@@ -149,7 +156,7 @@ class Entry(object):
                                                        skip_empty_tags=skip_empty_tags, show_comments=show_comments))
                 seen_saveframes[saveframe_obj.category] = True
 
-        return "data_%s\n\n%s" % (self.entry_id, "\n".join(sf_strings))
+        return f"data_{self.entry_id}\n\n" + "\n".join(sf_strings)
 
     @property
     def category_list(self) -> List[str]:
@@ -174,6 +181,12 @@ class Entry(object):
 
     @property
     def entry_id(self) -> Union[str, int]:
+        """ When read, fetches the entry ID.
+
+        When set, updates the entry ID for the Entry, and updates all the tags which
+        are foreign keys of the Entry_ID. (For example, Entry.ID and
+        Citation.Entry_ID will be updated, if present.)
+        """
         return self._entry_id
 
     @entry_id.setter
@@ -202,7 +215,7 @@ class Entry(object):
 
     @property
     def frame_dict(self) -> Dict[str, 'saveframe_mod.Saveframe']:
-        """Returns a dictionary of saveframe name -> saveframe object"""
+        """Returns a dictionary of saveframe name -> saveframe object mappings."""
 
         fast_dict = dict((frame.name, frame) for frame in self.frame_list)
 
@@ -215,8 +228,11 @@ class Entry(object):
 
         for frame in self.frame_list:
             if frame.name in frame_dict:
-                raise ValueError("The entry has multiple saveframes with the same name. That is illegal. Please remove "
-                                 "or rename one. Duplicate name: %s" % frame.name)
+                raise InvalidStateError("The entry has multiple saveframes with the same name. That is not allowed in "
+                                        "the NMR-STAR format. Please remove or rename one. Duplicate name: "
+                                        f"'{frame.name}'. Furthermore, please use Entry.add_saveframe() and "
+                                        f"Entry.remove_saveframe() rather than manually editing the Entry.frame_list "
+                                        f"list, which will prevent this state from existing in the future.")
             frame_dict[frame.name] = frame
 
         return frame_dict
@@ -329,20 +345,21 @@ class Entry(object):
 
         schema = utils.get_schema(schema)
         entry = cls(entry_id=entry_id, all_tags=all_tags, default_values=default_values, schema=schema)
-        entry.source = "from_template(%s)" % schema.version
+        entry.source = f"from_template({schema.version})"
         return entry
 
     def add_saveframe(self, frame) -> None:
         """Add a saveframe to the entry."""
 
         if not isinstance(frame, saveframe_mod.Saveframe):
-            raise ValueError("You can only add instances of saveframes using this method.")
+            raise ValueError("You can only add instances of saveframes using this method. You attempted to add "
+                             f"the object: '{repr(frame)}'.")
 
         # Do not allow the addition of saveframes with the same name
         #  as a saveframe which already exists in the entry
         if frame.name in self.frame_dict:
-            raise ValueError("Cannot add a saveframe with name '%s' since a saveframe with that name already exists "
-                             "in the entry." % frame.name)
+            raise ValueError(f"Cannot add a saveframe with name '{frame.name}' since a saveframe with that "
+                             f"name already exists in the entry.")
 
         self.frame_list.append(frame)
 
@@ -363,22 +380,22 @@ class Entry(object):
             return ['Other object is not of class Entry.']
         try:
             if str(self.entry_id) != str(other.entry_id):
-                diffs.append("Entry ID does not match between entries: '%s' vs '%s'." % (self.entry_id, other.entry_id))
+                diffs.append(f"Entry ID does not match between entries: '{self.entry_id}' vs '{other.entry_id}'.")
             if len(self.frame_list) != len(other.frame_list):
-                diffs.append("The number of saveframes in the entries are not equal: '%d' vs '%d'." %
-                             (len(self.frame_list), len(other.frame_list)))
+                diffs.append(f"The number of saveframes in the entries are not equal: '{len(self.frame_list)}' vs "
+                             f"'{len(other.frame_list)}'.")
             for frame in self.frame_list:
                 other_frame_dict = other.frame_dict
                 if frame.name not in other_frame_dict:
-                    diffs.append("No saveframe with name '%s' in other entry." % frame.name)
+                    diffs.append(f"No saveframe with name '{frame.name}' in other entry.")
                 else:
                     comp = frame.compare(other_frame_dict[frame.name])
                     if len(comp) > 0:
-                        diffs.append("Saveframes do not match: '%s'." % frame.name)
+                        diffs.append(f"Saveframes do not match: '{frame.name}'.")
                         diffs.extend(comp)
 
         except AttributeError as err:
-            diffs.append("An exception occurred while comparing: '%s'." % err)
+            diffs.append(f"An exception occurred while comparing: '{err}'.")
 
         return diffs
 
@@ -445,7 +462,7 @@ class Entry(object):
         if saveframe_name in frames:
             return frames[saveframe_name]
         else:
-            raise KeyError("No saveframe with name '%s'" % saveframe_name)
+            raise KeyError(f"No saveframe with name '{saveframe_name}'")
 
     def get_saveframes_by_category(self, value: str) -> List['saveframe_mod.Saveframe']:
         """Allows fetching saveframes by category."""
@@ -467,11 +484,12 @@ class Entry(object):
     def get_tag(self, tag: str, whole_tag: bool = False) -> list:
         """ Given a tag (E.g. _Assigned_chem_shift_list.Data_file_name)
         return a list of all values for that tag. Specify whole_tag=True
-        and the [tag_name, tag_value (,tag_line_number)] pair will be
-        returned."""
+        and the [tag_name, tag_value] pair will be returned."""
 
         if "." not in str(tag):
-            raise ValueError("You must provide the tag category to call this method at the entry level.")
+            raise ValueError("You must provide the tag category to call this method at the entry level. For "
+                             "example, you must provide 'Entry.Title' rather than 'Title' as the tag if calling"
+                             " this at the Entry level. You can call Saveframe.get_tag('Title') without issue.")
 
         results = []
         for frame in self.frame_list:
@@ -720,9 +738,9 @@ class Entry(object):
         print(repr(self))
         frame: saveframe_mod.Saveframe
         for pos, frame in enumerate(self):
-            print("\t[%d] %s" % (pos, repr(frame)))
+            print(f"\t[{pos}] {repr(frame)}")
             for pos2, one_loop in enumerate(frame):
-                print("\t\t[%d] %s" % (pos2, repr(one_loop)))
+                print(f"\t\t[{pos2}] {repr(one_loop)}")
 
     def rename_saveframe(self, original_name: str, new_name: str) -> None:
         """ Renames a saveframe and updates all pointers to that
@@ -736,8 +754,8 @@ class Entry(object):
 
         # Make sure there is no saveframe called what the new name is
         if [x.name for x in self.frame_list].count(new_name) > 0:
-            raise ValueError("Cannot rename a saveframe as '%s' because a saveframe with that name already exists." %
-                             new_name)
+            raise ValueError(f"Cannot rename the saveframe '{original_name}' as '{new_name}' because a "
+                             f"saveframe with that name already exists in the entry.")
 
         # This can raise a ValueError, but no point catching it since it really is a ValueError if they provide a name
         #  of a saveframe that doesn't exist in the entry.
@@ -787,7 +805,7 @@ class Entry(object):
             saveframe_names = sorted(x.name for x in self)
             for ordinal in range(0, len(saveframe_names) - 2):
                 if saveframe_names[ordinal] == saveframe_names[ordinal + 1]:
-                    errors.append("Multiple saveframes with same name: '%s'" % saveframe_names[ordinal])
+                    errors.append(f"Multiple saveframes with same name: '{saveframe_names[ordinal]}'")
 
             # Check for dangling references
             fdict = self.frame_dict
@@ -798,9 +816,8 @@ class Entry(object):
                     tag_copy = str(each_tag[1])
                     if (tag_copy.startswith("$")
                             and tag_copy[1:] not in fdict):
-                        errors.append("Dangling saveframe reference '%s' in tag '%s.%s'" % (each_tag[1],
-                                                                                            each_frame.tag_prefix,
-                                                                                            each_tag[0]))
+                        errors.append(f"Dangling saveframe reference '{each_tag[1]}' in "
+                                      f"tag '{each_frame.tag_prefix}.{each_tag[0]}'")
 
                 # Iterate through the loops
                 for each_loop in each_frame:
@@ -808,10 +825,8 @@ class Entry(object):
                         for pos, val in enumerate(each_row):
                             val = str(val)
                             if val.startswith("$") and val[1:] not in fdict:
-                                errors.append("Dangling saveframe reference '%s' in tag '%s.%s'" %
-                                              (val,
-                                               each_loop.category,
-                                               each_loop.tags[pos]))
+                                errors.append(f"Dangling saveframe reference '{val}' in tag "
+                                              f"'{each_loop.category}.{each_loop.tags[pos]}'")
 
         # Ask the saveframes to check themselves for errors
         for frame in self:

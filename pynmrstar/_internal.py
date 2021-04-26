@@ -14,7 +14,7 @@ from urllib.request import urlopen, Request
 
 import pynmrstar
 
-__version__: str = "3.1.0"
+__version__: str = "3.1.1"
 
 # If we have requests, open a session to reuse for the duration of the program run
 try:
@@ -248,13 +248,13 @@ def _get_entry_from_database(entry_num: Union[str, int], convert_data_types: boo
         for each_saveframe in ent:
             for tag in each_saveframe.tags:
                 cur_tag = each_saveframe.tag_prefix + "." + tag[0]
-                tag[1] = schema.convert_tag(cur_tag, tag[1], line_num="SF %s" % each_saveframe.name)
+                tag[1] = schema.convert_tag(cur_tag, tag[1])
             for loop in each_saveframe:
                 for row in loop.data:
                     for pos in range(0, len(row)):
                         category = loop.category + "." + loop.tags[pos]
                         line_num = "Loop %s" % loop.category
-                        row[pos] = schema.convert_tag(category, row[pos], line_num=line_num)
+                        row[pos] = schema.convert_tag(category, row[pos])
 
     return ent
 
@@ -292,4 +292,4 @@ def _interpret_file(the_file: Union[str, IO]) -> StringIO:
         pass
 
     buffer.seek(0)
-    return StringIO(buffer.read().decode())
+    return StringIO(buffer.read().decode().replace("\r\n", "\n").replace("\r", "\n"))
