@@ -12,6 +12,8 @@ jobs:
         python: [ 36, 37, 38, 39 ]
     steps:
       - uses: actions/checkout@v2
+      - name: Checkout submodules
+        uses: textbook/git-checkout-submodule-action@master
       - uses: actions/setup-python@v2
       - name: Install dependencies
         run: python3 -m pip install -r requirements.txt
