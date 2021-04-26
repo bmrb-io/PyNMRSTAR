@@ -292,4 +292,4 @@ def _interpret_file(the_file: Union[str, IO]) -> StringIO:
         pass
 
     buffer.seek(0)
-    return StringIO(buffer.read().decode())
+    return StringIO(buffer.read().decode().replace("\r\n", "\n").replace("\r", "\n"))
