@@ -12,8 +12,6 @@ jobs:
         python: [ 36, 37, 38, 39, "pypy3" ]
     steps:
       - uses: actions/checkout@v2
-      - name: Checkout submodules
-        run: git submodule update --recursive
       - uses: actions/setup-python@v2
       - name: Install dependencies
         run: python3 -m pip install -r requirements.txt
