@@ -43,13 +43,11 @@ class Entry(object):
 
     def __init__(self, **kwargs) -> None:
         """ You should not directly instantiate an Entry using this method.
-            Instead use the class methods:"
-              Entry.from_database()
-              Entry.from_file()
-              Entry.from_string()
-              Entry.from_scratch()
-              Entry.from_json()
-              Entry.from_template()"""
+            Instead use the class methods:
+
+            :py:meth:`Entry.from_database`, :py:meth:`Entry.from_file`,
+            :py:meth:`Entry.from_string`, :py:meth:`Entry.from_scratch`,
+            :py:meth:`Entry.from_json`, and :py:meth:`Entry.from_template`"""
 
         # Default initializations
         self._entry_id: Union[str, int] = 0

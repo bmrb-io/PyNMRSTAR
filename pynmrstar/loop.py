@@ -38,11 +38,10 @@ class Loop(object):
     def __init__(self, **kwargs) -> None:
         """ You should not directly instantiate a Loop using this method.
             Instead use the class methods:
-              Loop.from_scratch()
-              Loop.from_string()
-              Loop.from_template()
-              Loop.from_file()
-              Loop.from_json()"""
+
+            :py:meth:`Loop.from_scratch`, :py:meth:`Loop.from_string`,
+            :py:meth:`Loop.from_template`, :py:meth:`Loop.from_file`,
+            :py:meth:`Loop.from_json`"""
 
         # Initialize our local variables
         self.tags: List[str] = []

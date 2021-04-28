@@ -81,11 +81,9 @@ class Saveframe(object):
 
     def __init__(self, **kwargs) -> None:
         """Don't use this directly. Use the class methods to construct:
-             Saveframe.from_scratch()
-             Saveframe.from_string()
-             Saveframe.from_template()
-             Saveframe.from_file()
-             Saveframe.from_json()"""
+           :py:meth:`Saveframe.from_scratch`, :py:meth:`Saveframe.from_string`,
+           :py:meth:`Saveframe.from_template`, :py:meth:`Saveframe.from_file`,
+           :py:meth:`Saveframe.from_json`"""
 
         # They initialized us wrong
         if len(kwargs) == 0:
