@@ -116,77 +116,7 @@ def quote_value(value: Any) -> str:
         if any(isinstance(value, type(x)) for x in definitions.STR_CONVERSION_DICT):
             value = definitions.STR_CONVERSION_DICT[value]
 
-    # Use the fast code if it is available
-    if cnmrstar is not None:
-        # It's faster to assume we are working with a string and catch
-        #  errors than to check the instance for every object and convert
-        try:
-            return cnmrstar.clean_value(value)
-        except (ValueError, TypeError):
-            return cnmrstar.clean_value(str(value))
-
-    # Convert non-string types to string
-    if not isinstance(value, str):
-        value = str(value)
-
-    # If it is a STAR-format multi-line comment already, we need to escape it
-    if "\n;" in value:
-        value = value.replace("\n", "\n   ")
-        if value[-1] != "\n":
-            value = value + "\n"
-        if value[0] != "\n":
-            value = "\n   " + value
-        return value
-
-    # If it's going on it's own line, don't touch it
-    if "\n" in value:
-        if value[-1] != "\n":
-            return value + "\n"
-        return value
-
-    if value == "":
-        raise ValueError("Empty strings are not allowed as values. Use a '.' or a '?' if needed.")
-
-    # If it has single and double quotes it will need to go on its
-    #  own line under certain conditions...
-    if '"' in value and "'" in value:
-        can_wrap_single = True
-        can_wrap_double = True
-
-        for pos, char in enumerate(value):
-            next_char = value[pos + 1:pos + 2]
-
-            if next_char != "" and next_char in definitions.WHITESPACE:
-                if char == "'":
-                    can_wrap_single = False
-                if char == '"':
-                    can_wrap_double = False
-
-        if not can_wrap_single and not can_wrap_double:
-            return f'{value}\n'
-        elif can_wrap_single:
-            return f"'{value}'"
-        elif can_wrap_double:
-            return f'"{value}"'
-
-    # Check for special characters in a tag
-    if any(x in value for x in definitions.WHITESPACE) or '#' in value or value in definitions.RESERVED_KEYWORDS or \
-            value.startswith("_"):
-        # If there is a single quote wrap in double quotes
-        if "'" in value:
-            return f'"{value}"'
-        # Either there is a double quote or no quotes
-        else:
-            return f"'{value}'"
-
-    # Quote if necessary
-    if value[0] == "'":
-        return f'"{value}"'
-    if value[0] == '"':
-        return f"'{value}'"
-
-    # It's good to go
-    return value
+    return cnmrstar.clean_value(value)
 
 
 def validate(entry_to_validate: 'entry_mod.Entry', schema: 'Schema' = None) -> None:
