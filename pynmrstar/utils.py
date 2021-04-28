@@ -7,14 +7,9 @@ import os
 from typing import Iterable, Any, Dict
 from urllib.error import HTTPError, URLError
 
-from pynmrstar import definitions, entry as entry_mod
+from pynmrstar import definitions, cnmrstar, entry as entry_mod
 from pynmrstar._internal import _interpret_file
 from pynmrstar.schema import Schema
-
-try:
-    import cnmrstar
-except ImportError:
-    cnmrstar = None
 
 # Set this to allow import * from pynmrstar to work sensibly
 __all__ = ['diff', 'format_category', 'format_tag', 'get_schema', 'iter_entries', 'quote_value', 'validate']

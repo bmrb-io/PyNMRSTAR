@@ -11,12 +11,23 @@ import decimal as _decimal
 import logging
 
 from pynmrstar import utils
-from pynmrstar._internal import __version__, _get_cnmrstar
+from pynmrstar._internal import __version__
 from pynmrstar.entry import Entry
 from pynmrstar.loop import Loop
 from pynmrstar.parser import Parser as _Parser
 from pynmrstar.saveframe import Saveframe
 from pynmrstar.schema import Schema
+
+try:
+    import pynmrstar.cnmrstar as cnmrstar
+except ImportError:
+    import cnmrstar
+
+if "version" not in dir(cnmrstar) or cnmrstar.version() < "3.2.0":
+    raise ImportError("The version of the cnmrstar module installed does "
+                      "not meet the requirements. As this should be handled "
+                      "automatically, there may be an issue with your installation.")
+
 
 # Set up logging
 logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s')
@@ -25,7 +36,7 @@ logging.getLogger().setLevel(logging.INFO)
 # This makes sure that when decimals are printed a lower case "e" is used
 _decimal.getcontext().capitals = 0
 # Make sure the cnmstar module is compiled
-cnmrstar = _get_cnmrstar()
+
 del loop
 del entry
 del saveframe

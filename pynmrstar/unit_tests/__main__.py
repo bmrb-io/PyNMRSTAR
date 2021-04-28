@@ -11,14 +11,6 @@ from pynmrstar import utils, definitions, Saveframe, Entry, Schema, Loop, _Parse
 from pynmrstar._internal import _interpret_file
 from pynmrstar.exceptions import ParsingError
 
-try:
-    import pynmrstar.cnmrstar as cnmrstar
-except ImportError:
-    cnmrstar = None
-
-if cnmrstar:
-    print("Using C library...")
-
 logging.getLogger().setLevel(logging.ERROR)
 
 our_path = os.path.dirname(os.path.realpath(__file__))

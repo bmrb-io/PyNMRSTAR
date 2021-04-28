@@ -2,9 +2,7 @@ import logging
 import re
 from typing import Optional
 
-import pynmrstar.cnmrstar as cnmrstar
-
-from pynmrstar import definitions, entry as entry_mod, loop as loop_mod, saveframe as saveframe_mod
+from pynmrstar import definitions, cnmrstar, entry as entry_mod, loop as loop_mod, saveframe as saveframe_mod
 from pynmrstar.exceptions import ParsingError
 
 

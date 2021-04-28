@@ -2,7 +2,6 @@ import decimal
 import json
 import logging
 import os
-import sys
 import time
 import zlib
 from datetime import date
@@ -24,78 +23,6 @@ try:
     _session = _requests_session()
 except ModuleNotFoundError:
     _session = None
-
-
-def _build_extension() -> bool:
-    """ Try to compile the c extension. """
-    import subprocess
-
-    cur_dir = os.getcwd()
-    try:
-        src_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)))
-        os.chdir(os.path.join(src_dir, '..', "c"))
-
-        # Use the appropriate build command
-        process = subprocess.Popen(['make', 'python3'], stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
-        stdout, stderr = process.communicate()
-        ret_code = process.poll()
-        # The make command exited with a non-zero status
-        if ret_code:
-            logging.warning('Compiling cnmrstar failed with error code %s and stderr: %s', ret_code, stderr)
-            return False
-
-        # We were able to build the extension?
-        return True
-    except OSError:
-        # There was an error going into the c dir
-        logging.warning('Could not find a directory with c source code.')
-        return False
-    finally:
-        # Go back to the directory we were in before exiting
-        os.chdir(cur_dir)
-
-
-def _get_cnmrstar() -> Union[None, object]:
-    """ Returns the cnmrstar module, or returns None if it isn't available. """
-
-    # First see if it's installed via pip
-    try:
-        import cnmrstar
-        logging.debug('Imported cnmrstar via installed package.')
-        return cnmrstar
-    except ImportError:
-
-        # See if it is compiled locally
-        try:
-            import pynmrstar.cnmrstar as cnmrstar
-            logging.debug('Imported cnmrstar from locally compiled file.')
-
-            if "version" not in dir(cnmrstar) or cnmrstar.version() < "3.0.9":
-                logging.warning("Recompiling cnmrstar module due to API changes. You may experience a segmentation "
-                                "fault immediately following this message but should have no issues the next time you "
-                                "run your script or this program.")
-                _build_extension()
-                sys.exit(0)
-
-            return cnmrstar
-
-        except ImportError:
-
-            # Try to compile cnmrstar, but check for the 'no c module' file before continuing
-            if not os.path.isfile(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".nocompile")):
-                logging.info('Compiling local cnmrstar module...')
-
-                if _build_extension():
-                    try:
-                        import pynmrstar.cnmrstar as cnmrstar
-                        logging.debug('Imported cnmrstar from locally compiled file.')
-                        return cnmrstar
-                    except ImportError:
-                        return
-            else:
-                logging.debug("Not compiling cnmrstar due to presence of '.nocompile' file")
-                return
-
 
 # noinspection PyDefaultArgument
 def _get_comments(_comment_cache: Dict[str, Dict[str, str]] = {}) -> Dict[str, Dict[str, str]]:
