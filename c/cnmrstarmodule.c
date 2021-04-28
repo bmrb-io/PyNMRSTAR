@@ -753,16 +753,9 @@ PARSE_get_token_full(PyObject *self)
         // Return python none if done parsing
         Py_INCREF(Py_None);
 
-    #if PY_MAJOR_VERSION >= 3
         return Py_BuildValue("OlC", Py_None, my_parser->line_no, my_parser->last_delimiter);
     }
     return Py_BuildValue("slC", token, my_parser->line_no, my_parser->last_delimiter);
-
-    #else
-        return Py_BuildValue("Olc", Py_None, my_parser->line_no, my_parser->last_delimiter);
-    }
-    return Py_BuildValue("slc", token, my_parser->line_no, my_parser->last_delimiter);
-    #endif
 }
 
 static PyObject *

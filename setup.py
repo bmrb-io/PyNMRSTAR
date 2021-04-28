@@ -26,7 +26,7 @@ setup(name='pynmrstar',
       description='PyNMR-STAR provides tools for reading, writing, modifying, and interacting with NMR-STAR files. '
                   'Maintained by the BMRB.',
       long_description=long_des,
-      long_description_content_type='text/markdown',
+      long_description_content_type='text/x-rst',
       keywords=['bmrb', 'parser', 'nmr', 'nmrstar', 'biomagresbank', 'biological magnetic resonance bank'],
       url='https://github.com/uwbmrb/PyNMRSTAR',
       license='MIT',

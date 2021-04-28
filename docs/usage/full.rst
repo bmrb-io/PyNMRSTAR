@@ -5,19 +5,21 @@ Entry class
 ~~~~~~~~~~~
 
 .. autoclass:: pynmrstar.Entry
-   :special-members: __delitem__
+   :special-members:
    :members:
 
 Saveframe class
 ~~~~~~~~~~~~~~~
 
 .. autoclass:: pynmrstar.Saveframe
+   :special-members:
    :members:
 
 Loop class
 ~~~~~~~~~~
 
 .. autoclass:: pynmrstar.Loop
+   :special-members:
    :members:
 
 Schema class
