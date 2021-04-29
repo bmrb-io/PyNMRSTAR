@@ -201,8 +201,6 @@ class Loop(object):
 
         return_chunks.append("\n")
 
-        row_strings = []
-
         if len(self.data) != 0:
 
             # Make a copy of the data
