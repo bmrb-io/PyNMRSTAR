@@ -377,9 +377,13 @@ class Saveframe(object):
             # If the tag already exists, set its value
             self.add_tag(key, item, update=True)
 
-    def __str__(self, first_in_category: bool = True, skip_empty_loops: bool = False,
-                skip_empty_tags: bool = False, show_comments: bool = True) -> str:
-        """Returns the saveframe in STAR format as a string."""
+    def __str__(self,
+                first_in_category: bool = True,
+                skip_empty_loops: bool = False,
+                skip_empty_tags: bool = False,
+                show_comments: bool = True) -> str:
+        """Returns the saveframe in STAR format as a string. Please use :py:meth:`Saveframe.format`
+        when you want to pass arguments."""
 
         if self.tag_prefix is None:
             raise InvalidStateError(f"The tag prefix was never set! Error in saveframe named '{self.name}'.")
