@@ -390,17 +390,17 @@ class Saveframe(object):
         except ValueError:
             return f"\nsave_{self.name}\n\nsave_\n"
 
-        ret_string = ""
+        return_chunks = []
 
         # Insert the comment if not disabled
         if show_comments:
             if self.category in _get_comments():
                 this_comment = _get_comments()[self.category]
                 if first_in_category or this_comment['every_flag']:
-                    ret_string = _get_comments()[self.category]['comment']
+                    return_chunks.append(_get_comments()[self.category]['comment'])
 
         # Print the saveframe
-        ret_string += f"save_{self.name}\n"
+        return_chunks.append(f"save_{self.name}\n")
         pstring = "   %%-%ds  %%s\n" % width
         mstring = "   %%-%ds\n;\n%%s;\n" % width
 
@@ -418,17 +418,16 @@ class Saveframe(object):
 
             formatted_tag = self.tag_prefix + "." + each_tag[0]
             if "\n" in clean_tag:
-                ret_string += mstring % (formatted_tag, clean_tag)
+                return_chunks.append(mstring % (formatted_tag, clean_tag))
             else:
-                ret_string += pstring % (formatted_tag, clean_tag)
+                return_chunks.append(pstring % (formatted_tag, clean_tag))
 
         # Print any loops
         for each_loop in self.loops:
-            ret_string += each_loop.format(skip_empty_loops=skip_empty_loops, skip_empty_tags=skip_empty_tags)
+            return_chunks.append(each_loop.format(skip_empty_loops=skip_empty_loops, skip_empty_tags=skip_empty_tags))
 
         # Close the saveframe
-        ret_string += "\nsave_\n"
-        return ret_string
+        return "".join(return_chunks) + "\nsave_\n"
 
     def add_loop(self, loop_to_add: 'loop_mod.Loop') -> None:
         """Add a loop to the saveframe loops."""

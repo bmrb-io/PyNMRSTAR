@@ -182,7 +182,7 @@ class Loop(object):
             return self.filter([tag for x, tag in enumerate(self.tags) if has_data[x]]).format()
 
         # Start the loop
-        ret_string = "\n   loop_\n"
+        return_chunks = ["\n   loop_\n"]
         # Print the tags
         format_string = "      %-s\n"
 
@@ -194,12 +194,12 @@ class Loop(object):
         # Print the categories
         if self.category is None:
             for tag in self.tags:
-                ret_string += format_string % tag
+                return_chunks.append(format_string % tag)
         else:
             for tag in self.tags:
-                ret_string += format_string % (self.category + "." + tag)
+                return_chunks.append(format_string % (self.category + "." + tag))
 
-        ret_string += "\n"
+        return_chunks.append("\n")
 
         row_strings = []
 
@@ -240,11 +240,10 @@ class Loop(object):
 
                 # Print the data (combine the tags' widths with their data)
                 tag_width_list = [d for d in zip(title_widths, datum)]
-                row_strings.append(format_string % tuple(chain.from_iterable(tag_width_list)))
+                return_chunks.append(format_string % tuple(chain.from_iterable(tag_width_list)))
 
         # Close the loop
-        ret_string += "".join(row_strings) + "\n   stop_\n"
-        return ret_string
+        return "".join(return_chunks) + "\n   stop_\n"
 
     @property
     def empty(self) -> bool:
