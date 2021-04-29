@@ -10,6 +10,8 @@ Use python's built in help function for documentation."""
 import decimal as _decimal
 import logging
 
+import cnmrstar
+
 from pynmrstar import utils
 from pynmrstar._internal import __version__
 from pynmrstar.entry import Entry
@@ -17,11 +19,6 @@ from pynmrstar.loop import Loop
 from pynmrstar.parser import Parser as _Parser
 from pynmrstar.saveframe import Saveframe
 from pynmrstar.schema import Schema
-
-try:
-    import pynmrstar.cnmrstar as cnmrstar
-except ImportError:
-    import cnmrstar
 
 if "version" not in dir(cnmrstar) or cnmrstar.version() < "3.2.0":
     raise ImportError("The version of the cnmrstar module installed does "
@@ -35,7 +32,6 @@ logging.getLogger().setLevel(logging.INFO)
 
 # This makes sure that when decimals are printed a lower case "e" is used
 _decimal.getcontext().capitals = 0
-# Make sure the cnmstar module is compiled
 
 del loop
 del entry
@@ -44,4 +40,3 @@ del schema
 del parser
 
 __all__ = ['Loop', 'Saveframe', 'Entry', 'Schema', 'definitions', 'utils', '__version__', 'exceptions', 'cnmrstar']
-
