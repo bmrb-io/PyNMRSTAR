@@ -10,7 +10,10 @@ Use python's built in help function for documentation."""
 import decimal as _decimal
 import logging
 
-import cnmrstar
+try:
+    import cnmrstar
+except ImportError:
+    import pynmrstar.cnmrstar
 
 from pynmrstar import utils
 from pynmrstar._internal import __version__
