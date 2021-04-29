@@ -93,11 +93,11 @@ def quote_value(value: Any) -> str:
     quote values you send to this method or they will show up in
     another set of quotes as part of the actual data. E.g.:
 
-    clean_value('"e. coli"') returns '\'"e. coli"\''
+    quote_value('"e. coli"') returns '\'"e. coli"\''
 
     while
 
-    clean_value("e. coli") returns "'e. coli'"
+    quote_value("e. coli") returns "'e. coli'"
 
     This will automatically be called on all values when you use a str()
     method (so don't call it before inserting values into tags or loops).
@@ -112,7 +112,7 @@ def quote_value(value: Any) -> str:
         if any(isinstance(value, type(x)) for x in definitions.STR_CONVERSION_DICT):
             value = definitions.STR_CONVERSION_DICT[value]
 
-    return cnmrstar.clean_value(value)
+    return cnmrstar.quote_value(value)
 
 
 def validate(entry_to_validate: 'entry_mod.Entry', schema: 'Schema' = None) -> None:

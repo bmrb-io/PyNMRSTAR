@@ -8,7 +8,7 @@
 
 // Version number. Only need to update when
 // API changes.
-#define module_version "3.0.9"
+#define module_version "3.2.0"
 
 // Use for returning errors
 #define err_size 500
@@ -518,13 +518,13 @@ bool ends_with(const char * str, const char * suffix)
     quote values you send to this method or they will show up in
     another set of quotes as part of the actual data. E.g.:
 
-    clean_value('"e. coli"') returns '\'"e. coli"\''
+    quote_value('"e. coli"') returns '\'"e. coli"\''
 
     while
 
-    clean_value("e. coli") returns "'e. coli'"
+    quote_value("e. coli") returns "'e. coli'"
 */
-static PyObject * clean_string(PyObject *self, PyObject *args){
+static PyObject * quote_value(PyObject *self, PyObject *args){
     char * format;
     PyObject * orig;
     PyObject * result;
@@ -803,7 +803,7 @@ version(PyObject *self)
 }
 
 static PyMethodDef cnmrstar_methods[] = {
-    {"clean_value",  (PyCFunction)clean_string, METH_VARARGS,
+    {"quote_value",  (PyCFunction)quote_value, METH_VARARGS,
      "Properly quote or encapsulate a value before printing."},
 
     {"load",  (PyCFunction)PARSE_load, METH_VARARGS,
