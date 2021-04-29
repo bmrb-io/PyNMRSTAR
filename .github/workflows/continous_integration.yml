@@ -25,9 +25,7 @@ jobs:
           architecture: x64
       - name: Install dependencies
         run: python3 -m pip install -r requirements.txt
+      - name: Build c extension
+        run: cd c && make
       - name: Run tests
-        run: |
-          touch "pynmrstar/.nocompile"
-          python3 -m pynmrstar.unit_tests
-          rm pynmrstar/.nocompile
-          python3 -m pynmrstar.unit_tests
+        run: python3 -m pynmrstar.unit_tests
