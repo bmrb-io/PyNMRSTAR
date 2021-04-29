@@ -26,6 +26,6 @@ jobs:
       - name: Install dependencies
         run: python3 -m pip install -r requirements.txt
       - name: Build c extension
-        run: cd c && make
+        run: pip3 install .
       - name: Run tests
         run: python3 -m pynmrstar.unit_tests
