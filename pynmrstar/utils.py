@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """ This file contains various helper functions."""
-
+import functools
 import json
 import os
 from typing import Iterable, Any, Dict
@@ -87,6 +87,7 @@ def iter_entries(metabolomics: bool = False) -> Iterable['entry_mod.Entry']:
         yield entry_mod.Entry.from_database(entry)
 
 
+@functools.lru_cache(maxsize=65536, typed=True)
 def quote_value(value: Any) -> str:
     """Automatically quotes the value in the appropriate way. Don't
     quote values you send to this method or they will show up in
