@@ -207,12 +207,19 @@ class Loop(object):
 
             # Make a copy of the data
             working_data = []
+            title_widths = [4]*len(self.data[0])
+
             # Put quotes as needed on the data
-            for row_pos, datum in enumerate(self.data):
+            for row_pos, row in enumerate(self.data):
                 clean_row = []
-                for col_pos, x in enumerate(datum):
+                for col_pos, x in enumerate(row):
                     try:
-                        clean_row.append(utils.quote_value(x))
+                        clean_val = utils.quote_value(x)
+                        clean_row.append(clean_val)
+                        length = len(clean_val) + 3
+                        if length > title_widths[col_pos] and "\n" not in clean_val:
+                            title_widths[col_pos] = length
+
                     except ValueError:
                         raise InvalidStateError('Cannot generate NMR-STAR for entry, as empty strings are not valid '
                                                 'tag values in NMR-STAR. Please either replace the empty strings with'
@@ -221,17 +228,6 @@ class Loop(object):
                                                 f'Loop: {self.category} Row: {row_pos} Column: {col_pos}')
 
                 working_data.append(clean_row)
-
-            # The nightmare below creates a list of the maximum length of
-            #  elements in each tag in the self.data matrix. Don't try to
-            #   understand it. It's an incomprehensible list comprehension.
-            title_widths = [max([len(str(x)) + 3 for x in col]) for
-                            col in [[row[x] for row in working_data] for
-                                    x in range(0, len(working_data[0]))]]
-
-            # TODO: Replace with a smarter title_widths algorithm - or in C
-            # It needs to not count the length of items that will go on their
-            # own line...
 
             # Generate the format string
             format_string = "     " + "%-*s" * len(self.tags) + " \n"
