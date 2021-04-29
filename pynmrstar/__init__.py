@@ -13,7 +13,10 @@ import logging
 try:
     import cnmrstar
 except ImportError:
-    import pynmrstar.cnmrstar
+    try:
+        import pynmrstar.cnmrstar
+    except ImportError:
+        cnmrstar = None
 
 from pynmrstar import utils
 from pynmrstar._internal import __version__
