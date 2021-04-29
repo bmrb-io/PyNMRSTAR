@@ -39,6 +39,7 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertRaises(ValueError, utils.quote_value, "")
 
         definitions.STR_CONVERSION_DICT = {"loop_": "noloop_"}
+        utils.quote_value.cache_clear()
         self.assertEqual(utils.quote_value("loop_"), "noloop_")
         definitions.STR_CONVERSION_DICT = {None: "."}
 

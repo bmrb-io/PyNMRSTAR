@@ -7,9 +7,17 @@ Adding key->value pairs to STR_CONVERSION_DICT will automatically convert tags
 whose value matches "key" to the string "value" when printing. This allows you
 to set the default conversion value for Booleans or other objects.
 
-WARNING: STR_CONVERSION_DICT cannot contain both booleans and arithmetic types.
-Attempting to use both will cause an issue since boolean True == 1 in python
-and False == 0.
+WARNINGS:
+ * STR_CONVERSION_DICT cannot contain both booleans and arithmetic types.
+   Attempting to use both will cause an issue since boolean True == 1 in python
+   and False == 0.
+
+ * You must call utils.quote_value.clear_cache() after changing the
+   STR_CONVERSION_DICT or else your changes won't take effect due to caching!
+
+   The only exception is if you set STR_CONVERSION_DICT before performing any
+   actions which would call quote_value() - which include calling __str__ or
+   format() on Entry, Saveframe, and Loop objects.
 """
 
 NULL_VALUES = ['', ".", "?", None]
