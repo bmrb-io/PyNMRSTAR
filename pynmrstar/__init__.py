@@ -13,10 +13,7 @@ import logging
 try:
     import cnmrstar
 except ImportError:
-    try:
-        import pynmrstar.cnmrstar
-    except ImportError:
-        cnmrstar = None
+    import pynmrstar.cnmrstar
 
 from pynmrstar import utils
 from pynmrstar._internal import __version__
@@ -26,10 +23,13 @@ from pynmrstar.parser import Parser as _Parser
 from pynmrstar.saveframe import Saveframe
 from pynmrstar.schema import Schema
 
-if "version" not in dir(cnmrstar) or cnmrstar.version() < "3.2.0":
-    raise ImportError("The version of the cnmrstar module installed does "
-                      "not meet the requirements. As this should be handled "
-                      "automatically, there may be an issue with your installation.")
+if "version" not in dir(cnmrstar):
+    raise ImportError("Could not determine the version of cnmrstar installed, and version 3.2.0 or greater is"
+                      f"required. Some details about your cnmrstar installation - dir(cnmrstar)={dir(cnmrstar)}.")
+if cnmrstar.version() < "3.2.0":
+    raise ImportError("The version of the cnmrstar module installed does not meet the requirements. As this should be "
+                      f"handled automatically, there may be an issue with your installation. Version installed: "
+                      f"{cnmrstar.version()}.")
 
 
 # Set up logging
