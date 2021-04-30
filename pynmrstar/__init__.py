@@ -16,13 +16,12 @@ except ImportError:
     try:
         import pynmrstar.cnmrstar
     except ImportError:
-        print(help('modules'))
-        import os
-        print(os.listdir('.'))
-        raise ImportError('Could\'t import cnmrstar module which should be available.')
+        import requests
+        print(repr(requests))
+        raise ImportError("Couldn't import cnmrstar module which should be available.")
 
 from pynmrstar import utils
-from pynmrstar._internal import __version__
+from pynmrstar._internal import __version__, min_cnmrstar_version
 from pynmrstar.entry import Entry
 from pynmrstar.loop import Loop
 from pynmrstar.parser import Parser as _Parser
@@ -30,13 +29,12 @@ from pynmrstar.saveframe import Saveframe
 from pynmrstar.schema import Schema
 
 if "version" not in dir(cnmrstar):
-    raise ImportError("Could not determine the version of cnmrstar installed, and version 3.2.0 or greater is"
-                      f"required. Some details about your cnmrstar installation - dir(cnmrstar)={dir(cnmrstar)}.")
-if cnmrstar.version() < "3.2.0":
+    raise ImportError(f"Could not determine the version of cnmrstar installed, and version {min_cnmrstar_version} or "
+                      "greater is required.")
+if cnmrstar.version() < min_cnmrstar_version:
     raise ImportError("The version of the cnmrstar module installed does not meet the requirements. As this should be "
                       f"handled automatically, there may be an issue with your installation. Version installed: "
-                      f"{cnmrstar.version()}.")
-
+                      f"{cnmrstar.version()}. Version required: {min_cnmrstar_version}")
 
 # Set up logging
 logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s')
