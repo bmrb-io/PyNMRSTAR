@@ -29,3 +29,5 @@ jobs:
         run: pip3 install ./c
       - name: Run tests
         run: python3 -m pynmrstar.unit_tests
+      - name: Launch interactive debug if build fails
+        uses: mxschmitt/action-tmate@v3
