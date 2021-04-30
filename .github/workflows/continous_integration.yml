@@ -27,7 +27,7 @@ jobs:
         run: python3 -m pip install -r requirements.txt
       - name: Build c extension
         run: pip3 install ./c
-      - name: Run tests
-        run: python3 -m pynmrstar.unit_tests
       - name: Launch interactive debug if build fails
         uses: mxschmitt/action-tmate@v3
+      - name: Run tests
+        run: python3 -m pynmrstar.unit_tests
