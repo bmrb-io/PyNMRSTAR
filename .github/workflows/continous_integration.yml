@@ -23,18 +23,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           architecture: x64
-      - name: Install dependencies for pypy3
-        if: ${{ matrix.python-version }} == 'pypy3'
-        run: pypy3 -m pip install -r requirements.txt
-      - name: Install dependencies for CPython
-        if: ${{ matrix.python-version }} != 'pypy3'
-        run: python3 -m pip install -r requirements.txt
-      - name: Build c extension for pypy3
-        if: ${{ matrix.python-version }} == 'pypy3'
-        run: python3 -m pip install ./c
-      - name: Build c extension for Cpython
-        if: ${{ matrix.python-version }} != 'pypy3'
-        run: pypy3 -m pip install ./c
+      - name: Install dependencies
+        run: pypy3 -m pip install -r requirements.txt || python3 -m pip install -r requirements.txt
+      - name: Build c extension
+        run: pypy3 -m pip install ./c || python3 -m pip install ./c
       #- name: Launch interactive debug if build fails
 #        uses: mxschmitt/action-tmate@v3
       - name: Run tests
