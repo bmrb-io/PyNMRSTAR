@@ -35,7 +35,11 @@ jobs:
       - name: Build c extension for Cpython
         if: ${{ matrix.python-version != 'pypy3' }}
         run: python3 -m pip install ./c
-      #- name: Launch interactive debug if build fails
-#        uses: mxschmitt/action-tmate@v3
-      - name: Run tests
+      - name: Run tests using Cpython
+        if: ${{ matrix.python-version != 'pypy3' }}
         run: python3 -m pynmrstar.unit_tests
+      - name: Run tests using Pypy
+        if: ${{ matrix.python-version == 'pypy3' }}
+        run: pypy3 -m pynmrstar.unit_tests
+        #- name: Launch interactive debug
+        #        uses: mxschmitt/action-tmate@v3
