@@ -16,8 +16,10 @@ except ImportError:
     try:
         import pynmrstar.cnmrstar
     except ImportError:
-        import requests
-        print(repr(requests))
+        import site, os
+        locations = site.getsitepackages()
+        for location in locations:
+            print(f"{location}: {os.listdir(location)}")
         raise ImportError("Couldn't import cnmrstar module which should be available.")
 
 from pynmrstar import utils
