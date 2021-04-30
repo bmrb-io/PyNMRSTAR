@@ -4,7 +4,7 @@ cnmrstar = Extension('cnmrstar',
                      sources = ['cnmrstarmodule.c'],
                      extra_compile_args=["-funroll-loops", "-O3"])
 
-setup(name='cNMR-STAR Tools',
+setup(name='cnmrstar',
       version='3.2.0',
       description='This contains a really fast NMR-STAR tokenizer and value sanitizer.',
       ext_modules=[cnmrstar])
