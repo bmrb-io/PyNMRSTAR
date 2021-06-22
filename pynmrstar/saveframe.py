@@ -388,12 +388,6 @@ class Saveframe(object):
         if self.tag_prefix is None:
             raise InvalidStateError(f"The tag prefix was never set! Error in saveframe named '{self.name}'.")
 
-        # Make sure this isn't a dummy saveframe before proceeding
-        try:
-            width = max([len(self.tag_prefix + "." + x[0]) for x in self.tags])
-        except ValueError:
-            return f"\nsave_{self.name}\n\nsave_\n"
-
         return_chunks = []
 
         # Insert the comment if not disabled
@@ -405,26 +399,29 @@ class Saveframe(object):
 
         # Print the saveframe
         return_chunks.append(f"save_{self.name}\n")
-        pstring = "   %%-%ds  %%s\n" % width
-        mstring = "   %%-%ds\n;\n%%s;\n" % width
 
-        # Print the tags
-        for each_tag in self.tags:
-            if skip_empty_tags and each_tag[1] in definitions.NULL_VALUES:
-                continue
-            try:
-                clean_tag = utils.quote_value(each_tag[1])
-            except ValueError:
-                raise InvalidStateError('Cannot generate NMR-STAR for entry, as empty strings are not valid tag values '
-                                        'in NMR-STAR. Please either replace the empty strings with None objects, '
-                                        'or set pynmrstar.definitions.STR_CONVERSION_DICT[\'\'] = None. '
-                                        f'Saveframe: {self.name} Tag: {each_tag[0]}')
+        if len(self.tags) > 0:
+            width = max([len(self.tag_prefix + "." + x[0]) for x in self.tags])
+            pstring = "   %%-%ds  %%s\n" % width
+            mstring = "   %%-%ds\n;\n%%s;\n" % width
 
-            formatted_tag = self.tag_prefix + "." + each_tag[0]
-            if "\n" in clean_tag:
-                return_chunks.append(mstring % (formatted_tag, clean_tag))
-            else:
-                return_chunks.append(pstring % (formatted_tag, clean_tag))
+            # Print the tags
+            for each_tag in self.tags:
+                if skip_empty_tags and each_tag[1] in definitions.NULL_VALUES:
+                    continue
+                try:
+                    clean_tag = utils.quote_value(each_tag[1])
+                except ValueError:
+                    raise InvalidStateError('Cannot generate NMR-STAR for entry, as empty strings are not valid tag'
+                                            ' values in NMR-STAR. Please either replace the empty strings with None '
+                                            'objects, or set pynmrstar.definitions.STR_CONVERSION_DICT[\'\'] = None. '
+                                            f'Saveframe: {self.name} Tag: {each_tag[0]}')
+
+                formatted_tag = self.tag_prefix + "." + each_tag[0]
+                if "\n" in clean_tag:
+                    return_chunks.append(mstring % (formatted_tag, clean_tag))
+                else:
+                    return_chunks.append(pstring % (formatted_tag, clean_tag))
 
         # Print any loops
         for each_loop in self.loops:
