@@ -20,10 +20,11 @@ class Loop(object):
         """Returns True if this loop is equal to another loop, False if
         it is different."""
 
-        if not isinstance(other, (Loop, str)):
+        if not isinstance(other, Loop):
             return False
 
-        return len(self.compare(other)) == 0
+        return (self.category, self.source, self.tags, self.data) == \
+               (other.category,  other.source, other.tags, other.data)
 
     def __getitem__(self, item: Union[int, str, List[str], tuple]) -> list:
         """Get the indicated row from the data array."""

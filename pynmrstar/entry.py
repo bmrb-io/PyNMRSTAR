@@ -28,10 +28,10 @@ class Entry(object):
         """Returns True if this entry is equal to another entry, false
         if it is not equal."""
 
-        if not isinstance(other, (Entry, str)):
+        if not isinstance(other, Entry):
             return False
 
-        return len(self.compare(other)) == 0
+        return (self.entry_id, self.source, self.frame_list) == (other.entry_id, other.source, other.frame_list)
 
     def __getitem__(self, item: Union[int, str]) -> 'saveframe_mod.Saveframe':
         """Get the indicated saveframe."""

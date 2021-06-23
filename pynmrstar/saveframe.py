@@ -44,10 +44,11 @@ class Saveframe(object):
         """Returns True if this saveframe is equal to another saveframe,
         False if it is equal."""
 
-        if not isinstance(other, (Saveframe, str)):
+        if not isinstance(other, Saveframe):
             return False
 
-        return len(self.compare(other)) == 0
+        return (self.name, self.category, self.source, self.tags, self.loops) == \
+               (other.name, other.category, other.source, other.tags, other.loops)
 
     def __getitem__(self, item: Union[int, str]) -> Union[list, 'loop_mod.Loop']:
         """Get the indicated loop or tag."""
