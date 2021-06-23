@@ -113,6 +113,12 @@ class Loop(object):
         self.data = tmp_entry[0][0].data
         self.category = tmp_entry[0][0].category
 
+    def __iter__(self) -> list:
+        """ Yields each of the rows contained within the loop. """
+
+        for row in self.data:
+            yield row
+
     def __len__(self) -> int:
         """Return the number of rows of data."""
 

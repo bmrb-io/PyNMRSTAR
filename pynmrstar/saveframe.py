@@ -64,6 +64,12 @@ class Saveframe(object):
                 except KeyError:
                     raise KeyError(f"No tag or loop matching '{item}'.")
 
+    def __iter__(self) -> "loop_mod.Loop":
+        """ Yields each of the loops contained within the saveframe. """
+
+        for loop in self.loops:
+            yield loop
+
     def __len__(self) -> int:
         """Return the number of loops in this saveframe."""
 

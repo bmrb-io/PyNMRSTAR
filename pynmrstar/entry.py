@@ -98,6 +98,12 @@ class Entry(object):
         parser: parser_mod.Parser = parser_mod.Parser(entry_to_parse_into=self)
         parser.parse(star_buffer.read(), source=self.source, convert_data_types=kwargs.get('convert_data_types', False))
 
+    def __iter__(self) -> saveframe_mod.Saveframe:
+        """ Yields each of the saveframes contained within the entry. """
+
+        for saveframe in self.frame_list:
+            yield saveframe
+
     def __len__(self) -> int:
         """ Returns the number of saveframes in the entry."""
 
