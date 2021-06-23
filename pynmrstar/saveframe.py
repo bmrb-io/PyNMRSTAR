@@ -26,8 +26,11 @@ class Saveframe(object):
 
         # If they specify the specific loop to delete, go ahead and delete it
         if isinstance(item, loop_mod.Loop):
-            del self.loops[self.loops.index(item)]
-            return
+            for pos, loop in enumerate(self.loops):
+                if loop is item:
+                    del self.loops[pos]
+                    return
+            raise IndexError('That loop was not found in the saveframe.')
 
         # See if the result of get(item) is a loop. If so, delete it
         # (calls this method recursively)

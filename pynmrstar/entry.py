@@ -19,8 +19,11 @@ class Entry(object):
         """Remove the indicated saveframe."""
 
         if isinstance(item, saveframe_mod.Saveframe):
-            del self.frame_list[self.frame_list.index(item)]
-            return
+            for pos, saveframe in enumerate(self.frame_list):
+                if saveframe is item:
+                    del self.frame_list[pos]
+                    return
+            raise IndexError('That saveframe was not found in the entry.')
         else:
             self.__delitem__(self.__getitem__(item))
 
