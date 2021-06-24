@@ -2,7 +2,7 @@ import decimal
 import logging
 import os
 import re
-from csv import reader as csv_reader
+from csv import DictReader
 from datetime import date
 from io import StringIO
 from typing import Union, List, Optional, Any, Dict, IO
@@ -40,41 +40,40 @@ class Schema(object):
         schema_stream = _interpret_file(schema_file)
         fix_newlines = StringIO('\n'.join(schema_stream.read().splitlines()))
 
-        csv_reader_instance = csv_reader(fix_newlines)
-        self.headers = next(csv_reader_instance)
+        csv_reader_instance = DictReader(fix_newlines)
+        self.headers = csv_reader_instance.fieldnames
 
         # Skip the header descriptions and header index values and anything
         #  else before the real data starts
         tmp_line = next(csv_reader_instance)
         try:
-            while tmp_line[0] != "TBL_BEGIN":
+            while tmp_line['Dictionary sequence'] != "TBL_BEGIN":
                 tmp_line = next(csv_reader_instance)
         except IndexError:
             raise ValueError(f"Could not parse a schema from the specified URL: {schema_file}")
-        self.version = tmp_line[3]
+        self.version = tmp_line['ADIT category view type']
 
         # Determine the primary key field
         tag_field = self.headers.index("Tag")
-        nullable = self.headers.index("Nullable")
 
         for line in csv_reader_instance:
 
-            if line[0] == "TBL_END":
+            if line['Dictionary sequence'] == "TBL_END":
                 break
 
-            # Convert nulls
-            if line[nullable] == "NOT NULL":
-                line[nullable] = False
-            else:
-                line[nullable] = True
+            single_tag_data: Dict[str, any] = dict(line)
 
-            single_tag_data = dict(zip(self.headers, line))
+            # Convert nulls
+            if single_tag_data['Nullable'] == "NOT NULL":
+                single_tag_data['Nullable'] = False
+            else:
+                single_tag_data['Nullable'] = True
             if '' in single_tag_data:
                 del single_tag_data['']
-            self.schema[line[tag_field].lower()] = single_tag_data
 
-            self.schema_order.append(line[tag_field])
-            formatted = utils.format_category(line[tag_field])
+            self.schema[single_tag_data['Tag'].lower()] = single_tag_data
+            self.schema_order.append(single_tag_data['Tag'])
+            formatted = utils.format_category(single_tag_data['Tag'])
             if formatted not in self.category_order:
                 self.category_order.append(formatted)
 
@@ -89,9 +88,9 @@ class Schema(object):
             except Exception:
                 raise ValueError("Could not load the data type definition file from disk or the internet!")
 
-        csv_reader_instance = csv_reader(types_file)
+        csv_reader_instance = DictReader(types_file, fieldnames=['type_name', 'type_definition'])
         for item in csv_reader_instance:
-            self.data_types[item[0]] = "^" + item[1] + "$"
+            self.data_types[item['type_name']] = f"^{item['type_definition']}$"
 
     def __repr__(self) -> str:
         """Return how we can be initialized."""
