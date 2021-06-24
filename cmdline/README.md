@@ -4,7 +4,7 @@
 
 These scripts are developed to ease certain common tasks performed against
 NMR-STAR files. To run, they must be able to find a copy of `pynmrstar.py`
-either in the same directory as them, or in the directory above them. Therefore
+either in the same directory as them, or in the directory above them. Therefore,
 if you copy the script elsewhere make sure to copy `pynmrstar.py` as well.
 
 Most of the tools' functions are clear from their names, but they are described
@@ -173,7 +173,7 @@ assigned_chem_shift_list_1: assigned_chemical_shifts
 
 Provide the filename of an NMR-STAR file as the first argument.
 
-Prints a list of all of the saveframes, loop, and tags that exist in a given
+Prints a list of all the saveframes, loop, and tags that exist in a given
 NMR-STAR file.
 
 ```bash
@@ -214,7 +214,7 @@ Entry 15000
 
 Provide the filename of an NMR-STAR saveframe file as the first argument.
 
-Prints all of the tags and their values from a NMR-STAR saveframe file in the format:
+Prints all the tags, and their values from a NMR-STAR saveframe file in the format:
 `tag_name: tag_value`
 
 ```bash
