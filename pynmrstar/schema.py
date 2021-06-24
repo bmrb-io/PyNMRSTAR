@@ -277,7 +277,7 @@ class Schema(object):
         text = """BMRB schema from: '%s' version '%s'
 %s
   %-*s %-*s %-*s %-*s
-""" % format_parameters
+""".format(format_parameters)
 
         last_tag = ""
 
