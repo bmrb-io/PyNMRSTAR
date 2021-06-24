@@ -53,9 +53,6 @@ class Schema(object):
             raise ValueError(f"Could not parse a schema from the specified URL: {schema_file}")
         self.version = tmp_line['ADIT category view type']
 
-        # Determine the primary key field
-        tag_field = self.headers.index("Tag")
-
         for line in csv_reader_instance:
 
             if line['Dictionary sequence'] == "TBL_END":
