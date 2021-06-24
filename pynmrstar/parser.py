@@ -70,8 +70,9 @@ class Parser(object):
 
         # Make sure this is actually a STAR file
         if not self.token.lower().startswith("data_"):
-            raise ParsingError("Invalid file. NMR-STAR files must start with 'data_'. Did you accidentally select the "
-                               f"wrong file? Your file started with '{self.token}'.", self.line_number)
+            raise ParsingError("Invalid file. NMR-STAR files must start with 'data_' followed by the data name. "
+                               f"Did you accidentally select the wrong file? Your file started with '{self.token}'.",
+                               self.line_number)
 
         # Make sure there is a data name
         elif len(self.token) < 6:
