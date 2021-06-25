@@ -609,8 +609,13 @@ class Entry(object):
                             tag[1] = self._entry_id
                         # Must be an integer to avoid renumbering the chem_comp ID, for example
                         elif tag_schema['BMRB data type'] == "int":
-                            mapping[f'{each_frame.tag_prefix[1:]}.{tag[0]}.{tag[1]}'] = id_counter
-                            tag[1] = id_counter
+                            prev_tag = tag[1]
+                            if isinstance(tag[1], str):
+                                tag[1] = str(id_counter)
+                                mapping[f'{each_frame.tag_prefix[1:]}.{tag[0]}.{prev_tag}'] = str(id_counter)
+                            else:
+                                tag[1] = id_counter
+                                mapping[f'{each_frame.tag_prefix[1:]}.{tag[0]}.{prev_tag}'] = id_counter
                         # We need to still store all the other tag values too
                         else:
                             mapping[f'{each_frame.tag_prefix[1:]}.{tag[0]}.{tag[1]}'] = tag[1]
@@ -634,16 +639,22 @@ class Entry(object):
                             if tag_schema['lclSfIdFlg'] == 'Y':
                                 # If it's an Entry_ID tag, set it that way
                                 if tag_schema['entryIdFlg'] == 'Y':
-                                    row[x] = self.entry_id
+                                    row[x] = self._entry_id
                                 # Must be an integer to avoid renumbering the chem_comp ID, for example
                                 elif tag_schema['BMRB data type'] == "int":
                                     if row[x] in definitions.NULL_VALUES:
-                                        row[x] = id_counter
+                                        if isinstance(row[x], str):
+                                            row[x] = str(id_counter)
+                                        else:
+                                            row[x] = id_counter
                                 # Handle chem_comp and it's ilk
                                 else:
                                     parent_id_tag = f"{tag_schema['Foreign Table']}.{tag_schema['Foreign Column']}"
                                     parent_id_value = each_frame[parent_id_tag][0]
-                                    row[x] = parent_id_value
+                                    if isinstance(row[x], str):
+                                        row[x] = str(parent_id_value)
+                                    else:
+                                        row[x] = parent_id_value
                 id_counter += 1
 
         # Now fix any other references

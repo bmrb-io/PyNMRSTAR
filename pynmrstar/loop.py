@@ -875,7 +875,11 @@ class Loop(object):
                     if pos == 0:
                         offset = start_value - int(self.data[0][renumber_tag])
                     new_data = int(self.data[pos][renumber_tag]) + offset
-                    self.data[pos][renumber_tag] = new_data
+
+                    if isinstance(self.data[pos][renumber_tag], str):
+                        self.data[pos][renumber_tag] = str(new_data)
+                    else:
+                        self.data[pos][renumber_tag] = new_data
                 except ValueError:
                     self.data = data_copy
                     raise ValueError("You can't renumber a row containing anything that can't be coerced into an "
@@ -885,7 +889,10 @@ class Loop(object):
         # Simple renumbering algorithm if we don't need to maintain the ordering
         else:
             for pos in range(0, len(self.data)):
-                self.data[pos][renumber_tag] = pos + start_value
+                if isinstance(self.data[pos][renumber_tag], str):
+                    self.data[pos][renumber_tag] = str(pos + start_value)
+                else:
+                    self.data[pos][renumber_tag] = pos + start_value
 
     def set_category(self, category: str) -> None:
         """ Set the category of the loop. Useful if you didn't know the
