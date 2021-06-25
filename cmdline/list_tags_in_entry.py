@@ -1,16 +1,9 @@
 #!/usr/bin/env python
 
-from __future__ import print_function
-
 import os
 import sys
 
-# Load the pynmrstar.py library
-if not os.path.isfile("pynmrstar.py"):
-    if not os.path.isfile("../pynmrstar.py"):
-        raise ImportError("Could not locate pynmrstar.py library. Please copy to this directory.")
-    sys.path.append("..")
-import bmrb
+import pynmrstar
 
 if len(sys.argv) < 2:
     raise ValueError("You must provide the file to read from as the first argument.")
@@ -19,9 +12,8 @@ the_file = sys.argv[1]
 
 if not os.path.isfile(the_file):
     raise IOError("The file you asked to read from does not exist.")
-    sys.exit(1)
 
-entry = bmrb.Entry.from_file(the_file)
+entry = pynmrstar.Entry.from_file(the_file)
 
 # Go through the saveframes and loops and print off the tags
 print("Entry %s" % entry.entry_id)

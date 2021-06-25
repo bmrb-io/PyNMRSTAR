@@ -2,19 +2,19 @@ import decimal
 import json
 import logging
 import os
-import sys
 import time
 import zlib
 from datetime import date
 from gzip import GzipFile
 from io import StringIO, BytesIO
-from typing import Dict, Union, IO
+from typing import Dict, Union, IO, List, Tuple
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen, Request
 
 import pynmrstar
 
-__version__: str = "3.1.1"
+__version__: str = "3.2.0"
+min_cnmrstar_version: str = "3.2.0"
 
 # If we have requests, open a session to reuse for the duration of the program run
 try:
@@ -24,77 +24,6 @@ try:
     _session = _requests_session()
 except ModuleNotFoundError:
     _session = None
-
-
-def _build_extension() -> bool:
-    """ Try to compile the c extension. """
-    import subprocess
-
-    cur_dir = os.getcwd()
-    try:
-        src_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)))
-        os.chdir(os.path.join(src_dir, '..', "c"))
-
-        # Use the appropriate build command
-        process = subprocess.Popen(['make', 'python3'], stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
-        stdout, stderr = process.communicate()
-        ret_code = process.poll()
-        # The make command exited with a non-zero status
-        if ret_code:
-            logging.warning('Compiling cnmrstar failed with error code %s and stderr: %s', ret_code, stderr)
-            return False
-
-        # We were able to build the extension?
-        return True
-    except OSError:
-        # There was an error going into the c dir
-        logging.warning('Could not find a directory with c source code.')
-        return False
-    finally:
-        # Go back to the directory we were in before exiting
-        os.chdir(cur_dir)
-
-
-def _get_cnmrstar() -> Union[None, object]:
-    """ Returns the cnmrstar module, or returns None if it isn't available. """
-
-    # First see if it's installed via pip
-    try:
-        import cnmrstar
-        logging.debug('Imported cnmrstar via installed package.')
-        return cnmrstar
-    except ImportError:
-
-        # See if it is compiled locally
-        try:
-            import pynmrstar.cnmrstar as cnmrstar
-            logging.debug('Imported cnmrstar from locally compiled file.')
-
-            if "version" not in dir(cnmrstar) or cnmrstar.version() < "3.0.9":
-                logging.warning("Recompiling cnmrstar module due to API changes. You may experience a segmentation "
-                                "fault immediately following this message but should have no issues the next time you "
-                                "run your script or this program.")
-                _build_extension()
-                sys.exit(0)
-
-            return cnmrstar
-
-        except ImportError:
-
-            # Try to compile cnmrstar, but check for the 'no c module' file before continuing
-            if not os.path.isfile(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".nocompile")):
-                logging.info('Compiling local cnmrstar module...')
-
-                if _build_extension():
-                    try:
-                        import pynmrstar.cnmrstar as cnmrstar
-                        logging.debug('Imported cnmrstar from locally compiled file.')
-                        return cnmrstar
-                    except ImportError:
-                        return
-            else:
-                logging.debug("Not compiling cnmrstar due to presence of '.nocompile' file")
-                return
 
 
 # noinspection PyDefaultArgument
@@ -253,7 +182,6 @@ def _get_entry_from_database(entry_num: Union[str, int], convert_data_types: boo
                 for row in loop.data:
                     for pos in range(0, len(row)):
                         category = loop.category + "." + loop.tags[pos]
-                        line_num = "Loop %s" % loop.category
                         row[pos] = schema.convert_tag(category, row[pos])
 
     return ent
@@ -293,3 +221,53 @@ def _interpret_file(the_file: Union[str, IO]) -> StringIO:
 
     buffer.seek(0)
     return StringIO(buffer.read().decode().replace("\r\n", "\n").replace("\r", "\n"))
+
+
+def get_clean_tag_list(item: Union[str, List[str], Tuple[str]]) -> List[Dict[str, str]]:
+    """ Converts the provided item to a list of dictionaries of
+    {
+     formatted -> just the lower case tag name (category stripped)
+     original -> whatever was provided, completely unmodified
+    }"""
+
+    if not isinstance(item, (str, list, tuple)):
+        raise ValueError('Invalid object provided. Only a tag name (str), or list of tags (list or tuple)'
+                         ' are valid inputs to this function.')
+
+    if isinstance(item, list):
+        tag_list: List[str] = item
+    elif isinstance(item, tuple):
+        tag_list = list(item)
+    elif isinstance(item, str):
+        tag_list = [item]
+    else:
+        raise ValueError(f'The value you provided was not a string, list, or tuple. Item: {repr(item)}')
+
+    try:
+        return [{"formatted": pynmrstar.utils.format_tag(_.lower()), "original": _} for _ in tag_list]
+    except AttributeError:
+        raise ValueError('Your list or tuple may only contain tag names expressed as strings.')
+
+
+def write_to_file(nmrstar_object: Union['pynmrstar.Entry', 'pynmrstar.Saveframe'],
+                  file_name: str,
+                  format_: str = "nmrstar",
+                  show_comments: bool = True,
+                  skip_empty_loops: bool = False,
+                  skip_empty_tags: bool = False):
+    """ Writes the object to the specified file in NMR-STAR format. """
+
+    if format_ not in ["nmrstar", "json"]:
+        raise ValueError("Invalid output format.")
+
+    data_to_write = ''
+    if format_ == "nmrstar":
+        data_to_write = nmrstar_object.format(show_comments=show_comments,
+                                              skip_empty_loops=skip_empty_loops,
+                                              skip_empty_tags=skip_empty_tags)
+    elif format_ == "json":
+        data_to_write = nmrstar_object.get_json()
+
+    out_file = open(file_name, "w")
+    out_file.write(data_to_write)
+    out_file.close()

@@ -1,16 +1,11 @@
-#!/usr/bin/env python
-
-from __future__ import print_function
+#!/usr/bin/env python3
 
 import os
 import sys
 
 # Load the pynmrstar.py library
-if not os.path.isfile("pynmrstar.py"):
-    if not os.path.isfile("../pynmrstar.py"):
-        raise ImportError("Could not locate pynmrstar.py library. Please copy to this directory.")
-    sys.path.append("..")
-import bmrb
+import pynmrstar
+from pynmrstar.exceptions import ParsingError
 
 if len(sys.argv) < 2:
     raise ValueError("You must provide the file to read from as the first argument.")
@@ -19,18 +14,17 @@ the_file = sys.argv[1]
 
 if not os.path.isfile(the_file):
     raise IOError("The file you asked to read from does not exist.")
-    sys.exit(1)
 
 # First try to load the file as a saveframe, then try to load as an entry
 #  and pull out the first saveframe
 try:
-    saveframe = bmrb.Saveframe.from_file(the_file)
-except ValueError:
+    saveframe = pynmrstar.Saveframe.from_file(the_file)
+except ParsingError:
     try:
-        full_entry = bmrb.Entry.from_file(the_file)
-    except ValueError:
-        raise ValueError("The file you specified does not appear to be a "
-                         "NMR-STAR file or NMR-STAR saveframe.")
+        full_entry = pynmrstar.Entry.from_file(the_file)
+    except ParsingError:
+        raise ParsingError("The file you specified does not appear to be a "
+                           "NMR-STAR file or NMR-STAR saveframe.")
 
     shift_frames = full_entry.get_saveframes_by_category("assigned_chemical_shifts")
 

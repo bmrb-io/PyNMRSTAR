@@ -8,7 +8,7 @@
 
 // Version number. Only need to update when
 // API changes.
-#define module_version "3.0.9"
+#define module_version "3.2.0"
 
 // Use for returning errors
 #define err_size 500
@@ -84,7 +84,7 @@ long get_index(char * haystack, char * needle, long start_pos){
 
 /* From: http://stackoverflow.com/questions/779875/what-is-the-function-to-replace-string-in-c#answer-779960 */
 // You must free the result if result is non-NULL.
-char *str_replace(char *orig, char *rep, char *with) {
+char *str_replace(const char *orig, char *rep, char *with) {
     char *result; // the return string
     char *ins;    // the next insert point
     char *tmp;    // varies
@@ -103,8 +103,10 @@ char *str_replace(char *orig, char *rep, char *with) {
         with = "";
     len_with = strlen(with);
 
-    // count the number of replacements needed
-    ins = orig;
+    // Count the number of replacements needed
+    // We explicitly are casting from a const char * to a char *, which is fine because we don't write to any
+    // value in the char array - just where ins points.
+    ins = (char *)orig;
     for (count = 0; (tmp = strstr(ins, rep)); ++count) {
         ins = tmp + len_rep;
     }
@@ -132,7 +134,7 @@ char *str_replace(char *orig, char *rep, char *with) {
 
 // Creates a new string that is all lower-case
 // You must free the result if result is non-NULL.
-char *str_to_lowercase(char *orig) {
+char *str_to_lowercase(const char *orig) {
     char *result; // the return string
 
     // sanity checks and initialization
@@ -516,19 +518,32 @@ bool ends_with(const char * str, const char * suffix)
     quote values you send to this method or they will show up in
     another set of quotes as part of the actual data. E.g.:
 
-    clean_value('"e. coli"') returns '\'"e. coli"\''
+    quote_value('"e. coli"') returns '\'"e. coli"\''
 
     while
 
-    clean_value("e. coli") returns "'e. coli'"
+    quote_value("e. coli") returns "'e. coli'"
 */
-static PyObject * clean_string(PyObject *self, PyObject *args){
-    char * str;
+static PyObject * quote_value(PyObject *self, PyObject *args){
     char * format;
+    PyObject * orig;
+    PyObject * result;
 
-    // Get the string to clean
-    if (!PyArg_ParseTuple(args, "s", &str))
+    // Get the object to clean
+    if (!PyArg_ParseTuple(args, "O", &orig)){
+        PyErr_SetString(PyExc_ValueError, "Failed to parse the input arguments.");
         return NULL;
+    }
+
+    // Convert the python object to a string
+    PyObject * temp = PyObject_Str(orig);
+    if (temp == NULL){
+        PyErr_SetString(PyExc_ValueError, "Failed to convert the object you passed to a string using __str__().");
+        Py_DECREF(temp);
+        return NULL;
+    }
+
+    const char * str = PyUnicode_AsUTF8(temp);
 
     // Figure out how long the string is
     long len = strlen(str);
@@ -536,6 +551,7 @@ static PyObject * clean_string(PyObject *self, PyObject *args){
     // Don't allow the empty string
     if (len == 0){
         PyErr_SetString(PyExc_ValueError, "Empty strings are not allowed as values. Use the None singleton, or '.' to represent null values.");
+        Py_DECREF(temp);
         return NULL;
     }
 
@@ -564,6 +580,7 @@ static PyObject * clean_string(PyObject *self, PyObject *args){
 
         PyObject* result = PyUnicode_FromFormat(format, replaced_string);
         free(replaced_string);
+        Py_DECREF(temp);
         return(result);
     }
 
@@ -571,10 +588,14 @@ static PyObject * clean_string(PyObject *self, PyObject *args){
     if (strstr(str, "\n") != NULL){
         // But always newline terminate it
         if (str[len-1] != '\n'){
-            return PyUnicode_FromFormat("%s\n", str);
+            result = PyUnicode_FromFormat("%s\n", str);
+            Py_DECREF(temp);
+            return result;
         } else {
             // Return as is if it already ends with a newline
-            return PyUnicode_FromString(str);
+            result = PyUnicode_FromString(str);
+            Py_DECREF(temp);
+            return result;
         }
     }
 
@@ -601,12 +622,21 @@ static PyObject * clean_string(PyObject *self, PyObject *args){
         }
 
         // Return the string with whatever type of quoting we are allowed
-        if ((!can_wrap_single) && (!can_wrap_double))
-            return PyUnicode_FromFormat("%s\n", str);
-        if (can_wrap_single)
-            return PyUnicode_FromFormat("'%s'", str);
-        if (can_wrap_double)
-            return PyUnicode_FromFormat("\"%s\"", str);
+        if ((!can_wrap_single) && (!can_wrap_double)){
+            result = PyUnicode_FromFormat("%s\n", str);
+            Py_DECREF(temp);
+            return result;
+        }
+        if (can_wrap_single) {
+            result = PyUnicode_FromFormat("'%s'", str);
+            Py_DECREF(temp);
+            return result;
+        }
+        if (can_wrap_double) {
+            result = PyUnicode_FromFormat("\"%s\"", str);
+            Py_DECREF(temp);
+            return result;
+        }
     }
 
     // Check for special characters in a tag that would require quoting.
@@ -652,17 +682,25 @@ static PyObject * clean_string(PyObject *self, PyObject *args){
         free(lower_case);
     }
 
-    if (needs_wrapping){
+    if (needs_wrapping) {
         // If there is a single quote wrap in double quotes
-        if (has_single)
-            return PyUnicode_FromFormat("\"%s\"", str);
+        if (has_single) {
+            result = PyUnicode_FromFormat("\"%s\"", str);
+            Py_DECREF(temp);
+            return result;
+        }
         // Either there is a double quote or no quotes
-        else
-            return PyUnicode_FromFormat("'%s'", str);
+        else {
+            result = PyUnicode_FromFormat("'%s'", str);
+            Py_DECREF(temp);
+            return result;
+        }
     }
 
     // If we got here it's good to go as it is
-    return PyUnicode_FromString(str);
+    result = PyUnicode_FromString(str);
+    Py_DECREF(temp);
+    return result;
 }
 
 
@@ -765,7 +803,7 @@ version(PyObject *self)
 }
 
 static PyMethodDef cnmrstar_methods[] = {
-    {"clean_value",  (PyCFunction)clean_string, METH_VARARGS,
+    {"quote_value",  (PyCFunction)quote_value, METH_VARARGS,
      "Properly quote or encapsulate a value before printing."},
 
     {"load",  (PyCFunction)PARSE_load, METH_VARARGS,
