@@ -1,11 +1,12 @@
 import hashlib
 import json
 import logging
+import warnings
 from io import StringIO
-from typing import TextIO, BinaryIO, Union, List, Optional, Dict, Any
+from typing import TextIO, BinaryIO, Union, List, Optional, Dict, Any, Tuple
 
 from pynmrstar import definitions, utils, loop as loop_mod, parser as parser_mod, saveframe as saveframe_mod
-from pynmrstar._internal import _json_serialize, _interpret_file, _get_entry_from_database
+from pynmrstar._internal import _json_serialize, _interpret_file, _get_entry_from_database, write_to_file
 from pynmrstar.exceptions import InvalidStateError
 from pynmrstar.schema import Schema
 
@@ -15,17 +16,43 @@ class Entry(object):
     object several ways; (e.g. from a file, from the official database,
     from scratch) see the class methods below. """
 
+    def __contains__(self, item: Any):
+        """ Check if the given item is present in the entry. """
+
+        # Prepare for processing
+        if isinstance(item, (list, tuple)):
+            to_process: List[Union[str, saveframe_mod.Saveframe, loop_mod.Loop]] = list(item)
+        elif isinstance(item, (loop_mod.Loop, saveframe_mod.Saveframe, str)):
+            to_process = [item]
+        else:
+            return False
+
+        for item in to_process:
+            if isinstance(item, saveframe_mod.Saveframe):
+                if item not in self._frame_list:
+                    return False
+            elif isinstance(item, (loop_mod.Loop, str)):
+                found = False
+                for saveframe in self._frame_list:
+                    if item in saveframe:
+                        found = True
+                        break
+                if not found:
+                    return False
+            else:
+                return False
+        return True
+
     def __delitem__(self, item: Union['saveframe_mod.Saveframe', int, str]) -> None:
         """Remove the indicated saveframe."""
 
-        if isinstance(item, saveframe_mod.Saveframe):
-            for pos, saveframe in enumerate(self.frame_list):
-                if saveframe is item:
-                    del self.frame_list[pos]
-                    return
-            raise IndexError('That saveframe was not found in the entry.')
+        if isinstance(item, int):
+            try:
+                del self._frame_list[item]
+            except IndexError:
+                raise IndexError(f'Index out of range: no saveframe at index: {item}')
         else:
-            self.__delitem__(self.__getitem__(item))
+            self.remove_saveframe(item)
 
     def __eq__(self, other) -> bool:
         """Returns True if this entry is equal to another entry, false
@@ -34,13 +61,13 @@ class Entry(object):
         if not isinstance(other, Entry):
             return False
 
-        return (self.entry_id, self.source, self.frame_list) == (other.entry_id, other.source, other.frame_list)
+        return (self.entry_id, self._frame_list) == (other.entry_id, other._frame_list)
 
     def __getitem__(self, item: Union[int, str]) -> 'saveframe_mod.Saveframe':
         """Get the indicated saveframe."""
 
         try:
-            return self.frame_list[item]
+            return self._frame_list[item]
         except TypeError:
             return self.get_saveframe_by_name(item)
 
@@ -54,7 +81,7 @@ class Entry(object):
 
         # Default initializations
         self._entry_id: Union[str, int] = 0
-        self.frame_list: List[saveframe_mod.Saveframe] = []
+        self._frame_list: List[saveframe_mod.Saveframe] = []
         self.source: Optional[str] = None
 
         # They initialized us wrong
@@ -86,7 +113,7 @@ class Entry(object):
                                                                                 all_tags=kwargs['all_tags'],
                                                                                 default_values=kwargs['default_values'],
                                                                                 schema=schema)
-                    self.frame_list.append(templated_saveframe)
+                    self._frame_list.append(templated_saveframe)
             entry_saveframe = self.get_saveframes_by_category('entry_information')[0]
             entry_saveframe['NMR_STAR_version'] = schema.version
             entry_saveframe['Original_NMR_STAR_version'] = schema.version
@@ -104,13 +131,13 @@ class Entry(object):
     def __iter__(self) -> saveframe_mod.Saveframe:
         """ Yields each of the saveframes contained within the entry. """
 
-        for saveframe in self.frame_list:
+        for saveframe in self._frame_list:
             yield saveframe
 
     def __len__(self) -> int:
         """ Returns the number of saveframes in the entry."""
 
-        return len(self.frame_list)
+        return len(self._frame_list)
 
     def __repr__(self) -> str:
         """Returns a description of the entry."""
@@ -124,13 +151,13 @@ class Entry(object):
         if isinstance(item, saveframe_mod.Saveframe):
             # Add by ordinal
             if isinstance(key, int):
-                self.frame_list[key] = item
+                self._frame_list[key] = item
 
             # TODO: Consider stripping this behavior out - it isn't clear it is useful
             else:
                 # Add by key
                 contains_frame: bool = False
-                for pos, frame in enumerate(self.frame_list):
+                for pos, frame in enumerate(self._frame_list):
                     if frame.name == key:
                         if contains_frame:
                             raise ValueError(f"Cannot replace the saveframe with the name '{frame.name} "
@@ -139,7 +166,7 @@ class Entry(object):
                                              f'invalid NMR-STAR. Did you manually edit the Entry.frame_list '
                                              f'object? Please use the Entry.add_saveframe() method instead to '
                                              f'add new saveframes.')
-                        self.frame_list[pos] = item
+                        self._frame_list[pos] = item
                         contains_frame = True
 
                 if not contains_frame:
@@ -170,7 +197,7 @@ class Entry(object):
         """ Returns a list of the unique categories present in the entry. """
 
         category_list = []
-        for saveframe in self.frame_list:
+        for saveframe in self._frame_list:
             category = saveframe.category
             if category and category not in category_list:
                 category_list.append(category)
@@ -180,7 +207,7 @@ class Entry(object):
     def empty(self) -> bool:
         """ Check if the entry has no data. Ignore the structural tags."""
 
-        for saveframe in self.frame_list:
+        for saveframe in self._frame_list:
             if not saveframe.empty:
                 return False
 
@@ -201,7 +228,7 @@ class Entry(object):
         self._entry_id = value
 
         schema = utils.get_schema()
-        for saveframe in self.frame_list:
+        for saveframe in self._frame_list:
             for tag in saveframe.tags:
                 fqtn = (saveframe.tag_prefix + "." + tag[0]).lower()
 
@@ -224,16 +251,16 @@ class Entry(object):
     def frame_dict(self) -> Dict[str, 'saveframe_mod.Saveframe']:
         """Returns a dictionary of saveframe name -> saveframe object mappings."""
 
-        fast_dict = dict((frame.name, frame) for frame in self.frame_list)
+        fast_dict = dict((frame.name, frame) for frame in self._frame_list)
 
         # If there are no duplicates then continue
-        if len(fast_dict) == len(self.frame_list):
+        if len(fast_dict) == len(self._frame_list):
             return fast_dict
 
         # Figure out where the duplicate is
         frame_dict = {}
 
-        for frame in self.frame_list:
+        for frame in self._frame_list:
             if frame.name in frame_dict:
                 raise InvalidStateError("The entry has multiple saveframes with the same name. That is not allowed in "
                                         "the NMR-STAR format. Please remove or rename one. Duplicate name: "
@@ -243,6 +270,10 @@ class Entry(object):
             frame_dict[frame.name] = frame
 
         return frame_dict
+
+    @property
+    def frame_list(self) -> List['saveframe_mod.Saveframe']:
+        return self._frame_list
 
     @classmethod
     def from_database(cls, entry_num: Union[str, int], convert_data_types: bool = False):
@@ -305,7 +336,7 @@ class Entry(object):
 
         # Create an entry from scratch and populate it
         ret = Entry.from_scratch(json_dict['entry_id'])
-        ret.frame_list = [saveframe_mod.Saveframe.from_json(x) for x in json_dict['saveframes']]
+        ret._frame_list = [saveframe_mod.Saveframe.from_json(x) for x in json_dict['saveframes']]
         ret.source = "from_json()"
 
         # Return the new loop
@@ -368,7 +399,7 @@ class Entry(object):
             raise ValueError(f"Cannot add a saveframe with name '{frame.name}' since a saveframe with that "
                              f"name already exists in the entry.")
 
-        self.frame_list.append(frame)
+        self._frame_list.append(frame)
 
     def compare(self, other) -> List[str]:
         """Returns the differences between two entries as a list.
@@ -388,10 +419,10 @@ class Entry(object):
         try:
             if str(self.entry_id) != str(other.entry_id):
                 diffs.append(f"Entry ID does not match between entries: '{self.entry_id}' vs '{other.entry_id}'.")
-            if len(self.frame_list) != len(other.frame_list):
-                diffs.append(f"The number of saveframes in the entries are not equal: '{len(self.frame_list)}' vs "
+            if len(self._frame_list) != len(other.frame_list):
+                diffs.append(f"The number of saveframes in the entries are not equal: '{len(self._frame_list)}' vs "
                              f"'{len(other.frame_list)}'.")
-            for frame in self.frame_list:
+            for frame in self._frame_list:
                 other_frame_dict = other.frame_dict
                 if frame.name not in other_frame_dict:
                     diffs.append(f"No saveframe with name '{frame.name}' in other entry.")
@@ -410,17 +441,14 @@ class Entry(object):
         """ Automatically adds any missing tags (according to the schema)
         to all saveframes and loops and sorts the tags. """
 
-        for saveframe in self.frame_list:
+        for saveframe in self._frame_list:
             saveframe.add_missing_tags(schema=schema, all_tags=all_tags)
 
     def delete_empty_saveframes(self) -> None:
-        """ This method will delete all empty saveframes in an entry
-        (the loops in the saveframe must also be empty for the saveframe
-        to be deleted). "Empty" means no values in tags, not no tags present."""
+        """ Deprecated. Please use `py:meth:pynmrstar.Entry.remove_empty_saveframes`. """
 
-        for pos, entry in enumerate(self.frame_list):
-            if entry.empty:
-                del self.frame_list[pos]
+        warnings.warn('Deprecated. Please use remove_empty_saveframes() instead.', DeprecationWarning)
+        return self.remove_empty_saveframes()
 
     def format(self, skip_empty_loops: bool = True, skip_empty_tags: bool = False, show_comments: bool = True) -> str:
         """ The same as calling str(Entry), except that you can pass options
@@ -438,7 +466,7 @@ class Entry(object):
         False a dictionary representation of the entry that is
         serializeable is returned instead."""
 
-        frames = [x.get_json(serialize=False) for x in self.frame_list]
+        frames = [x.get_json(serialize=False) for x in self._frame_list]
 
         entry_dict = {
             "entry_id": self.entry_id,
@@ -456,7 +484,7 @@ class Entry(object):
         value = utils.format_category(value).lower()
 
         results = []
-        for frame in self.frame_list:
+        for frame in self._frame_list:
             for one_loop in frame.loops:
                 if one_loop.category.lower() == value:
                     results.append(one_loop)
@@ -481,7 +509,7 @@ class Entry(object):
 
         ret_frames = []
 
-        for frame in self.frame_list:
+        for frame in self._frame_list:
             results = frame.get_tag(tag_name)
             if results != [] and results[0] == value:
                 ret_frames.append(frame)
@@ -499,7 +527,7 @@ class Entry(object):
                              " this at the Entry level. You can call Saveframe.get_tag('Title') without issue.")
 
         results = []
-        for frame in self.frame_list:
+        for frame in self._frame_list:
             results.extend(frame.get_tag(tag, whole_tag=whole_tag))
 
         return results
@@ -566,7 +594,7 @@ class Entry(object):
                 return len(ordering) + abs(int(hashlib.sha1(str(_.category).encode()).hexdigest(), 16))
 
         # Go through all the saveframes
-        for each_frame in self.frame_list:
+        for each_frame in self._frame_list:
             each_frame.sort_tags(schema=my_schema)
             # Iterate through the loops
             for each_loop in each_frame:
@@ -578,11 +606,11 @@ class Entry(object):
                 except ValueError:
                     pass
             each_frame.loops.sort(key=loop_key)
-        self.frame_list.sort(key=sf_key)
+        self._frame_list.sort(key=sf_key)
 
         # Calculate all the categories present
         categories: set = set()
-        for each_frame in self.frame_list:
+        for each_frame in self._frame_list:
             categories.add(each_frame.category)
 
         # tag_prefix -> tag -> original value -> mapped value
@@ -650,7 +678,7 @@ class Entry(object):
                                 # Handle chem_comp and it's ilk
                                 else:
                                     parent_id_tag = f"{tag_schema['Foreign Table']}.{tag_schema['Foreign Column']}"
-                                    parent_id_value = each_frame[parent_id_tag][0]
+                                    parent_id_value = each_frame.get_tag(parent_id_tag)[0]
                                     if isinstance(row[x], str):
                                         row[x] = str(parent_id_value)
                                     else:
@@ -737,14 +765,14 @@ class Entry(object):
                                                          )
                                             continue
                                     try:
-                                        row[tag_pos] = self.get_saveframe_by_name(row[x][1:])['ID'][0]
+                                        row[tag_pos] = self.get_saveframe_by_name(row[x][1:]).get_tag('ID')[0]
                                     except IndexError:
-                                        logging.info(f"Getting {self.get_saveframe_by_name(row[x][1:])['ID']}")
+                                        logging.info(f"Getting {self.get_saveframe_by_name(row[x][1:]).get_tag('ID')}")
                                     except KeyError:
                                         logging.warning(f"Missing frame of type {tag} pointed to by {conditional_tag}")
 
         # Renumber the 'ID' column in a loop
-        for each_frame in self.frame_list:
+        for each_frame in self._frame_list:
             for loop in each_frame.loops:
                 if loop.tag_index('ID') is not None and loop.category != '_Experiment':
                     loop.renumber_rows('ID')
@@ -760,6 +788,50 @@ class Entry(object):
             for pos2, one_loop in enumerate(frame):
                 print(f"\t\t[{pos2}] {repr(one_loop)}")
 
+    def remove_empty_saveframes(self) -> None:
+        """ This method will remove all empty saveframes in an entry
+        (the loops in the saveframe must also be empty for the saveframe
+        to be deleted). "Empty" means no values in tags, not no tags present."""
+
+        for pos, entry in enumerate(self._frame_list):
+            if entry.empty:
+                del self._frame_list[pos]
+
+    def remove_saveframe(self, item: Union[str, List[str], Tuple[str], 'saveframe_mod.Saveframe',
+                                           List['saveframe_mod.Saveframe'], Tuple['saveframe_mod.Saveframe']]) -> None:
+        """ Removes one or more saveframes from the entry. You can remove saveframes either by passing the saveframe
+        object itself, the saveframe name (as a string), or a list or tuple of either."""
+
+        parsed_list: list
+        if isinstance(item, tuple):
+            parsed_list = list(item)
+        elif isinstance(item, list):
+            parsed_list = item
+        elif isinstance(item, (str, saveframe_mod.Saveframe)):
+            parsed_list = [item]
+        else:
+            raise ValueError('The item you provided was not one or more saveframe objects or saveframe names (strings).'
+                             f' Item type: {type(item)}')
+
+        frames_to_remove = []
+        for saveframe in parsed_list:
+            if isinstance(saveframe, str):
+                try:
+                    frames_to_remove.append(self.frame_dict[saveframe])
+                except KeyError:
+                    raise ValueError('At least one saveframe specified to remove was not found in this saveframe. '
+                                     f'First missing saveframe: {saveframe}')
+            elif isinstance(saveframe, saveframe_mod.Saveframe):
+                if saveframe not in self._frame_list:
+                    raise ValueError('At least one loop specified to remove was not found in this saveframe. First '
+                                     f'missing loop: {saveframe}')
+                frames_to_remove.append(saveframe)
+            else:
+                raise ValueError('One of the items you provided was not a saveframe object or saveframe name '
+                                 f'(string). Item: {repr(saveframe)}')
+
+        self._frame_list = [_ for _ in self._frame_list if _ not in frames_to_remove]
+
     def rename_saveframe(self, original_name: str, new_name: str) -> None:
         """ Renames a saveframe and updates all pointers to that
         saveframe in the entry with the new name."""
@@ -771,7 +843,7 @@ class Entry(object):
             new_name = new_name[1:]
 
         # Make sure there is no saveframe called what the new name is
-        if [x.name for x in self.frame_list].count(new_name) > 0:
+        if [x.name for x in self._frame_list].count(new_name) > 0:
             raise ValueError(f"Cannot rename the saveframe '{original_name}' as '{new_name}' because a "
                              f"saveframe with that name already exists in the entry.")
 
@@ -862,16 +934,5 @@ class Entry(object):
         skip_empty_tags=True will omit tags in the saveframes and loops which have no non-null values.
         format_=json to write to the file in JSON format."""
 
-        if format_ not in ["nmrstar", "json"]:
-            raise ValueError("Invalid output format.")
-
-        data_to_write = ''
-        if format_ == "nmrstar":
-            data_to_write = self.format(show_comments=show_comments, skip_empty_loops=skip_empty_loops,
-                                        skip_empty_tags=skip_empty_tags)
-        elif format_ == "json":
-            data_to_write = self.get_json()
-
-        out_file = open(file_name, "w")
-        out_file.write(data_to_write)
-        out_file.close()
+        write_to_file(self, file_name=file_name, format_=format_, show_comments=show_comments,
+                      skip_empty_loops=skip_empty_loops, skip_empty_tags=skip_empty_tags)

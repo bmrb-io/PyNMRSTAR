@@ -1,7 +1,7 @@
 from distutils.core import setup, Extension
 
 cnmrstar = Extension('cnmrstar',
-                     sources = ['cnmrstarmodule.c'],
+                     sources=['cnmrstarmodule.c'],
                      extra_compile_args=["-funroll-loops", "-O3"])
 
 setup(name='cnmrstar',

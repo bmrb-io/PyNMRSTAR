@@ -361,10 +361,10 @@ ways python allows.
 .. code:: python
 
     >>> for x in our_data:
-    >>>    print("Sprectral chemical shift value is: " + str(x[1]))
-    Sprectral chemical shift value is: 9.857
-    Sprectral chemical shift value is: 4.922
-    Sprectral chemical shift value is: 9.857
+    >>>    print("Spectral chemical shift value is: " + str(x[1]))
+    Spectral chemical shift value is: 9.857
+    Spectral chemical shift value is: 4.922
+    Spectral chemical shift value is: 9.857
     ...
 
 It is also easy to dump the table in a loop as a CSV

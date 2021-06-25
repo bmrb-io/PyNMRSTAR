@@ -1,6 +1,60 @@
 Release notes
 =============
 
+3.2.0
+~~~~~
+
+Performance, performance, and packaging!
+
+This release makes some relatively large under-the-hood changes to improve performance, as well
+as to set up the library for further performance improvements in the future. Attempts were made to
+avoid changes which could impact current code, but a few (unlikely to be an issue) breaking changes have
+been made.
+
+PyNMR-STAR is now distributed in binary (wheel) form! This not only should speed up installation, but it will
+also allow us to more tightly integrate the c library in the future, leading to even faster code.
+
+Changes:
+
+- Significant speed improvements all over the library:
+ - Formatting an Entry object as a string is now up to four times faster under certain circumstances,
+   but significantly faster under all circumstances.
+ - Deleting saveframes from entries with a large number of saveframes is now significantly faster
+ - :py:class:`pynmrstar.Entry`, :py:class:`pynmrstar.Saveframe`, and :py:class:`pynmrstar.Loop`
+   equality comparisons are much faster (and also more exacting - see the breaking changes).
+ - Iterating over saveframes in an entry, Loops in a saveframe, and rows in a loop is now roughly twice as fast
+-  Added new :py:meth:`pynmrstar.Saveframe.remove_loop`, :py:meth:`pynmrstar.Saveframe.remove_tag`, and
+   :py:meth:`pynmrstar.Loop.remove_tag` methods. All are capable of removing more than one loop/tag (respectively)
+   at a time. Please use these rather than `del saveframe[tag]` constructions as it is less ambiguous as to whether a tag
+   or loop will be removed for others reading your code.
+-  A bug which erroneously omitted loops when getting the string representation of a saveframe with no tags
+   has been resolved. This shouldn't have been triggered in practice, since :py:class:`pynmrstar.Saveframe` objects,
+   to be valid NMR-STAR, require at least two tags. (The ``Sf_framecode`` and ``Sf_category`` tags.)
+
+Potentially breaking changes:
+- Equality checks operate differently. Before, :py:class:`pynmrstar.Entry`, :py:class:`pynmrstar.Saveframe`, and
+  :py:class:`pynmrstar.Loop` classes, when compared using the `__eq__` built-in, performed a "NMR-STAR-aware" comparison. This meant comparing
+  tag names case insensitively, etc. This was very slow, and may have lead to confusing behavior in some circumstances. If
+  you want to perform this type of comparison, use :py:meth:`pynmrstar.Entry.compare`, :py:meth:`pynmrstar.Saveframe.compare`, and
+  :py:meth:`pynmrstar.Loop.compare` and check if the list of differences is empty. `__eq__` now checks if the objects have the same exact
+  contents - including source, tag capitalization, etc. Previously the string representation of an entry would compare equal
+  to the actual Entry object, for example.
+- If you use :py:func:`pynmrstar.utils.quote_value` (very unlikely) and you also modify
+  :py:attr:`pynmrstar.definitions.STR_CONVERSION_DICT` (extraordinarily unlikely) then you must call
+  :py:func:`pynmrstar.utils.quote_value.clear_cache` before performing any operations which render objects
+  as NMR-STAR strings.
+- :py:meth:`pynmrstar.Saveframe.delete_tag` has been renamed to :py:meth:`pynmrstar.Saveframe.remove_tag`.
+  :py:meth:`pynmrstar.Loop.delete_tag` has been renamed to :py:meth:`pynmrstar.Loop.remove_tag`.
+  :py:meth:`pynmrstar.Loop.delete_data_by_tag_value` has been renamed to :py:meth:`pynmrstar.Loop.remove_data_by_tag_value`.
+  :py:meth:`pynmrstar.Entry.delete_empty_saveframes` has been renamed to :py:meth:`pynmrstar.Entry.remove_empty_saveframes`.
+  All of the original methods remain for now in a deprecated state. Please update them as they will be released in the 4.0 release.
+- :py:attr:`pynmrstar.Entry.frame_list`, :py:attr:`pynmrstar.Saveframe.tags`, :py:attr:`pynmrstar.Saveframe.category`,
+  :py:attr:`pynmrstar.Saveframe.loops`, and :py:attr:`pynmrstar.Loop.tags` have all been converted into properties. Of them,
+  only :py:attr:`pynmrstar.Saveframe.category` can be set - the others are read only. Please use the built in functions to modify
+  these rather than manually modifying the returned lists. In version 4.0, modifying these directly will be impossible as they
+  will become iterators, and all modification must be done through the provided methods. This will allow for more speed
+  improvements in the library, as well as more robust sanity checks.
+
 3.1.1
 ~~~~~
 

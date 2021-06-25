@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 
 import json
 import logging
@@ -189,6 +190,7 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertEqual(self.file_entry, Entry.from_string(str(self.file_entry)))
         self.assertEqual(str(self.file_entry), str(Entry.from_string(str(self.file_entry))))
         self.assertRaises(IOError, Entry.from_database, 0)
+
         self.assertEqual(str(Entry.from_scratch(15000)), "data_15000\n\n")
         self.assertEqual(Entry.from_file(os.path.join(our_path, "sample_files", "bmr15000_3.str.gz")), self.file_entry)
 
@@ -249,7 +251,7 @@ class TestPyNMRSTAR(unittest.TestCase):
         frame = self.file_entry[0]
 
         # Check __delitem__
-        del frame['DEtails']
+        frame.remove_tag('DEtails')
         self.assertEqual([[x[0], x[1]] for x in frame.tags],
                          [['Sf_category', 'entry_information'],
                           ['Sf_framecode', 'entry_information'],
@@ -284,14 +286,14 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertEqual(len(frame), 7)
         del frame[0]
         self.assertEqual(len(frame), 6)
-        del frame[frame.get_loop_by_category('RElease')]
+        del frame[frame.get_loop('RElease')]
         self.assertEqual(len(frame), 5)
-        self.assertRaises(KeyError, frame.get_loop_by_category, 'RElease')
+        self.assertRaises(KeyError, frame.get_loop, 'RElease')
 
         # Check __getitem__
-        self.assertEqual(frame['NMR_STAR_version'], ['3.2.6.0'])
+        self.assertEqual(frame.get_tag('NMR_STAR_version'), ['3.2.6.0'])
         self.assertEqual(frame[0], frame.loops[0])
-        self.assertEqual(frame['_SG_project'], frame.loops[0])
+        self.assertEqual(frame.get_loop('_SG_project'), frame.loops[0])
 
         # Check __lt__
         self.assertEqual(frame[-3] > frame[-1], False)
@@ -299,9 +301,9 @@ class TestPyNMRSTAR(unittest.TestCase):
         # Check __init__
         self.assertRaises(ValueError, Saveframe)
         self.assertEqual(Saveframe.from_string(str(frame)), frame)
-        self.assertEqual(str(Saveframe.from_scratch("test", tag_prefix="test")), "\nsave_test\n\nsave_\n")
+        self.assertEqual(str(Saveframe.from_scratch("test", tag_prefix="test")), "save_test\n\nsave_\n")
         tmp = copy(frame)
-        tmp.loops = []
+        tmp._loops = []
         self.assertEqual(Saveframe.from_string(frame.get_data_as_csv(frame), csv=True).compare(tmp), [])
         self.assertRaises(ValueError, Saveframe.from_string, "test.1,test.2\n2,3,4", csv=True)
 
@@ -325,7 +327,7 @@ class TestPyNMRSTAR(unittest.TestCase):
         self.assertRaises(ValueError, frame.add_tag, "invalid.test.test", 1)
         self.assertRaises(ValueError, frame.add_tag, "invalid.test", 1, update=True)
         frame.add_tag("test", 3, update=True)
-        self.assertEqual(frame['test'], [3])
+        self.assertEqual(frame.get_tag('test'), [3])
 
         # Check add_tags
         frame.add_tags([['example1'], ['example2']])
@@ -344,9 +346,9 @@ class TestPyNMRSTAR(unittest.TestCase):
         tmp.tags[0][0] = "broken"
         self.assertEqual(frame.compare(tmp), ["\tNo tag with name '_Entry.Sf_category' in compared entry."])
 
-        # Test delete_tag
-        self.assertRaises(KeyError, frame.delete_tag, "this_tag_will_not_exist")
-        frame.delete_tag("test")
+        # Test remove_tag
+        self.assertRaises(KeyError, frame.remove_tag, "this_tag_will_not_exist")
+        frame.remove_tag("test")
         self.assertEqual(frame.get_tag("test"), [])
 
         # Test get_data_as_csv
@@ -369,9 +371,9 @@ entry_information,entry_information,15000,"Solution structure of chicken villin 
 ",macromolecule,original,2006-09-07,2006-09-07,2006-09-07,2006-09-07,author,.,3.2.6.0,.,3.2.6.0,NMR,solution,.,.,.,.,.,.,.,.,.,.,.,5,.
 ''')
 
-        # Test get_loop_by_category
-        self.assertEqual(repr(frame.get_loop_by_category("_SG_projecT")), "<pynmrstar.Loop '_SG_project'>")
-        self.assertRaises(KeyError, frame.get_loop_by_category, 'this_loop_wont_be_found')
+        # Test get_loop
+        self.assertEqual(repr(frame.get_loop("_SG_projecT")), "<pynmrstar.Loop '_SG_project'>")
+        self.assertRaises(KeyError, frame.get_loop, 'this_loop_wont_be_found')
 
         # Test get_tag - this is really already tested in the other tests here
         self.assertEqual(frame.get_tag("sf_category"), ['entry_information'])
@@ -412,7 +414,7 @@ entry_information,entry_information,15000,"Solution structure of chicken villin 
                                                               ['example1', 5],
                                                               ['example2', '.']])
 
-        del frame['example2'], frame['example1']
+        frame.remove_tag(['example2', 'example1'])
         frame.tags.append(frame.tags.pop(0))
         frame.sort_tags()
         self.assertEqual([[x[0], x[1]] for x in frame.tags], [['Sf_category', 'entry_information'],
@@ -483,7 +485,7 @@ entry_information,entry_information,15000,"Solution structure of chicken villin 
 
         test_entry = Entry.from_scratch('test')
         test_saveframe = Saveframe.from_scratch('test', 'test')
-        test_entry.frame_list = [test_saveframe, test_saveframe]
+        test_entry._frame_list = [test_saveframe, test_saveframe]
         with self.assertRaises(ValueError):
             test_entry['test'] = test_saveframe
 
@@ -576,8 +578,8 @@ entry_information,entry_information,15000,"Solution structure of chicken villin 
         self.assertEqual(tmp_loop.data, [[1, 2, 3], [4, 5, 6], [7, 8, 9]])
 
         # Test delete_data_by_tag_value
-        self.assertEqual(tmp_loop.delete_data_by_tag_value("tag1", 1, index_tag=0), [[1, 2, 3]])
-        self.assertRaises(ValueError, tmp_loop.delete_data_by_tag_value, "tag4", "data")
+        self.assertEqual(tmp_loop.remove_data_by_tag_value("tag1", 1, index_tag=0), [[1, 2, 3]])
+        self.assertRaises(ValueError, tmp_loop.remove_data_by_tag_value, "tag4", "data")
         self.assertEqual(tmp_loop.data, [[1, 5, 6], [2, 8, 9]])
 
         # Test get_data_as_csv()
@@ -759,7 +761,7 @@ loop_
         db_tmp = copy(self.file_entry)
         denormalized = Entry.from_file(os.path.join(our_path, "sample_files", "bmr15000_3_denormalized.str"))
         denormalized.normalize()
-        self.assertEqual(db_tmp, denormalized)
+        self.assertEqual(db_tmp.compare(denormalized), [])
 
         # Shuffle our local entry
         random.shuffle(db_tmp.frame_list)
@@ -768,28 +770,29 @@ loop_
             random.shuffle(frame.tags)
 
         # Might as well test equality testing while shuffled:
-        self.assertEqual(db_tmp, self.file_entry)
+        self.assertEqual(db_tmp.compare(self.file_entry), [])
 
         # Test that the frames are in a different order
         self.assertNotEqual(db_tmp.frame_list, self.file_entry.frame_list)
         db_tmp.normalize()
 
-        # And test they have been put back together
         self.assertEqual(db_tmp.frame_list, self.file_entry.frame_list)
 
         # Now test ordering of saveframes when tags may be missing
         b = Saveframe.from_scratch('not_real2')
         b.add_tag('_help.Sf_category', 'a')
         b.add_tag('_help.ID', 1)
+        c = Saveframe.from_scratch('not_real')
+        c.add_tag('_help.Sf_category', 'a')
+        c.add_tag('_help.ID', 'a')
+        d = Saveframe.from_scratch('not_real3')
+        d.add_tag('_help.borg', 'a')
+
         db_tmp.add_saveframe(b)
-        b = Saveframe.from_scratch('not_real')
-        b.add_tag('_help.Sf_category', 'a')
-        b.add_tag('_help.ID', 'a')
-        db_tmp.add_saveframe(b)
-        b = Saveframe.from_scratch('not_real3')
-        b.add_tag('_help.borg', 'a')
-        db_tmp.add_saveframe(b)
-        correct_order = copy(db_tmp.frame_list)
+        db_tmp.add_saveframe(c)
+        db_tmp.add_saveframe(d)
+
+        correct_order = db_tmp.frame_list[:]
         random.shuffle(db_tmp.frame_list)
         db_tmp.normalize()
         self.assertEqual(db_tmp.frame_list, correct_order)

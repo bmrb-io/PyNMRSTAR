@@ -1,5 +1,6 @@
 """ Exceptions defined by PyNMR-STAR. """
 
+
 class ParsingError(ValueError):
     """ Indicates that something went wrong when parsing NMR-STAR data.
     A line number on which the exception occurred will be provided if

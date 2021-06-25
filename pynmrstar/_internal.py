@@ -7,7 +7,7 @@ import zlib
 from datetime import date
 from gzip import GzipFile
 from io import StringIO, BytesIO
-from typing import Dict, Union, IO
+from typing import Dict, Union, IO, List, Tuple
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen, Request
 
@@ -24,6 +24,7 @@ try:
     _session = _requests_session()
 except ModuleNotFoundError:
     _session = None
+
 
 # noinspection PyDefaultArgument
 def _get_comments(_comment_cache: Dict[str, Dict[str, str]] = {}) -> Dict[str, Dict[str, str]]:
@@ -181,7 +182,6 @@ def _get_entry_from_database(entry_num: Union[str, int], convert_data_types: boo
                 for row in loop.data:
                     for pos in range(0, len(row)):
                         category = loop.category + "." + loop.tags[pos]
-                        line_num = "Loop %s" % loop.category
                         row[pos] = schema.convert_tag(category, row[pos])
 
     return ent
@@ -221,3 +221,53 @@ def _interpret_file(the_file: Union[str, IO]) -> StringIO:
 
     buffer.seek(0)
     return StringIO(buffer.read().decode().replace("\r\n", "\n").replace("\r", "\n"))
+
+
+def get_clean_tag_list(item: Union[str, List[str], Tuple[str]]) -> List[Dict[str, str]]:
+    """ Converts the provided item to a list of dictionaries of
+    {
+     formatted -> just the lower case tag name (category stripped)
+     original -> whatever was provided, completely unmodified
+    }"""
+
+    if not isinstance(item, (str, list, tuple)):
+        raise ValueError('Invalid object provided. Only a tag name (str), or list of tags (list or tuple)'
+                         ' are valid inputs to this function.')
+
+    if isinstance(item, list):
+        tag_list: List[str] = item
+    elif isinstance(item, tuple):
+        tag_list = list(item)
+    elif isinstance(item, str):
+        tag_list = [item]
+    else:
+        raise ValueError(f'The value you provided was not a string, list, or tuple. Item: {repr(item)}')
+
+    try:
+        return [{"formatted": pynmrstar.utils.format_tag(_.lower()), "original": _} for _ in tag_list]
+    except AttributeError:
+        raise ValueError('Your list or tuple may only contain tag names expressed as strings.')
+
+
+def write_to_file(nmrstar_object: Union['pynmrstar.Entry', 'pynmrstar.Saveframe'],
+                  file_name: str,
+                  format_: str = "nmrstar",
+                  show_comments: bool = True,
+                  skip_empty_loops: bool = False,
+                  skip_empty_tags: bool = False):
+    """ Writes the object to the specified file in NMR-STAR format. """
+
+    if format_ not in ["nmrstar", "json"]:
+        raise ValueError("Invalid output format.")
+
+    data_to_write = ''
+    if format_ == "nmrstar":
+        data_to_write = nmrstar_object.format(show_comments=show_comments,
+                                              skip_empty_loops=skip_empty_loops,
+                                              skip_empty_tags=skip_empty_tags)
+    elif format_ == "json":
+        data_to_write = nmrstar_object.get_json()
+
+    out_file = open(file_name, "w")
+    out_file.write(data_to_write)
+    out_file.close()
