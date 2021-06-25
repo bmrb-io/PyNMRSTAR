@@ -13,10 +13,9 @@ import logging
 try:
     import cnmrstar
 except ImportError:
-    try:
-        import pynmrstar.cnmrstar as cnmrstar
-    except ImportError:
-        raise ImportError("Couldn't import cnmrstar module which should be available.")
+    cnmrstar = None
+    import warnings
+    warnings.warn('Could not import cnmrstar, this is fatal, but proceeding since we are likely running on ReadTheDocs rather than in a local installation.')
 
 from pynmrstar import utils
 from pynmrstar._internal import __version__, min_cnmrstar_version
