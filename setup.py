@@ -1,22 +1,31 @@
 #!/usr/bin/env python3
 
-try:
-    from setuptools import setup, Extension
-except ImportError:
-    from distutils.core import setup, Extension
+import os
+from setuptools import setup, Extension
 
-from pynmrstar import __version__
+
+def get_version():
+    internal_file_location = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'pynmrstar', '_internal.py')
+
+    with open(internal_file_location, 'r') as internal_file:
+        for line in internal_file:
+            if line.startswith('__version__'):
+                delim = '"' if '"' in line else "'"
+                return line.split(delim)[1]
+        else:
+            raise RuntimeError("Unable to find version string.")
+
+
+# Should fail if the readme is missing
+long_des = open('README.rst', 'r').read()
 
 cnmrstar = Extension('cnmrstar',
                      sources=['c/cnmrstarmodule.c'],
                      extra_compile_args=["-funroll-loops", "-O3"],
                      optional=True)
 
-# Should fail if the readme is missing
-long_des = open('README.rst', 'r').read()
-
 setup(name='pynmrstar',
-      version=__version__,
+      version=get_version(),
       packages=['pynmrstar'],
       ext_modules=[cnmrstar],
       install_requires=['requests>=2.21.0,<=3'],
