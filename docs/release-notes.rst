@@ -48,7 +48,7 @@ Potentially breaking changes:
   :py:meth:`pynmrstar.Loop.delete_tag` has been renamed to :py:meth:`pynmrstar.Loop.remove_tag`.
   :py:meth:`pynmrstar.Loop.delete_data_by_tag_value` has been renamed to :py:meth:`pynmrstar.Loop.remove_data_by_tag_value`.
   :py:meth:`pynmrstar.Entry.delete_empty_saveframes` has been renamed to :py:meth:`pynmrstar.Entry.remove_empty_saveframes`.
-  All of the original methods remain for now in a deprecated state. Please update them as they will be released in the 4.0 release.
+  All of the original methods remain for now in a deprecated state. Please update them as they will be removed in the 4.0 release.
 - :py:attr:`pynmrstar.Entry.frame_list`, :py:attr:`pynmrstar.Saveframe.tags`, :py:attr:`pynmrstar.Saveframe.category`,
   :py:attr:`pynmrstar.Saveframe.loops`, and :py:attr:`pynmrstar.Loop.tags` have all been converted into properties. Of them,
   only :py:attr:`pynmrstar.Saveframe.category` can be set - the others are read only. Please use the built in functions to modify
