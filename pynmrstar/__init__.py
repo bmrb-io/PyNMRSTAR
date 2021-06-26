@@ -25,13 +25,14 @@ from pynmrstar.parser import Parser as _Parser
 from pynmrstar.saveframe import Saveframe
 from pynmrstar.schema import Schema
 
-if "version" not in dir(cnmrstar):
-    raise ImportError(f"Could not determine the version of cnmrstar installed, and version {min_cnmrstar_version} or "
-                      "greater is required.")
-if cnmrstar.version() < min_cnmrstar_version:
-    raise ImportError("The version of the cnmrstar module installed does not meet the requirements. As this should be "
-                      f"handled automatically, there may be an issue with your installation. Version installed: "
-                      f"{cnmrstar.version()}. Version required: {min_cnmrstar_version}")
+if cnmrstar:
+    if "version" not in dir(cnmrstar):
+        raise ImportError(f"Could not determine the version of cnmrstar installed, and version {min_cnmrstar_version} or "
+                          "greater is required.")
+    if cnmrstar.version() < min_cnmrstar_version:
+        raise ImportError("The version of the cnmrstar module installed does not meet the requirements. As this should be "
+                          f"handled automatically, there may be an issue with your installation. Version installed: "
+                          f"{cnmrstar.version()}. Version required: {min_cnmrstar_version}")
 
 # Set up logging
 logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s')
