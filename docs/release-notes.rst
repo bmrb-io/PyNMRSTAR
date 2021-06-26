@@ -32,6 +32,7 @@ Changes:
    to be valid NMR-STAR, require at least two tags. (The ``Sf_framecode`` and ``Sf_category`` tags.)
 
 Potentially breaking changes:
+
 - Equality checks operate differently. Before, :py:class:`pynmrstar.Entry`, :py:class:`pynmrstar.Saveframe`, and
   :py:class:`pynmrstar.Loop` classes, when compared using the `__eq__` built-in, performed a "NMR-STAR-aware" comparison. This meant comparing
   tag names case insensitively, etc. This was very slow, and may have lead to confusing behavior in some circumstances. If
