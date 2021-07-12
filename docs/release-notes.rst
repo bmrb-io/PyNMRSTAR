@@ -1,6 +1,20 @@
 Release notes
 =============
 
+3.2.1
+~~~~~
+
+Minor improvements.
+
+Changes:
+
+- Improved retry logic to better handle throttling on the server.
+- Fixed a bug in the retry logic which would return the wrong content type
+  under certain circumstances.
+- Better detection of ReadTheDocs environment to determine if check for cnmrstar
+  is needed.
+
+
 3.2.0
 ~~~~~
 
