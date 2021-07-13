@@ -9,13 +9,18 @@ Use python's built in help function for documentation."""
 
 import decimal as _decimal
 import logging
+import os
 
 try:
     import cnmrstar
 except ImportError:
-    cnmrstar = None
-    import warnings
-    warnings.warn('Could not import cnmrstar, this is fatal, but proceeding since we are likely running on ReadTheDocs rather than in a local installation.')
+    try:
+        import pynmrstar.cnmrstar as cnmrstar
+    except ImportError:
+        if os.environ.get('READTHEDOCS'):
+            cnmrstar = None
+        else:
+            raise ImportError('Could not import cnmrstar sub-module! Your installation appears to be broken.')
 
 from pynmrstar import utils
 from pynmrstar._internal import __version__, min_cnmrstar_version
