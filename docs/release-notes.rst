@@ -1,6 +1,16 @@
 Release notes
 =============
 
+3.2.2
+~~~~~
+
+Minor improvements.
+
+Changes:
+
+- When checking if a token found in a data block while parsing is in the reserved keywords,
+  perform the check case-insensitively.
+
 3.2.1
 ~~~~~
 
