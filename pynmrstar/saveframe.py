@@ -578,7 +578,7 @@ class Saveframe(object):
             elif self._name != value:
                 raise ValueError('The Sf_framecode tag cannot be different from the saveframe name. Error '
                                  f'occurred in tag {self.tag_prefix}.Sf_framecode with value {value} which '
-                                 f'conflicts with with the saveframe name {self._name}.')
+                                 f'conflicts with the saveframe name {self._name}.')
         self._tags.append(new_tag)
 
     def add_tags(self, tag_list: list, update: bool = False) -> None:

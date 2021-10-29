@@ -10,6 +10,7 @@ Changes:
 
 - When checking if a token found in a data block while parsing is in the reserved keywords,
   perform the check case-insensitively.
+- Fix a typo in an error message.
 
 3.2.1
 ~~~~~
