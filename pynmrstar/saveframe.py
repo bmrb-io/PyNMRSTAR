@@ -36,7 +36,7 @@ class Saveframe(object):
                     if item.lower() not in loop_dict:
                         return False
                 else:
-                    if utils.format_tag(item).lower() not in lc_tags:
+                    if utils.format_tag_lc(item) not in lc_tags:
                         return False
             else:
                 return False
@@ -809,7 +809,7 @@ class Saveframe(object):
                 results.extend(each_loop.get_tag(query, whole_tag=whole_tag))
 
         # Check our tags
-        query = utils.format_tag(query).lower()
+        query = utils.format_tag_lc(query)
         if tag_prefix is not None and tag_prefix.lower() == self.tag_prefix.lower():
             for tag in self._tags:
                 if query == tag[0].lower():

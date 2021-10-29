@@ -259,7 +259,7 @@ def get_clean_tag_list(item: Union[str, List[str], Tuple[str]]) -> List[Dict[str
         raise ValueError(f'The value you provided was not a string, list, or tuple. Item: {repr(item)}')
 
     try:
-        return [{"formatted": pynmrstar.utils.format_tag(_.lower()), "original": _} for _ in tag_list]
+        return [{"formatted": pynmrstar.utils.format_tag_lc(_), "original": _} for _ in tag_list]
     except AttributeError:
         raise ValueError('Your list or tuple may only contain tag names expressed as strings.')
 

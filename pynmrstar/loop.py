@@ -29,7 +29,7 @@ class Loop(object):
 
         lc_tags = self._lc_tags
         for tag in to_process:
-            if utils.format_tag(tag).lower() not in lc_tags:
+            if utils.format_tag_lc(tag) not in lc_tags:
                 return False
         return True
 
@@ -161,14 +161,14 @@ class Loop(object):
         If there are 5 rows of data in the loop, you will need to
         assign a list with 5 elements."""
 
-        tag = utils.format_tag(key)
+        tag = utils.format_tag_lc(key)
 
         # Check that their tag is in the loop
-        if tag not in self._tags:
+        if tag not in self._lc_tags:
             raise ValueError(f"Cannot assign to tag '{key}' as it does not exist in this loop.")
 
         # Determine where to assign
-        tag_id = self._tags.index(tag)
+        tag_id = self._lc_tags[tag]
 
         # Make sure they provide a list of the correct length
         if len(self[key]) != len(item):
@@ -489,7 +489,7 @@ class Loop(object):
                 current_row = [None]*len(self._tags)
                 for tag, value in row.items():
                     try:
-                        tag_index = lc_tag_index[utils.format_tag(tag).lower()]
+                        tag_index = lc_tag_index[utils.format_tag_lc(tag)]
                     except KeyError:
                         raise ValueError(f'In row {pos} of your provided data, a tag was supplied which was not'
                                          f" already present in the loop. Invalid tag: '{tag}'")
@@ -852,7 +852,7 @@ class Loop(object):
             if "." in item and utils.format_category(item).lower() != self.category.lower():
                 raise ValueError(f"Cannot fetch data with tag '{item}' because the category does not match the "
                                  f"category of this loop '{self.category}'.")
-            lower_tags[pos] = utils.format_tag(item).lower()
+            lower_tags[pos] = utils.format_tag_lc(item)
 
         # Make a lower case copy of the tags
         tags_lower = [x.lower() for x in self._tags]
@@ -1107,7 +1107,7 @@ class Loop(object):
         iterate through the data and modify it."""
 
         try:
-            return self._lc_tags[utils.format_tag(str(tag_name)).lower()]
+            return self._lc_tags[utils.format_tag_lc(str(tag_name))]
         except KeyError:
             return None
 

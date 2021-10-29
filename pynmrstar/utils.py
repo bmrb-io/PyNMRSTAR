@@ -49,6 +49,13 @@ def format_tag(tag: str) -> str:
     return tag
 
 
+@functools.lru_cache(maxsize=1024)
+def format_tag_lc(tag: str) -> str:
+    """Strips anything before the '.' and makes the tag lowercase. """
+
+    return format_tag(tag.lower())
+
+
 # noinspection PyDefaultArgument
 def get_schema(passed_schema: 'Schema' = None, _cached_schema: Dict[str, Schema] = {}) -> 'Schema':
     """If passed a schema (not None) it returns it. If passed none,
