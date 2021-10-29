@@ -4,6 +4,7 @@ import os
 import re
 from csv import DictReader
 from datetime import date
+from functools import lru_cache
 from io import StringIO
 from typing import Union, List, Optional, Any, Dict, IO
 
@@ -202,6 +203,7 @@ class Schema(object):
                                     "SFCategory": sf_category, "Tag": tag,
                                     "Dictionary sequence": new_tag_pos}
 
+    @lru_cache(maxsize=1024, typed=True)
     def convert_tag(self, tag: str, value: Any) -> \
             Optional[Union[str, int, decimal.Decimal, date]]:
         """ Converts the provided tag from string to the appropriate

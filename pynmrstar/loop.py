@@ -418,39 +418,119 @@ class Loop(object):
 
         return True
 
-    def add_data(self, the_list: List[Any], rearrange: bool = False, convert_data_types: bool = False):
-        """Add a list to the data field. Items in list can be any type,
-        they will be converted to string and formatted correctly. The
-        list must have the same cardinality as the tag names or you
-        must set the rearrange variable to true and have already set all
-        the tag names in the loop. Rearrange will break a longer list into
-        rows based on the number of tags."""
+    def add_data(self,
+                 data: Union[List[dict], Dict[str, List], List[Union[str, float, int]], List[List[Any]]],
+                 rearrange: bool = False,
+                 convert_data_types: bool = False):
+        """Add data to a loop. You can provide the data to add organized in four different ways, though the first
+        two are recommended for new code. The other two (#3 and #4) are preserved for sake of existing code (written
+        prior to version 3.3) and for niche use cases:
 
-        # Add one row of data
-        if not rearrange:
-            if len(the_list) != len(self._tags):
-                raise ValueError("The list must have the same number of elements as the number of tags when adding a "
-                                 "single row of values! Insert tag names first by calling Loop.add_tag().")
-            # Add the user data
-            self.data.append(the_list)
-            return
+        1: You can provide a list of dictionaries of tags to add. For example,
+        ``[{'name': 'Jeff', 'location': 'Connecticut'}, {'name': 'Chad', 'location': 'Madison'}]`` will add two new
+        rows, and set the values of the tags ``name`` and ``location`` to the values provided. If there are other
+        tags in the loop, they will be assigned null values for the rows corresponding to the tags added.
 
-        # Break their data into chunks based on the number of tags
-        processed_data = [the_list[x:x + len(self._tags)] for x in range(0, len(the_list), len(self._tags))]
-        if len(processed_data[-1]) != len(self._tags):
-            raise ValueError(f"The number of data elements in the list you provided is not an even multiple of the "
-                             f"number of tags which are set in the loop. Please either add missing tags using "
-                             f"Loop.add_tag() or modify the list of tag values you are adding to be an even multiple "
-                             f"of the number of tags. Error in loop '{self.category}'.")
+        2: You can provide a dictionary of lists, as such (corresponds to adding the same ultimate data as in the
+        example #1): ``{'name': ['Jeff', 'Chad'], 'location': ['Connecticut', 'Madison']}``. This will also create
+        two new rows in the loop and assign the values provided.
+        
+        3: You can provide a list of lists of tag values to add. In this case, each list must have the same tag
+        values (and order of tags) as the known tags present in the loop. To correspond to the above examples, the data
+        would look like: ``[['Jeff', 'Connecticut'], ['Chad', 'Madison']]``. Adding data this way requires both that
+        you provide values for all tags present in the loop, and that you provide the values in the same order that the
+        tags already are already defined in the loop.
+
+        4. You can provide a single list of tag values to add. In the most simple case, that would correspond to just
+        adding one row of data in the same was as in #3 above, as such: ``['Jeff', 'Connecticut']``. In a more
+        complicated example, you could also add data (corresponding to example #1 and #2) as such:
+        ``['Jeff', 'Connecticut', 'Chad', 'Madison']`` - but if you provide data this way, you must set
+         ``rearrange=True``. This usage is strongly discouraged, but exists for legacy reasons.
+
+        :param data: See the docstring for the method.
+        :type data: Union[List[dict], Dict[str, List], List[Union[str, float, int]], List[List[Any]]]
+        :param convert_data_types: If true, converts data you provide into the data type defined in the dictionary.
+            For example, if you provided the string '5' for the tag ``_Atom_chem_shift.Val``, it would automatically
+            be converted to a float while being added. This is mainly useful for parsers, as your data is probably
+            already in a format that is usable for you.
+        :type convert_data_types: bool
+        :param rearrange: If true, rearrange data provided in method #4 as necessary to fit in the loop. This only
+        exists for parsers, and it's use is strongly discouraged.
+        :type rearrange: bool
+        """
+
+        if not data:
+            raise ValueError('No valid data provided.')
+
+        pending_data: List = []
+        lc_tag_index: Dict[str, int] = self._lc_tags
+
+        def format_two_to_one(format_two: Dict[str, List]):
+            max_length = max([len(_) for _ in format_two.values()])
+            keys = format_two.keys()
+            for row_id in range(0, max_length):
+                row_dict = {}
+                for key in keys:
+                    try:
+                        row_dict[key] = format_two[key][row_id]
+                    except IndexError:
+                        pass
+                yield row_dict
+
+        # Data format #1 and #2
+        if (isinstance(data, list) and isinstance(data[0], dict)) or \
+                isinstance(data, dict) and all([isinstance(_, list) for _ in data.values()]):
+
+            # Handle format #2 by converting it to #1
+            if isinstance(data, dict):
+                data = format_two_to_one(data)
+
+            for pos, row in enumerate(data):
+                current_row = [None]*len(self._tags)
+                for tag, value in row.items():
+                    try:
+                        tag_index = lc_tag_index[utils.format_tag(tag).lower()]
+                    except KeyError:
+                        raise ValueError(f'In row {pos} of your provided data, a tag was supplied which was not'
+                                         f" already present in the loop. Invalid tag: '{tag}'")
+                    current_row[tag_index] = value
+                pending_data.append(current_row)
+        # Type 4 - a list of lists
+        elif isinstance(data, list) and isinstance(data[0], list):
+            for pos, row in enumerate(data):
+                if len(row) != len(self.tags):
+                    raise ValueError('One of the lists you provided is not the correct length to match the number '
+                                     f'of tags present in the loop. Error on row {pos} with values: {row}')
+            pending_data = data
+        # Type 3 - a list of values
+        elif isinstance(data, list):
+            if rearrange:
+                # Break their data into chunks based on the number of tags
+                pending_data = [data[x:x + len(self._tags)] for x in range(0, len(data), len(self._tags))]
+                if len(pending_data[-1]) != len(self._tags):
+                    raise ValueError(f"The number of data elements in the list you provided is not an even multiple of "
+                                     f"the number of tags which are set in the loop. Please either add missing tags "
+                                     f"using Loop.add_tag() or modify the list of tag values you are adding to be an "
+                                     f"even multiple of the number of tags. Error in loop '{self.category}'.")
+            else:
+                # Add one row of data
+                if len(data) != len(self._tags):
+                    raise ValueError("The list must have the same number of elements as the number of tags when adding "
+                                     "a single row of values! Insert tag names first by calling Loop.add_tag().")
+                # Add the user data
+                pending_data.append(data)
+        else:
+            raise ValueError("Your data did not match one of the supported types.")
 
         # Auto convert data types if option set
         if convert_data_types:
             schema = utils.get_schema()
-            for row in processed_data:
+            for row in pending_data:
                 for tag_id, datum in enumerate(row):
-                    row[tag_id] = schema.convert_tag(self.category + "." + self._tags[tag_id], datum)
+                    row[tag_id] = schema.convert_tag(f"{self.category}.{self._tags[tag_id]}", datum)
 
-        self.data.extend(processed_data)
+        # Add the data at the very end to ensure that errors are caught before we mutate the data
+        self.data.extend(pending_data)
 
     def add_data_by_tag(self, tag_name: str, value) -> None:
         """Deprecated: It is recommended to use add_data() instead for most use
