@@ -29,6 +29,7 @@ from pynmrstar.loop import Loop
 from pynmrstar.parser import Parser as _Parser
 from pynmrstar.saveframe import Saveframe
 from pynmrstar.schema import Schema
+import pynmrstar.definitions as definitions
 
 if cnmrstar:
     if "version" not in dir(cnmrstar):
