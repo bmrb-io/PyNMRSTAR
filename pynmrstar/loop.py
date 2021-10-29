@@ -1027,9 +1027,8 @@ class Loop(object):
         iterate through the data and modify it."""
 
         try:
-            lc_col = [x.lower() for x in self._tags]
-            return lc_col.index(utils.format_tag(str(tag_name)).lower())
-        except ValueError:
+            return self._lc_tags[utils.format_tag(str(tag_name)).lower()]
+        except KeyError:
             return None
 
     def validate(self, validate_schema: bool = True, schema: 'Schema' = None,
