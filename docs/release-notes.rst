@@ -1,6 +1,33 @@
 Release notes
 =============
 
+3.3.0
+~~~~~
+
+:py:meth:`pynmrstar.Loop.add_data` has been significantly improved. Adding data to a loop used to be somewhat
+cumbersome, but the function has been updated to support adding data in two new ways which should be significantly
+easier. For one, you can provide a list of dictionaries of tags to add. For example, adding
+``[{'name': 'Jeff', 'location': 'Connecticut'}, {'name': 'Chad', 'location': 'Madison'}]`` to a loop will add two new
+rows, and set the values of ``name`` and ``location`` to the values provided. If there are other tags in the loop, they will
+be assigned null values for the rows corresponding to the tags added.
+
+An additional way to add data, is adding a dictionary of lists, as such (corresponds to the example above):
+``{'name': ['Jon', 'Connecticut'], 'location': ['Chad', 'Madison']}``. This will also create two new rows in the loop
+and assign the values provided.
+
+For both of these, any tags present in the loop for which you do no provide values, or tags for which you provide fewer
+values than other tags, will have the remaining values filled in with null values.
+
+See the function help/documentation (:py:meth:`pynmrstar.Loop.add_data`) for more details. The original functionality
+has been preserved for backwards compatibility, though the new functionality is expected to be easier to use and lead
+to more readable code.
+
+Other minor improvements:
+
+- When checking if a token found in a data block while parsing is in the reserved keywords,
+  perform the check case-insensitively.
+- Fix a typo in an error message.
+
 3.2.1
 ~~~~~
 

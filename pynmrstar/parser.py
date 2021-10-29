@@ -191,7 +191,7 @@ class Parser(object):
                                                            "defined. Value: '{self.token}'",
                                                            self.line_number)
 
-                                    if self.token in definitions.RESERVED_KEYWORDS and self.delimiter == " ":
+                                    if self.token.lower() in definitions.RESERVED_KEYWORDS and self.delimiter == " ":
                                         error = "Cannot use keywords as data values unless quoted or semi-colon " \
                                                 "delimited. Perhaps this is a loop that wasn't properly terminated " \
                                                 "with a 'stop_' keyword before the saveframe ended or another loop " \
@@ -249,7 +249,7 @@ class Parser(object):
                     # We are in a saveframe and waiting for the saveframe tag
                     self.get_token()
                     if self.delimiter == " ":
-                        if self.token in definitions.RESERVED_KEYWORDS:
+                        if self.token.lower() in definitions.RESERVED_KEYWORDS:
                             raise ParsingError("Cannot use keywords as data values unless quoted or semi-colon "
                                                f"delimited. Illegal value: '{self.token}'", self.line_number)
                         if self.token.startswith("_"):

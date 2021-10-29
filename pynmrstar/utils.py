@@ -27,6 +27,7 @@ def diff(entry1: 'entry_mod.Entry', entry2: 'entry_mod.Entry') -> None:
         print(difference)
 
 
+@functools.lru_cache(maxsize=1024)
 def format_category(tag: str) -> str:
     """Adds a '_' to the front of a tag (if not present) and strips out
     anything after a '.'"""
@@ -39,12 +40,20 @@ def format_category(tag: str) -> str:
     return tag
 
 
+@functools.lru_cache(maxsize=1024)
 def format_tag(tag: str) -> str:
     """Strips anything before the '.'"""
 
     if '.' in tag:
         return tag[tag.index('.') + 1:]
     return tag
+
+
+@functools.lru_cache(maxsize=1024)
+def format_tag_lc(tag: str) -> str:
+    """Strips anything before the '.' and makes the tag lowercase. """
+
+    return format_tag(tag.lower())
 
 
 # noinspection PyDefaultArgument

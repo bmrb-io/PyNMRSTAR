@@ -6,6 +6,7 @@ import os
 import random
 import unittest
 from copy import deepcopy as copy
+from decimal import Decimal
 
 from pynmrstar import utils, definitions, Saveframe, Entry, Schema, Loop, _Parser
 from pynmrstar._internal import _interpret_file
@@ -572,8 +573,6 @@ entry_information,entry_information,15000,"Solution structure of chicken villin 
         # Check add_data
         self.assertRaises(ValueError, tmp_loop.add_data, [1, 2, 3, 4])
         tmp_loop.add_data([4, 5, 6])
-        self.assertEqual(tmp_loop.data, [[1, 2, 3], [4, 5, 6]])
-
         tmp_loop.add_data([7, 8, 9])
         self.assertEqual(tmp_loop.data, [[1, 2, 3], [4, 5, 6], [7, 8, 9]])
 
@@ -742,6 +741,42 @@ loop_
         tmp_loop = Loop.from_string("loop_ _Atom_chem_shift.ID stop_")
         tmp_loop.add_missing_tags()
         self.assertEqual(tmp_loop, Loop.from_template("atom_chem_shift"))
+
+    def test_loop_add_data(self):
+        test1 = Loop.from_scratch('test')
+        test1.add_tag(['Name', 'Location'])
+        self.assertRaises(ValueError, test1.add_data, None)
+        self.assertRaises(ValueError, test1.add_data, [])
+        self.assertRaises(ValueError, test1.add_data, {})
+        self.assertRaises(ValueError, test1.add_data, {'not_present': 1})
+        test1.add_data([{'name': 'Jeff', 'location': 'Connecticut'}, {'name': 'Chad', 'location': 'Madison'}])
+
+        test2 = Loop.from_scratch('test')
+        test2.add_tag(['Name', 'Location'])
+        test2.add_data({'name': ['Jeff', 'Chad'], 'location': ['Connecticut', 'Madison']})
+
+        test3 = Loop.from_scratch('test')
+        test3.add_tag(['Name', 'Location'])
+        self.assertRaises(ValueError, test3.add_data, [['Jeff', 'Connecticut'], ['Chad']])
+        test3.add_data([['Jeff', 'Connecticut'], ['Chad', 'Madison']])
+
+        test4 = Loop.from_scratch('test')
+        test4.add_tag(['Name', 'Location'])
+        self.assertRaises(ValueError, test4.add_data, ['Jeff', 'Connecticut', 'Chad', 'Madison'])
+        test4.add_data(['Jeff', 'Connecticut', 'Chad', 'Madison'], rearrange=True)
+
+        self.assertEqual(test1, test2)
+        self.assertEqual(test2, test3)
+        self.assertEqual(test3, test4)
+
+        # Now check the 'convert_data_types' argument and the raw data present in the loop
+        test = Loop.from_scratch('_Atom_chem_shift')
+        test.add_tag(['Val', 'Entry_ID', 'Details'])
+        test.add_data([{'details': 'none', 'vAL': '1.2'}, {'val': 5, 'details': '.'}], convert_data_types=True)
+        self.assertEqual(test.data, [[Decimal('1.2'), None, 'none'], [Decimal(5), None, None]])
+        test.clear_data()
+        test.add_data([{'details': 'none', 'vAL': '1.2'}, {'val': 5, 'details': '.'}])
+        self.assertEqual(test.data, [['1.2', None, 'none'], [5, None, '.']])
 
     def test_rename_saveframe(self):
         tmp = copy(self.file_entry)
