@@ -455,7 +455,7 @@ class Loop(object):
             already in a format that is usable for you.
         :type convert_data_types: bool
         :param rearrange: If true, rearrange data provided in method #4 as necessary to fit in the loop. This only
-        exists for parsers, and it's use is strongly discouraged.
+            exists for parsers, and it's use is strongly discouraged.
         :type rearrange: bool
         """
 

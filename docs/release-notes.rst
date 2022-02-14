@@ -1,6 +1,15 @@
 Release notes
 =============
 
+3.3.1
+~~~~~
+
+Minor improvements:
+
+- The module now uses it's own `pynmrstar` logger rather than the default (root) logger. This enables
+  the end user of the library to have much better control over the log level and output of the logging,
+  and avoids setting state on the root logger in a way that could conflict with calling code.
+
 3.3.0
 ~~~~~
 

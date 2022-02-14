@@ -5,6 +5,8 @@ from typing import Optional
 from pynmrstar import definitions, cnmrstar, entry as entry_mod, loop as loop_mod, saveframe as saveframe_mod
 from pynmrstar.exceptions import ParsingError
 
+logger = logging.getLogger('pynmrstar')
+
 
 class Parser(object):
     """Parses an entry. You should not ever use this class directly."""
@@ -151,14 +153,14 @@ class Parser(object):
                                         if raise_parse_warnings:
                                             raise ParsingError("Loop with no tags.", self.line_number)
                                         else:
-                                            logging.warning('Loop with no tags in parsed file on line: %s',
-                                                            self.line_number)
+                                            logger.warning('Loop with no tags in parsed file on line: %s',
+                                                           self.line_number)
                                         cur_loop = None
                                     if not seen_data:
                                         if raise_parse_warnings:
                                             raise ParsingError("Loop with no data.", self.line_number)
                                         else:
-                                            logging.warning("Loop with no data on line: %s", self.line_number)
+                                            logger.warning("Loop with no data on line: %s", self.line_number)
 
                                     if len(cur_data) > 0:
                                         if len(cur_data) % len(cur_loop.tags) != 0:

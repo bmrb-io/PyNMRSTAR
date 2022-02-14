@@ -12,7 +12,7 @@ from pynmrstar import utils, definitions, Saveframe, Entry, Schema, Loop, _Parse
 from pynmrstar._internal import _interpret_file
 from pynmrstar.exceptions import ParsingError
 
-logging.getLogger().setLevel(logging.ERROR)
+logging.getLogger('pynmrstar').setLevel(logging.ERROR)
 
 our_path = os.path.dirname(os.path.realpath(__file__))
 database_entry = Entry.from_database(15000)
