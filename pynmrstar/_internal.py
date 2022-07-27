@@ -175,12 +175,12 @@ def _get_entry_from_database(entry_num: Union[str, int], convert_data_types: boo
             entry_content = _get_url_reliably(url, raw=False, timeout=20, retries=1)
             ent = pynmrstar.Entry.from_string(entry_content)
         except HTTPError:
-            raise IOError(f"Entry {entry_num} does not exist in the public database.")
+            raise IOError(f"Entry {entry_num} does not exist in the public database.") from None
         except URLError:
-            raise IOError("You don't appear to have an active internet connection. Cannot fetch entry.")
+            raise IOError("You don't appear to have an active internet connection. Cannot fetch entry.") from None
 
     except KeyError:
-        raise IOError(f"Entry {entry_num} does not exist in the public database.")
+        raise IOError(f"Entry {entry_num} does not exist in the public database.") from None
 
     # Update the entry source
     ent.source = f"from_database({entry_num})"
