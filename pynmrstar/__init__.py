@@ -41,13 +41,7 @@ if cnmrstar:
                           f"{cnmrstar.version()}. Version required: {min_cnmrstar_version}")
 
 # Set up logging
-_handler = logging.StreamHandler()
-_handler.setLevel(logging.INFO)
-_handler.setFormatter(logging.Formatter('%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'))
-
 logger = logging.getLogger('pynmrstar')
-logger.setLevel(logging.DEBUG)
-logger.addHandler(_handler)
 
 # This makes sure that when decimals are printed a lower case "e" is used
 _decimal.getcontext().capitals = 0
