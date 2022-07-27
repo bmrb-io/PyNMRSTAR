@@ -128,7 +128,8 @@ class Entry(object):
 
         # Load the BMRB entry from the file
         parser: parser_mod.Parser = parser_mod.Parser(entry_to_parse_into=self)
-        parser.parse(star_buffer.read(), source=self.source, convert_data_types=kwargs.get('convert_data_types', False))
+        parser.parse(star_buffer.read(), source=self.source, convert_data_types=kwargs.get('convert_data_types', False),
+                     raise_parse_warnings=kwargs.get('raise_parse_warnings', False))
 
     def __iter__(self) -> saveframe_mod.Saveframe:
         """ Yields each of the saveframes contained within the entry. """
@@ -296,7 +297,8 @@ class Entry(object):
         return _get_entry_from_database(entry_num, convert_data_types=convert_data_types)
 
     @classmethod
-    def from_file(cls, the_file: Union[str, TextIO, BinaryIO], convert_data_types: bool = False):
+    def from_file(cls, the_file: Union[str, TextIO, BinaryIO], convert_data_types: bool = False,
+                  raise_parse_warnings: bool = False):
         """Create an entry by loading in a file. If the_file starts with
         http://, https://, or ftp:// then we will use those protocols to
         attempt to open the file.
@@ -309,9 +311,14 @@ class Entry(object):
         dates will become datetime.date objects. When printing str() is called
         on all objects. Other that converting uppercase "E"s in scientific
         notation floats to lowercase "e"s this should not cause any change in
-        the way re-printed NMR-STAR objects are displayed."""
+        the way re-printed NMR-STAR objects are displayed.
 
-        return cls(file_name=the_file, convert_data_types=convert_data_types)
+        Setting raise_parse_warnings to True will result in the raising of a
+        ParsingError rather than logging a warning when non-valid (but
+        ignorable) issues are found. """
+
+        return cls(file_name=the_file, convert_data_types=convert_data_types,
+                   raise_parse_warnings=raise_parse_warnings)
 
     @classmethod
     def from_json(cls, json_dict: Union[dict, str]):
@@ -345,7 +352,8 @@ class Entry(object):
         return ret
 
     @classmethod
-    def from_string(cls, the_string: str, convert_data_types: bool = False):
+    def from_string(cls, the_string: str, convert_data_types: bool = False,
+                    raise_parse_warnings: bool = False):
         """Create an entry by parsing a string.
 
 
@@ -357,9 +365,14 @@ class Entry(object):
         dates will become datetime.date objects. When printing str() is called
         on all objects. Other that converting uppercase "E"s in scientific
         notation floats to lowercase "e"s this should not cause any change in
-        the way re-printed NMR-STAR objects are displayed."""
+        the way re-printed NMR-STAR objects are displayed.
 
-        return cls(the_string=the_string, convert_data_types=convert_data_types)
+        Setting raise_parse_warnings to True will result in the raising of a
+        ParsingError rather than logging a warning when non-valid (but
+        ignorable) issues are found."""
+
+        return cls(the_string=the_string, convert_data_types=convert_data_types,
+                   raise_parse_warnings=raise_parse_warnings)
 
     @classmethod
     def from_scratch(cls, entry_id: Union[str, int]):
