@@ -773,16 +773,13 @@ class Entry(object):
                                         if tag_schema['Nullable']:
                                             continue
                                         else:
-                                            logger.info(f"A foreign saveframe reference tag that is not nullable was "
-                                                        f"set to a null value. Tag: {loop.category}.{tag} "
-                                                        "Foreign saveframe: "
-                                                        f"{tag_schema['Foreign Table']}.{tag_schema['Foreign Column']}"
-                                                        )
+                                            logger.warning(f"A foreign saveframe reference tag that is not nullable was"
+                                                           f" set to a null value. Tag: {loop.category}.{tag} "
+                                                           f"Foreign saveframe: {tag_schema['Foreign Table']}"
+                                                           f".{tag_schema['Foreign Column']}")
                                             continue
                                     try:
                                         row[tag_pos] = self.get_saveframe_by_name(row[x][1:]).get_tag('ID')[0]
-                                    except IndexError:
-                                        logger.info(f"Getting {self.get_saveframe_by_name(row[x][1:]).get_tag('ID')}")
                                     except KeyError:
                                         logger.warning(f"Missing frame of type {tag} pointed to by {conditional_tag}")
 
