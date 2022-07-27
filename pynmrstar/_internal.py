@@ -13,7 +13,7 @@ from urllib.request import urlopen, Request
 
 import pynmrstar
 
-__version__: str = "3.3.0"
+__version__: str = "3.3.1"
 min_cnmrstar_version: str = "3.2.0"
 
 # If we have requests, open a session to reuse for the duration of the program run
@@ -24,6 +24,8 @@ try:
     _session = _requests_session()
 except ModuleNotFoundError:
     _session = None
+
+logger = logging.getLogger('pynmrstar')
 
 
 # noinspection PyDefaultArgument
@@ -46,10 +48,10 @@ def _get_comments(_comment_cache: Dict[str, Dict[str, str]] = {}) -> Dict[str, D
     except IOError:
         # Load the comments from Github if we can't find them locally
         try:
-            logging.warning('Could not load comments from disk. Loading from web...')
+            logger.warning('Could not load comments from disk. Loading from web...')
             comment_entry = Entry.from_file(_interpret_file(pynmrstar.definitions.COMMENT_URL))
         except Exception:
-            logging.exception('Could not load comments from web. No comments will be shown.')
+            logger.exception('Could not load comments from web. No comments will be shown.')
             # No comments will be printed
             return {}
 
@@ -95,7 +97,7 @@ def _get_url_reliably(url: str, wait_time: float = 10, raw: bool = False, timeou
         # We are rate limited - sleep and try again
         if response.status_code == 403:
             if retries > 0:
-                logging.warning(f'We were rate limited. Sleeping for {wait_time} seconds.')
+                logger.warning(f'We were rate limited. Sleeping for {wait_time} seconds.')
                 time.sleep(wait_time)
                 return _get_url_reliably(url, wait_time=wait_time*2, raw=raw, timeout=timeout,
                                          retries=retries - 1)
@@ -124,7 +126,7 @@ def _get_url_reliably(url: str, wait_time: float = 10, raw: bool = False, timeou
             # We are rate limited - sleep and try again
             elif err.code == 403:
                 if retries > 0:
-                    logging.warning(f'We were rate limited. Sleeping for {wait_time} seconds.')
+                    logger.warning(f'We were rate limited. Sleeping for {wait_time} seconds.')
                     time.sleep(wait_time)
                     return _get_url_reliably(url, wait_time=wait_time * 2, raw=raw, timeout=timeout,
                                              retries=retries - 1)
@@ -163,7 +165,7 @@ def _get_entry_from_database(entry_num: Union[str, int], convert_data_types: boo
             raise IOError("Unable to load that chemcomp from the API.")
 
         # We're going to try again from the FTP
-        logging.warning('Failed to download entry from the API, trying again from the FTP site.')
+        logger.warning('Failed to download entry from the API, trying again from the FTP site.')
         if "bmse" in entry_num or "bmst" in entry_num:
             url = f"{pynmrstar.definitions.FTP_URL}/metabolomics/entry_directories/{entry_num}/{entry_num}.str"
         else:
@@ -173,12 +175,12 @@ def _get_entry_from_database(entry_num: Union[str, int], convert_data_types: boo
             entry_content = _get_url_reliably(url, raw=False, timeout=20, retries=1)
             ent = pynmrstar.Entry.from_string(entry_content)
         except HTTPError:
-            raise IOError(f"Entry {entry_num} does not exist in the public database.")
+            raise IOError(f"Entry {entry_num} does not exist in the public database.") from None
         except URLError:
-            raise IOError("You don't appear to have an active internet connection. Cannot fetch entry.")
+            raise IOError("You don't appear to have an active internet connection. Cannot fetch entry.") from None
 
     except KeyError:
-        raise IOError(f"Entry {entry_num} does not exist in the public database.")
+        raise IOError(f"Entry {entry_num} does not exist in the public database.") from None
 
     # Update the entry source
     ent.source = f"from_database({entry_num})"

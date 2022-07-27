@@ -10,6 +10,8 @@ from pynmrstar._internal import _json_serialize, _interpret_file, _get_entry_fro
 from pynmrstar.exceptions import InvalidStateError
 from pynmrstar.schema import Schema
 
+logger = logging.getLogger('pynmrstar')
+
 
 class Entry(object):
     """An object oriented representation of a BMRB entry. You can initialize this
@@ -126,7 +128,8 @@ class Entry(object):
 
         # Load the BMRB entry from the file
         parser: parser_mod.Parser = parser_mod.Parser(entry_to_parse_into=self)
-        parser.parse(star_buffer.read(), source=self.source, convert_data_types=kwargs.get('convert_data_types', False))
+        parser.parse(star_buffer.read(), source=self.source, convert_data_types=kwargs.get('convert_data_types', False),
+                     raise_parse_warnings=kwargs.get('raise_parse_warnings', False))
 
     def __iter__(self) -> saveframe_mod.Saveframe:
         """ Yields each of the saveframes contained within the entry. """
@@ -294,7 +297,8 @@ class Entry(object):
         return _get_entry_from_database(entry_num, convert_data_types=convert_data_types)
 
     @classmethod
-    def from_file(cls, the_file: Union[str, TextIO, BinaryIO], convert_data_types: bool = False):
+    def from_file(cls, the_file: Union[str, TextIO, BinaryIO], convert_data_types: bool = False,
+                  raise_parse_warnings: bool = False):
         """Create an entry by loading in a file. If the_file starts with
         http://, https://, or ftp:// then we will use those protocols to
         attempt to open the file.
@@ -307,9 +311,14 @@ class Entry(object):
         dates will become datetime.date objects. When printing str() is called
         on all objects. Other that converting uppercase "E"s in scientific
         notation floats to lowercase "e"s this should not cause any change in
-        the way re-printed NMR-STAR objects are displayed."""
+        the way re-printed NMR-STAR objects are displayed.
 
-        return cls(file_name=the_file, convert_data_types=convert_data_types)
+        Setting raise_parse_warnings to True will result in the raising of a
+        ParsingError rather than logging a warning when non-valid (but
+        ignorable) issues are found. """
+
+        return cls(file_name=the_file, convert_data_types=convert_data_types,
+                   raise_parse_warnings=raise_parse_warnings)
 
     @classmethod
     def from_json(cls, json_dict: Union[dict, str]):
@@ -343,7 +352,8 @@ class Entry(object):
         return ret
 
     @classmethod
-    def from_string(cls, the_string: str, convert_data_types: bool = False):
+    def from_string(cls, the_string: str, convert_data_types: bool = False,
+                    raise_parse_warnings: bool = False):
         """Create an entry by parsing a string.
 
 
@@ -355,9 +365,14 @@ class Entry(object):
         dates will become datetime.date objects. When printing str() is called
         on all objects. Other that converting uppercase "E"s in scientific
         notation floats to lowercase "e"s this should not cause any change in
-        the way re-printed NMR-STAR objects are displayed."""
+        the way re-printed NMR-STAR objects are displayed.
 
-        return cls(the_string=the_string, convert_data_types=convert_data_types)
+        Setting raise_parse_warnings to True will result in the raising of a
+        ParsingError rather than logging a warning when non-valid (but
+        ignorable) issues are found."""
+
+        return cls(the_string=the_string, convert_data_types=convert_data_types,
+                   raise_parse_warnings=raise_parse_warnings)
 
     @classmethod
     def from_scratch(cls, entry_id: Union[str, int]):
@@ -697,16 +712,16 @@ class Entry(object):
                         if tag_schema['Nullable']:
                             continue
                         else:
-                            logging.warning("A foreign key tag that is not nullable was set to "
-                                            f"a null value. Tag: {saveframe.tag_prefix}.{tag[1]} Primary key: "
-                                            f"{tag_schema['Foreign Table']}.{tag_schema['Foreign Column']} "
-                                            f"Value: {tag[1]}")
+                            logger.warning("A foreign key tag that is not nullable was set to "
+                                           f"a null value. Tag: {saveframe.tag_prefix}.{tag[1]} Primary key: "
+                                           f"{tag_schema['Foreign Table']}.{tag_schema['Foreign Column']} "
+                                           f"Value: {tag[1]}")
 
                     try:
                         tag[1] = mapping[f"{tag_schema['Foreign Table']}.{tag_schema['Foreign Column']}.{tag[1]}"]
                     except KeyError:
-                        logging.warning(f'The tag {saveframe.tag_prefix}.{tag[0]} has value {tag[1]} '
-                                        f'but there is no valid primary key.')
+                        logger.warning(f'The tag {saveframe.tag_prefix}.{tag[0]} has value {tag[1]} '
+                                       f'but there is no valid primary key.')
 
             # Now apply the remapping to loops...
             for loop in saveframe:
@@ -720,10 +735,10 @@ class Entry(object):
                                 if tag_schema['Nullable']:
                                     continue
                                 else:
-                                    logging.warning("A foreign key reference tag that is not nullable was set to "
-                                                    f"a null value. Tag: {loop.category}.{tag} Foreign key: "
-                                                    f"{tag_schema['Foreign Table']}.{tag_schema['Foreign Column']} "
-                                                    f"Value: {row[x]}")
+                                    logger.warning("A foreign key reference tag that is not nullable was set to "
+                                                   f"a null value. Tag: {loop.category}.{tag} Foreign key: "
+                                                   f"{tag_schema['Foreign Table']}.{tag_schema['Foreign Column']} "
+                                                   f"Value: {row[x]}")
                             try:
                                 row[x] = mapping[
                                     f"{tag_schema['Foreign Table']}.{tag_schema['Foreign Column']}.{row[x]}"]
@@ -731,10 +746,10 @@ class Entry(object):
                                 if (loop.category == '_Atom_chem_shift' or loop.category == '_Entity_comp_index') and \
                                         (tag == 'Atom_ID' or tag == 'Comp_ID'):
                                     continue
-                                logging.warning(f'The tag {loop.category}.{tag} has value {row[x]} '
-                                                f'but there is no valid primary key '
-                                                f"{tag_schema['Foreign Table']}.{tag_schema['Foreign Column']} "
-                                                f"with the tag value.")
+                                logger.warning(f'The tag {loop.category}.{tag} has value {row[x]} '
+                                               f'but there is no valid primary key '
+                                               f"{tag_schema['Foreign Table']}.{tag_schema['Foreign Column']} "
+                                               f"with the tag value.")
 
                     # If there is both a label tag and an ID tag, do the reassignment
 
@@ -758,18 +773,15 @@ class Entry(object):
                                         if tag_schema['Nullable']:
                                             continue
                                         else:
-                                            logging.info(f"A foreign saveframe reference tag that is not nullable was "
-                                                         f"set to a null value. Tag: {loop.category}.{tag} "
-                                                         "Foreign saveframe: "
-                                                         f"{tag_schema['Foreign Table']}.{tag_schema['Foreign Column']}"
-                                                         )
+                                            logger.warning(f"A foreign saveframe reference tag that is not nullable was"
+                                                           f" set to a null value. Tag: {loop.category}.{tag} "
+                                                           f"Foreign saveframe: {tag_schema['Foreign Table']}"
+                                                           f".{tag_schema['Foreign Column']}")
                                             continue
                                     try:
                                         row[tag_pos] = self.get_saveframe_by_name(row[x][1:]).get_tag('ID')[0]
-                                    except IndexError:
-                                        logging.info(f"Getting {self.get_saveframe_by_name(row[x][1:]).get_tag('ID')}")
                                     except KeyError:
-                                        logging.warning(f"Missing frame of type {tag} pointed to by {conditional_tag}")
+                                        logger.warning(f"Missing frame of type {tag} pointed to by {conditional_tag}")
 
         # Renumber the 'ID' column in a loop
         for each_frame in self._frame_list:

@@ -1,6 +1,22 @@
 Release notes
 =============
 
+3.3.1
+~~~~~
+
+Minor improvements:
+
+- The module now uses it's own `pynmrstar` logger rather than the default (root) logger. This enables
+  the end user of the library to have much better control over the log level and output of the logging,
+  and avoids setting state on the root logger in a way that could conflict with calling code.
+- It is now possible to specify `raise_parse_warnings` when calling :py:meth:`pynmrstar.Entry.from_file`,
+  :py:meth:`pynmrstar.Entry.from_string`, :py:meth:`pynmrstar.Saveframe.from_file`,
+  :py:meth:`pynmrstar.Saveframe.from_string`, :py:meth:`pynmrstar.Loop.from_file`,
+  and :py:meth:`pynmrstar.Loop.from_string`. This will result in certain ignorable but technically wrong
+  issues found when parsing to result in throwing of a :py:exc:`pynmrstar.exceptions.ParsingError` rather
+  than just a warning being logged. Use this if you want to ensure that you never silently parse invalid files.
+- Some exceptions are displayed with less of a traceback when the traceback is not relevant to the exception.
+
 3.3.0
 ~~~~~
 

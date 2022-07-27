@@ -11,6 +11,8 @@ from typing import Union, List, Optional, Any, Dict, IO
 from pynmrstar import definitions, utils
 from pynmrstar._internal import _interpret_file
 
+logger = logging.getLogger('pynmrstar')
+
 
 class Schema(object):
     """A BMRB schema. Used to validate NMR-STAR files. Unless you need to
@@ -211,7 +213,7 @@ class Schema(object):
 
         # If we don't know what the tag is, just return it
         if tag.lower() not in self.schema:
-            logging.warning(f"Couldn't convert tag data type because it is not in the dictionary: {tag}")
+            logger.warning(f"Couldn't convert tag data type because it is not in the dictionary: {tag}")
             return value
 
         full_tag = self.schema[tag.lower()]
