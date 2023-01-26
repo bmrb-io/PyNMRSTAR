@@ -25,3 +25,12 @@ is to read the documentation at `read the docs <https://pynmrstar.readthedocs.or
 
 .. |Wheel| image:: https://img.shields.io/pypi/wheel/pynmrstar.svg
    :target: https://pypi.org/project/PyNMRSTAR
+
+
+Running the unit tests
+----------------------
+
+.. role:: bash(code)
+   :language: bash
+
+if you with to run the unit tests distributed with PyNMR-Star, please see the readme in :bash:`pynmrstar/unit_tests`
