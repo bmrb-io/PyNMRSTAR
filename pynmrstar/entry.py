@@ -805,9 +805,7 @@ class Entry(object):
         (the loops in the saveframe must also be empty for the saveframe
         to be deleted). "Empty" means no values in tags, not no tags present."""
 
-        for pos, entry in enumerate(self._frame_list):
-            if entry.empty:
-                del self._frame_list[pos]
+        self._frame_list = [_ for _ in self._frame_list if not _.empty]
 
     def remove_saveframe(self, item: Union[str, List[str], Tuple[str], 'saveframe_mod.Saveframe',
                                            List['saveframe_mod.Saveframe'], Tuple['saveframe_mod.Saveframe']]) -> None:

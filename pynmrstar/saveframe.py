@@ -254,15 +254,19 @@ class Saveframe(object):
 
     @category.setter
     def category(self, category):
-        """ Updates the saveframe category. """
+        """ Updates the saveframe category. Sets the Sf_category tag if not present,
+         updates it if present. """
 
         if category in definitions.NULL_VALUES:
             raise ValueError("Cannot set the saveframe category to a null-equivalent value.")
 
-        # Update the sf_category tag too
-        lc_tags = self._lc_tags
-        if 'sf_category' in lc_tags:
-            self.tags[lc_tags['sf_category']] = category
+        # Update the sf_category tag if present - otherwise add it
+        category_tag = self.get_tag('sf_category', whole_tag=True)
+        if category_tag:
+            category_tag[0][1] = category
+        else:
+            self.add_tag('Sf_category', category)
+
         self._category = category
 
     @property
