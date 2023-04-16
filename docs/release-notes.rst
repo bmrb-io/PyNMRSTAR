@@ -6,7 +6,9 @@ Release notes
 
 Minor improvements:
 
-- Fix a bug in :py:attr:`pynmrstar.Saveframe.category` which incorrectly modified the sf_category tag and value.
+- Fix a bug in :py:attr:`pynmrstar.Saveframe.category` which incorrectly modified the sf_category tag and value. Note
+  that setting the category now creates a `Sf_framecode` tag if it wasn't previously present, since there is no way
+  to set the category of a saveframe otherwise.
 - Fix a bug in :py:meth:`pynmrstar.Entry.remove_empty_saveframes` which failed to remove all saveframes when
   removing more than one saveframe.
 
