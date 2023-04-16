@@ -5,7 +5,7 @@ A Python module for reading, writing, and manipulating NMR-STAR files.
 
 |BuildStatus| |License| |Wheel| |PythonVersions|
 
-Python versions supported: 3.6, 3.7, 3.8, and 3.9.
+Python versions supported: 3.6, 3.7, 3.8, 3.9, 3.10, 3.11
 
 Overview
 --------
