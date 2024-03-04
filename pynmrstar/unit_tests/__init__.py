@@ -595,9 +595,27 @@ entry_information,entry_information,15000,"Solution structure of chicken villin 
 
         self.assertEqual(
             test_loop.get_tag(['_Entry_author.Ordinal', '_Entry_author.Middle_initials'], dict_result=True),
-            [{'Middle_initials': 'C.', 'Ordinal': '1'}, {'Middle_initials': '.', 'Ordinal': '2'},
-             {'Middle_initials': 'B.', 'Ordinal': '3'}, {'Middle_initials': 'H.', 'Ordinal': '4'},
-             {'Middle_initials': 'L.', 'Ordinal': '5'}])
+            [{'_Entry_author.Middle_initials': 'C.', '_Entry_author.Ordinal': '1'},
+             {'_Entry_author.Middle_initials': '.', '_Entry_author.Ordinal': '2'},
+             {'_Entry_author.Middle_initials': 'B.', '_Entry_author.Ordinal': '3'},
+             {'_Entry_author.Middle_initials': 'H.', '_Entry_author.Ordinal': '4'},
+             {'_Entry_author.Middle_initials': 'L.', '_Entry_author.Ordinal': '5'}])
+
+        self.assertEqual(
+            test_loop.get_tag(['ORdinal', 'MIddle_initials'], dict_result=True),
+            [{'MIddle_initials': 'C.', 'ORdinal': '1'},
+             {'MIddle_initials': '.', 'ORdinal': '2'},
+             {'MIddle_initials': 'B.', 'ORdinal': '3'},
+             {'MIddle_initials': 'H.', 'ORdinal': '4'},
+             {'MIddle_initials': 'L.', 'ORdinal': '5'}])
+
+        self.assertEqual(
+            test_loop.get_tag(['Ordinal', 'Middle_initials'], dict_result=True, whole_tag=True),
+            [{'_Entry_author.Middle_initials': 'C.', '_Entry_author.Ordinal': '1'},
+             {'_Entry_author.Middle_initials': '.', '_Entry_author.Ordinal': '2'},
+             {'_Entry_author.Middle_initials': 'B.', '_Entry_author.Ordinal': '3'},
+             {'_Entry_author.Middle_initials': 'H.', '_Entry_author.Ordinal': '4'},
+             {'_Entry_author.Middle_initials': 'L.', '_Entry_author.Ordinal': '5'}])
 
         self.assertEqual(test_loop.get_tag(['_Entry_author.Ordinal', '_Entry_author.Middle_initials'], dict_result=True,
                                            whole_tag=True),

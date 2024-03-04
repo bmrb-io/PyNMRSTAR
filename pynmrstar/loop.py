@@ -834,23 +834,27 @@ class Loop(object):
 
         return [self.category + "." + x for x in self._tags]
 
-    def get_tag(self, tags: Optional[Union[str, List[str]]] = None, whole_tag: bool = False,
+    def get_tag(self,
+                tags: Optional[Union[str, List[str]]] = None,
+                whole_tag: bool = False,
                 dict_result: bool = False) -> Union[List[Any], List[Dict[str, Any]]]:
         """Provided a tag name (or a list of tag names) return the selected tags by row as
-        a list of lists.
+        a list of lists. Leave tags unset to fetch all tags.
 
         If whole_tag=True return the full tag name along with the tag
         value, or if dict_result=True, as the tag key.
 
         If dict_result=True, return the tags as a list of dictionaries
-        in which the tag value points to the tag."""
+        in which the tag value points to the tag. Uses the specified capitalization
+        of the tag unless whole_tag is True, in which case it will use the capitalization
+        found in the loop."""
 
         # All tags
         if tags is None:
             if not dict_result:
                 return self.data
             else:
-                tags = [self._tags]
+                tags = self._tags
         # Turn single elements into lists
         if not isinstance(tags, list):
             tags = [tags]
@@ -904,7 +908,7 @@ class Loop(object):
                 result = [dict((self.category + "." + self._tags[col_id], row[col_id]) for col_id in tag_ids) for
                           row in self.data]
             else:
-                result = [dict((self._tags[col_id], row[col_id]) for col_id in tag_ids) for row in self.data]
+                result = [dict((tags[pos], row[col_id]) for pos, col_id in enumerate(tag_ids)) for row in self.data]
 
         return result
 
