@@ -823,6 +823,9 @@ class Loop(object):
         """ Return the tag names for this entry with the category
         included. Throws ValueError if the category was never set.
 
+        To get the tags without the category, just access them directly
+        using the "tags" attribute.
+
         To fetch tag values use get_tag()."""
 
         if not self.category:
