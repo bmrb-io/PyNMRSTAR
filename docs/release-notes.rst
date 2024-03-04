@@ -1,6 +1,19 @@
 Release notes
 =============
 
+3.3.3
+~~~~~
+
+Minor improvements:
+
+- Preserve whatever capitalization was used when calling :py:meth:`pynmrstar.Loop.get_tags` with ``dict_result=True``
+  so that it is easy to index into the resulting dictionary.
+
+Other changes:
+
+- Updates to the package metadata to tell PyPI that Python versions through 3.12 are supported.
+- Minor updates to the documentation.
+
 3.3.2
 ~~~~~
 
