@@ -13,6 +13,8 @@ Other changes:
 
 - Updates to the package metadata to tell PyPI that Python versions through 3.12 are supported.
 - Minor updates to the documentation.
+- Ended official support for end-of-life Python 3.6 and stopped building wheels for it. You should
+  still be able to install on 3.6 if you are able to build cnmrstar from source. Alternatively, use version 3.3.2.
 
 3.3.2
 ~~~~~
