@@ -15,6 +15,7 @@ Previous python versions (back to 2.6) are supported by the v2 branch
    usage/quick-start
    usage/examples
    usage/full
+   usage/unit-test
    release-notes
 
 
