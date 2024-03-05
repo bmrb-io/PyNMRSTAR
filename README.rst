@@ -3,9 +3,7 @@ Welcome to PyNMR-STAR!
 
 A Python module for reading, writing, and manipulating NMR-STAR files.
 
-|BuildStatus| |License| |Wheel| |PythonVersions|
-
-Python versions supported: 3.6, 3.7, 3.8, 3.9, 3.10, 3.11
+|License| |Wheel| |PythonVersions|
 
 Overview
 --------
@@ -18,8 +16,6 @@ interactive python session will print the documentation for the object
 or method. An even more convenient way to learn how to use this library
 is to read the documentation at `read the docs <https://pynmrstar.readthedocs.org>`__.
 
-.. |BuildStatus| image:: https://travis-ci.org/uwbmrb/PyNMRSTAR.svg?branch=v3
-   :target: https://travis-ci.org/uwbmrb/PyNMRSTAR
 
 .. |PythonVersions| image:: https://img.shields.io/pypi/pyversions/pynmrstar.svg
    :target: https://pypi.org/project/PyNMRSTAR
