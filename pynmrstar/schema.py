@@ -272,14 +272,10 @@ class Schema(object):
         for y in range(0, len(values[0])):
             lengths.append(max([len(str(x[y])) for x in values]))
 
-        format_parameters = (self.schema_file, self.version, "Tag_Prefix", lengths[0],
-                             "Tag", lengths[1] - 6, "Type", lengths[2], "Null_Allowed",
-                             lengths[3], "SF_Category")
-        text = """BMRB schema from: '%s' version '%s'
-%s
-  %-*s %-*s %-*s %-*s
-""".format(format_parameters)
-
+        text = f"""BMRB schema from: '{self.schema_file}' version '{self.version}'
+{''}
+  {'Tag_Prefix':<{lengths[0]}} {'Tag':<{lengths[1] - 6}} {'Type':<{lengths[2]}} {'Null_Allowed':<{lengths[3]}} {'SF_Category'}
+"""
         last_tag = ""
 
         for tag in self.schema_order:
