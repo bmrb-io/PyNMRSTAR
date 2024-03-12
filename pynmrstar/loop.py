@@ -108,7 +108,9 @@ class Loop(object):
             csv_file = csv_reader(star_buffer)
             self.add_tag(next(csv_file))
             for row in csv_file:
-                self.add_data(row, convert_data_types=kwargs.get('convert_data_types', False))
+                self.add_data(row,
+                              convert_data_types=kwargs.get('convert_data_types', False),
+                              schema=kwargs.get('schema', None))
             self.source = f"from_csv('{kwargs['csv']}')"
             return
 
@@ -118,8 +120,11 @@ class Loop(object):
         star_buffer = StringIO(f"data_0 save_internaluseyoushouldntseethis_frame _internal.use internal "
                                f"{star_buffer.read()} save_")
         parser = Parser(entry_to_parse_into=tmp_entry)
-        parser.parse(star_buffer.read(), source=self.source, convert_data_types=kwargs.get('convert_data_types', False),
-                     raise_parse_warnings=kwargs.get('raise_parse_warnings', False))
+        parser.parse(star_buffer.read(),
+                     source=self.source,
+                     convert_data_types=kwargs.get('convert_data_types', False),
+                     raise_parse_warnings=kwargs.get('raise_parse_warnings', False),
+                     schema=kwargs.get('schema', None))
 
         # Check that there was only one loop here
         if len(tmp_entry[0].loops) > 1:
@@ -288,8 +293,12 @@ class Loop(object):
         return self._tags
 
     @classmethod
-    def from_file(cls, the_file: Union[str, TextIO, BinaryIO], csv: bool = False, convert_data_types: bool = False,
-                  raise_parse_warnings: bool = False):
+    def from_file(cls,
+                  the_file: Union[str, TextIO, BinaryIO],
+                  csv: bool = False,
+                  convert_data_types: bool = False,
+                  raise_parse_warnings: bool = False,
+                  schema: Schema = None):
         """Create a loop by loading in a file. Specify csv=True if
         the file is a CSV file. If the_file starts with http://,
         https://, or ftp:// then we will use those protocols to attempt
@@ -303,14 +312,18 @@ class Loop(object):
         dates will become datetime.date objects. When printing str() is called
         on all objects. Other that converting uppercase "E"s in scientific
         notation floats to lowercase "e"s this should not cause any change in
-        the way re-printed NMR-STAR objects are displayed.
+        the way re-printed NMR-STAR objects are displayed. Specify a custom
+        schema object to use using the schema parameter.
 
         Setting raise_parse_warnings to True will result in the raising of a
         ParsingError rather than logging a warning when non-valid (but
         ignorable) issues are found."""
 
-        return cls(file_name=the_file, csv=csv, convert_data_types=convert_data_types,
-                   raise_parse_warnings=raise_parse_warnings)
+        return cls(file_name=the_file,
+                   csv=csv,
+                   convert_data_types=convert_data_types,
+                   raise_parse_warnings=raise_parse_warnings,
+                   schema=schema)
 
     @classmethod
     def from_json(cls, json_dict: Union[dict, str]):
@@ -340,7 +353,9 @@ class Loop(object):
         return ret
 
     @classmethod
-    def from_scratch(cls, category: str = None, source: str = "from_scratch()"):
+    def from_scratch(cls,
+                     category: str = None,
+                     source: str = "from_scratch()"):
         """Create an empty saveframe that you can programmatically add
         to. You may also pass the tag prefix as the second argument. If
         you do not pass the tag prefix it will be set the first time you
@@ -349,9 +364,13 @@ class Loop(object):
         return cls(category=category, source=source)
 
     @classmethod
-    def from_string(cls, the_string: str, csv: bool = False, convert_data_types: bool = False,
-                    raise_parse_warnings: bool = False):
-        """Create a loop by parsing a string. Specify csv=True is
+    def from_string(cls,
+                    the_string: str,
+                    csv: bool = False,
+                    convert_data_types: bool = False,
+                    raise_parse_warnings: bool = False,
+                    schema: Schema = None):
+        """Create a loop by parsing a string. Specify csv=True if
         the string is in CSV format and not NMR-STAR format.
 
         Setting convert_data_types to True will automatically convert
@@ -362,17 +381,23 @@ class Loop(object):
         dates will become datetime.date objects. When printing str() is called
         on all objects. Other that converting uppercase "E"s in scientific
         notation floats to lowercase "e"s this should not cause any change in
-        the way re-printed NMR-STAR objects are displayed.
+        the way re-printed NMR-STAR objects are displayed. Specify a custom
+        schema object to use using the schema parameter.
 
         Setting raise_parse_warnings to True will result in the raising of a
         ParsingError rather than logging a warning when non-valid (but
         ignorable) issues are found."""
 
-        return cls(the_string=the_string, csv=csv, convert_data_types=convert_data_types,
-                   raise_parse_warnings=raise_parse_warnings)
+        return cls(the_string=the_string,
+                   csv=csv,
+                   convert_data_types=convert_data_types,
+                   raise_parse_warnings=raise_parse_warnings,
+                   schema=schema)
 
     @classmethod
-    def from_template(cls, tag_prefix: str, all_tags: bool = False, schema: Schema = None):
+    def from_template(cls, tag_prefix: str,
+                      all_tags: bool = False,
+                      schema: Schema = None):
         """ Create a loop that has all of the tags from the schema present.
         No values will be assigned. Specify the tag prefix of the loop.
 
@@ -380,8 +405,10 @@ class Loop(object):
         rather than just the mandatory tags."""
 
         schema = utils.get_schema(schema)
-        return cls(tag_prefix=tag_prefix, all_tags=all_tags,
-                   schema=schema, source=f"from_template({schema.version})")
+        return cls(tag_prefix=tag_prefix,
+                   all_tags=all_tags,
+                   schema=schema,
+                   source=f"from_template({schema.version})")
 
     @staticmethod
     def _get_tags_from_schema(category: str, schema: Schema = None, all_tags: bool = False) -> List[str]:
@@ -434,7 +461,8 @@ class Loop(object):
     def add_data(self,
                  data: Union[List[dict], Dict[str, List], List[Union[str, float, int]], List[List[Any]]],
                  rearrange: bool = False,
-                 convert_data_types: bool = False):
+                 convert_data_types: bool = False,
+                 schema: Schema = None):
         """Add data to a loop. You can provide the data to add organized in four different ways, though the first
         two are recommended for new code. The other two (#3 and #4) are preserved for sake of existing code (written
         prior to version 3.3) and for niche use cases:
@@ -470,6 +498,9 @@ class Loop(object):
         :param rearrange: If true, rearrange data provided in method #4 as necessary to fit in the loop. This only
             exists for parsers, and it's use is strongly discouraged.
         :type rearrange: bool
+        :param schema: A pynmrstar Schema object, which will be used to determine data types if convert_data_types
+            is True.
+        :type schema: pynmrstar.Schema
         """
 
         if not data:
@@ -537,7 +568,7 @@ class Loop(object):
 
         # Auto convert data types if option set
         if convert_data_types:
-            schema = utils.get_schema()
+            schema = utils.get_schema(schema)
             for row in pending_data:
                 for tag_id, datum in enumerate(row):
                     row[tag_id] = schema.convert_tag(f"{self.category}.{self._tags[tag_id]}", datum)
@@ -574,7 +605,7 @@ class Loop(object):
             raise ValueError("You cannot add data out of tag order.")
         self.data[-1].append(value)
 
-    def add_missing_tags(self, schema: 'Schema' = None, all_tags: bool = False) -> None:
+    def add_missing_tags(self, schema: Schema = None, all_tags: bool = False) -> None:
         """ Automatically adds any missing tags (according to the schema),
         sorts the tags, and renumbers the tags by ordinal. """
 
@@ -1038,7 +1069,7 @@ class Loop(object):
 
         self.category = utils.format_category(category)
 
-    def sort_tags(self, schema: 'Schema' = None) -> None:
+    def sort_tags(self, schema: Schema = None) -> None:
         """ Rearranges the tag names and data in the loop to match the order
         from the schema. Uses the BMRB schema unless one is provided."""
 

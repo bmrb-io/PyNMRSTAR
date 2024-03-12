@@ -279,7 +279,10 @@ class Entry(object):
         return self._frame_list
 
     @classmethod
-    def from_database(cls, entry_num: Union[str, int], convert_data_types: bool = False):
+    def from_database(cls,
+                      entry_num: Union[str, int],
+                      convert_data_types: bool = False,
+                      schema: Schema = None):
         """Create an entry corresponding to the most up to date entry on
         the public BMRB server. (Requires ability to initiate outbound
         HTTP connections.)
@@ -292,13 +295,19 @@ class Entry(object):
         dates will become datetime.date objects. When printing str() is called
         on all objects. Other that converting uppercase "E"s in scientific
         notation floats to lowercase "e"s this should not cause any change in
-        the way re-printed NMR-STAR objects are displayed."""
+        the way re-printed NMR-STAR objects are displayed. Specify a custom
+        schema object to use using the schema parameter."""
 
-        return _get_entry_from_database(entry_num, convert_data_types=convert_data_types)
+        return _get_entry_from_database(entry_num,
+                                        convert_data_types=convert_data_types,
+                                        schema=schema)
 
     @classmethod
-    def from_file(cls, the_file: Union[str, TextIO, BinaryIO], convert_data_types: bool = False,
-                  raise_parse_warnings: bool = False):
+    def from_file(cls,
+                  the_file: Union[str, TextIO, BinaryIO],
+                  convert_data_types: bool = False,
+                  raise_parse_warnings: bool = False,
+                  schema: Schema = None):
         """Create an entry by loading in a file. If the_file starts with
         http://, https://, or ftp:// then we will use those protocols to
         attempt to open the file.
@@ -311,14 +320,17 @@ class Entry(object):
         dates will become datetime.date objects. When printing str() is called
         on all objects. Other that converting uppercase "E"s in scientific
         notation floats to lowercase "e"s this should not cause any change in
-        the way re-printed NMR-STAR objects are displayed.
+        the way re-printed NMR-STAR objects are displayed. Specify a custom
+        schema object to use using the schema parameter.
 
         Setting raise_parse_warnings to True will result in the raising of a
         ParsingError rather than logging a warning when non-valid (but
         ignorable) issues are found. """
 
-        return cls(file_name=the_file, convert_data_types=convert_data_types,
-                   raise_parse_warnings=raise_parse_warnings)
+        return cls(file_name=the_file,
+                   convert_data_types=convert_data_types,
+                   raise_parse_warnings=raise_parse_warnings,
+                   schema=schema)
 
     @classmethod
     def from_json(cls, json_dict: Union[dict, str]):
@@ -352,8 +364,11 @@ class Entry(object):
         return ret
 
     @classmethod
-    def from_string(cls, the_string: str, convert_data_types: bool = False,
-                    raise_parse_warnings: bool = False):
+    def from_string(cls,
+                    the_string: str,
+                    convert_data_types: bool = False,
+                    raise_parse_warnings: bool = False,
+                    schema: Schema = None):
         """Create an entry by parsing a string.
 
 
@@ -365,14 +380,17 @@ class Entry(object):
         dates will become datetime.date objects. When printing str() is called
         on all objects. Other that converting uppercase "E"s in scientific
         notation floats to lowercase "e"s this should not cause any change in
-        the way re-printed NMR-STAR objects are displayed.
+        the way re-printed NMR-STAR objects are displayed. Specify a custom
+        schema object to use using the schema parameter.
 
         Setting raise_parse_warnings to True will result in the raising of a
         ParsingError rather than logging a warning when non-valid (but
         ignorable) issues are found."""
 
-        return cls(the_string=the_string, convert_data_types=convert_data_types,
-                   raise_parse_warnings=raise_parse_warnings)
+        return cls(the_string=the_string,
+                   convert_data_types=convert_data_types,
+                   raise_parse_warnings=raise_parse_warnings,
+                   schema=schema)
 
     @classmethod
     def from_scratch(cls, entry_id: Union[str, int]):
@@ -383,7 +401,11 @@ class Entry(object):
         return cls(entry_id=entry_id)
 
     @classmethod
-    def from_template(cls, entry_id, all_tags=False, default_values=False, schema=None) -> 'Entry':
+    def from_template(cls,
+                      entry_id,
+                      all_tags=False,
+                      default_values=False,
+                      schema=None) -> 'Entry':
         """ Create an entry that has all of the saveframes and loops from the
         schema present. No values will be assigned. Specify the entry
         ID when calling this method.
@@ -452,7 +474,7 @@ class Entry(object):
 
         return diffs
 
-    def add_missing_tags(self, schema: 'Schema' = None, all_tags: bool = False) -> None:
+    def add_missing_tags(self, schema: Schema = None, all_tags: bool = False) -> None:
         """ Automatically adds any missing tags (according to the schema)
         to all saveframes and loops and sorts the tags. """
 
@@ -561,7 +583,7 @@ class Entry(object):
 
         return results
 
-    def normalize(self, schema: Optional['Schema'] = None) -> None:
+    def normalize(self, schema: Optional[Schema] = None) -> None:
         """ Sorts saveframes, loops, and tags according to the schema
         provided (or BMRB default if none provided).
 
@@ -881,7 +903,7 @@ class Entry(object):
                         if val == old_reference:
                             each_row[pos] = new_reference
 
-    def validate(self, validate_schema: bool = True, schema: 'Schema' = None,
+    def validate(self, validate_schema: bool = True, schema: Schema = None,
                  validate_star: bool = True) -> List[str]:
         """Validate an entry in a variety of ways. Returns a list of
         errors found. 0-length list indicates no errors found. By

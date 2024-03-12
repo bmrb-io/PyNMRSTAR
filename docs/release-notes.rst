@@ -1,6 +1,15 @@
 Release notes
 =============
 
+3.3.4
+~~~~~
+
+Minor improvements:
+
+- Support creating :py:class:`pynmrstar.Entry`, :py:class:`pynmrstar.Saveframe`, and :py:class:`pynmrstar.Loop`
+  objects from string or from file while specifying a Schema object to be used rather than the default schema.
+
+
 3.3.3
 ~~~~~
 

@@ -2,7 +2,7 @@ import logging
 import re
 from typing import Optional
 
-from pynmrstar import definitions, cnmrstar, entry as entry_mod, loop as loop_mod, saveframe as saveframe_mod
+from pynmrstar import definitions, cnmrstar, entry as entry_mod, loop as loop_mod, saveframe as saveframe_mod, schema as schema_mod
 from pynmrstar.exceptions import ParsingError
 
 logger = logging.getLogger('pynmrstar')
@@ -48,8 +48,12 @@ class Parser(object):
 
         cnmrstar.load_string(data)
 
-    def parse(self, data: str, source: str = "unknown", raise_parse_warnings: bool = False,
-              convert_data_types: bool = False) -> 'entry_mod.Entry':
+    def parse(self,
+              data: str,
+              source: str = "unknown",
+              raise_parse_warnings: bool = False,
+              convert_data_types: bool = False,
+              schema: 'schema_mod.Schema' = None) -> 'entry_mod.Entry':
         """ Parses the string provided as data as an NMR-STAR entry
         and returns the parsed entry. Raises ParsingError on exceptions.
 
@@ -170,8 +174,10 @@ class Parser(object):
                                                                f"either missing from or duplicated in this loop.",
                                                                self.line_number)
                                         try:
-                                            cur_loop.add_data(cur_data, rearrange=True,
-                                                              convert_data_types=convert_data_types)
+                                            cur_loop.add_data(cur_data,
+                                                              rearrange=True,
+                                                              convert_data_types=convert_data_types,
+                                                              schema=schema)
                                         # If there is an issue with the loops during parsing, raise a parse error
                                         #  rather than the ValueError that would be raised if they made the mistake
                                         #   directly
@@ -260,7 +266,10 @@ class Parser(object):
                                 "is quoted. You may be missing a data value on the previous line. "
                                 f"Illegal value: '{self.token}'", self.line_number)
                     try:
-                        cur_frame.add_tag(cur_tag, self.token, convert_data_types=convert_data_types)
+                        cur_frame.add_tag(cur_tag,
+                                          self.token,
+                                          convert_data_types=convert_data_types,
+                                          schema=schema)
                     except ValueError as err:
                         raise ParsingError(str(err), line_number=self.line_number)
 
