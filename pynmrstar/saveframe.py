@@ -333,7 +333,10 @@ class Saveframe(object):
         return {x[0].lower(): x[1] for x in self._tags}
 
     @classmethod
-    def from_scratch(cls, sf_name: str, tag_prefix: str = None, source: str = "from_scratch()"):
+    def from_scratch(cls,
+                     sf_name: str,
+                     tag_prefix: str = None,
+                     source: str = "from_scratch()"):
         """Create an empty saveframe that you can programmatically add
         to. You may also pass the tag prefix as the second argument. If
         you do not pass the tag prefix it will be set the first time you
@@ -342,8 +345,12 @@ class Saveframe(object):
         return cls(saveframe_name=sf_name, tag_prefix=tag_prefix, source=source)
 
     @classmethod
-    def from_file(cls, the_file: Union[str, TextIO, BinaryIO], csv: bool = False, convert_data_types: bool = False,
-                  raise_parse_warnings: bool = False):
+    def from_file(cls,
+                  the_file: Union[str, TextIO, BinaryIO],
+                  csv: bool = False,
+                  convert_data_types: bool = False,
+                  raise_parse_warnings: bool = False,
+                  schema: Schema = None):
         """Create a saveframe by loading in a file. Specify csv=True is
         the file is a CSV file. If the_file starts with http://,
         https://, or ftp:// then we will use those protocols to attempt
@@ -357,14 +364,18 @@ class Saveframe(object):
         dates will become datetime.date objects. When printing str() is called
         on all objects. Other that converting uppercase "E"s in scientific
         notation floats to lowercase "e"s this should not cause any change in
-        the way re-printed NMR-STAR objects are displayed.
+        the way re-printed NMR-STAR objects are displayed. Specify a custom
+        schema object to use using the schema parameter.
 
         Setting raise_parse_warnings to True will result in the raising of a
         ParsingError rather than logging a warning when non-valid (but
         ignorable) issues are found."""
 
-        return cls(file_name=the_file, csv=csv, convert_data_types=convert_data_types,
-                   raise_parse_warnings=raise_parse_warnings)
+        return cls(file_name=the_file,
+                   csv=csv,
+                   convert_data_types=convert_data_types,
+                   raise_parse_warnings=raise_parse_warnings,
+                   schema=schema)
 
     @classmethod
     def from_json(cls, json_dict: Union[dict, str]):
@@ -395,8 +406,12 @@ class Saveframe(object):
         return ret
 
     @classmethod
-    def from_string(cls, the_string: str, csv: bool = False, convert_data_types: bool = False,
-                    raise_parse_warnings: bool = False):
+    def from_string(cls,
+                    the_string: str,
+                    csv: bool = False,
+                    convert_data_types: bool = False,
+                    raise_parse_warnings: bool = False,
+                    schema: Schema = None):
         """Create a saveframe by parsing a string. Specify csv=True is
         the string is in CSV format and not NMR-STAR format.
 
@@ -408,18 +423,27 @@ class Saveframe(object):
         dates will become datetime.date objects. When printing str() is called
         on all objects. Other that converting uppercase "E"s in scientific
         notation floats to lowercase "e"s this should not cause any change in
-        the way re-printed NMR-STAR objects are displayed.
+        the way re-printed NMR-STAR objects are displayed. Specify a custom
+        schema object to use using the schema parameter.
 
         Setting raise_parse_warnings to True will result in the raising of a
         ParsingError rather than logging a warning when non-valid (but
         ignorable) issues are found."""
 
-        return cls(the_string=the_string, csv=csv, convert_data_types=convert_data_types,
-                   raise_parse_warnings=raise_parse_warnings)
+        return cls(the_string=the_string,
+                   csv=csv,
+                   convert_data_types=convert_data_types,
+                   raise_parse_warnings=raise_parse_warnings,
+                   schema=schema)
 
     @classmethod
-    def from_template(cls, category: str, name: str = None, entry_id: Union[str, int] = None, all_tags: bool = False,
-                      default_values: bool = False, schema: Schema = None):
+    def from_template(cls,
+                      category: str,
+                      name: str = None,
+                      entry_id: Union[str, int] = None,
+                      all_tags: bool = False,
+                      default_values: bool = False,
+                      schema: Schema = None):
         """ Create a saveframe that has all of the tags and loops from the
         schema present. No values will be assigned. Specify the category
         when calling this method. Optionally also provide the name of the
@@ -432,8 +456,12 @@ class Saveframe(object):
         values from the schema."""
 
         schema = utils.get_schema(schema)
-        return cls(category=category, saveframe_name=name, entry_id=entry_id,
-                   all_tags=all_tags, default_values=default_values, schema=schema,
+        return cls(category=category,
+                   saveframe_name=name,
+                   entry_id=entry_id,
+                   all_tags=all_tags,
+                   default_values=default_values,
+                   schema=schema,
                    source=f"from_template({schema.version})")
 
     def __repr__(self) -> str:
@@ -527,7 +555,12 @@ class Saveframe(object):
 
         self._loops.append(loop_to_add)
 
-    def add_tag(self, name: str, value: Any, update: bool = False, convert_data_types: bool = False) -> None:
+    def add_tag(self,
+                name: str,
+                value: Any,
+                update: bool = False,
+                convert_data_types: bool = False,
+                schema: Schema = None) -> None:
         """Add a tag to the tag list. Does a bit of validation and
         parsing.
 
@@ -535,7 +568,10 @@ class Saveframe(object):
         than raise an exception.
 
         Set convert_data_types to True to convert the tag value from str to
-        whatever type the tag is as defined in the schema."""
+        whatever type the tag is as defined in the schema.
+
+        Optionally specify a schema if you don't want to use the default schema.
+        """
 
         if not isinstance(name, str):
             raise ValueError('Tag names must be strings.')
@@ -581,7 +617,7 @@ class Saveframe(object):
 
         # See if we need to convert the data type
         if convert_data_types:
-            new_tag = [name, utils.get_schema().convert_tag(self.tag_prefix + "." + name, value)]
+            new_tag = [name, utils.get_schema(schema).convert_tag(self.tag_prefix + "." + name, value)]
         else:
             new_tag = [name, value]
 
@@ -612,7 +648,9 @@ class Saveframe(object):
             else:
                 raise ValueError(f"You provided an invalid tag/value to add: '{tag_pair}'.")
 
-    def add_missing_tags(self, schema: 'Schema' = None, all_tags: bool = False,
+    def add_missing_tags(self,
+                         schema: Schema = None,
+                         all_tags: bool = False,
                          recursive: bool = True) -> None:
         """ Automatically adds any missing tags (according to the schema)
         and sorts the tags.

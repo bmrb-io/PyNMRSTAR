@@ -213,7 +213,8 @@ class Schema(object):
 
         # If we don't know what the tag is, just return it
         if tag.lower() not in self.schema:
-            logger.warning(f"Couldn't convert tag data type because it is not in the dictionary: {tag}")
+            if tag != '_internal.use':
+                logger.warning(f"Couldn't convert tag data type because it is not in the dictionary: {tag}")
             return value
 
         full_tag = self.schema[tag.lower()]

@@ -141,7 +141,9 @@ def _get_url_reliably(url: str, wait_time: float = 10, raw: bool = False, timeou
             return serialized_ent.decode()
 
 
-def _get_entry_from_database(entry_num: Union[str, int], convert_data_types: bool = False) -> 'pynmrstar.Entry':
+def _get_entry_from_database(entry_num: Union[str, int],
+                             convert_data_types: bool = False,
+                             schema: 'pynmrstar.Schema' = None) -> 'pynmrstar.Entry':
     """ Fetches an entry from the API (or falls back to the FTP site) in
     as reliable and robust a way as possible. Used by Entry.from_database(). """
 
@@ -190,7 +192,7 @@ def _get_entry_from_database(entry_num: Union[str, int], convert_data_types: boo
             each_loop.source = ent.source
 
     if convert_data_types:
-        schema = pynmrstar.utils.get_schema()
+        schema = pynmrstar.utils.get_schema(schema)
         for each_saveframe in ent:
             for tag in each_saveframe.tags:
                 cur_tag = each_saveframe.tag_prefix + "." + tag[0]
