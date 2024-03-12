@@ -340,7 +340,9 @@ class Loop(object):
         return ret
 
     @classmethod
-    def from_scratch(cls, category: str = None, source: str = "from_scratch()"):
+    def from_scratch(cls,
+                     category: str = None,
+                     source: str = "from_scratch()"):
         """Create an empty saveframe that you can programmatically add
         to. You may also pass the tag prefix as the second argument. If
         you do not pass the tag prefix it will be set the first time you
@@ -372,7 +374,9 @@ class Loop(object):
                    raise_parse_warnings=raise_parse_warnings)
 
     @classmethod
-    def from_template(cls, tag_prefix: str, all_tags: bool = False, schema: Schema = None):
+    def from_template(cls, tag_prefix: str,
+                      all_tags: bool = False,
+                      schema: Schema = None):
         """ Create a loop that has all of the tags from the schema present.
         No values will be assigned. Specify the tag prefix of the loop.
 
@@ -380,8 +384,10 @@ class Loop(object):
         rather than just the mandatory tags."""
 
         schema = utils.get_schema(schema)
-        return cls(tag_prefix=tag_prefix, all_tags=all_tags,
-                   schema=schema, source=f"from_template({schema.version})")
+        return cls(tag_prefix=tag_prefix,
+                   all_tags=all_tags,
+                   schema=schema,
+                   source=f"from_template({schema.version})")
 
     @staticmethod
     def _get_tags_from_schema(category: str, schema: Schema = None, all_tags: bool = False) -> List[str]:
