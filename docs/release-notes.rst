@@ -4,7 +4,8 @@ Release notes
 3.3.5
 ~~~~~
 
-No code changes, just repackaging to fix some build issues in previous releases.
+No code changes, just repackaging to fix some build issues in previous releases. Dropping official support for
+Python3.7 but the code still runs without issue in Python3.7 environments.
 
 3.3.4
 ~~~~~
