@@ -1,6 +1,11 @@
 Release notes
 =============
 
+3.3.5
+~~~~~
+
+No code changes, just repackaging to fix some build issues in previous releases.
+
 3.3.4
 ~~~~~
 
