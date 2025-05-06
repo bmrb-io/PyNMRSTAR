@@ -14,7 +14,7 @@ done
 while true; do
     read -p "Do [b]uild, [t]est, or [r]elease? " rt
     case ${rt} in
-        [Tt]* ) python3 -m twine upload --repository testpypi dist/*.tar.gz dist/*.whl; break;;
+        [Tt]* ) python3 -m twine upload --verbose --repository testpypi dist/*.tar.gz dist/*.whl; break;;
         [Rr]* ) python3 -m twine upload dist/*.tar.gz dist/*.whl; break;;
         [Bb]* ) rm dist/*; python3 setup.py sdist; rm -rfv pynmrstar.egg-info; break;;
         * ) echo "Please answer r or t.";;
