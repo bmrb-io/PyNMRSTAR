@@ -8,22 +8,17 @@ from datetime import date
 from gzip import GzipFile
 from io import StringIO, BytesIO
 from typing import Dict, Union, IO, List, Tuple
-from urllib.error import HTTPError, URLError
-from urllib.request import urlopen, Request
+from urllib.error import URLError
+
+import requests
 
 import pynmrstar
 
 __version__: str = "3.3.5"
 min_cnmrstar_version: str = "3.2.0"
 
-# If we have requests, open a session to reuse for the duration of the program run
-try:
-    from requests import session as _requests_session
-    # This replaces the urllib HTTPError if we have requests
-    from requests.exceptions import HTTPError, ConnectionError
-    _session = _requests_session()
-except ModuleNotFoundError:
-    _session = None
+# Create a session to reuse for the duration of the program run
+_session = requests.session()
 
 logger = logging.getLogger('pynmrstar')
 
@@ -81,64 +76,34 @@ def _get_url_reliably(url: str, wait_time: float = 10, raw: bool = False, timeou
 
     global _session
 
-    # If using Requests
-    if _session:
+    try:
+        response = _session.get(url, timeout=timeout,
+                                headers={'Application': f'PyNMRSTAR {__version__}'})
+    except requests.exceptions.ConnectionError:
+        _session = requests.session()
         try:
             response = _session.get(url, timeout=timeout,
                                     headers={'Application': f'PyNMRSTAR {__version__}'})
-        except ConnectionError:
-            _session = _requests_session()
-            try:
-                response = _session.get(url, timeout=timeout,
-                                        headers={'Application': f'PyNMRSTAR {__version__}'})
-            except ConnectionError:
-                raise HTTPError("A ConnectionError was thrown during an attempt to load the entry.")
+        except requests.exceptions.ConnectionError:
+            raise requests.exceptions.HTTPError("A ConnectionError was thrown during an attempt to load the entry.")
 
-        # We are rate limited - sleep and try again
-        if response.status_code == 403:
-            if retries > 0:
-                logger.warning(f'We were rate limited. Sleeping for {wait_time} seconds.')
-                time.sleep(wait_time)
-                return _get_url_reliably(url, wait_time=wait_time*2, raw=raw, timeout=timeout,
-                                         retries=retries - 1)
-            else:
-                raise HTTPError("Continued to receive 403 (forbidden, due to rate limit) after multiple wait times.") \
-                    from None
-        if response.status_code == 404:
-            raise KeyError(f"Server returned 404.") from None
-        response.raise_for_status()
-        if raw:
-            return response.content
+    # We are rate limited - sleep and try again
+    if response.status_code == 403:
+        if retries > 0:
+            logger.warning(f'We were rate limited. Sleeping for {wait_time} seconds.')
+            time.sleep(wait_time)
+            return _get_url_reliably(url, wait_time=wait_time * 2, raw=raw, timeout=timeout,
+                                     retries=retries - 1)
         else:
-            return response.text
+            raise requests.exceptions.HTTPError("Continued to receive 403 (forbidden, due to rate limit) after multiple wait times.") \
+                from None
+    if response.status_code == 404:
+        raise KeyError(f"Server returned 404.") from None
+    response.raise_for_status()
+    if raw:
+        return response.content
     else:
-        # Use the built in library
-        try:
-            req = Request(url)
-            req.add_header('Application', f'PyNMRSTAR {__version__}')
-            url_request = urlopen(req, timeout=timeout)
-            serialized_ent = url_request.read()
-            url_request.close()
-
-        except HTTPError as err:
-            if err.code == 404:
-                raise KeyError(f"Server returned 404.") from None
-            # We are rate limited - sleep and try again
-            elif err.code == 403:
-                if retries > 0:
-                    logger.warning(f'We were rate limited. Sleeping for {wait_time} seconds.')
-                    time.sleep(wait_time)
-                    return _get_url_reliably(url, wait_time=wait_time * 2, raw=raw, timeout=timeout,
-                                             retries=retries - 1)
-                else:
-                    raise HTTPError("Continued to receive 403 (forbidden, due to rate limit) after multiple wait "
-                                    "times.") from None
-            else:
-                raise err
-        if raw:
-            return serialized_ent
-        else:
-            return serialized_ent.decode()
+        return response.text
 
 
 def _get_entry_from_database(entry_num: Union[str, int],
@@ -161,7 +126,7 @@ def _get_entry_from_database(entry_num: Union[str, int],
         if "error" in json_data:
             raise RuntimeError('Something wrong with API response.')
         ent = pynmrstar.Entry.from_json(json_data)
-    except (HTTPError, ConnectionError, RuntimeError):
+    except (requests.exceptions.HTTPError, requests.exceptions.ConnectionError, RuntimeError):
         # Can't fall back to FTP for chemcomps
         if entry_num.startswith("chemcomp"):
             raise IOError("Unable to load that chemcomp from the API.")
@@ -176,7 +141,7 @@ def _get_entry_from_database(entry_num: Union[str, int],
             # Use a longer timeout for the timeout
             entry_content = _get_url_reliably(url, raw=False, timeout=20, retries=1)
             ent = pynmrstar.Entry.from_string(entry_content)
-        except HTTPError:
+        except requests.exceptions.HTTPError:
             raise IOError(f"Entry {entry_num} does not exist in the public database.") from None
         except URLError:
             raise IOError("You don't appear to have an active internet connection. Cannot fetch entry.") from None
