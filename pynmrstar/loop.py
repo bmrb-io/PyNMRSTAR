@@ -8,6 +8,7 @@ from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Callable,
 
 from pynmrstar import definitions, utils, entry as entry_mod
 from pynmrstar._internal import _json_serialize, _interpret_file
+from pynmrstar._types import DataInput
 from pynmrstar.exceptions import InvalidStateError
 from pynmrstar.parser import Parser
 from pynmrstar.schema import Schema
@@ -458,49 +459,66 @@ class Loop(object):
 
         return True
 
-    def add_data(self,
-                 data: Union[List[dict], Dict[str, List], List[Union[str, float, int]], List[List[Any]]],
-                 rearrange: bool = False,
-                 convert_data_types: bool = False,
-                 schema: Schema = None):
-        """Add data to a loop. You can provide the data to add organized in four different ways, though the first
-        two are recommended for new code. The other two (#3 and #4) are preserved for sake of existing code (written
-        prior to version 3.3) and for niche use cases:
+    def add_data(
+            self,
+            data: DataInput,
+            rearrange: bool = False,
+            convert_data_types: bool = False,
+            schema: Union[Schema, None] = None,
+    ) -> None:
+        """
+        Add data to a loop.
 
-        1: You can provide a list of dictionaries of tags to add. For example,
-        ``[{'name': 'Jeff', 'location': 'Connecticut'}, {'name': 'Chad', 'location': 'Madison'}]`` will add two new
-        rows, and set the values of the tags ``name`` and ``location`` to the values provided. If there are other
-        tags in the loop, they will be assigned null values for the rows corresponding to the tags added.
+        You can supply *data* in **four** canonical formats.  Formats #1 and #2
+        are the most convenient; the others are retained mainly for legacy code.
 
-        2: You can provide a dictionary of lists, as such (corresponds to adding the same ultimate data as in the
-        example #1): ``{'name': ['Jeff', 'Chad'], 'location': ['Connecticut', 'Madison']}``. This will also create
-        two new rows in the loop and assign the values provided.
-        
-        3: You can provide a list of lists of tag values to add. In this case, each list must have the same tag
-        values (and order of tags) as the known tags present in the loop. To correspond to the above examples, the data
-        would look like: ``[['Jeff', 'Connecticut'], ['Chad', 'Madison']]``. Adding data this way requires both that
-        you provide values for all tags present in the loop, and that you provide the values in the same order that the
-        tags already are already defined in the loop.
+        1. **Row‑oriented dictionaries**  *(preferred)*
+           • a **list** of dictionaries,
+           where each dictionary represents one row::
 
-        4. You can provide a single list of tag values to add. In the most simple case, that would correspond to just
-        adding one row of data in the same was as in #3 above, as such: ``['Jeff', 'Connecticut']``. In a more
-        complicated example, you could also add data (corresponding to example #1 and #2) as such:
-        ``['Jeff', 'Connecticut', 'Chad', 'Madison']`` - but if you provide data this way, you must set
-         ``rearrange=True``. This usage is strongly discouraged, but exists for legacy reasons.
+               [{'name': 'Jeff', 'location': 'Connecticut'},
+                {'name': 'Chad', 'location': 'Madison'}]
 
-        :param data: See the docstring for the method.
-        :type data: Union[List[dict], Dict[str, List], List[Union[str, float, int]], List[List[Any]]]
-        :param convert_data_types: If true, converts data you provide into the data type defined in the dictionary.
-            For example, if you provided the string '5' for the tag ``_Atom_chem_shift.Val``, it would automatically
-            be converted to a float while being added. This is mainly useful for parsers, as your data is probably
-            already in a format that is usable for you.
-        :type convert_data_types: bool
-        :param rearrange: If true, rearrange data provided in method #4 as necessary to fit in the loop. This only
-            exists for parsers, and it's use is strongly discouraged.
-        :type rearrange: bool
-        :param schema: A pynmrstar Schema object, which will be used to determine data types if convert_data_types
-            is True.
-        :type schema: pynmrstar.Schema
+        2. **Column‑oriented dictionary of lists**
+           A dictionary mapping each tag to a list of values (or to a single
+           scalar)::
+
+               {'name': ['Jeff', 'Chad'],
+                'location': ['Connecticut', 'Madison']}
+
+           All value‑lists must be the same length; that length determines the
+           number of rows created.
+
+        3. **Matrix of values**
+           A list of lists whose inner order exactly matches the loop’s current
+           tag order::
+
+               [['Jeff', 'Connecticut'],
+                ['Chad', 'Madison']]
+
+        4. **Flat list of values**
+           A single list whose length is either:
+           • exactly the number of tags (adds one row), or
+           • any multiple of that length **when** ``rearrange=True``::
+
+               ['Jeff', 'Connecticut']                          # one row
+               ['Jeff', 'Connecticut', 'Chad', 'Madison']       # two rows (requires rearrange=True)
+
+           This form is discouraged and kept only for backward compatibility.
+
+        Parameters
+        ----------
+        data
+            The data to add, in any of the formats described above.
+        rearrange
+            Only used with format #4.  When ``True`` the flat list is split into
+            evenly sized rows.  Rarely needed outside of old parsers.
+        convert_data_types
+            If ``True`` each value is converted to the type defined in *schema*
+            before insertion.
+        schema
+            A :class:`pynmrstar.Schema` instance used when
+            ``convert_data_types`` is ``True``.
         """
 
         if not data:
@@ -564,7 +582,8 @@ class Loop(object):
                 # Add the user data
                 pending_data.append(data)
         else:
-            raise ValueError("Your data did not match one of the supported types.")
+            raise ValueError("Your data did not match one of the supported types. Please review the documentation for "
+                             "proper usage of this function.")
 
         # Auto convert data types if option set
         if convert_data_types:
