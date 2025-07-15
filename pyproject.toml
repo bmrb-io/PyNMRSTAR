@@ -38,7 +38,7 @@ dependencies = [
 ]                                                                                                                                                                                                                                   
                                                                                                                                                                                                                                     
 [project.urls]                                                                                                                                                                                                                      
-Homepage = "https://github.com/uwbmrb/PyNMRSTAR"                                                                                                                                                                                    
+Homepage = "https://github.com/bmrb-io/PyNMRSTAR"
                                                                                                                                                                                                                                     
 [tool.setuptools]                                                                                                                                                                                                                   
 packages = ["pynmrstar"]                                                                                                                                                                                                            
