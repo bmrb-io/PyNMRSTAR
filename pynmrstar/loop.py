@@ -4,6 +4,7 @@ from copy import deepcopy
 from csv import reader as csv_reader, writer as csv_writer
 from io import StringIO
 from itertools import chain
+from pathlib import Path
 from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Callable, Tuple
 
 from pynmrstar import definitions, utils, entry as entry_mod
@@ -295,7 +296,7 @@ class Loop(object):
 
     @classmethod
     def from_file(cls,
-                  the_file: Union[str, TextIO, BinaryIO],
+                  the_file: Union[str, Path, TextIO, BinaryIO],
                   csv: bool = False,
                   convert_data_types: bool = False,
                   raise_parse_warnings: bool = False,
@@ -303,7 +304,8 @@ class Loop(object):
         """Create a loop by loading in a file. Specify csv=True if
         the file is a CSV file. If the_file starts with http://,
         https://, or ftp:// then we will use those protocols to attempt
-        to open the file.
+        to open the file. the_file can be a string path, pathlib.Path object,
+        or an open file handle.
 
         Setting convert_data_types to True will automatically convert
         the data loaded from the file into the corresponding python type as

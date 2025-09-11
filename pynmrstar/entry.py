@@ -3,6 +3,7 @@ import json
 import logging
 import warnings
 from io import StringIO
+from pathlib import Path
 from typing import TextIO, BinaryIO, Union, List, Optional, Dict, Any, Tuple
 
 from pynmrstar import definitions, utils, loop as loop_mod, parser as parser_mod, saveframe as saveframe_mod
@@ -304,13 +305,14 @@ class Entry(object):
 
     @classmethod
     def from_file(cls,
-                  the_file: Union[str, TextIO, BinaryIO],
+                  the_file: Union[str, Path, TextIO, BinaryIO],
                   convert_data_types: bool = False,
                   raise_parse_warnings: bool = False,
                   schema: Schema = None):
         """Create an entry by loading in a file. If the_file starts with
         http://, https://, or ftp:// then we will use those protocols to
-        attempt to open the file.
+        attempt to open the file. the_file can be a string path, pathlib.Path 
+        object, or an open file handle.
         
         Setting convert_data_types to True will automatically convert
         the data loaded from the file into the corresponding python type as
@@ -956,7 +958,7 @@ class Entry(object):
 
         return errors
 
-    def write_to_file(self, file_name: str, format_: str = "nmrstar", show_comments: bool = True,
+    def write_to_file(self, file_name: Union[str, Path], format_: str = "nmrstar", show_comments: bool = True,
                       skip_empty_loops: bool = False, skip_empty_tags: bool = False) -> None:
         """ Writes the entry to the specified file in NMR-STAR format.
 

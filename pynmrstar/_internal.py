@@ -7,6 +7,7 @@ import zlib
 from datetime import date
 from gzip import GzipFile
 from io import StringIO, BytesIO
+from pathlib import Path
 from typing import Dict, Union, IO, List, Tuple
 from urllib.error import URLError
 
@@ -171,7 +172,7 @@ def _get_entry_from_database(entry_num: Union[str, int],
     return ent
 
 
-def _interpret_file(the_file: Union[str, IO]) -> StringIO:
+def _interpret_file(the_file: Union[str, Path, IO]) -> StringIO:
     """Helper method returns some sort of object with a read() method.
     the_file could be a URL, a file location, a file object, or a
     gzipped version of any of the above."""
@@ -190,6 +191,9 @@ def _interpret_file(the_file: Union[str, IO]) -> StringIO:
         else:
             with open(the_file, 'rb') as read_file:
                 buffer = BytesIO(read_file.read())
+    elif isinstance(the_file, Path):
+        with open(str(the_file), 'rb') as read_file:
+            buffer = BytesIO(read_file.read())
     else:
         raise ValueError("Cannot figure out how to interpret the file you passed.")
 
@@ -234,7 +238,7 @@ def get_clean_tag_list(item: Union[str, List[str], Tuple[str]]) -> List[Dict[str
 
 
 def write_to_file(nmrstar_object: Union['pynmrstar.Entry', 'pynmrstar.Saveframe'],
-                  file_name: str,
+                  file_name: Union[str, Path],
                   format_: str = "nmrstar",
                   show_comments: bool = True,
                   skip_empty_loops: bool = False,
@@ -252,6 +256,6 @@ def write_to_file(nmrstar_object: Union['pynmrstar.Entry', 'pynmrstar.Saveframe'
     elif format_ == "json":
         data_to_write = nmrstar_object.get_json()
 
-    out_file = open(file_name, "w")
+    out_file = open(str(file_name), "w")
     out_file.write(data_to_write)
     out_file.close()

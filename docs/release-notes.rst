@@ -1,6 +1,13 @@
 Release notes
 =============
 
+3.3.6
+~~~~~
+
+Update :py:meth:`pynmrstar.Entry.from_file`, :py:meth:`pynmrstar.Saveframe.from_file`, :py:meth:`pynmrstar.Loop.from_file`,
+:py:meth:`pynmrstar.Entry.write_to_file`, and :py:meth:`pynmrstar.Saveframe.write_to_file`
+to support Path objects in addition to strings for the file name.
+
 3.3.5
 ~~~~~
 

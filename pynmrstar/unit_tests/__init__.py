@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-
 import json
 import logging
 import os
 import random
+import tempfile
 import unittest
 from copy import deepcopy as copy
 from decimal import Decimal
+from pathlib import Path
 
 from pynmrstar import utils, definitions, Saveframe, Entry, Schema, Loop, _Parser
 from pynmrstar._internal import _interpret_file
@@ -17,6 +18,8 @@ logging.getLogger('pynmrstar').setLevel(logging.ERROR)
 our_path = os.path.dirname(os.path.realpath(__file__))
 database_entry = Entry.from_database(15000)
 sample_file_location = os.path.join(our_path, "sample_files", "bmr15000_3.str")
+sample_saveframe_location = os.path.join(our_path, "sample_files", "saveframe.txt")
+sample_loop_location = os.path.join(our_path, "sample_files", "loop.txt")
 file_entry = Entry.from_file(sample_file_location)
 
 
@@ -194,6 +197,27 @@ class TestPyNMRSTAR(unittest.TestCase):
 
         self.assertEqual(str(Entry.from_scratch(15000)), "data_15000\n\n")
         self.assertEqual(Entry.from_file(os.path.join(our_path, "sample_files", "bmr15000_3.str.gz")), self.file_entry)
+
+    def test_from_file_path_support(self):
+        """Test that from_file methods support pathlib.Path objects."""
+
+        # Test Entry.from_file with Path object
+        path_obj = Path(sample_file_location)
+        entry_from_path = Entry.from_file(path_obj)
+        self.assertEqual(entry_from_path, self.file_entry)
+        
+        # Test Saveframe.from_file with Path object
+        saveframe_from_path = Saveframe.from_file(Path(sample_saveframe_location))
+        self.assertEqual(saveframe_from_path, self.file_entry[0])
+        
+        # Test Loop.from_file with Path object
+        loop_from_str = Loop.from_file(sample_loop_location)
+        loop_from_path = Loop.from_file(Path(sample_loop_location))
+        self.assertEqual(loop_from_str, loop_from_path)
+        self.assertEqual(loop_from_path.category, '_Test')
+        self.assertEqual(loop_from_path.tags, ['ID', 'Name'])
+        self.assertEqual(loop_from_path.data, [['1', 'First'], ['2', 'Second']])
+
 
     def test___setitem(self):
         tmp_entry = copy(self.file_entry)
