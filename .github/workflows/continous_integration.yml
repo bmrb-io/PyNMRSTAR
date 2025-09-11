@@ -45,10 +45,10 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies for pypy3
         if: ${{ matrix.python-version == 'pypy3' }}
-        run: pypy3 -m pip install -r requirements.txt
+        run: pypy3 -m pip install -e .
       - name: Install dependencies for CPython
         if: ${{ matrix.python-version != 'pypy3' }}
-        run: python3 -m pip install -r requirements.txt
+        run: python3 -m pip install -e .
       - name: Build c extension for pypy3
         if: ${{ matrix.python-version == 'pypy3' }}
         run: pypy3 -m pip install ./c
