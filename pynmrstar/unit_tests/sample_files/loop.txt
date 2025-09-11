@@ -1,0 +1,6 @@
+loop_
+_Test.ID
+_Test.Name
+1 "First"
+2 "Second"
+stop_

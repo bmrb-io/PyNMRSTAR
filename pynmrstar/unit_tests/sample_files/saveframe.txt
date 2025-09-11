@@ -1,0 +1,121 @@
+save_entry_information
+   _Entry.Sf_category                   entry_information
+   _Entry.Sf_framecode                  entry_information
+   _Entry.ID                            15000
+   _Entry.Title
+;
+Solution structure of chicken villin headpiece subdomain containing a fluorinated side chain in the core
+;
+   _Entry.Type                          macromolecule
+   _Entry.Version_type                  original
+   _Entry.Submission_date               2006-09-07
+   _Entry.Accession_date                2006-09-07
+   _Entry.Last_release_date             2006-09-07
+   _Entry.Original_release_date         2006-09-07
+   _Entry.Origination                   author
+   _Entry.Format_name                   .
+   _Entry.NMR_STAR_version              3.2.6.0
+   _Entry.NMR_STAR_dict_location        .
+   _Entry.Original_NMR_STAR_version     3.2.6.0
+   _Entry.Experimental_method           NMR
+   _Entry.Experimental_method_subtype   solution
+   _Entry.Source_data_format            .
+   _Entry.Source_data_format_version    .
+   _Entry.Generated_software_name       .
+   _Entry.Generated_software_version    .
+   _Entry.Generated_software_ID         .
+   _Entry.Generated_software_label      .
+   _Entry.Generated_date                .
+   _Entry.DOI                           .
+   _Entry.UUID                          .
+   _Entry.Related_coordinate_file_name  .
+   _Entry.Details                       .
+   _Entry.BMRB_internal_directory_name  .
+
+   loop_
+      _Entry_author.Ordinal
+      _Entry_author.Given_name
+      _Entry_author.Family_name
+      _Entry_author.First_initial
+      _Entry_author.Middle_initials
+      _Entry_author.Family_title
+      _Entry_author.ORCID
+      _Entry_author.Entry_ID
+
+     1   Claudia   Cornilescu   .   C.   .   .   15000
+     2   Gabriel   Cornilescu   .   .    .   .   15000
+     3   Erik      Hadley       .   B.   .   .   15000
+     4   Samuel    Gellman      .   H.   .   .   15000
+     5   John      Markley      .   L.   .   .   15000
+
+   stop_
+
+   loop_
+      _SG_project.SG_project_ID
+      _SG_project.Project_name
+      _SG_project.Full_name_of_center
+      _SG_project.Initial_of_center
+      _SG_project.Entry_ID
+
+     1   'not applicable'   'not applicable'   .   15000
+
+   stop_
+
+   loop_
+      _Struct_keywords.Keywords
+      _Struct_keywords.Text
+      _Struct_keywords.Entry_ID
+
+     VHP                          .   15000
+     'chicken villin headpiece'   .   15000
+     'fluorinated Phe'            .   15000
+
+   stop_
+
+   loop_
+      _Data_set.Type
+      _Data_set.Count
+      _Data_set.Entry_ID
+
+     assigned_chemical_shifts   1   15000
+
+   stop_
+
+   loop_
+      _Datum.Type
+      _Datum.Count
+      _Datum.Entry_ID
+
+     '13C chemical shifts'   77    15000
+     '15N chemical shifts'   40    15000
+     '1H chemical shifts'    223   15000
+
+   stop_
+
+   loop_
+      _Release.Release_number
+      _Release.Format_type
+      _Release.Format_version
+      _Release.Date
+      _Release.Submission_date
+      _Release.Type
+      _Release.Author
+      _Release.Detail
+      _Release.Entry_ID
+
+     2   .   .   2008-07-17   2006-09-06   update     BMRB     'complete entry citation'   15000
+     1   .   .   2006-10-20   2006-09-06   original   author   'original release'          15000
+
+   stop_
+
+   loop_
+      _Related_entries.Database_name
+      _Related_entries.Database_accession_code
+      _Related_entries.Relationship
+      _Related_entries.Entry_ID
+
+     PDB   2JM0   'BMRB Entry Tracking System'   15000
+
+   stop_
+
+save_
