@@ -20,7 +20,7 @@ import pynmrstar
 # -- Project information -----------------------------------------------------
 
 project = 'PyNMR-STAR'
-copyright = '2021, Jon Wedell'
+copyright = 'UConn Health'
 author = 'Jon Wedell'
 
 # The full version, including alpha/beta/rc tags
