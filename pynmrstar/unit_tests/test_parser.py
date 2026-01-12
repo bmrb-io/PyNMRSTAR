@@ -1,34 +1,61 @@
 #!/usr/bin/env python3
 import unittest
 
-from pynmrstar import Entry, Saveframe, _Parser
+from pynmrstar import Entry, Saveframe, Loop
 from pynmrstar.exceptions import ParsingError
+from pynmrstar.parser import Parser
 
 
 class TestParser(unittest.TestCase):
 
-    def test___Parser(self):
+    def test__Parser(self):
+        """ Test that the various parsing Errors that can be raised are raised. """
 
-        # Check for error when reserved token present in data value
-        self.assertRaises(ParsingError, Entry.from_string, "data_1\nsave_1\n_tag.example loop_\nsave_\n")
-        self.assertRaises(ParsingError, Entry.from_string, "data_1\nsave_1\n_tag.example data_\nsave_\n")
-        self.assertRaises(ParsingError, Entry.from_string, "data_1\nsave_1\n_tag.example save_\nsave_\n")
-        self.assertRaises(ParsingError, Entry.from_string, "data_1\nsave_1\nloop_\n_tag.tag\nloop_\nstop_\nsave_\n")
-        self.assertRaises(ParsingError, Entry.from_string, "data_1\nsave_1\nloop_\n_tag.tag\nsave_\nstop_\nsave_\n")
-        self.assertRaises(ParsingError, Entry.from_string, "data_1\nsave_1\nloop_\n_tag.tag\nglobal_\nstop_\nsave_\n")
-
-        # Check for error when reserved token quoted
-        self.assertRaises(ParsingError, Entry.from_string, "'data_1'\nsave_1\nloop_\n_tag.tag\ndata_\nstop_\nsave_\n")
-        self.assertRaises(ParsingError, Entry.from_string, "data_1\n'save_1'\nloop_\n_tag.tag\ndata_\nstop_\nsave_\n")
+        # These checks match the order of the parser code at the time they were written.
         self.assertRaises(ParsingError, Entry.from_string, 'data_1\nsave_1\n"loop"_\n_tag.tag\ndata_\nstop_\nsave_\n')
-        self.assertRaises(ParsingError, Entry.from_string,
-                          "data_1\nsave_1\nloop_\n_tag.tag\ndata_\n;\nstop_\n;\nsave_\n")
+
+        # STAR/file start checks
+        self.assertRaises(ParsingError, Entry.from_string, "whatever test")
+        self.assertRaises(ParsingError, Entry.from_string, "data_")
+        self.assertRaises(ParsingError, Entry.from_string, "'data_1'\nsave_1\nloop_\n_tag.tag\ndata_\nstop_\nsave_\n")
+
+        # Saveframe checks
+        self.assertRaises(ParsingError, Entry.from_string, "data_frame invalid")
+        self.assertRaises(ParsingError, Entry.from_string, "data_frame save_ invalid")
+        self.assertRaises(ParsingError, Entry.from_string, "data_1\n'save_1'\nloop_\n_tag.tag\ndata_\nstop_\nsave_\n")
+
+        # Loop checks
+        self.assertRaises(ParsingError, Entry.from_string, "data_1\nsave_1\n'loop_'\n_tag.tag\ndata_\nstop_\nsave_\n")
+        self.assertRaises(ParsingError, Entry.from_string, "data_1 save_1 loop_ _tag.one _tag2.one stop_")
+        self.assertRaises(ParsingError, Entry.from_string, "data_1 save_1 loop_ _tag.one stop_ loop_ _tag.one stop_")
+        self.assertRaises(ParsingError, Entry.from_string, "data_1 save_1 loop_ _tag.one 'stop_'")
+        self.assertRaises(ParsingError, Entry.from_string, "data_1 save_1 _saveframe.tag value loop_ stop_ save_", raise_parse_warnings=True)
+        self.assertRaises(ParsingError, Entry.from_string, "data_1 save_1 _saveframe.tag value loop_ _tag.one stop_ save_", raise_parse_warnings=True)
+        with self.assertLogs('pynmrstar', level='WARNING'):
+            Entry.from_string("data_1 save_1 _saveframe.tag value loop_ stop_ save_", raise_parse_warnings=False)
+        with self.assertLogs('pynmrstar', level='WARNING'):
+            Entry.from_string("data_1 save_1 _saveframe.tag value loop_ _tag.one stop_ save_", raise_parse_warnings=False)
+        self.assertRaises(ParsingError, Entry.from_string, "data_1 save_1 _saveframe.tag value loop_ _tag.one _tag.two data stop_ save_")
+        self.assertRaises(ParsingError, Entry.from_string, "data_1 save_1 _saveframe.tag value loop_ _tag.one _tag.two data _tag.three stop_ save_")
+        self.assertRaises(ParsingError, Entry.from_string, "data_1 save_1 _saveframe.tag value loop_ data stop_ save_")
+        self.assertRaises(ParsingError, Entry.from_string, "data_1 save_1 _saveframe.tag value loop_ _tag.one _tag.two data data2 loop_ stop_ save_")
+        self.assertRaises(ParsingError, Entry.from_string, "data_1 save_1 _saveframe.tag value loop_ _tag.one _tag.two data data2")
+        self.assertRaises(ParsingError, Entry.from_string, "data_1 save_1 _saveframe.tag value 'save_'")
+        self.assertRaises(ParsingError, Entry.from_string, "data_1 save_1 save_")
+        self.assertRaises(ParsingError, Entry.from_string, "data_1 save_1 stop_")
+
+        # Back to saveframes
+        self.assertRaises(ParsingError, Entry.from_string, "data_1\nsave_1\n'_tag.example' save_\nsave_\n")
+        self.assertRaises(ParsingError, Entry.from_string, "data_1\nsave_1\n_tag.example save_\nsave_\n")
+        self.assertRaises(ParsingError, Loop.from_string, "d")
         self.assertRaises(ParsingError, Saveframe.from_string, "save_1\n_tag.1 _tag.2")
+        self.assertRaises(ParsingError, Entry.from_string, "data_1 save_1 _savef.rame.tag value save_")
+        self.assertRaises(ParsingError, Entry.from_string, "data_1 save_1 _saveframe.tag value")
 
     def test_parse_outliers(self):
         """ Make sure the parser handles edge cases. """
 
-        parser = _Parser()
+        parser = Parser()
         parser.load_data("""data_#pound
 save_entry_information  _Entry.Sf_category entry_information _Entry.Sf_framecode entry_information
 _Entry.sameline_comment value #ignore this all
