@@ -7,7 +7,7 @@ name = "pynmrstar"
 dynamic = ["version"]                                                                                                                                                                                                               
 description = "PyNMR-STAR provides tools for reading, writing, modifying, and interacting with NMR-STAR files. Maintained by the BMRB."                                                                                             
 readme = "README.rst"                                                                                                                                                                                                               
-requires-python = ">3.7"                                                                                                                                                                                                           
+requires-python = ">3.8"
 license = {text = "MIT"}                                                                                                                                                                                                            
 authors = [                                                                                                                                                                                                                         
     {name = "Jon Wedell", email = "wedell@uchc.edu"}                                                                                                                                                                                
@@ -17,12 +17,12 @@ classifiers = [
     "Development Status :: 6 - Mature",                                                                                                                                                                                             
     "Environment :: Console",                                                                                                                                                                                                       
     "Programming Language :: Python :: 3 :: Only",                                                                                                                                                                                  
-    "Programming Language :: Python :: 3.8",                                                                                                                                                                                        
-    "Programming Language :: Python :: 3.9",                                                                                                                                                                                        
+    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",                                                                                                                                                                                       
     "Programming Language :: Python :: 3.11",                                                                                                                                                                                       
     "Programming Language :: Python :: 3.12",                                                                                                                                                                                       
-    "Programming Language :: Python :: 3.13",                                                                                                                                                                                       
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Intended Audience :: Developers",                                                                                                                                                                                              
     "License :: OSI Approved :: MIT License",                                                                                                                                                                                       
     "Natural Language :: English",                                                                                                                                                                                                  
