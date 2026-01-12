@@ -141,7 +141,7 @@ class Loop(object):
         self.data = tmp_entry[0][0].data
         self.category = tmp_entry[0][0].category
 
-    def __iter__(self) -> list:
+    def __iter__(self) -> Generator[list[Any], Any, None]:
         """ Yields each of the rows contained within the loop. """
 
         for row in self.data:
