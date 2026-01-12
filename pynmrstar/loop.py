@@ -5,12 +5,12 @@ from csv import reader as csv_reader, writer as csv_writer
 from io import StringIO
 from itertools import chain
 from pathlib import Path
-from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Callable, Tuple
+from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Callable, Tuple, Generator
 
 from pynmrstar import definitions, utils, entry as entry_mod
 from pynmrstar._internal import _json_serialize, _interpret_file
 from pynmrstar._types import DataInput
-from pynmrstar.exceptions import InvalidStateError
+from pynmrstar.exceptions import InvalidStateError, ParsingError
 from pynmrstar.parser import Parser
 from pynmrstar.schema import Schema
 
@@ -130,11 +130,13 @@ class Loop(object):
 
         # Check that there was only one loop here
         if len(tmp_entry[0].loops) > 1:
-            raise ValueError("You attempted to parse one loop but the source you provided had more than one loop. "
-                             "Please either parse all loops as a saveframe or only parse one loop. Loops detected: " +
-                             str(tmp_entry[0].loops))
+            raise ParsingError("You attempted to parse one loop but the source you provided had more than one loop. "
+                               "Please either parse all loops as a saveframe or only parse one loop. Loops detected: " +
+                               str(tmp_entry[0].loops))
 
-        # Copy the first parsed saveframe into ourself
+        # Copy the first parsed loop into ourself
+        if len(tmp_entry[0].loops) == 0:
+            raise ParsingError("You attempted to parse an empty string as a loop.")
         self._tags = tmp_entry[0][0].tags
         self.data = tmp_entry[0][0].data
         self.category = tmp_entry[0][0].category
