@@ -219,11 +219,6 @@ class Parser(object):
                         raise ParsingError(f"Loop improperly terminated at end of file. Loops must end with the "
                                            f"'stop_' token, but the file ended without the stop token.",
                                            self.line_number)
-                    if self.token.lower() != 'stop_':
-                        raise ParsingError(f"Loop improperly terminated at end of file. Loops must end with the "
-                                           f"'stop_' token, but the token '{self.token}' was found instead.",
-                                           self.line_number)
-
                 # Close saveframe
                 elif self.token.lower() == "save_":
                     if self.delimiter not in " ;":
