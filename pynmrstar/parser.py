@@ -180,7 +180,8 @@ class Parser(object):
                                                               schema=schema)
                                         # If there is an issue with the loops during parsing, raise a parse error
                                         #  rather than the ValueError that would be raised if they made the mistake
-                                        #   directly
+                                        #   directly. At the moment this comment was written, this shouldn't ever be
+                                        #    able to be triggered, but good to have for the future.
                                         except ValueError as e:
                                             raise ParsingError(str(e))
                                     cur_data = []
