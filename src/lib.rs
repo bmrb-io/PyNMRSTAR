@@ -2,17 +2,53 @@ use pyo3::prelude::*;
 use pyo3::exceptions::PyValueError;
 use pyo3::types::IntoPyDict;
 use pyo3::import_exception;
-use once_cell::sync::Lazy;
+use memchr::memchr_iter;
 
 // Import the ParsingError exception from pynmrstar.exceptions
 import_exception!(pynmrstar.exceptions, ParsingError);
 
 const RESERVED_KEYWORDS: [&str; 5] = ["data_", "save_", "loop_", "stop_", "global_"];
 
-// Static regex for preprocessing, compiled once
-static MULTILINE_REGEX: Lazy<regex::Regex> = Lazy::new(|| {
-    regex::Regex::new(r"\n;([^\n]+?)\n").unwrap()
-});
+/// Fix multiline semicolon values where content appears on the same line as the semicolon.
+/// Transforms patterns like `\n;content\n` to `\n;\ncontent\n`.
+/// This is equivalent to the regex: `\n;([^\n]+?)\n` -> `\n;\n$1\n`
+fn fix_multiline_semicolons(data: &str) -> String {
+    let bytes = data.as_bytes();
+    let len = bytes.len();
+
+    // Quick check: if no semicolons exist, return as-is
+    if memchr::memchr(b';', bytes).is_none() {
+        return data.to_string();
+    }
+
+    let mut result = String::with_capacity(len + 64);
+    let mut last_end = 0;
+
+    // Find all newlines and check if pattern `\n;[^\n]+\n` follows
+    for nl_pos in memchr_iter(b'\n', bytes) {
+        // Check if we have `\n;` pattern (need at least 2 more chars: ; and something)
+        if nl_pos + 2 < len && bytes[nl_pos + 1] == b';' {
+            let after_semi = nl_pos + 2;
+            // Check if next char is NOT a newline (meaning there's content on same line)
+            if bytes[after_semi] != b'\n' {
+                // Find the next newline after the semicolon
+                if memchr::memchr(b'\n', &bytes[after_semi..]).is_some() {
+                    // We found the pattern: \n;[content]\n
+                    // Copy everything up to and including \n;
+                    result.push_str(&data[last_end..after_semi]);
+                    // Insert the extra newline
+                    result.push('\n');
+                    // Update position to continue from the content
+                    last_end = after_semi;
+                }
+            }
+        }
+    }
+
+    // Append remaining data
+    result.push_str(&data[last_end..]);
+    result
+}
 
 // Tokenizer state
 struct TokenizerState {
@@ -1054,7 +1090,7 @@ fn parse(
     // Fix DOS line endings
     let data = data.replace("\r\n", "\n").replace("\r", "\n");
     // Change '\n; data ' started multi-lines to '\n;\ndata'
-    let data = MULTILINE_REGEX.replace_all(&data, "\n;\n$1\n").to_string();
+    let data = fix_multiline_semicolons(&data);
 
     // Create tokenizer and load data
     let mut tokenizer = TokenizerState {
