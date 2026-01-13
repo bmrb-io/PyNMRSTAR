@@ -452,9 +452,11 @@ fn quote_value(orig: &Bound<PyAny>) -> PyResult<String> {
 }
 
 struct ParserContext {
+    tokenizer: TokenizerState,
     line_number: usize,
     delimiter: char,
-    token: Option<String>,
+    token: Option<(usize, usize)>,
+    processed_token: Option<String>,  // For rare cases where we need to process the token
     entry: PyObject,
     current_saveframe: Option<PyObject>,
     current_loop: Option<PyObject>,
@@ -474,7 +476,7 @@ struct ParserContext {
 
 impl ParserContext {
     fn new(py: Python, entry: PyObject, source: String, raise_parse_warnings: bool,
-           convert_data_types: bool, schema: Option<PyObject>) -> PyResult<Self> {
+           convert_data_types: bool, schema: Option<PyObject>, tokenizer: TokenizerState) -> PyResult<Self> {
         // Cache module/class lookups at initialization
         let saveframe_mod = py.import("pynmrstar.saveframe")?;
         let saveframe_class = saveframe_mod.getattr("Saveframe")?.into();
@@ -509,9 +511,11 @@ impl ParserContext {
         };
 
         Ok(ParserContext {
+            tokenizer,
             line_number: 0,
             delimiter: ' ',
             token: None,
+            processed_token: None,
             entry,
             current_saveframe: None,
             current_loop: None,
@@ -530,21 +534,61 @@ impl ParserContext {
         })
     }
 
-    fn get_token(&mut self) -> PyResult<Option<String>> {
-        let mut tokenizer = TOKENIZER.lock().unwrap();
-        match tokenizer.get_token_full() {
-            Ok(Some((token, line_no, delimiter))) => {
-                self.token = Some(token.clone());
-                self.line_number = line_no;
-                self.delimiter = delimiter;
-                // Return clone since we store one in self.token
-                Ok(Some(token))
+    fn get_token(&mut self) -> PyResult<bool> {
+        // Clear any previous processed token
+        self.processed_token = None;
+
+        // Get token and skip comments
+        loop {
+            match self.tokenizer.get_token() {
+                Ok(Some((start, end))) => {
+                    if self.tokenizer.last_delimiter != '#' {
+                        let token_str = &self.tokenizer.full_data[start..end];
+
+                        // Handle embedded STAR unwrapping for semicolon-delimited tokens
+                        if self.tokenizer.last_delimiter == ';' && token_str.starts_with("\n   ") {
+                            let mut shift_over = true;
+                            let lines: Vec<&str> = token_str.split('\n').collect();
+
+                            for line in &lines[1..] {  // Skip first empty line
+                                if !line.is_empty() && !line.starts_with("   ") {
+                                    shift_over = false;
+                                    break;
+                                }
+                            }
+
+                            if shift_over && token_str.contains("\n   ;") {
+                                // Process the string and store it separately
+                                let mut processed = token_str.trim_end_matches('\n').to_string();
+                                processed = processed.replace("\n   ", "\n");
+                                self.processed_token = Some(processed);
+                            }
+                        }
+
+                        self.token = Some((start, end));
+                        self.line_number = self.tokenizer.line_no;
+                        self.delimiter = self.tokenizer.last_delimiter;
+                        return Ok(true);
+                    }
+                    // If it's a comment, continue to get the next token
+                }
+                Ok(None) => {
+                    self.token = None;
+                    return Ok(false);
+                }
+                Err(e) => return Err(ParsingError::new_err(e)),
             }
-            Ok(None) => {
-                self.token = None;
-                Ok(None)
-            }
-            Err(e) => Err(ParsingError::new_err(e)),
+        }
+    }
+
+    fn token_str(&self) -> &str {
+        // Return processed token if available
+        if let Some(ref processed) = self.processed_token {
+            processed
+        } else if let Some((start, end)) = self.token {
+            &self.tokenizer.full_data[start..end]
+        } else {
+            ""
         }
     }
 
@@ -576,10 +620,11 @@ fn starts_with_ignore_case(s: &str, prefix: &str) -> bool {
 
 fn parse_initial(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
     // Get first token
-    ctx.get_token()?;
+    if !ctx.get_token()? {
+        return Err(ctx.raise_error("Empty file"));
+    }
 
-    let token = ctx.token.as_ref()
-        .ok_or_else(|| ctx.raise_error("Empty file"))?;
+    let token = ctx.token_str();
 
     // Validate data_ token
     if !starts_with_ignore_case(token, "data_") {
@@ -608,8 +653,8 @@ fn parse_initial(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
 }
 
 fn parse_entry_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
-    while ctx.get_token()?.is_some() {
-        let token = ctx.token.as_ref().unwrap();
+    while ctx.get_token()? {
+        let token = ctx.token_str();
 
         if !starts_with_ignore_case(token, "save_") {
             return Err(ctx.raise_error(&format!(
@@ -654,14 +699,15 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
     let flush_tags = |ctx: &ParserContext, pending: &mut Vec<(String, String)>| -> PyResult<()> {
         if !pending.is_empty() {
             let saveframe = ctx.current_saveframe.as_ref().unwrap();
-            saveframe.call_method(py, "add_tags", (pending.clone(),), Some(ctx.add_tags_kwargs.bind(py).downcast()?))?;
-            pending.clear();
+            // Use std::mem::take to move instead of clone
+            let tags_to_add = std::mem::take(pending);
+            saveframe.call_method(py, "add_tags", (tags_to_add,), Some(ctx.add_tags_kwargs.bind(py).downcast()?))?;
         }
         Ok(())
     };
 
-    while ctx.get_token()?.is_some() {
-        let token = ctx.token.as_ref().unwrap();
+    while ctx.get_token()? {
+        let token = ctx.token_str();
 
         if token.eq_ignore_ascii_case("loop_") {
             // Flush any pending tags before processing loop
@@ -718,9 +764,10 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
             let tag_name = token.to_string();
 
             // Get tag value
-            ctx.get_token()?;
-            let value = ctx.token.as_ref()
-                .ok_or_else(|| ctx.raise_error("Tag without value"))?;
+            if !ctx.get_token()? {
+                return Err(ctx.raise_error("Tag without value"));
+            }
+            let value = ctx.token_str();
 
             if ctx.delimiter == ' ' {
                 if is_reserved_keyword(value) {
@@ -764,7 +811,7 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
     }
 
     // Validate saveframe was properly closed
-    if ctx.token.is_none() || !ctx.token.as_ref().unwrap().eq_ignore_ascii_case("save_") {
+    if ctx.token.is_none() || !ctx.token_str().eq_ignore_ascii_case("save_") {
         return Err(ctx.raise_error(
             "Saveframe improperly terminated at end of file. Saveframes must be terminated \
              with the 'save_' token."
@@ -777,8 +824,8 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
 fn parse_loop_tags(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
     let mut tags = Vec::new();
 
-    while ctx.in_loop && ctx.get_token()?.is_some() {
-        let token = ctx.token.as_ref().unwrap();
+    while ctx.in_loop && ctx.get_token()? {
+        let token = ctx.token_str();
 
         // Check if this is a tag
         if token.starts_with('_') && ctx.delimiter == ' ' {
@@ -814,10 +861,13 @@ fn parse_loop_tags(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
 
 fn parse_loop_data(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
     loop {
-        let token = ctx.token.as_ref()
-            .ok_or_else(|| ctx.raise_error("Loop improperly terminated at end of file. \
-                                             Loops must end with the 'stop_' token, but the \
-                                             file ended without the stop token."))?;
+        if ctx.token.is_none() {
+            return Err(ctx.raise_error("Loop improperly terminated at end of file. \
+                                        Loops must end with the 'stop_' token, but the \
+                                        file ended without the stop token."));
+        }
+
+        let token = ctx.token_str();
 
         if token.eq_ignore_ascii_case("stop_") {
             if ctx.delimiter != ' ' {
@@ -863,7 +913,9 @@ fn parse_loop_data(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
                     )));
                 }
 
-                loop_obj.call_method(py, "add_data", (ctx.loop_data.clone(),), Some(ctx.add_data_kwargs.bind(py).downcast()?))?;
+                // Use std::mem::take to move instead of clone
+                let loop_data_to_add = std::mem::take(&mut ctx.loop_data);
+                loop_obj.call_method(py, "add_data", (loop_data_to_add,), Some(ctx.add_data_kwargs.bind(py).downcast()?))?;
             }
 
             ctx.loop_data.clear();
@@ -914,7 +966,11 @@ fn parse_loop_data(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
         }
 
         // Get next token
-        ctx.get_token()?;
+        if !ctx.get_token()? {
+            return Err(ctx.raise_error("Loop improperly terminated at end of file. \
+                                        Loops must end with the 'stop_' token, but the \
+                                        file ended without the stop token."));
+        }
     }
 
     Ok(())
@@ -940,21 +996,21 @@ fn parse(
     // Change '\n; data ' started multi-lines to '\n;\ndata'
     let data = MULTILINE_REGEX.replace_all(&data, "\n;\n$1\n").to_string();
 
-    // Load data into tokenizer (using Rust tokenizer directly)
-    let mut tokenizer = TOKENIZER.lock().unwrap();
+    // Create tokenizer and load data
+    let mut tokenizer = TokenizerState {
+        full_data: String::new(),
+        index: 0,
+        line_no: 0,
+        last_delimiter: ' ',
+    };
     tokenizer.load_string(data);
-    drop(tokenizer); // Release the lock
 
     // Create parser context
     let mut ctx = ParserContext::new(py, entry.clone_ref(py), source,
-                                     raise_parse_warnings, convert_data_types, schema)?;
+                                     raise_parse_warnings, convert_data_types, schema, tokenizer)?;
     // Parse
     parse_initial(py, &mut ctx)?;
     parse_entry_body(py, &mut ctx)?;
-
-    // Reset the tokenizer
-    let mut tokenizer = TOKENIZER.lock().unwrap();
-    tokenizer.reset();
 
     Ok(entry)
 }
