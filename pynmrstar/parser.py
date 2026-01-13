@@ -1,11 +1,9 @@
 import logging
 import re
-from typing import Optional
 
-import pynmrstar
-from pynmrstar import definitions, cnmrstar, entry as entry_mod, loop as loop_mod, saveframe as saveframe_mod, schema as schema_mod
-from pynmrstar.exceptions import ParsingError
 import pynmrstar_parser
+
+from pynmrstar import cnmrstar, entry as entry_mod, schema as schema_mod
 
 logger = logging.getLogger('pynmrstar')
 
@@ -26,15 +24,6 @@ class Parser(object):
         self.delimiter: str = " "
         self.line_number: int = 0
 
-    def get_token(self) -> str:
-        """ Returns the next token in the parsing process."""
-
-        try:
-            self.token, self.line_number, self.delimiter = cnmrstar.get_token_full()
-        except ValueError as err:
-            raise ParsingError(str(err))
-
-        return self.token
 
     @staticmethod
     def load_data(data: str) -> None:
