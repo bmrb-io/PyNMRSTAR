@@ -486,6 +486,9 @@ struct ParserContext {
     schema: Option<PyObject>,
     saveframe_class: PyObject,
     loop_class: PyObject,
+    source_dict: PyObject,
+    add_tags_kwargs: PyObject,
+    add_data_kwargs: PyObject,
 }
 
 impl ParserContext {
@@ -497,6 +500,32 @@ impl ParserContext {
 
         let loop_mod = py.import("pynmrstar.loop")?;
         let loop_class = loop_mod.getattr("Loop")?.into();
+
+        // Pre-create reusable dictionaries for kwargs
+        let source_dict = [("source", source.as_str())].into_py_dict(py)?.into();
+
+        let add_tags_kwargs = if schema.is_some() {
+            [
+                ("convert_data_types", convert_data_types.into_py(py)),
+                ("schema", schema.as_ref().unwrap().clone_ref(py))
+            ].into_py_dict(py)?.into()
+        } else {
+            [("convert_data_types", convert_data_types.into_py(py))]
+                .into_py_dict(py)?.into()
+        };
+
+        let add_data_kwargs = if schema.is_some() {
+            [
+                ("rearrange", true.into_py(py)),
+                ("convert_data_types", convert_data_types.into_py(py)),
+                ("schema", schema.as_ref().unwrap().clone_ref(py))
+            ].into_py_dict(py)?.into()
+        } else {
+            [
+                ("rearrange", true.into_py(py)),
+                ("convert_data_types", convert_data_types.into_py(py))
+            ].into_py_dict(py)?.into()
+        };
 
         Ok(ParserContext {
             line_number: 0,
@@ -514,6 +543,9 @@ impl ParserContext {
             schema,
             saveframe_class,
             loop_class,
+            source_dict,
+            add_tags_kwargs,
+            add_data_kwargs,
         })
     }
 
@@ -621,7 +653,7 @@ fn parse_entry_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
         let saveframe = ctx.saveframe_class.bind(py).call_method(
             "from_scratch",
             (saveframe_name,),
-            Some(&[("source", &ctx.source)].into_py_dict(py)?)
+            Some(ctx.source_dict.bind(py).downcast()?)
         )?;
 
         ctx.current_saveframe = Some(saveframe.into());
@@ -641,17 +673,7 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
     let mut flush_tags = |ctx: &ParserContext, pending: &mut Vec<(String, String)>| -> PyResult<()> {
         if !pending.is_empty() {
             let saveframe = ctx.current_saveframe.as_ref().unwrap();
-            let kwargs = if ctx.schema.is_some() {
-                [
-                    ("convert_data_types", ctx.convert_data_types.into_py(py)),
-                    ("schema", ctx.schema.as_ref().unwrap().clone_ref(py))
-                ].into_py_dict(py)?
-            } else {
-                [("convert_data_types", ctx.convert_data_types.into_py(py))]
-                    .into_py_dict(py)?
-            };
-
-            saveframe.call_method(py, "add_tags", (pending.clone(),), Some(&kwargs))?;
+            saveframe.call_method(py, "add_tags", (pending.clone(),), Some(ctx.add_tags_kwargs.bind(py).downcast()?))?;
             pending.clear();
         }
         Ok(())
@@ -671,7 +693,7 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
             let new_loop = ctx.loop_class.bind(py).call_method(
                 "from_scratch",
                 (),
-                Some(&[("source", &ctx.source)].into_py_dict(py)?)
+                Some(ctx.source_dict.bind(py).downcast()?)
             )?;
 
             ctx.current_loop = Some(new_loop.into());
@@ -860,20 +882,7 @@ fn parse_loop_data(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
                     )));
                 }
 
-                let kwargs = if ctx.schema.is_some() {
-                    [
-                        ("rearrange", true.into_py(py)),
-                        ("convert_data_types", ctx.convert_data_types.into_py(py)),
-                        ("schema", ctx.schema.as_ref().unwrap().clone_ref(py))
-                    ].into_py_dict(py)?
-                } else {
-                    [
-                        ("rearrange", true.into_py(py)),
-                        ("convert_data_types", ctx.convert_data_types.into_py(py))
-                    ].into_py_dict(py)?
-                };
-
-                loop_obj.call_method(py, "add_data", (ctx.loop_data.clone(),), Some(&kwargs))?;
+                loop_obj.call_method(py, "add_data", (ctx.loop_data.clone(),), Some(ctx.add_data_kwargs.bind(py).downcast()?))?;
             }
 
             ctx.loop_data.clear();
