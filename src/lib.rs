@@ -315,18 +315,33 @@ fn quote_value(orig: &Bound<PyAny>) -> PyResult<String> {
 
     // Handle embedded STAR format multiline comments
     if s.contains("\n;") {
-        let replaced = s.replace("\n", "\n   ");
+        // Build result with indentation after newlines
+        // After replacing \n with \n + 3 spaces, result never ends with \n,
+        // so we always need to add trailing \n
+        let starts_with_newline = s.starts_with('\n');
 
-        // Check if we need newlines at start/end
-        let needs_start_newline = !replaced.starts_with('\n');
-        let needs_end_newline = !replaced.ends_with('\n');
+        // Estimate capacity: original + 3 bytes per newline + potential prefix/suffix
+        let newline_count = s.bytes().filter(|&b| b == b'\n').count();
+        let mut result = String::with_capacity(len + newline_count * 3 + 8);
 
-        return Ok(match (needs_start_newline, needs_end_newline) {
-            (true, true) => format!("\n   {}\n", replaced),
-            (true, false) => format!("\n   {}", replaced),
-            (false, true) => format!("{}\n", replaced),
-            (false, false) => replaced,
-        });
+        if !starts_with_newline {
+            result.push_str("\n   ");
+        }
+
+        // Replace \n with \n followed by 3 spaces, inline
+        let bytes = s.as_bytes();
+        let mut last_end = 0;
+        for i in memchr_iter(b'\n', bytes) {
+            result.push_str(&s[last_end..=i]);
+            result.push_str("   ");
+            last_end = i + 1;
+        }
+        result.push_str(&s[last_end..]);
+
+        // Always add trailing newline (replacement makes any original \n become \n + spaces)
+        result.push('\n');
+
+        return Ok(result);
     }
 
     // If it has newlines but not "\n;", handle multiline
@@ -334,7 +349,10 @@ fn quote_value(orig: &Bound<PyAny>) -> PyResult<String> {
         if s.ends_with('\n') {
             return Ok(s.to_string());
         } else {
-            return Ok(format!("{}\n", s));
+            let mut result = String::with_capacity(len + 1);
+            result.push_str(s);
+            result.push('\n');
+            return Ok(result);
         }
     }
 
@@ -343,30 +361,43 @@ fn quote_value(orig: &Bound<PyAny>) -> PyResult<String> {
     let has_double = s.contains('"');
 
     // If it has both single and double quotes, need special handling
+    // Check if quote is followed by whitespace (which would break parsing)
     if has_single && has_double {
-        let chars: Vec<char> = s.chars().collect();
         let mut can_wrap_single = true;
         let mut can_wrap_double = true;
 
-        for i in 0..chars.len()-1 {
-            if TokenizerState::is_whitespace(chars[i+1]) {
-                if chars[i] == '\'' {
-                    can_wrap_single = false;
-                }
-                if chars[i] == '"' {
-                    can_wrap_double = false;
+        let bytes = s.as_bytes();
+        for i in 0..bytes.len() - 1 {
+            let next = bytes[i + 1];
+            let next_is_ws = matches!(next, b' ' | b'\t' | b'\x0B');
+            if next_is_ws {
+                match bytes[i] {
+                    b'\'' => can_wrap_single = false,
+                    b'"' => can_wrap_double = false,
+                    _ => {}
                 }
             }
         }
 
         if !can_wrap_single && !can_wrap_double {
-            return Ok(format!("{}\n", s));
+            let mut result = String::with_capacity(len + 1);
+            result.push_str(s);
+            result.push('\n');
+            return Ok(result);
         }
         if can_wrap_single {
-            return Ok(format!("'{}'", s));
+            let mut result = String::with_capacity(len + 2);
+            result.push('\'');
+            result.push_str(s);
+            result.push('\'');
+            return Ok(result);
         }
         if can_wrap_double {
-            return Ok(format!("\"{}\"", s));
+            let mut result = String::with_capacity(len + 2);
+            result.push('"');
+            result.push_str(s);
+            result.push('"');
+            return Ok(result);
         }
     }
 
@@ -386,34 +417,41 @@ fn quote_value(orig: &Bound<PyAny>) -> PyResult<String> {
             needs_wrapping = true;
         }
 
-        // Check for whitespace or problematic characters
+        // Check for whitespace or problematic characters using bytes (all relevant chars are ASCII)
         if !needs_wrapping {
-            let chars: Vec<char> = s.chars().collect();
-            for i in 0..chars.len() {
-                if TokenizerState::is_whitespace(chars[i]) {
+            let bytes = s.as_bytes();
+            let mut prev_is_ws = true; // Treat start of string as preceded by whitespace for # check
+            for &b in bytes {
+                // Check for whitespace
+                if matches!(b, b' ' | b'\t' | b'\x0B') {
                     needs_wrapping = true;
                     break;
                 }
-                // The pound sign only needs quotes if preceded by whitespace
-                if chars[i] == '#' {
-                    if i == 0 || TokenizerState::is_whitespace(chars[i-1]) {
-                        needs_wrapping = true;
-                        break;
-                    }
+                // The pound sign only needs quotes if preceded by whitespace (or at start)
+                if b == b'#' && prev_is_ws {
+                    needs_wrapping = true;
+                    break;
                 }
+                prev_is_ws = matches!(b, b' ' | b'\t' | b'\x0B');
             }
         }
     }
 
     if needs_wrapping {
+        let mut result = String::with_capacity(len + 2);
         // If there is a single quote wrap in double quotes
         if has_single {
-            return Ok(format!("\"{}\"", s));
+            result.push('"');
+            result.push_str(s);
+            result.push('"');
         }
         // Either there is a double quote or no quotes
         else {
-            return Ok(format!("'{}'", s));
+            result.push('\'');
+            result.push_str(s);
+            result.push('\'');
         }
+        return Ok(result);
     }
 
     // If we got here it's good to go as is
