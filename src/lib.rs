@@ -3,12 +3,18 @@ use pyo3::exceptions::PyValueError;
 use pyo3::types::IntoPyDict;
 use pyo3::import_exception;
 use std::sync::Mutex;
+use once_cell::sync::Lazy;
 
 // Import the ParsingError exception from pynmrstar.exceptions
 import_exception!(pynmrstar.exceptions, ParsingError);
 
 const RESERVED_KEYWORDS: [&str; 5] = ["data_", "save_", "loop_", "stop_", "global_"];
 const WHITESPACE_CHARS: [char; 4] = [' ', '\n', '\t', '\x0B']; // \v is \x0B
+
+// Static regex for preprocessing, compiled once
+static MULTILINE_REGEX: Lazy<regex::Regex> = Lazy::new(|| {
+    regex::Regex::new(r"\n;([^\n]+?)\n").unwrap()
+});
 
 // Tokenizer state
 struct TokenizerState {
@@ -41,7 +47,7 @@ impl TokenizerState {
     }
 
     fn is_whitespace(c: char) -> bool {
-        WHITESPACE_CHARS.contains(&c)
+        matches!(c, ' ' | '\n' | '\t' | '\x0B')
     }
 
     fn pass_whitespace(&mut self) {
@@ -99,7 +105,7 @@ impl TokenizerState {
         pos
     }
 
-    fn get_token(&mut self) -> Result<Option<String>, String> {
+    fn get_token(&mut self) -> Result<Option<(usize, usize)>, String> {
         // Reset delimiter
         self.last_delimiter = '?';
 
@@ -116,11 +122,12 @@ impl TokenizerState {
         // Handle comments
         if bytes[self.index] == b'#' {
             if let Some(length) = self.find_substring("\n", self.index) {
-                let token = self.full_data[self.index..self.index + length].to_string();
+                let start = self.index;
+                let end = self.index + length;
                 self.last_delimiter = '#';
                 self.update_line_number(self.index, length + 1);
                 self.index += length + 1;
-                return Ok(Some(token));
+                return Ok(Some((start, end)));
             } else {
                 // Comment at end of file with no newline
                 return Ok(None);
@@ -134,11 +141,12 @@ impl TokenizerState {
                 self.line_no += 1;
                 self.index += 2;
 
-                let token = self.full_data[self.index..self.index + length - 1].to_string();
+                let start = self.index;
+                let end = self.index + length - 1;
                 self.last_delimiter = ';';
                 self.update_line_number(self.index, length);
                 self.index += length;
-                return Ok(Some(token));
+                return Ok(Some((start, end)));
             } else {
                 return Err(format!("Invalid file. Semicolon-delineated value was not terminated. Error on line: {}", self.line_no + 1));
             }
@@ -169,11 +177,12 @@ impl TokenizerState {
                 }
 
                 self.index += 1;
-                let token = self.full_data[self.index..self.index + end_quote].to_string();
+                let start = self.index;
+                let end = self.index + end_quote;
                 self.last_delimiter = '\'';
                 self.update_line_number(self.index, end_quote + 1);
                 self.index += end_quote + 1;
-                return Ok(Some(token));
+                return Ok(Some((start, end)));
             } else {
                 return Err(format!("Invalid file. Single quoted value was not terminated. Error on line: {}", self.line_no + 1));
             }
@@ -204,11 +213,12 @@ impl TokenizerState {
                 }
 
                 self.index += 1;
-                let token = self.full_data[self.index..self.index + end_quote].to_string();
+                let start = self.index;
+                let end = self.index + end_quote;
                 self.last_delimiter = '"';
                 self.update_line_number(self.index, end_quote + 1);
                 self.index += end_quote + 1;
-                return Ok(Some(token));
+                return Ok(Some((start, end)));
             } else {
                 return Err(format!("Invalid file. Double quoted value was not terminated. Error on line: {}", self.line_no + 1));
             }
@@ -216,7 +226,8 @@ impl TokenizerState {
 
         // Handle normal unquoted tokens
         let end_pos = self.get_next_whitespace(self.index);
-        let token = self.full_data[self.index..end_pos].to_string();
+        let start = self.index;
+        let end = end_pos;
 
         // Determine delimiter
         if self.index == 0 {
@@ -226,21 +237,24 @@ impl TokenizerState {
         }
 
         // Check if it's a reference (starts with $ and delimiter was space)
-        if token.starts_with('$') && self.last_delimiter == ' ' && token.len() > 1 {
+        let token_slice = &self.full_data[start..end];
+        if token_slice.starts_with('$') && self.last_delimiter == ' ' && token_slice.len() > 1 {
             self.last_delimiter = '$';
         }
 
         self.update_line_number(self.index, end_pos - self.index + 1);
         self.index = end_pos + 1;
-        Ok(Some(token))
+        Ok(Some((start, end)))
     }
 
     fn get_token_full(&mut self) -> Result<Option<(String, usize, char)>, String> {
         // Get token and skip comments
         loop {
             match self.get_token()? {
-                Some(token) => {
+                Some((start, end)) => {
                     if self.last_delimiter != '#' {
+                        let token = &self.full_data[start..end];
+
                         // Unwrap embedded STAR if all lines start with three spaces
                         let processed_token = if self.last_delimiter == ';' && token.starts_with("\n   ") {
                             let mut shift_over = true;
@@ -259,10 +273,10 @@ impl TokenizerState {
                                 processed = processed.replace("\n   ", "\n");
                                 processed
                             } else {
-                                token
+                                token.to_string()
                             }
                         } else {
-                            token
+                            token.to_string()
                         };
 
                         return Ok(Some((processed_token, self.line_no, self.last_delimiter)));
@@ -434,7 +448,7 @@ fn quote_value(py: Python, orig: &Bound<PyAny>) -> PyResult<String> {
 
 struct ParserContext {
     line_number: usize,
-    delimiter: String,
+    delimiter: char,
     token: Option<String>,
     entry: PyObject,
     current_saveframe: Option<PyObject>,
@@ -453,7 +467,7 @@ impl ParserContext {
            convert_data_types: bool, schema: Option<PyObject>) -> Self {
         ParserContext {
             line_number: 0,
-            delimiter: " ".to_string(),
+            delimiter: ' ',
             token: None,
             entry,
             current_saveframe: None,
@@ -474,7 +488,8 @@ impl ParserContext {
             Ok(Some((token, line_no, delimiter))) => {
                 self.token = Some(token.clone());
                 self.line_number = line_no;
-                self.delimiter = delimiter.to_string();
+                self.delimiter = delimiter;
+                // Return clone since we store one in self.token
                 Ok(Some(token))
             }
             Ok(None) => {
@@ -517,7 +532,7 @@ fn parse_initial(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
         ));
     }
 
-    if ctx.delimiter != " " {
+    if ctx.delimiter != ' ' {
         return Err(ctx.raise_error("The data_ keyword may not be quoted or semicolon-delimited."));
     }
 
@@ -546,7 +561,7 @@ fn parse_entry_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
             ));
         }
 
-        if ctx.delimiter != " " {
+        if ctx.delimiter != ' ' {
             return Err(ctx.raise_error("The save_ keyword may not be quoted or semicolon-delimited."));
         }
 
@@ -573,11 +588,11 @@ fn parse_entry_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
 
 fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
     while ctx.get_token(py)?.is_some() {
-        let token = ctx.token.as_ref().unwrap().clone();
+        let token = ctx.token.as_ref().unwrap();
         let token_lower = token.to_lowercase();
 
         if token_lower == "loop_" {
-            if ctx.delimiter != " " {
+            if ctx.delimiter != ' ' {
                 return Err(ctx.raise_error("The loop_ keyword may not be quoted or semicolon-delimited."));
             }
 
@@ -598,7 +613,7 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
             parse_loop_tags(py, ctx)?;
 
         } else if token_lower == "save_" {
-            if ctx.delimiter != " " && ctx.delimiter != ";" {
+            if ctx.delimiter != ' ' && ctx.delimiter != ';' {
                 return Err(ctx.raise_error("The save_ keyword may not be quoted or semicolon-delimited."));
             }
 
@@ -618,21 +633,21 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
             break; // Exit saveframe
 
         } else if token.starts_with('_') {
-            if ctx.delimiter != " " {
+            if ctx.delimiter != ' ' {
                 return Err(ctx.raise_error(&format!(
                     "Saveframe tags may not be quoted or semicolon-delimited. Quoted tag: '{}'.",
                     token
                 )));
             }
 
-            let tag_name = token.clone();
+            let tag_name = token.to_string();
 
             // Get tag value
             ctx.get_token(py)?;
             let value = ctx.token.as_ref()
                 .ok_or_else(|| ctx.raise_error("Tag without value"))?;
 
-            if ctx.delimiter == " " {
+            if ctx.delimiter == ' ' {
                 if is_reserved_keyword(value) {
                     return Err(ctx.raise_error(&format!(
                         "Cannot use keywords as data values unless quoted or semi-colon \
@@ -700,7 +715,7 @@ fn parse_loop_tags(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
         let token = ctx.token.as_ref().unwrap();
 
         // Check if this is a tag
-        if token.starts_with('_') && ctx.delimiter == " " {
+        if token.starts_with('_') && ctx.delimiter == ' ' {
             // Add tag to loop
             let loop_obj = ctx.current_loop.as_ref().unwrap();
             loop_obj.call_method1(py, "add_tag", (token,))?;
@@ -709,6 +724,14 @@ fn parse_loop_tags(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
             let loop_obj = ctx.current_loop.as_ref().unwrap();
             let saveframe = ctx.current_saveframe.as_ref().unwrap();
             saveframe.call_method1(py, "add_loop", (loop_obj,))?;
+
+            // Preallocate loop_data Vec based on number of tags
+            // Estimate: average of 100 rows per loop seems reasonable
+            let tags = loop_obj.bind(py).getattr("tags")?;
+            let tags_len = tags.len()?;
+            if tags_len > 0 {
+                ctx.loop_data.reserve(tags_len * 100);
+            }
 
             // Parse loop data (without consuming current token)
             parse_loop_data(py, ctx)?;
@@ -728,7 +751,7 @@ fn parse_loop_data(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
         let token_lower = token.to_lowercase();
 
         if token_lower == "stop_" {
-            if ctx.delimiter != " " {
+            if ctx.delimiter != ' ' {
                 return Err(ctx.raise_error("The stop_ keyword may not be quoted or semicolon-delimited."));
             }
 
@@ -792,7 +815,7 @@ fn parse_loop_data(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
             ctx.in_loop = false;
             break;
 
-        } else if token.starts_with('_') && ctx.delimiter == " " {
+        } else if token.starts_with('_') && ctx.delimiter == ' ' {
             return Err(ctx.raise_error(&format!(
                 "Cannot have more loop tags after loop data. Or perhaps this \
                  was a data value which was not quoted (but must be, \
@@ -813,7 +836,7 @@ fn parse_loop_data(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
                 )));
             }
 
-            if is_reserved_keyword(token) && ctx.delimiter == " " {
+            if is_reserved_keyword(token) && ctx.delimiter == ' ' {
                 let mut error = format!(
                     "Cannot use keywords as data values unless quoted or semi-colon \
                      delimited. Perhaps this is a loop that wasn't properly terminated \
@@ -830,7 +853,7 @@ fn parse_loop_data(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
                 return Err(ctx.raise_error(&error));
             }
 
-            ctx.loop_data.push(token.clone());
+            ctx.loop_data.push(token.to_string());
             ctx.seen_data = true;
         }
 
@@ -859,8 +882,7 @@ fn parse(
     // Fix DOS line endings
     let data = data.replace("\r\n", "\n").replace("\r", "\n");
     // Change '\n; data ' started multi-lines to '\n;\ndata'
-    let re = regex::Regex::new(r"\n;([^\n]+?)\n").unwrap();
-    let data = re.replace_all(&data, "\n;\n$1\n").to_string();
+    let data = MULTILINE_REGEX.replace_all(&data, "\n;\n$1\n").to_string();
 
     // Load data into tokenizer (using Rust tokenizer directly)
     let mut tokenizer = TOKENIZER.lock().unwrap();
