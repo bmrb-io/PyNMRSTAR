@@ -90,6 +90,32 @@ impl TokenizerState {
         if start_pos >= self.full_data.len() {
             return None;
         }
+
+        // Optimize single-byte searches to work directly with bytes
+        if needle.len() == 1 {
+            let needle_byte = needle.as_bytes()[0];
+            let bytes = self.full_data.as_bytes();
+            for i in start_pos..bytes.len() {
+                if bytes[i] == needle_byte {
+                    return Some(i - start_pos);
+                }
+            }
+            return None;
+        }
+
+        // Optimize two-byte searches (e.g., "\n;")
+        if needle.len() == 2 {
+            let needle_bytes = needle.as_bytes();
+            let bytes = self.full_data.as_bytes();
+            for i in start_pos..bytes.len().saturating_sub(1) {
+                if bytes[i] == needle_bytes[0] && bytes[i + 1] == needle_bytes[1] {
+                    return Some(i - start_pos);
+                }
+            }
+            return None;
+        }
+
+        // Fall back to str::find for longer patterns
         self.full_data[start_pos..].find(needle)
     }
 
