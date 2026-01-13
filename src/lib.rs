@@ -2,7 +2,6 @@ use pyo3::prelude::*;
 use pyo3::exceptions::PyValueError;
 use pyo3::types::IntoPyDict;
 use pyo3::import_exception;
-use std::sync::Mutex;
 use once_cell::sync::Lazy;
 
 // Import the ParsingError exception from pynmrstar.exceptions
@@ -261,72 +260,6 @@ impl TokenizerState {
         self.update_line_number(self.index, end_pos - self.index + 1);
         self.index = end_pos + 1;
         Ok(Some((start, end)))
-    }
-
-    fn get_token_full(&mut self) -> Result<Option<(String, usize, char)>, String> {
-        // Get token and skip comments
-        loop {
-            match self.get_token()? {
-                Some((start, end)) => {
-                    if self.last_delimiter != '#' {
-                        let token = &self.full_data[start..end];
-
-                        // Unwrap embedded STAR if all lines start with three spaces
-                        let processed_token = if self.last_delimiter == ';' && token.starts_with("\n   ") {
-                            let mut shift_over = true;
-                            let lines: Vec<&str> = token.split('\n').collect();
-
-                            for line in &lines[1..] {  // Skip first empty line
-                                if !line.is_empty() && !line.starts_with("   ") {
-                                    shift_over = false;
-                                    break;
-                                }
-                            }
-
-                            if shift_over && token.contains("\n   ;") {
-                                // Remove the trailing newline and shift text over
-                                let mut processed = token.trim_end_matches('\n').to_string();
-                                processed = processed.replace("\n   ", "\n");
-                                processed
-                            } else {
-                                token.to_string()
-                            }
-                        } else {
-                            token.to_string()
-                        };
-
-                        return Ok(Some((processed_token, self.line_no, self.last_delimiter)));
-                    }
-                    // If it's a comment, continue to get the next token
-                }
-                None => return Ok(None),
-            }
-        }
-    }
-}
-
-// Global tokenizer state
-static TOKENIZER: Mutex<TokenizerState> = Mutex::new(TokenizerState {
-    full_data: String::new(),
-    index: 0,
-    line_no: 0,
-    last_delimiter: ' ',
-});
-
-// Python-facing tokenizer functions
-#[pyfunction]
-fn reset() -> PyResult<()> {
-    let mut tokenizer = TOKENIZER.lock().unwrap();
-    tokenizer.reset();
-    Ok(())
-}
-
-#[pyfunction]
-fn get_token_full() -> PyResult<Option<(String, usize, char)>> {
-    let mut tokenizer = TOKENIZER.lock().unwrap();
-    match tokenizer.get_token_full() {
-        Ok(result) => Ok(result),
-        Err(e) => Err(ParsingError::new_err(e)),
     }
 }
 
@@ -1145,8 +1078,6 @@ fn parse(
 #[pymodule]
 fn pynmrstar_parser(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse, m)?)?;
-    m.add_function(wrap_pyfunction!(reset, m)?)?;
-    m.add_function(wrap_pyfunction!(get_token_full, m)?)?;
     m.add_function(wrap_pyfunction!(quote_value, m)?)?;
     Ok(())
 }
