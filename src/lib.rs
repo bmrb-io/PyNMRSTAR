@@ -305,157 +305,13 @@ fn quote_value(orig: &Bound<PyAny>) -> PyResult<String> {
     let str_obj = orig.str()?;
     let s = str_obj.to_str()?;
 
-    // Get length
-    let len = s.len();
-
     // Don't allow empty string
-    if len == 0 {
+    if s.is_empty() {
         return Err(PyValueError::new_err("Empty strings are not allowed as values. Use the None singleton, or '.' to represent null values."));
     }
 
-    // Handle embedded STAR format multiline comments
-    if s.contains("\n;") {
-        // Build result with indentation after newlines
-        // After replacing \n with \n + 3 spaces, result never ends with \n,
-        // so we always need to add trailing \n
-        let starts_with_newline = s.starts_with('\n');
-
-        // Estimate capacity: original + 3 bytes per newline + potential prefix/suffix
-        let newline_count = s.bytes().filter(|&b| b == b'\n').count();
-        let mut result = String::with_capacity(len + newline_count * 3 + 8);
-
-        if !starts_with_newline {
-            result.push_str("\n   ");
-        }
-
-        // Replace \n with \n followed by 3 spaces, inline
-        let bytes = s.as_bytes();
-        let mut last_end = 0;
-        for i in memchr_iter(b'\n', bytes) {
-            result.push_str(&s[last_end..=i]);
-            result.push_str("   ");
-            last_end = i + 1;
-        }
-        result.push_str(&s[last_end..]);
-
-        // Always add trailing newline (replacement makes any original \n become \n + spaces)
-        result.push('\n');
-
-        return Ok(result);
-    }
-
-    // If it has newlines but not "\n;", handle multiline
-    if s.contains('\n') {
-        if s.ends_with('\n') {
-            return Ok(s.to_string());
-        } else {
-            let mut result = String::with_capacity(len + 1);
-            result.push_str(s);
-            result.push('\n');
-            return Ok(result);
-        }
-    }
-
-    // Check for quotes
-    let has_single = s.contains('\'');
-    let has_double = s.contains('"');
-
-    // If it has both single and double quotes, need special handling
-    // Check if quote is followed by whitespace (which would break parsing)
-    if has_single && has_double {
-        let mut can_wrap_single = true;
-        let mut can_wrap_double = true;
-
-        let bytes = s.as_bytes();
-        for i in 0..bytes.len() - 1 {
-            let next = bytes[i + 1];
-            let next_is_ws = matches!(next, b' ' | b'\t' | b'\x0B');
-            if next_is_ws {
-                match bytes[i] {
-                    b'\'' => can_wrap_single = false,
-                    b'"' => can_wrap_double = false,
-                    _ => {}
-                }
-            }
-        }
-
-        if !can_wrap_single && !can_wrap_double {
-            let mut result = String::with_capacity(len + 1);
-            result.push_str(s);
-            result.push('\n');
-            return Ok(result);
-        }
-        if can_wrap_single {
-            let mut result = String::with_capacity(len + 2);
-            result.push('\'');
-            result.push_str(s);
-            result.push('\'');
-            return Ok(result);
-        }
-        if can_wrap_double {
-            let mut result = String::with_capacity(len + 2);
-            result.push('"');
-            result.push_str(s);
-            result.push('"');
-            return Ok(result);
-        }
-    }
-
-    // Check if we need wrapping
-    let mut needs_wrapping = false;
-
-    // Check first character
-    if s.starts_with('_') || s.starts_with('"') || s.starts_with('\'') {
-        needs_wrapping = true;
-    }
-
-    if !needs_wrapping {
-        // Check for reserved keywords
-        if starts_with_ignore_case(s, "data_") || starts_with_ignore_case(s, "save_") ||
-           starts_with_ignore_case(s, "loop_") || starts_with_ignore_case(s, "stop_") ||
-           starts_with_ignore_case(s, "global_") {
-            needs_wrapping = true;
-        }
-
-        // Check for whitespace or problematic characters using bytes (all relevant chars are ASCII)
-        if !needs_wrapping {
-            let bytes = s.as_bytes();
-            let mut prev_is_ws = true; // Treat start of string as preceded by whitespace for # check
-            for &b in bytes {
-                // Check for whitespace
-                if matches!(b, b' ' | b'\t' | b'\x0B') {
-                    needs_wrapping = true;
-                    break;
-                }
-                // The pound sign only needs quotes if preceded by whitespace (or at start)
-                if b == b'#' && prev_is_ws {
-                    needs_wrapping = true;
-                    break;
-                }
-                prev_is_ws = matches!(b, b' ' | b'\t' | b'\x0B');
-            }
-        }
-    }
-
-    if needs_wrapping {
-        let mut result = String::with_capacity(len + 2);
-        // If there is a single quote wrap in double quotes
-        if has_single {
-            result.push('"');
-            result.push_str(s);
-            result.push('"');
-        }
-        // Either there is a double quote or no quotes
-        else {
-            result.push('\'');
-            result.push_str(s);
-            result.push('\'');
-        }
-        return Ok(result);
-    }
-
-    // If we got here it's good to go as is
-    Ok(s.to_string())
+    // Delegate to the internal implementation
+    Ok(quote_value_str(s))
 }
 
 // Represents a token either as indices into tokenizer.full_data or as a materialized string
@@ -1149,9 +1005,281 @@ fn parse(
     Ok(entry)
 }
 
+/// Internal function to quote a value for NMR-STAR format.
+/// This is a simpler version that takes a string directly, used by format_loop.
+fn quote_value_str(s: &str) -> String {
+    let len = s.len();
+
+    // Don't allow empty string - return as-is, caller handles this error
+    if len == 0 {
+        return String::new();
+    }
+
+    // Handle embedded STAR format multiline comments
+    if s.contains("\n;") {
+        let starts_with_newline = s.starts_with('\n');
+        let newline_count = s.bytes().filter(|&b| b == b'\n').count();
+        let mut result = String::with_capacity(len + newline_count * 3 + 8);
+
+        if !starts_with_newline {
+            result.push_str("\n   ");
+        }
+
+        let bytes = s.as_bytes();
+        let mut last_end = 0;
+        for i in memchr_iter(b'\n', bytes) {
+            result.push_str(&s[last_end..=i]);
+            result.push_str("   ");
+            last_end = i + 1;
+        }
+        result.push_str(&s[last_end..]);
+        result.push('\n');
+
+        return result;
+    }
+
+    // If it has newlines but not "\n;", handle multiline
+    if s.contains('\n') {
+        if s.ends_with('\n') {
+            return s.to_string();
+        } else {
+            let mut result = String::with_capacity(len + 1);
+            result.push_str(s);
+            result.push('\n');
+            return result;
+        }
+    }
+
+    // Check for quotes
+    let has_single = s.contains('\'');
+    let has_double = s.contains('"');
+
+    // If it has both single and double quotes, need special handling
+    if has_single && has_double {
+        let mut can_wrap_single = true;
+        let mut can_wrap_double = true;
+
+        let bytes = s.as_bytes();
+        for i in 0..bytes.len() - 1 {
+            let next = bytes[i + 1];
+            let next_is_ws = matches!(next, b' ' | b'\t' | b'\x0B');
+            if next_is_ws {
+                match bytes[i] {
+                    b'\'' => can_wrap_single = false,
+                    b'"' => can_wrap_double = false,
+                    _ => {}
+                }
+            }
+        }
+
+        if !can_wrap_single && !can_wrap_double {
+            let mut result = String::with_capacity(len + 1);
+            result.push_str(s);
+            result.push('\n');
+            return result;
+        }
+        if can_wrap_single {
+            let mut result = String::with_capacity(len + 2);
+            result.push('\'');
+            result.push_str(s);
+            result.push('\'');
+            return result;
+        }
+        if can_wrap_double {
+            let mut result = String::with_capacity(len + 2);
+            result.push('"');
+            result.push_str(s);
+            result.push('"');
+            return result;
+        }
+    }
+
+    // Check if we need wrapping
+    let mut needs_wrapping = false;
+
+    if s.starts_with('_') || s.starts_with('"') || s.starts_with('\'') {
+        needs_wrapping = true;
+    }
+
+    if !needs_wrapping {
+        if starts_with_ignore_case(s, "data_") || starts_with_ignore_case(s, "save_") ||
+           starts_with_ignore_case(s, "loop_") || starts_with_ignore_case(s, "stop_") ||
+           starts_with_ignore_case(s, "global_") {
+            needs_wrapping = true;
+        }
+
+        if !needs_wrapping {
+            let bytes = s.as_bytes();
+            let mut prev_is_ws = true;
+            for &b in bytes {
+                if matches!(b, b' ' | b'\t' | b'\x0B') {
+                    needs_wrapping = true;
+                    break;
+                }
+                if b == b'#' && prev_is_ws {
+                    needs_wrapping = true;
+                    break;
+                }
+                prev_is_ws = matches!(b, b' ' | b'\t' | b'\x0B');
+            }
+        }
+    }
+
+    if needs_wrapping {
+        let mut result = String::with_capacity(len + 2);
+        if has_single {
+            result.push('"');
+            result.push_str(s);
+            result.push('"');
+        } else {
+            result.push('\'');
+            result.push_str(s);
+            result.push('\'');
+        }
+        return result;
+    }
+
+    s.to_string()
+}
+
+/// Format a loop in NMR-STAR format.
+/// This is the performance-critical function that formats all the data in a loop.
+#[pyfunction]
+#[pyo3(signature = (tags, category, data, skip_empty_loops=false, str_conversion_dict=None))]
+fn format_loop(
+    _py: Python,
+    tags: Vec<String>,
+    category: &str,
+    data: Vec<Vec<Bound<'_, PyAny>>>,
+    skip_empty_loops: bool,
+    str_conversion_dict: Option<&Bound<'_, PyAny>>,
+) -> PyResult<String> {
+    // Handle empty data case
+    if data.is_empty() {
+        if skip_empty_loops {
+            return Ok(String::new());
+        } else {
+            if tags.is_empty() {
+                return Ok("\n   loop_\n\n   stop_\n".to_string());
+            }
+            // Fall through to print tags with no data
+        }
+    }
+
+    if tags.is_empty() && !data.is_empty() {
+        return Err(PyValueError::new_err(format!(
+            "Impossible to print data if there are no associated tags. Error in loop '{}' which contains data but hasn't had any tags added.",
+            category
+        )));
+    }
+
+    // Pre-allocate for the result
+    // Estimate: header (~50) + tags (category.len + tag.len + 10 per tag) + data
+    let estimated_size = 100 + tags.len() * (category.len() + 20) + data.len() * tags.len() * 15;
+    let mut result = String::with_capacity(estimated_size);
+
+    // Start the loop
+    result.push_str("\n   loop_\n");
+
+    // Print the tags
+    for tag in &tags {
+        result.push_str("      ");
+        result.push_str(category);
+        result.push('.');
+        result.push_str(tag);
+        result.push('\n');
+    }
+    result.push('\n');
+
+    if data.is_empty() {
+        result.push_str("\n   stop_\n");
+        return Ok(result);
+    }
+
+    // Convert and quote all data, tracking column widths
+    let num_cols = tags.len();
+    let mut quoted_data: Vec<Vec<String>> = Vec::with_capacity(data.len());
+    let mut col_widths: Vec<usize> = vec![4; num_cols]; // minimum width of 4
+
+    for (row_idx, row) in data.iter().enumerate() {
+        let mut quoted_row: Vec<String> = Vec::with_capacity(num_cols);
+
+        for (col_idx, cell) in row.iter().enumerate() {
+            // Apply STR_CONVERSION_DICT if provided
+            let converted_cell: std::borrow::Cow<'_, Bound<'_, PyAny>> = if let Some(conv_dict) = str_conversion_dict {
+                // Check if the cell value is a key in the conversion dict
+                if conv_dict.contains(cell)? {
+                    // Get the converted value
+                    std::borrow::Cow::Owned(conv_dict.get_item(cell)?)
+                } else {
+                    std::borrow::Cow::Borrowed(cell)
+                }
+            } else {
+                std::borrow::Cow::Borrowed(cell)
+            };
+
+            // Convert to string, handling None specially (default conversion)
+            let string_val: String = if converted_cell.is_none() {
+                ".".to_string()
+            } else {
+                converted_cell.str()?.to_str()?.to_string()
+            };
+
+            // Quote the value
+            let quoted = if string_val.is_empty() {
+                // Empty strings are not allowed - return error
+                return Err(PyValueError::new_err(format!(
+                    "Cannot generate NMR-STAR for entry, as empty strings are not valid tag values in NMR-STAR. Please either replace the empty strings with None objects, or set pynmrstar.definitions.STR_CONVERSION_DICT[''] = None.\nLoop: {} Row: {} Column: {}",
+                    category, row_idx, col_idx
+                )));
+            } else {
+                quote_value_str(&string_val)
+            };
+
+            // Track width (but not for multiline values)
+            if !quoted.contains('\n') {
+                let width = quoted.len() + 3; // +3 for spacing
+                if width > col_widths[col_idx] {
+                    col_widths[col_idx] = width;
+                }
+            }
+
+            quoted_row.push(quoted);
+        }
+        quoted_data.push(quoted_row);
+    }
+
+    // Print the data rows
+    for row in &quoted_data {
+        result.push_str("     ");
+        for (col_idx, val) in row.iter().enumerate() {
+            if val.contains('\n') {
+                // Multiline value - format specially
+                result.push_str("\n;\n");
+                result.push_str(val);
+                result.push_str(";\n");
+            } else {
+                // Pad to column width
+                result.push_str(val);
+                let padding = col_widths[col_idx].saturating_sub(val.len());
+                for _ in 0..padding {
+                    result.push(' ');
+                }
+            }
+        }
+        result.push_str(" \n");
+    }
+
+    // Close the loop
+    result.push_str("\n   stop_\n");
+
+    Ok(result)
+}
+
 #[pymodule]
 fn pynmrstar_parser(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse, m)?)?;
     m.add_function(wrap_pyfunction!(quote_value, m)?)?;
+    m.add_function(wrap_pyfunction!(format_loop, m)?)?;
     Ok(())
 }

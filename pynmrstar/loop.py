@@ -7,6 +7,8 @@ from itertools import chain
 from pathlib import Path
 from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Callable, Tuple, Generator
 
+import pynmrstar_parser
+
 from pynmrstar import definitions, utils, entry as entry_mod, parser
 from pynmrstar._internal import _json_serialize, _interpret_file
 from pynmrstar._types import DataInput
@@ -192,89 +194,33 @@ class Loop(object):
     def __str__(self, skip_empty_loops: bool = False, skip_empty_tags: bool = False) -> str:
         """Returns the loop in STAR format as a string."""
 
-        # Check if there is any data in this loop
-        if len(self.data) == 0:
-            # They do not want us to print empty loops
-            if skip_empty_loops:
-                return ""
-            else:
-                # If we have no tags than return the empty loop
-                if len(self._tags) == 0:
-                    return "\n   loop_\n\n   stop_\n"
-
-        if len(self._tags) == 0:
-            raise InvalidStateError("Impossible to print data if there are no associated tags. Error in loop "
-                                    f"'{self.category}' which contains data but hasn't had any tags added.")
-
-        # Make sure the tags and data match
-        self._check_tags_match_data()
-
-        # If skipping null tags, it's easier to filter out a loop with only real tags and then print
-        if skip_empty_tags:
+        # If skipping null tags, filter and recurse (this path stays in Python)
+        if skip_empty_tags and len(self.data) > 0:
             has_data = [not all([_ in definitions.NULL_VALUES for _ in column]) for column in zip(*self.data)]
             return self.filter([tag for x, tag in enumerate(self._tags) if has_data[x]]).format()
 
-        # Start the loop
-        return_chunks = ["\n   loop_\n"]
-        # Print the tags
-        format_string = "      %-s\n"
-
         # Check to make sure our category is set
-        if self.category is None:
+        if self.category is None and len(self._tags) > 0:
             raise InvalidStateError("The category was never set for this loop. Either add a tag with the category "
                                     "intact, specify it when generating the loop, or set it using Loop.set_category().")
 
-        # Print the categories
-        if self.category is None:
-            for tag in self._tags:
-                return_chunks.append(format_string % tag)
-        else:
-            for tag in self._tags:
-                return_chunks.append(format_string % (self.category + "." + tag))
+        # Make sure the tags and data match
+        if len(self.data) > 0:
+            self._check_tags_match_data()
 
-        return_chunks.append("\n")
-
-        if len(self.data) != 0:
-
-            # Make a copy of the data
-            working_data = []
-            title_widths = [4]*len(self.data[0])
-
-            # Put quotes as needed on the data
-            for row_pos, row in enumerate(self.data):
-                clean_row = []
-                for col_pos, x in enumerate(row):
-                    try:
-                        clean_val = utils.quote_value(x)
-                        clean_row.append(clean_val)
-                        length = len(clean_val) + 3
-                        if length > title_widths[col_pos] and "\n" not in clean_val:
-                            title_widths[col_pos] = length
-
-                    except ValueError:
-                        raise InvalidStateError('Cannot generate NMR-STAR for entry, as empty strings are not valid '
-                                                'tag values in NMR-STAR. Please either replace the empty strings with'
-                                                ' None objects, or set pynmrstar.definitions.STR_CONVERSION_DICT['
-                                                '\'\'] = None.\n'
-                                                f'Loop: {self.category} Row: {row_pos} Column: {col_pos}')
-
-                working_data.append(clean_row)
-
-            # Generate the format string
-            format_string = "     " + "%-*s" * len(self._tags) + " \n"
-
-            # Print the data, with the tags sized appropriately
-            for datum in working_data:
-                for pos, item in enumerate(datum):
-                    if "\n" in item:
-                        datum[pos] = "\n;\n%s;\n" % item
-
-                # Print the data (combine the tags' widths with their data)
-                tag_width_list = [d for d in zip(title_widths, datum)]
-                return_chunks.append(format_string % tuple(chain.from_iterable(tag_width_list)))
-
-        # Close the loop
-        return "".join(return_chunks) + "\n   stop_\n"
+        # Use the Rust implementation for the main formatting work
+        # Pass STR_CONVERSION_DICT so Rust can handle conversions
+        try:
+            return pynmrstar_parser.format_loop(
+                self._tags,
+                self.category or "",
+                self.data,
+                skip_empty_loops,
+                definitions.STR_CONVERSION_DICT
+            )
+        except ValueError as e:
+            # Convert ValueError from Rust to InvalidStateError for consistency
+            raise InvalidStateError(str(e))
 
     @property
     def _lc_tags(self) -> Dict[str, int]:
