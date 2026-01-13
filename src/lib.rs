@@ -491,10 +491,10 @@ struct ParserContext {
     loop_data: Vec<TokenValue>,  // Store indices instead of materialized strings
     seen_data: bool,
     in_loop: bool,
-    source: String,
+    _source: String,
     raise_parse_warnings: bool,
-    convert_data_types: bool,
-    schema: Option<PyObject>,
+    _convert_data_types: bool,
+    _schema: Option<PyObject>,
     saveframe_class: PyObject,
     loop_class: PyObject,
     source_dict: PyObject,
@@ -520,24 +520,24 @@ impl ParserContext {
 
         let add_tags_kwargs = if schema.is_some() {
             [
-                ("convert_data_types", convert_data_types.into_py(py)),
+                ("convert_data_types", convert_data_types.into_pyobject(py)?.to_owned().into_any().unbind()),
                 ("schema", schema.as_ref().unwrap().clone_ref(py))
             ].into_py_dict(py)?.into()
         } else {
-            [("convert_data_types", convert_data_types.into_py(py))]
+            [("convert_data_types", convert_data_types.into_pyobject(py)?.to_owned().into_any().unbind())]
                 .into_py_dict(py)?.into()
         };
 
         let add_data_kwargs = if schema.is_some() {
             [
-                ("rearrange", true.into_py(py)),
-                ("convert_data_types", convert_data_types.into_py(py)),
+                ("rearrange", true.into_pyobject(py)?.to_owned().into_any().unbind()),
+                ("convert_data_types", convert_data_types.into_pyobject(py)?.to_owned().into_any().unbind()),
                 ("schema", schema.as_ref().unwrap().clone_ref(py))
             ].into_py_dict(py)?.into()
         } else {
             [
-                ("rearrange", true.into_py(py)),
-                ("convert_data_types", convert_data_types.into_py(py))
+                ("rearrange", true.into_pyobject(py)?.to_owned().into_any().unbind()),
+                ("convert_data_types", convert_data_types.into_pyobject(py)?.to_owned().into_any().unbind())
             ].into_py_dict(py)?.into()
         };
 
@@ -553,10 +553,10 @@ impl ParserContext {
             loop_data: Vec::new(),
             seen_data: false,
             in_loop: false,
-            source,
+            _source: source,
             raise_parse_warnings,
-            convert_data_types,
-            schema,
+            _convert_data_types: convert_data_types,
+            _schema: schema,
             saveframe_class,
             loop_class,
             source_dict,
