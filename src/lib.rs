@@ -429,12 +429,10 @@ fn quote_value(py: Python, orig: &Bound<PyAny>) -> PyResult<String> {
     }
 
     if !needs_wrapping {
-        let lower = s.to_lowercase();
-
         // Check for reserved keywords
-        if lower.starts_with("data_") || lower.starts_with("save_") ||
-           lower.starts_with("loop_") || lower.starts_with("stop_") ||
-           lower.starts_with("global_") {
+        if starts_with_ignore_case(s, "data_") || starts_with_ignore_case(s, "save_") ||
+           starts_with_ignore_case(s, "loop_") || starts_with_ignore_case(s, "stop_") ||
+           starts_with_ignore_case(s, "global_") {
             needs_wrapping = true;
         }
 
@@ -543,8 +541,24 @@ impl ParserContext {
 }
 
 fn is_reserved_keyword(token: &str) -> bool {
-    let lower = token.to_lowercase();
-    RESERVED_KEYWORDS.iter().any(|&kw| lower == kw)
+    RESERVED_KEYWORDS.iter().any(|&kw| token.eq_ignore_ascii_case(kw))
+}
+
+fn starts_with_ignore_case(s: &str, prefix: &str) -> bool {
+    // For ASCII-only prefixes, we can safely check byte-by-byte
+    if s.len() < prefix.len() {
+        return false;
+    }
+
+    let s_bytes = s.as_bytes();
+    let prefix_bytes = prefix.as_bytes();
+
+    for i in 0..prefix.len() {
+        if !s_bytes[i].eq_ignore_ascii_case(&prefix_bytes[i]) {
+            return false;
+        }
+    }
+    true
 }
 
 fn parse_initial(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
@@ -555,7 +569,7 @@ fn parse_initial(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
         .ok_or_else(|| ctx.raise_error("Empty file"))?;
 
     // Validate data_ token
-    if !token.to_lowercase().starts_with("data_") {
+    if !starts_with_ignore_case(token, "data_") {
         return Err(ctx.raise_error(&format!(
             "Invalid file. NMR-STAR files must start with 'data_' followed by the data name. \
              Did you accidentally select the wrong file? Your file started with '{}'.",
@@ -584,7 +598,7 @@ fn parse_entry_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
     while ctx.get_token(py)?.is_some() {
         let token = ctx.token.as_ref().unwrap();
 
-        if !token.to_lowercase().starts_with("save_") {
+        if !starts_with_ignore_case(token, "save_") {
             return Err(ctx.raise_error(&format!(
                 "Only 'save_NAME' is valid in the body of a NMR-STAR file. Found '{}'.",
                 token
@@ -645,9 +659,8 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
 
     while ctx.get_token(py)?.is_some() {
         let token = ctx.token.as_ref().unwrap();
-        let token_lower = token.to_lowercase();
 
-        if token_lower == "loop_" {
+        if token.eq_ignore_ascii_case("loop_") {
             // Flush any pending tags before processing loop
             flush_tags(ctx, &mut pending_tags)?;
             if ctx.delimiter != ' ' {
@@ -668,7 +681,7 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
 
             parse_loop_tags(py, ctx)?;
 
-        } else if token_lower == "save_" {
+        } else if token.eq_ignore_ascii_case("save_") {
             // Flush any pending tags before exiting saveframe
             flush_tags(ctx, &mut pending_tags)?;
 
@@ -748,7 +761,7 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
     }
 
     // Validate saveframe was properly closed
-    if ctx.token.is_none() || ctx.token.as_ref().unwrap().to_lowercase() != "save_" {
+    if ctx.token.is_none() || !ctx.token.as_ref().unwrap().eq_ignore_ascii_case("save_") {
         return Err(ctx.raise_error(
             "Saveframe improperly terminated at end of file. Saveframes must be terminated \
              with the 'save_' token."
@@ -802,9 +815,8 @@ fn parse_loop_data(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
             .ok_or_else(|| ctx.raise_error("Loop improperly terminated at end of file. \
                                              Loops must end with the 'stop_' token, but the \
                                              file ended without the stop token."))?;
-        let token_lower = token.to_lowercase();
 
-        if token_lower == "stop_" {
+        if token.eq_ignore_ascii_case("stop_") {
             if ctx.delimiter != ' ' {
                 return Err(ctx.raise_error("The stop_ keyword may not be quoted or semicolon-delimited."));
             }
