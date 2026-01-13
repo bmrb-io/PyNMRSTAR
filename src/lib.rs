@@ -460,12 +460,21 @@ struct ParserContext {
     raise_parse_warnings: bool,
     convert_data_types: bool,
     schema: Option<PyObject>,
+    saveframe_class: PyObject,
+    loop_class: PyObject,
 }
 
 impl ParserContext {
-    fn new(_py: Python, entry: PyObject, source: String, raise_parse_warnings: bool,
-           convert_data_types: bool, schema: Option<PyObject>) -> Self {
-        ParserContext {
+    fn new(py: Python, entry: PyObject, source: String, raise_parse_warnings: bool,
+           convert_data_types: bool, schema: Option<PyObject>) -> PyResult<Self> {
+        // Cache module/class lookups at initialization
+        let saveframe_mod = py.import("pynmrstar.saveframe")?;
+        let saveframe_class = saveframe_mod.getattr("Saveframe")?.into();
+
+        let loop_mod = py.import("pynmrstar.loop")?;
+        let loop_class = loop_mod.getattr("Loop")?.into();
+
+        Ok(ParserContext {
             line_number: 0,
             delimiter: ' ',
             token: None,
@@ -479,7 +488,9 @@ impl ParserContext {
             raise_parse_warnings,
             convert_data_types,
             schema,
-        }
+            saveframe_class,
+            loop_class,
+        })
     }
 
     fn get_token(&mut self, py: Python) -> PyResult<Option<String>> {
@@ -565,12 +576,9 @@ fn parse_entry_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
             return Err(ctx.raise_error("The save_ keyword may not be quoted or semicolon-delimited."));
         }
 
-        // Create new saveframe
+        // Create new saveframe using cached class
         let saveframe_name = &token[5..];
-        let saveframe_mod = py.import("pynmrstar.saveframe")?;
-        let saveframe_class = saveframe_mod.getattr("Saveframe")?;
-
-        let saveframe = saveframe_class.call_method(
+        let saveframe = ctx.saveframe_class.bind(py).call_method(
             "from_scratch",
             (saveframe_name,),
             Some(&[("source", &ctx.source)].into_py_dict(py)?)
@@ -620,10 +628,8 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
                 return Err(ctx.raise_error("The loop_ keyword may not be quoted or semicolon-delimited."));
             }
 
-            // Create new loop
-            let loop_mod = py.import("pynmrstar.loop")?;
-            let loop_class = loop_mod.getattr("Loop")?;
-            let new_loop = loop_class.call_method(
+            // Create new loop using cached class
+            let new_loop = ctx.loop_class.bind(py).call_method(
                 "from_scratch",
                 (),
                 Some(&[("source", &ctx.source)].into_py_dict(py)?)
@@ -913,7 +919,7 @@ fn parse(
 
     // Create parser context
     let mut ctx = ParserContext::new(py, entry.clone_ref(py), source,
-                                     raise_parse_warnings, convert_data_types, schema);
+                                     raise_parse_warnings, convert_data_types, schema)?;
     // Parse
     parse_initial(py, &mut ctx)?;
     parse_entry_body(py, &mut ctx)?;
