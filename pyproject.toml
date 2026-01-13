@@ -1,48 +1,51 @@
 [build-system]
-requires = ["setuptools>=42", "wheel", "setuptools-rust"]
-build-backend = "setuptools.build_meta"                                                                                                                                                                                             
-                                                                                                                                                                                                                                    
-[project]                                                                                                                                                                                                                           
-name = "pynmrstar"                                                                                                                                                                                                                  
-dynamic = ["version"]                                                                                                                                                                                                               
-description = "PyNMR-STAR provides tools for reading, writing, modifying, and interacting with NMR-STAR files. Maintained by the BMRB."                                                                                             
-readme = "README.rst"                                                                                                                                                                                                               
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "pynmrstar"
+dynamic = ["version"]
+description = "PyNMR-STAR provides tools for reading, writing, modifying, and interacting with NMR-STAR files. Maintained by the BMRB."
+readme = "README.rst"
 requires-python = ">3.8"
-license = {text = "MIT"}                                                                                                                                                                                                            
-authors = [                                                                                                                                                                                                                         
-    {name = "Jon Wedell", email = "wedell@uchc.edu"}                                                                                                                                                                                
-]                                                                                                                                                                                                                                   
-keywords = ["bmrb", "parser", "nmr", "nmrstar", "biomagresbank", "biological magnetic resonance bank"]                                                                                                                              
-classifiers = [                                                                                                                                                                                                                     
-    "Development Status :: 6 - Mature",                                                                                                                                                                                             
-    "Environment :: Console",                                                                                                                                                                                                       
-    "Programming Language :: Python :: 3 :: Only",                                                                                                                                                                                  
+license = {text = "MIT"}
+authors = [
+    {name = "Jon Wedell", email = "wedell@uchc.edu"}
+]
+keywords = ["bmrb", "parser", "nmr", "nmrstar", "biomagresbank", "biological magnetic resonance bank"]
+classifiers = [
+    "Development Status :: 6 - Mature",
+    "Environment :: Console",
+    "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",                                                                                                                                                                                       
-    "Programming Language :: Python :: 3.11",                                                                                                                                                                                       
-    "Programming Language :: Python :: 3.12",                                                                                                                                                                                       
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
-    "Intended Audience :: Developers",                                                                                                                                                                                              
-    "License :: OSI Approved :: MIT License",                                                                                                                                                                                       
-    "Natural Language :: English",                                                                                                                                                                                                  
-    "Operating System :: MacOS",                                                                                                                                                                                                    
-    "Operating System :: POSIX :: Linux",                                                                                                                                                                                           
-    "Operating System :: Microsoft :: Windows",                                                                                                                                                                                     
-    "Topic :: Scientific/Engineering :: Bio-Informatics",                                                                                                                                                                           
-    "Topic :: Software Development :: Libraries",                                                                                                                                                                                   
-    "Topic :: Software Development :: Libraries :: Python Modules"                                                                                                                                                                  
-]                                                                                                                                                                                                                                   
-dependencies = [                                                                                                                                                                                                                    
-    "requests>=2.21.0,<=3"                                                                                                                                                                                                          
-]                                                                                                                                                                                                                                   
-                                                                                                                                                                                                                                    
-[project.urls]                                                                                                                                                                                                                      
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules"
+]
+dependencies = [
+    "requests>=2.21.0,<=3"
+]
+
+[project.urls]
 Homepage = "https://github.com/bmrb-io/PyNMRSTAR"
-                                                                                                                                                                                                                                    
-[tool.setuptools]                                                                                                                                                                                                                   
-packages = ["pynmrstar"]                                                                                                                                                                                                            
-package-data = {pynmrstar = ["reference_files/schema.csv", "reference_files/comments.str", "reference_files/data_types.csv"]}                                                                                                       
-                                                                                                                                                                                                                                    
-[tool.setuptools.dynamic]                                                                                                                                                                                                           
+
+[tool.setuptools]
+packages = ["pynmrstar"]
+package-data = {pynmrstar = ["reference_files/schema.csv", "reference_files/comments.str", "reference_files/data_types.csv"]}
+
+[tool.setuptools.dynamic]
 version = {attr = "pynmrstar._internal.__version__"}
+
+[tool.maturin]
+module-name = "pynmrstar_parser"
