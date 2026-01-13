@@ -451,6 +451,34 @@ fn quote_value(orig: &Bound<PyAny>) -> PyResult<String> {
     Ok(s.to_string())
 }
 
+// Represents a token either as indices into tokenizer.full_data or as a materialized string
+// (for rare processed tokens from embedded STAR format)
+enum TokenValue {
+    Indexed(usize, usize),      // Indices into ctx.tokenizer.full_data
+    Materialized(String),        // Pre-materialized string (< 0.1% of tokens)
+}
+
+impl TokenValue {
+    fn to_string(&self, full_data: &str) -> String {
+        match self {
+            TokenValue::Indexed(start, end) => full_data[*start..*end].to_string(),
+            TokenValue::Materialized(s) => s.clone(),
+        }
+    }
+
+    fn as_str<'a>(&'a self, full_data: &'a str) -> std::borrow::Cow<'a, str> {
+        match self {
+            TokenValue::Indexed(start, end) => std::borrow::Cow::Borrowed(&full_data[*start..*end]),
+            TokenValue::Materialized(s) => std::borrow::Cow::Borrowed(s),
+        }
+    }
+}
+
+struct LoopStatistics {
+    total_data_items: usize,
+    loop_count: usize,
+}
+
 struct ParserContext {
     tokenizer: TokenizerState,
     line_number: usize,
@@ -460,7 +488,7 @@ struct ParserContext {
     entry: PyObject,
     current_saveframe: Option<PyObject>,
     current_loop: Option<PyObject>,
-    loop_data: Vec<String>,
+    loop_data: Vec<TokenValue>,  // Store indices instead of materialized strings
     seen_data: bool,
     in_loop: bool,
     source: String,
@@ -472,6 +500,9 @@ struct ParserContext {
     source_dict: PyObject,
     add_tags_kwargs: PyObject,
     add_data_kwargs: PyObject,
+    // Loop pre-allocation tracking by loop type
+    loop_statistics: std::collections::HashMap<String, LoopStatistics>,
+    current_loop_type: Option<String>,
 }
 
 impl ParserContext {
@@ -531,6 +562,8 @@ impl ParserContext {
             source_dict,
             add_tags_kwargs,
             add_data_kwargs,
+            loop_statistics: std::collections::HashMap::new(),
+            current_loop_type: None,
         })
     }
 
@@ -693,15 +726,19 @@ fn parse_entry_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
 }
 
 fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
-    let mut pending_tags: Vec<(String, String)> = Vec::new();
+    let mut pending_tags: Vec<(TokenValue, TokenValue)> = Vec::new();
 
     // Helper to flush pending tags
-    let flush_tags = |ctx: &ParserContext, pending: &mut Vec<(String, String)>| -> PyResult<()> {
+    let flush_tags = |ctx: &ParserContext, pending: &mut Vec<(TokenValue, TokenValue)>| -> PyResult<()> {
         if !pending.is_empty() {
             let saveframe = ctx.current_saveframe.as_ref().unwrap();
-            // Use std::mem::take to move instead of clone
+            // Materialize TokenValues into (String, String) tuples for Python
             let tags_to_add = std::mem::take(pending);
-            saveframe.call_method(py, "add_tags", (tags_to_add,), Some(ctx.add_tags_kwargs.bind(py).downcast()?))?;
+            let materialized: Vec<(String, String)> = tags_to_add
+                .iter()
+                .map(|(tag, value)| (tag.to_string(&ctx.tokenizer.full_data), value.to_string(&ctx.tokenizer.full_data)))
+                .collect();
+            saveframe.call_method(py, "add_tags", (materialized,), Some(ctx.add_tags_kwargs.bind(py).downcast()?))?;
         }
         Ok(())
     };
@@ -761,7 +798,14 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
                 )));
             }
 
-            let tag_name = token.to_string();
+            // Capture tag name as TokenValue
+            let tag_name = if let Some(ref processed) = ctx.processed_token {
+                TokenValue::Materialized(processed.clone())
+            } else if let Some((start, end)) = ctx.token {
+                TokenValue::Indexed(start, end)
+            } else {
+                TokenValue::Materialized(String::new())
+            };
 
             // Get tag value
             if !ctx.get_token()? {
@@ -787,8 +831,17 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
                 }
             }
 
+            // Capture value as TokenValue
+            let value_token = if let Some(ref processed) = ctx.processed_token {
+                TokenValue::Materialized(processed.clone())
+            } else if let Some((start, end)) = ctx.token {
+                TokenValue::Indexed(start, end)
+            } else {
+                TokenValue::Materialized(String::new())
+            };
+
             // Collect tag-value pair for batch addition
-            pending_tags.push((tag_name, value.to_string()));
+            pending_tags.push((tag_name, value_token));
         } else {
             // Invalid token in saveframe
             let frame_name = ctx.current_saveframe.as_ref().unwrap()
@@ -822,32 +875,72 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
 }
 
 fn parse_loop_tags(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
-    let mut tags = Vec::new();
+    let mut tags: Vec<TokenValue> = Vec::new();
 
     while ctx.in_loop && ctx.get_token()? {
         let token = ctx.token_str();
 
         // Check if this is a tag
         if token.starts_with('_') && ctx.delimiter == ' ' {
+            // Extract loop type from first tag (e.g., "_Entry_author.Ordinal" -> "_Entry_author")
+            if tags.is_empty() {
+                let loop_type = if let Some(dot_pos) = token.find('.') {
+                    token[..dot_pos].to_string()
+                } else {
+                    // Tag without a dot - use the whole tag as loop type
+                    token.to_string()
+                };
+
+                // Store loop type first
+                ctx.current_loop_type = Some(loop_type);
+            }
+
+            // Capture tag as TokenValue
+            let tag_value = if let Some(ref processed) = ctx.processed_token {
+                TokenValue::Materialized(processed.clone())
+            } else if let Some((start, end)) = ctx.token {
+                TokenValue::Indexed(start, end)
+            } else {
+                TokenValue::Materialized(String::new())
+            };
+
             // Collect tag for batch addition
-            tags.push(token.to_string());
+            tags.push(tag_value);
         } else {
             // First non-tag token, batch add all tags to loop
             let loop_obj = ctx.current_loop.as_ref().unwrap();
 
-            // Batch add all collected tags
+            // Batch add all collected tags (materialize to strings for Python)
             if !tags.is_empty() {
-                loop_obj.call_method1(py, "add_tag", (tags.as_slice(),))?;
+                let materialized: Vec<String> = tags
+                    .iter()
+                    .map(|tv| tv.to_string(&ctx.tokenizer.full_data))
+                    .collect();
+                loop_obj.call_method1(py, "add_tag", (materialized.as_slice(),))?;
             }
 
             let saveframe = ctx.current_saveframe.as_ref().unwrap();
             saveframe.call_method1(py, "add_loop", (loop_obj,))?;
 
             // Preallocate loop_data Vec based on number of tags
-            // Estimate: average of 100 rows per loop seems reasonable
+            // Use adaptive sizing based on loop type statistics
             let tags_len = tags.len();
             if tags_len > 0 {
-                ctx.loop_data.reserve(tags_len * 100);
+                let estimated_rows = if let Some(loop_type) = &ctx.current_loop_type {
+                    // Look up statistics for this specific loop type
+                    if let Some(stats) = ctx.loop_statistics.get(loop_type) {
+                        let avg_items_per_loop = stats.total_data_items / stats.loop_count;
+                        let avg_rows = (avg_items_per_loop / tags_len).max(10); // At least 10 rows
+                        avg_rows
+                    } else {
+                        // First time seeing this loop type: use reasonable default
+                        100
+                    }
+                } else {
+                    // No loop type detected (shouldn't happen): use default
+                    100
+                };
+                ctx.loop_data.reserve(tags_len * estimated_rows);
             }
 
             // Parse loop data (without consuming current token)
@@ -913,13 +1006,38 @@ fn parse_loop_data(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
                     )));
                 }
 
-                // Use std::mem::take to move instead of clone
+                // Materialize TokenValues into Strings only when passing to Python
                 let loop_data_to_add = std::mem::take(&mut ctx.loop_data);
-                loop_obj.call_method(py, "add_data", (loop_data_to_add,), Some(ctx.add_data_kwargs.bind(py).downcast()?))?;
+                let data_items_count = loop_data_to_add.len();
+                let materialized: Vec<String> = loop_data_to_add
+                    .iter()
+                    .map(|tv| tv.to_string(&ctx.tokenizer.full_data))
+                    .collect();
+                loop_obj.call_method(py, "add_data", (materialized,), Some(ctx.add_data_kwargs.bind(py).downcast()?))?;
+
+                // Track statistics for adaptive pre-allocation by loop type
+                if let Some(loop_type) = &ctx.current_loop_type {
+                    let stats = ctx.loop_statistics.entry(loop_type.clone()).or_insert(LoopStatistics {
+                        total_data_items: 0,
+                        loop_count: 0,
+                    });
+                    stats.total_data_items += data_items_count;
+                    stats.loop_count += 1;
+                }
+            } else {
+                // Track empty loops too (for accurate statistics)
+                if let Some(loop_type) = &ctx.current_loop_type {
+                    let stats = ctx.loop_statistics.entry(loop_type.clone()).or_insert(LoopStatistics {
+                        total_data_items: 0,
+                        loop_count: 0,
+                    });
+                    stats.loop_count += 1;
+                }
             }
 
             ctx.loop_data.clear();
             ctx.current_loop = None;
+            ctx.current_loop_type = None;
             ctx.in_loop = false;
             break;
 
@@ -954,14 +1072,23 @@ fn parse_loop_data(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
                 );
 
                 if !ctx.loop_data.is_empty() {
-                    error.push_str(&format!(" Last loop data element parsed: '{}'.",
-                                           ctx.loop_data.last().unwrap()));
+                    let last_value = ctx.loop_data.last().unwrap().as_str(&ctx.tokenizer.full_data);
+                    error.push_str(&format!(" Last loop data element parsed: '{}'.", last_value));
                 }
 
                 return Err(ctx.raise_error(&error));
             }
 
-            ctx.loop_data.push(token.to_string());
+            // Store token as indices or materialized string
+            let token_value = if let Some(ref processed) = ctx.processed_token {
+                TokenValue::Materialized(processed.clone())
+            } else if let Some((start, end)) = ctx.token {
+                TokenValue::Indexed(start, end)
+            } else {
+                // Should never happen
+                TokenValue::Materialized(String::new())
+            };
+            ctx.loop_data.push(token_value);
             ctx.seen_data = true;
         }
 
