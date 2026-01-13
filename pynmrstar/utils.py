@@ -121,7 +121,9 @@ def quote_value(value: Any) -> str:
         if any(isinstance(value, type(x)) for x in definitions.STR_CONVERSION_DICT):
             value = definitions.STR_CONVERSION_DICT[value]
 
-    return cnmrstar.quote_value(value)
+    # Use the Rust implementation
+    import pynmrstar_parser
+    return pynmrstar_parser.quote_value(value)
 
 
 def validate(entry_to_validate: 'entry_mod.Entry', schema: 'Schema' = None) -> None:

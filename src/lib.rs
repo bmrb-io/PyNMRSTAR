@@ -1,8 +1,287 @@
 use pyo3::prelude::*;
 use pyo3::exceptions::PyValueError;
 use pyo3::types::IntoPyDict;
+use pyo3::import_exception;
+use std::sync::Mutex;
+
+// Import the ParsingError exception from pynmrstar.exceptions
+import_exception!(pynmrstar.exceptions, ParsingError);
 
 const RESERVED_KEYWORDS: [&str; 5] = ["data_", "save_", "loop_", "stop_", "global_"];
+const WHITESPACE_CHARS: [char; 4] = [' ', '\n', '\t', '\x0B']; // \v is \x0B
+
+// Tokenizer state
+struct TokenizerState {
+    full_data: String,
+    index: usize,
+    line_no: usize,
+    last_delimiter: char,
+}
+
+impl TokenizerState {
+    fn new() -> Self {
+        TokenizerState {
+            full_data: String::new(),
+            index: 0,
+            line_no: 0,
+            last_delimiter: ' ',
+        }
+    }
+
+    fn reset(&mut self) {
+        self.full_data.clear();
+        self.index = 0;
+        self.line_no = 0;
+        self.last_delimiter = ' ';
+    }
+
+    fn load_string(&mut self, data: String) {
+        self.reset();
+        self.full_data = data;
+    }
+
+    fn is_whitespace(c: char) -> bool {
+        WHITESPACE_CHARS.contains(&c)
+    }
+
+    fn pass_whitespace(&mut self) {
+        let bytes = self.full_data.as_bytes();
+        while self.index < bytes.len() {
+            let c = bytes[self.index] as char;
+            if Self::is_whitespace(c) {
+                if c == '\n' {
+                    self.line_no += 1;
+                }
+                self.index += 1;
+            } else {
+                break;
+            }
+        }
+    }
+
+    fn check_multiline(&self, length: usize) -> bool {
+        let end = (self.index + length).min(self.full_data.len());
+        let bytes = self.full_data.as_bytes();
+        for i in self.index..end {
+            if bytes[i] == b'\n' {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn update_line_number(&mut self, start_pos: usize, length: usize) {
+        let end = (start_pos + length).min(self.full_data.len());
+        let bytes = self.full_data.as_bytes();
+        for i in start_pos..end {
+            if bytes[i] == b'\n' {
+                self.line_no += 1;
+            }
+        }
+    }
+
+    fn find_substring(&self, needle: &str, start_pos: usize) -> Option<usize> {
+        if start_pos >= self.full_data.len() {
+            return None;
+        }
+        self.full_data[start_pos..].find(needle)
+    }
+
+    fn get_next_whitespace(&self, start_pos: usize) -> usize {
+        let bytes = self.full_data.as_bytes();
+        let mut pos = start_pos;
+        while pos < bytes.len() {
+            if Self::is_whitespace(bytes[pos] as char) {
+                return pos;
+            }
+            pos += 1;
+        }
+        pos
+    }
+
+    fn get_token(&mut self) -> Result<Option<String>, String> {
+        // Reset delimiter
+        self.last_delimiter = '?';
+
+        // Skip whitespace
+        self.pass_whitespace();
+
+        // Check if we're at the end
+        if self.index >= self.full_data.len() {
+            return Ok(None);
+        }
+
+        let bytes = self.full_data.as_bytes();
+
+        // Handle comments
+        if bytes[self.index] == b'#' {
+            if let Some(length) = self.find_substring("\n", self.index) {
+                let token = self.full_data[self.index..self.index + length].to_string();
+                self.last_delimiter = '#';
+                self.update_line_number(self.index, length + 1);
+                self.index += length + 1;
+                return Ok(Some(token));
+            } else {
+                // Comment at end of file with no newline
+                return Ok(None);
+            }
+        }
+
+        // Handle multiline values (semicolon-delimited)
+        if self.index + 1 < bytes.len() && bytes[self.index] == b';' && bytes[self.index + 1] == b'\n' {
+            if let Some(length) = self.find_substring("\n;", self.index) {
+                // We started with a newline so count it
+                self.line_no += 1;
+                self.index += 2;
+
+                let token = self.full_data[self.index..self.index + length - 1].to_string();
+                self.last_delimiter = ';';
+                self.update_line_number(self.index, length);
+                self.index += length;
+                return Ok(Some(token));
+            } else {
+                return Err(format!("Invalid file. Semicolon-delineated value was not terminated. Error on line: {}", self.line_no + 1));
+            }
+        }
+
+        // Handle single-quoted values
+        if bytes[self.index] == b'\'' {
+            if let Some(mut end_quote) = self.find_substring("'", self.index + 1) {
+                // Make sure we don't stop for quotes not followed by whitespace
+                loop {
+                    let absolute_quote_pos = self.index + end_quote + 1;
+                    if absolute_quote_pos + 1 < bytes.len() && !Self::is_whitespace(bytes[absolute_quote_pos + 1] as char) {
+                        // Search for next quote starting after this one
+                        if let Some(next_relative_idx) = self.find_substring("'", absolute_quote_pos + 1) {
+                            // Update end_quote to be relative to self.index
+                            end_quote = (absolute_quote_pos - self.index) + next_relative_idx + 1;
+                        } else {
+                            return Err("Invalid file. Single quoted value was never terminated at end of file.".to_string());
+                        }
+                    } else {
+                        break;
+                    }
+                }
+
+                // Check for newlines
+                if self.check_multiline(end_quote + 1) {
+                    return Err(format!("Invalid file. Single quoted value was not terminated on the same line it began. Error on line: {}", self.line_no + 1));
+                }
+
+                self.index += 1;
+                let token = self.full_data[self.index..self.index + end_quote].to_string();
+                self.last_delimiter = '\'';
+                self.update_line_number(self.index, end_quote + 1);
+                self.index += end_quote + 1;
+                return Ok(Some(token));
+            } else {
+                return Err(format!("Invalid file. Single quoted value was not terminated. Error on line: {}", self.line_no + 1));
+            }
+        }
+
+        // Handle double-quoted values
+        if bytes[self.index] == b'"' {
+            if let Some(mut end_quote) = self.find_substring("\"", self.index + 1) {
+                // Make sure we don't stop for quotes not followed by whitespace
+                loop {
+                    let absolute_quote_pos = self.index + end_quote + 1;
+                    if absolute_quote_pos + 1 < bytes.len() && !Self::is_whitespace(bytes[absolute_quote_pos + 1] as char) {
+                        // Search for next quote starting after this one
+                        if let Some(next_relative_idx) = self.find_substring("\"", absolute_quote_pos + 1) {
+                            // Update end_quote to be relative to self.index
+                            end_quote = (absolute_quote_pos - self.index) + next_relative_idx + 1;
+                        } else {
+                            return Err("Invalid file. Double quoted value was never terminated at end of file.".to_string());
+                        }
+                    } else {
+                        break;
+                    }
+                }
+
+                // Check for newlines
+                if self.check_multiline(end_quote + 1) {
+                    return Err(format!("Invalid file. Double quoted value was not terminated on the same line it began. Error on line: {}", self.line_no + 1));
+                }
+
+                self.index += 1;
+                let token = self.full_data[self.index..self.index + end_quote].to_string();
+                self.last_delimiter = '"';
+                self.update_line_number(self.index, end_quote + 1);
+                self.index += end_quote + 1;
+                return Ok(Some(token));
+            } else {
+                return Err(format!("Invalid file. Double quoted value was not terminated. Error on line: {}", self.line_no + 1));
+            }
+        }
+
+        // Handle normal unquoted tokens
+        let end_pos = self.get_next_whitespace(self.index);
+        let token = self.full_data[self.index..end_pos].to_string();
+
+        // Determine delimiter
+        if self.index == 0 {
+            self.last_delimiter = ' ';
+        } else {
+            self.last_delimiter = ' ';
+        }
+
+        // Check if it's a reference (starts with $ and delimiter was space)
+        if token.starts_with('$') && self.last_delimiter == ' ' && token.len() > 1 {
+            self.last_delimiter = '$';
+        }
+
+        self.update_line_number(self.index, end_pos - self.index + 1);
+        self.index = end_pos + 1;
+        Ok(Some(token))
+    }
+
+    fn get_token_full(&mut self) -> Result<Option<(String, usize, char)>, String> {
+        // Get token and skip comments
+        loop {
+            match self.get_token()? {
+                Some(token) => {
+                    if self.last_delimiter != '#' {
+                        // Unwrap embedded STAR if all lines start with three spaces
+                        let processed_token = if self.last_delimiter == ';' && token.starts_with("\n   ") {
+                            let mut shift_over = true;
+                            let lines: Vec<&str> = token.split('\n').collect();
+
+                            for line in &lines[1..] {  // Skip first empty line
+                                if !line.is_empty() && !line.starts_with("   ") {
+                                    shift_over = false;
+                                    break;
+                                }
+                            }
+
+                            if shift_over && token.contains("\n   ;") {
+                                // Remove the trailing newline and shift text over
+                                let mut processed = token.trim_end_matches('\n').to_string();
+                                processed = processed.replace("\n   ", "\n");
+                                processed
+                            } else {
+                                token
+                            }
+                        } else {
+                            token
+                        };
+
+                        return Ok(Some((processed_token, self.line_no, self.last_delimiter)));
+                    }
+                    // If it's a comment, continue to get the next token
+                }
+                None => return Ok(None),
+            }
+        }
+    }
+}
+
+// Global tokenizer state
+static TOKENIZER: Mutex<TokenizerState> = Mutex::new(TokenizerState {
+    full_data: String::new(),
+    index: 0,
+    line_no: 0,
+    last_delimiter: ' ',
+});
 
 #[derive(Debug)]
 enum ParserState {
@@ -11,6 +290,146 @@ enum ParserState {
     SaveframeBody,
     LoopTags,
     LoopData,
+}
+
+// Python-facing tokenizer functions
+#[pyfunction]
+fn reset() -> PyResult<()> {
+    let mut tokenizer = TOKENIZER.lock().unwrap();
+    tokenizer.reset();
+    Ok(())
+}
+
+#[pyfunction]
+fn get_token_full(py: Python) -> PyResult<Option<(String, usize, char)>> {
+    let mut tokenizer = TOKENIZER.lock().unwrap();
+    match tokenizer.get_token_full() {
+        Ok(result) => Ok(result),
+        Err(e) => Err(ParsingError::new_err(e)),
+    }
+}
+
+#[pyfunction]
+fn quote_value(py: Python, orig: &Bound<PyAny>) -> PyResult<String> {
+    // Convert to string
+    let str_obj = orig.str()?;
+    let s = str_obj.to_str()?;
+
+    // Get length
+    let len = s.len();
+
+    // Don't allow empty string
+    if len == 0 {
+        return Err(PyValueError::new_err("Empty strings are not allowed as values. Use the None singleton, or '.' to represent null values."));
+    }
+
+    // Handle embedded STAR format multiline comments
+    if s.contains("\n;") {
+        let replaced = s.replace("\n", "\n   ");
+
+        // Check if we need newlines at start/end
+        let needs_start_newline = !replaced.starts_with('\n');
+        let needs_end_newline = !replaced.ends_with('\n');
+
+        return Ok(match (needs_start_newline, needs_end_newline) {
+            (true, true) => format!("\n   {}\n", replaced),
+            (true, false) => format!("\n   {}", replaced),
+            (false, true) => format!("{}\n", replaced),
+            (false, false) => replaced,
+        });
+    }
+
+    // If it has newlines but not "\n;", handle multiline
+    if s.contains('\n') {
+        if s.ends_with('\n') {
+            return Ok(s.to_string());
+        } else {
+            return Ok(format!("{}\n", s));
+        }
+    }
+
+    // Check for quotes
+    let has_single = s.contains('\'');
+    let has_double = s.contains('"');
+
+    // If it has both single and double quotes, need special handling
+    if has_single && has_double {
+        let chars: Vec<char> = s.chars().collect();
+        let mut can_wrap_single = true;
+        let mut can_wrap_double = true;
+
+        for i in 0..chars.len()-1 {
+            if TokenizerState::is_whitespace(chars[i+1]) {
+                if chars[i] == '\'' {
+                    can_wrap_single = false;
+                }
+                if chars[i] == '"' {
+                    can_wrap_double = false;
+                }
+            }
+        }
+
+        if !can_wrap_single && !can_wrap_double {
+            return Ok(format!("{}\n", s));
+        }
+        if can_wrap_single {
+            return Ok(format!("'{}'", s));
+        }
+        if can_wrap_double {
+            return Ok(format!("\"{}\"", s));
+        }
+    }
+
+    // Check if we need wrapping
+    let mut needs_wrapping = false;
+
+    // Check first character
+    if s.starts_with('_') || s.starts_with('"') || s.starts_with('\'') {
+        needs_wrapping = true;
+    }
+
+    if !needs_wrapping {
+        let lower = s.to_lowercase();
+
+        // Check for reserved keywords
+        if lower.starts_with("data_") || lower.starts_with("save_") ||
+           lower.starts_with("loop_") || lower.starts_with("stop_") ||
+           lower.starts_with("global_") {
+            needs_wrapping = true;
+        }
+
+        // Check for whitespace or problematic characters
+        if !needs_wrapping {
+            let chars: Vec<char> = s.chars().collect();
+            for i in 0..chars.len() {
+                if TokenizerState::is_whitespace(chars[i]) {
+                    needs_wrapping = true;
+                    break;
+                }
+                // The pound sign only needs quotes if preceded by whitespace
+                if chars[i] == '#' {
+                    if i == 0 || TokenizerState::is_whitespace(chars[i-1]) {
+                        needs_wrapping = true;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    if needs_wrapping {
+        // If there is a single quote wrap in double quotes
+        if has_single {
+            return Ok(format!("\"{}\"", s));
+        }
+        // Either there is a double quote or no quotes
+        else {
+            return Ok(format!("'{}'", s));
+        }
+    }
+
+    // If we got here it's good to go as is
+    Ok(s.to_string())
 }
 
 struct ParserContext {
@@ -50,33 +469,24 @@ impl ParserContext {
     }
 
     fn get_token(&mut self, py: Python) -> PyResult<Option<String>> {
-        let cnmrstar = py.import("pynmrstar.cnmrstar")?;
-        let result = cnmrstar.call_method0("get_token_full")?;
-
-        if result.is_none() {
-            self.token = None;
-            return Ok(None);
+        let mut tokenizer = TOKENIZER.lock().unwrap();
+        match tokenizer.get_token_full() {
+            Ok(Some((token, line_no, delimiter))) => {
+                self.token = Some(token.clone());
+                self.line_number = line_no;
+                self.delimiter = delimiter.to_string();
+                Ok(Some(token))
+            }
+            Ok(None) => {
+                self.token = None;
+                Ok(None)
+            }
+            Err(e) => Err(ParsingError::new_err(e)),
         }
-
-        let tuple = result.extract::<(Option<String>, usize, Option<String>)>()?;
-
-        // If token is None, we're at EOF
-        if tuple.0.is_none() {
-            self.token = None;
-            return Ok(None);
-        }
-
-        let token_str = tuple.0.unwrap();
-        let delimiter = tuple.2.unwrap_or_else(|| " ".to_string());
-        self.token = Some(token_str.clone());
-        self.line_number = tuple.1;
-        self.delimiter = delimiter;
-
-        Ok(Some(token_str))
     }
 
     fn raise_error(&self, message: &str) -> PyErr {
-        PyValueError::new_err(format!("{} (line {})", message, self.line_number))
+        ParsingError::new_err(format!("{} (line {})", message, self.line_number))
     }
 }
 
@@ -331,7 +741,10 @@ fn parse_loop_data(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
                 if ctx.raise_parse_warnings {
                     return Err(ctx.raise_error("Loop with no tags."));
                 } else {
-                    eprintln!("Warning: Loop with no tags in parsed file on line: {}", ctx.line_number);
+                    // Log warning via Python logger
+                    let logging = py.import("logging")?;
+                    let logger = logging.call_method1("getLogger", ("pynmrstar",))?;
+                    logger.call_method1("warning", (format!("Loop with no tags in parsed file on line: {}", ctx.line_number),))?;
                 }
             }
 
@@ -339,7 +752,10 @@ fn parse_loop_data(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
                 if ctx.raise_parse_warnings {
                     return Err(ctx.raise_error("Loop with no data."));
                 } else {
-                    eprintln!("Warning: Loop with no data on line: {}", ctx.line_number);
+                    // Log warning via Python logger
+                    let logging = py.import("logging")?;
+                    let logger = logging.call_method1("getLogger", ("pynmrstar",))?;
+                    logger.call_method1("warning", (format!("Loop with no data on line: {}", ctx.line_number),))?;
                 }
             }
 
@@ -439,10 +855,17 @@ fn parse(
     // Convert to PyObject if Some
     let schema = schema.map(|s| s.clone().into());
 
-    // Load data into tokenizer
-    let parser_mod = py.import("pynmrstar.parser")?;
-    let load_data = parser_mod.getattr("Parser")?.getattr("load_data")?;
-    load_data.call1((data,))?;
+    // Preprocess data (same as Python's Parser.load_data)
+    // Fix DOS line endings
+    let data = data.replace("\r\n", "\n").replace("\r", "\n");
+    // Change '\n; data ' started multi-lines to '\n;\ndata'
+    let re = regex::Regex::new(r"\n;([^\n]+?)\n").unwrap();
+    let data = re.replace_all(&data, "\n;\n$1\n").to_string();
+
+    // Load data into tokenizer (using Rust tokenizer directly)
+    let mut tokenizer = TOKENIZER.lock().unwrap();
+    tokenizer.load_string(data);
+    drop(tokenizer); // Release the lock
 
     // Create parser context
     let mut ctx = ParserContext::new(py, entry.clone_ref(py), source,
@@ -452,8 +875,8 @@ fn parse(
     parse_entry_body(py, &mut ctx)?;
 
     // Reset the tokenizer
-    let cnmrstar = py.import("pynmrstar.cnmrstar")?;
-    cnmrstar.call_method0("reset")?;
+    let mut tokenizer = TOKENIZER.lock().unwrap();
+    tokenizer.reset();
 
     Ok(entry)
 }
@@ -461,5 +884,8 @@ fn parse(
 #[pymodule]
 fn pynmrstar_parser(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse, m)?)?;
+    m.add_function(wrap_pyfunction!(reset, m)?)?;
+    m.add_function(wrap_pyfunction!(get_token_full, m)?)?;
+    m.add_function(wrap_pyfunction!(quote_value, m)?)?;
     Ok(())
 }
