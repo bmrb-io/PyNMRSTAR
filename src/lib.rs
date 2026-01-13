@@ -300,9 +300,21 @@ impl TokenizerState {
 }
 
 #[pyfunction]
-fn quote_value(orig: &Bound<PyAny>) -> PyResult<String> {
+#[pyo3(signature = (orig, str_conversion_dict=None))]
+fn quote_value(orig: &Bound<PyAny>, str_conversion_dict: Option<&Bound<'_, PyAny>>) -> PyResult<String> {
+    // Apply STR_CONVERSION_DICT if provided
+    let converted: std::borrow::Cow<'_, Bound<'_, PyAny>> = if let Some(conv_dict) = str_conversion_dict {
+        if conv_dict.contains(orig)? {
+            std::borrow::Cow::Owned(conv_dict.get_item(orig)?)
+        } else {
+            std::borrow::Cow::Borrowed(orig)
+        }
+    } else {
+        std::borrow::Cow::Borrowed(orig)
+    };
+
     // Convert to string
-    let str_obj = orig.str()?;
+    let str_obj = converted.str()?;
     let s = str_obj.to_str()?;
 
     // Don't allow empty string
