@@ -7,6 +7,8 @@ import os
 from typing import Iterable, Any, Dict
 from urllib.error import HTTPError, URLError
 
+import pynmrstar_parser
+
 from pynmrstar import definitions, entry as entry_mod
 from pynmrstar._internal import _interpret_file
 from pynmrstar.schema import Schema
@@ -121,8 +123,6 @@ def quote_value(value: Any) -> str:
         if any(isinstance(value, type(x)) for x in definitions.STR_CONVERSION_DICT):
             value = definitions.STR_CONVERSION_DICT[value]
 
-    # Use the Rust implementation
-    import pynmrstar_parser
     return pynmrstar_parser.quote_value(value)
 
 
