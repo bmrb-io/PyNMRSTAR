@@ -39,23 +39,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
-      - name: Install dependencies for pypy3
-        if: ${{ matrix.python-version == 'pypy3' }}
-        run: pypy3 -m pip install -e .
-      - name: Install dependencies for CPython
-        if: ${{ matrix.python-version != 'pypy3' }}
+      - name: Install package
         run: python3 -m pip install -e .
-      - name: Build c extension for pypy3
-        if: ${{ matrix.python-version == 'pypy3' }}
-        run: pypy3 -m pip install ./c
-      - name: Build c extension for Cpython
-        if: ${{ matrix.python-version != 'pypy3' }}
-        run: python3 -m pip install ./c
-      - name: Run tests using Cpython
-        if: ${{ matrix.python-version != 'pypy3' }}
+      - name: Run tests
         run: python3 -m pynmrstar.unit_tests
-      - name: Run tests using Pypy
-        if: ${{ matrix.python-version == 'pypy3' }}
-        run: pypy3 -m pynmrstar.unit_tests
-        #- name: Launch interactive debug
-        #        uses: mxschmitt/action-tmate@v3
