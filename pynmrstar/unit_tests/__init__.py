@@ -2,7 +2,7 @@
 import logging
 import unittest
 
-logging.getLogger('pynmrstar').setLevel(logging.ERROR)
+logging.getLogger('pynmrstar').setLevel(logging.FATAL)
 
 # Import all test classes
 from .test_entry import TestEntry

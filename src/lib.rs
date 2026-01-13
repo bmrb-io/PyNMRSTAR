@@ -153,8 +153,8 @@ impl TokenizerState {
                     if absolute_quote_pos + 1 < bytes.len() && !Self::is_whitespace(bytes[absolute_quote_pos + 1] as char) {
                         // Search for next quote starting after this one
                         if let Some(next_relative_idx) = self.find_substring("'", absolute_quote_pos + 1) {
-                            // Update end_quote to be relative to self.index
-                            end_quote = (absolute_quote_pos - self.index) + next_relative_idx + 1;
+                            // Update end_quote to be relative to self.index + 1 (after opening quote)
+                            end_quote = (absolute_quote_pos - self.index - 1) + next_relative_idx + 1;
                         } else {
                             return Err("Invalid file. Single quoted value was never terminated at end of file.".to_string());
                         }
@@ -188,8 +188,8 @@ impl TokenizerState {
                     if absolute_quote_pos + 1 < bytes.len() && !Self::is_whitespace(bytes[absolute_quote_pos + 1] as char) {
                         // Search for next quote starting after this one
                         if let Some(next_relative_idx) = self.find_substring("\"", absolute_quote_pos + 1) {
-                            // Update end_quote to be relative to self.index
-                            end_quote = (absolute_quote_pos - self.index) + next_relative_idx + 1;
+                            // Update end_quote to be relative to self.index + 1 (after opening quote)
+                            end_quote = (absolute_quote_pos - self.index - 1) + next_relative_idx + 1;
                         } else {
                             return Err("Invalid file. Double quoted value was never terminated at end of file.".to_string());
                         }

@@ -7,7 +7,7 @@ import os
 from typing import Iterable, Any, Dict
 from urllib.error import HTTPError, URLError
 
-from pynmrstar import definitions, cnmrstar, entry as entry_mod
+from pynmrstar import definitions, entry as entry_mod
 from pynmrstar._internal import _interpret_file
 from pynmrstar.schema import Schema
 
