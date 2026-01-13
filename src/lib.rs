@@ -587,11 +587,35 @@ fn parse_entry_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
 }
 
 fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
+    let mut pending_tags: Vec<(String, String)> = Vec::new();
+
+    // Helper to flush pending tags
+    let mut flush_tags = |ctx: &ParserContext, pending: &mut Vec<(String, String)>| -> PyResult<()> {
+        if !pending.is_empty() {
+            let saveframe = ctx.current_saveframe.as_ref().unwrap();
+            let kwargs = if ctx.schema.is_some() {
+                [
+                    ("convert_data_types", ctx.convert_data_types.into_py(py)),
+                    ("schema", ctx.schema.as_ref().unwrap().clone_ref(py))
+                ].into_py_dict(py)?
+            } else {
+                [("convert_data_types", ctx.convert_data_types.into_py(py))]
+                    .into_py_dict(py)?
+            };
+
+            saveframe.call_method(py, "add_tags", (pending.clone(),), Some(&kwargs))?;
+            pending.clear();
+        }
+        Ok(())
+    };
+
     while ctx.get_token(py)?.is_some() {
         let token = ctx.token.as_ref().unwrap();
         let token_lower = token.to_lowercase();
 
         if token_lower == "loop_" {
+            // Flush any pending tags before processing loop
+            flush_tags(ctx, &mut pending_tags)?;
             if ctx.delimiter != ' ' {
                 return Err(ctx.raise_error("The loop_ keyword may not be quoted or semicolon-delimited."));
             }
@@ -613,6 +637,9 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
             parse_loop_tags(py, ctx)?;
 
         } else if token_lower == "save_" {
+            // Flush any pending tags before exiting saveframe
+            flush_tags(ctx, &mut pending_tags)?;
+
             if ctx.delimiter != ' ' && ctx.delimiter != ';' {
                 return Err(ctx.raise_error("The save_ keyword may not be quoted or semicolon-delimited."));
             }
@@ -665,19 +692,8 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
                 }
             }
 
-            // Add tag to saveframe
-            let saveframe = ctx.current_saveframe.as_ref().unwrap();
-            let kwargs = if ctx.schema.is_some() {
-                [
-                    ("convert_data_types", ctx.convert_data_types.into_py(py)),
-                    ("schema", ctx.schema.as_ref().unwrap().clone_ref(py))
-                ].into_py_dict(py)?
-            } else {
-                [("convert_data_types", ctx.convert_data_types.into_py(py))]
-                    .into_py_dict(py)?
-            };
-
-            saveframe.call_method(py, "add_tag", (tag_name, value), Some(&kwargs))?;
+            // Collect tag-value pair for batch addition
+            pending_tags.push((tag_name, value.to_string()));
         } else {
             // Invalid token in saveframe
             let frame_name = ctx.current_saveframe.as_ref().unwrap()
@@ -711,24 +727,30 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
 }
 
 fn parse_loop_tags(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
+    let mut tags = Vec::new();
+
     while ctx.in_loop && ctx.get_token(py)?.is_some() {
         let token = ctx.token.as_ref().unwrap();
 
         // Check if this is a tag
         if token.starts_with('_') && ctx.delimiter == ' ' {
-            // Add tag to loop
-            let loop_obj = ctx.current_loop.as_ref().unwrap();
-            loop_obj.call_method1(py, "add_tag", (token,))?;
+            // Collect tag for batch addition
+            tags.push(token.to_string());
         } else {
-            // First non-tag token, add loop to saveframe and switch to data parsing
+            // First non-tag token, batch add all tags to loop
             let loop_obj = ctx.current_loop.as_ref().unwrap();
+
+            // Batch add all collected tags
+            if !tags.is_empty() {
+                loop_obj.call_method1(py, "add_tag", (tags.as_slice(),))?;
+            }
+
             let saveframe = ctx.current_saveframe.as_ref().unwrap();
             saveframe.call_method1(py, "add_loop", (loop_obj,))?;
 
             // Preallocate loop_data Vec based on number of tags
             // Estimate: average of 100 rows per loop seems reasonable
-            let tags = loop_obj.bind(py).getattr("tags")?;
-            let tags_len = tags.len()?;
+            let tags_len = tags.len();
             if tags_len > 0 {
                 ctx.loop_data.reserve(tags_len * 100);
             }

@@ -638,7 +638,10 @@ class Saveframe(object):
                                  f'conflicts with the saveframe name {self._name}.')
         self._tags.append(new_tag)
 
-    def add_tags(self, tag_list: list, update: bool = False) -> None:
+    def add_tags(self, tag_list: list,
+                 update: bool = False,
+                 convert_data_types: bool = False,
+                 schema: Schema = None) -> None:
         """Adds multiple tags to the list. Input should be a list of
         tuples that are either [key, value] or [key]. In the latter case
         the value will be set to ".".  Set update to true to update a
@@ -646,9 +649,9 @@ class Saveframe(object):
 
         for tag_pair in tag_list:
             if len(tag_pair) == 2:
-                self.add_tag(tag_pair[0], tag_pair[1], update=update)
+                self.add_tag(tag_pair[0], tag_pair[1], update=update, convert_data_types=convert_data_types, schema=schema)
             elif len(tag_pair) == 1:
-                self.add_tag(tag_pair[0], ".", update=update)
+                self.add_tag(tag_pair[0], ".", update=update, convert_data_types=convert_data_types, schema=schema)
             else:
                 raise ValueError(f"You provided an invalid tag/value to add: '{tag_pair}'.")
 
