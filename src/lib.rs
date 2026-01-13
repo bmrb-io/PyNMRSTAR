@@ -9,7 +9,6 @@ use once_cell::sync::Lazy;
 import_exception!(pynmrstar.exceptions, ParsingError);
 
 const RESERVED_KEYWORDS: [&str; 5] = ["data_", "save_", "loop_", "stop_", "global_"];
-const WHITESPACE_CHARS: [char; 4] = [' ', '\n', '\t', '\x0B']; // \v is \x0B
 
 // Static regex for preprocessing, compiled once
 static MULTILINE_REGEX: Lazy<regex::Regex> = Lazy::new(|| {
@@ -25,15 +24,6 @@ struct TokenizerState {
 }
 
 impl TokenizerState {
-    fn new() -> Self {
-        TokenizerState {
-            full_data: String::new(),
-            index: 0,
-            line_no: 0,
-            last_delimiter: ' ',
-        }
-    }
-
     fn reset(&mut self) {
         self.full_data.clear();
         self.index = 0;
@@ -323,15 +313,6 @@ static TOKENIZER: Mutex<TokenizerState> = Mutex::new(TokenizerState {
     last_delimiter: ' ',
 });
 
-#[derive(Debug)]
-enum ParserState {
-    Initial,
-    EntryBody,
-    SaveframeBody,
-    LoopTags,
-    LoopData,
-}
-
 // Python-facing tokenizer functions
 #[pyfunction]
 fn reset() -> PyResult<()> {
@@ -341,7 +322,7 @@ fn reset() -> PyResult<()> {
 }
 
 #[pyfunction]
-fn get_token_full(py: Python) -> PyResult<Option<(String, usize, char)>> {
+fn get_token_full() -> PyResult<Option<(String, usize, char)>> {
     let mut tokenizer = TOKENIZER.lock().unwrap();
     match tokenizer.get_token_full() {
         Ok(result) => Ok(result),
@@ -350,7 +331,7 @@ fn get_token_full(py: Python) -> PyResult<Option<(String, usize, char)>> {
 }
 
 #[pyfunction]
-fn quote_value(py: Python, orig: &Bound<PyAny>) -> PyResult<String> {
+fn quote_value(orig: &Bound<PyAny>) -> PyResult<String> {
     // Convert to string
     let str_obj = orig.str()?;
     let s = str_obj.to_str()?;
@@ -549,7 +530,7 @@ impl ParserContext {
         })
     }
 
-    fn get_token(&mut self, py: Python) -> PyResult<Option<String>> {
+    fn get_token(&mut self) -> PyResult<Option<String>> {
         let mut tokenizer = TOKENIZER.lock().unwrap();
         match tokenizer.get_token_full() {
             Ok(Some((token, line_no, delimiter))) => {
@@ -595,7 +576,7 @@ fn starts_with_ignore_case(s: &str, prefix: &str) -> bool {
 
 fn parse_initial(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
     // Get first token
-    ctx.get_token(py)?;
+    ctx.get_token()?;
 
     let token = ctx.token.as_ref()
         .ok_or_else(|| ctx.raise_error("Empty file"))?;
@@ -627,7 +608,7 @@ fn parse_initial(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
 }
 
 fn parse_entry_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
-    while ctx.get_token(py)?.is_some() {
+    while ctx.get_token()?.is_some() {
         let token = ctx.token.as_ref().unwrap();
 
         if !starts_with_ignore_case(token, "save_") {
@@ -670,7 +651,7 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
     let mut pending_tags: Vec<(String, String)> = Vec::new();
 
     // Helper to flush pending tags
-    let mut flush_tags = |ctx: &ParserContext, pending: &mut Vec<(String, String)>| -> PyResult<()> {
+    let flush_tags = |ctx: &ParserContext, pending: &mut Vec<(String, String)>| -> PyResult<()> {
         if !pending.is_empty() {
             let saveframe = ctx.current_saveframe.as_ref().unwrap();
             saveframe.call_method(py, "add_tags", (pending.clone(),), Some(ctx.add_tags_kwargs.bind(py).downcast()?))?;
@@ -679,7 +660,7 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
         Ok(())
     };
 
-    while ctx.get_token(py)?.is_some() {
+    while ctx.get_token()?.is_some() {
         let token = ctx.token.as_ref().unwrap();
 
         if token.eq_ignore_ascii_case("loop_") {
@@ -737,7 +718,7 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
             let tag_name = token.to_string();
 
             // Get tag value
-            ctx.get_token(py)?;
+            ctx.get_token()?;
             let value = ctx.token.as_ref()
                 .ok_or_else(|| ctx.raise_error("Tag without value"))?;
 
@@ -796,7 +777,7 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
 fn parse_loop_tags(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
     let mut tags = Vec::new();
 
-    while ctx.in_loop && ctx.get_token(py)?.is_some() {
+    while ctx.in_loop && ctx.get_token()?.is_some() {
         let token = ctx.token.as_ref().unwrap();
 
         // Check if this is a tag
@@ -933,7 +914,7 @@ fn parse_loop_data(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
         }
 
         // Get next token
-        ctx.get_token(py)?;
+        ctx.get_token()?;
     }
 
     Ok(())
