@@ -5,7 +5,7 @@ from io import StringIO
 from pathlib import Path
 from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Iterable, Tuple
 
-from pynmrstar import definitions, entry as entry_mod, loop as loop_mod, parser as parser_mod, utils
+from pynmrstar import definitions, entry as entry_mod, loop as loop_mod, utils, parser
 from pynmrstar._internal import _get_comments, _json_serialize, _interpret_file, get_clean_tag_list, write_to_file
 from pynmrstar.exceptions import InvalidStateError
 from pynmrstar.schema import Schema
@@ -230,8 +230,10 @@ class Saveframe(object):
 
         # Load the BMRB entry from the file
         star_buffer = StringIO("data_1 " + star_buffer.read())
-        parser = parser_mod.Parser(entry_to_parse_into=tmp_entry)
-        parser.parse(star_buffer.read(), source=self.source, convert_data_types=kwargs.get('convert_data_types', False),
+        parser.parse(star_buffer.read(),
+                     parse_into=tmp_entry,
+                     source=self.source,
+                     convert_data_types=kwargs.get('convert_data_types', False),
                      raise_parse_warnings=kwargs.get('raise_parse_warnings', False))
 
         # Copy the first parsed saveframe into ourself

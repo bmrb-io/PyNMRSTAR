@@ -7,11 +7,10 @@ from itertools import chain
 from pathlib import Path
 from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Callable, Tuple, Generator
 
-from pynmrstar import definitions, utils, entry as entry_mod
+from pynmrstar import definitions, utils, entry as entry_mod, parser
 from pynmrstar._internal import _json_serialize, _interpret_file
 from pynmrstar._types import DataInput
 from pynmrstar.exceptions import InvalidStateError, ParsingError
-from pynmrstar.parser import Parser
 from pynmrstar.schema import Schema
 
 
@@ -121,8 +120,8 @@ class Loop(object):
         # Load the BMRB entry from the file
         star_buffer = StringIO(f"data_0 save_internaluseyoushouldntseethis_frame _internal.use internal "
                                f"{star_buffer.read()} save_")
-        parser = Parser(entry_to_parse_into=tmp_entry)
         parser.parse(star_buffer.read(),
+                     parse_into=tmp_entry,
                      source=self.source,
                      convert_data_types=kwargs.get('convert_data_types', False),
                      raise_parse_warnings=kwargs.get('raise_parse_warnings', False),

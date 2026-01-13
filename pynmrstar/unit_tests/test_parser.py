@@ -3,7 +3,6 @@ import unittest
 
 from pynmrstar import Entry, Saveframe, Loop
 from pynmrstar.exceptions import ParsingError
-from pynmrstar.parser import Parser
 
 
 class TestParser(unittest.TestCase):

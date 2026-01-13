@@ -15,7 +15,6 @@ from pynmrstar import utils
 from pynmrstar._internal import __version__, min_cnmrstar_version
 from pynmrstar.entry import Entry
 from pynmrstar.loop import Loop
-from pynmrstar.parser import Parser as _Parser
 from pynmrstar.saveframe import Saveframe
 from pynmrstar.schema import Schema
 
@@ -29,6 +28,5 @@ del loop
 del entry
 del saveframe
 del schema
-del parser
 
 __all__ = ['Loop', 'Saveframe', 'Entry', 'Schema', 'definitions', 'utils', '__version__', 'exceptions', 'cnmrstar']
