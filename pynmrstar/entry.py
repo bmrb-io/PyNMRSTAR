@@ -6,7 +6,7 @@ from io import StringIO
 from pathlib import Path
 from typing import TextIO, BinaryIO, Union, List, Optional, Dict, Any, Tuple
 
-from pynmrstar import definitions, utils, loop as loop_mod, parser as parser_mod, saveframe as saveframe_mod
+from pynmrstar import definitions, utils, loop as loop_mod, saveframe as saveframe_mod, parser
 from pynmrstar._internal import _json_serialize, _interpret_file, _get_entry_from_database, write_to_file
 from pynmrstar.exceptions import InvalidStateError
 from pynmrstar.schema import Schema
@@ -128,8 +128,10 @@ class Entry(object):
             return
 
         # Load the BMRB entry from the file
-        parser: parser_mod.Parser = parser_mod.Parser(entry_to_parse_into=self)
-        parser.parse(star_buffer.read(), source=self.source, convert_data_types=kwargs.get('convert_data_types', False),
+        parser.parse(star_buffer.read(),
+                     parse_into=self,
+                     source=self.source,
+                     convert_data_types=kwargs.get('convert_data_types', False),
                      raise_parse_warnings=kwargs.get('raise_parse_warnings', False))
 
     def __iter__(self) -> saveframe_mod.Saveframe:

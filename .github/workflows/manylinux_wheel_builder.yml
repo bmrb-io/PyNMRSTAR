@@ -3,9 +3,6 @@ name: Build and upload to PyPI
 on:
   workflow_dispatch:
   pull_request:
-  push:
-    branches:
-      - v3
   release:
     types:
       - published
@@ -16,17 +13,27 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        # macos-13 is an intel runner, macos-14 is apple silicon
-        os: [ubuntu-latest, windows-latest, macos-13, macos-14]
+        os: [ubuntu-latest, windows-latest, macos-15, macos-15-intel]
 
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.23.3
         env:
+          # Skip PyPy versions below 3.11 (PyO3 requirement) and 32-bit Linux (Rust unsupported)
+          CIBW_SKIP: "pp37-* pp38-* pp39-* pp310-* *-musllinux_i686 *-manylinux_i686"
           # Ensure cibuildwheel uses PEP 517 build
           CIBW_BUILD_FRONTEND: "build"
+          # Install Rust in the cibuildwheel environment
+          CIBW_BEFORE_ALL_LINUX: "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y && source $HOME/.cargo/env"
+          CIBW_BEFORE_ALL_MACOS: "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y && source $HOME/.cargo/env"
+          CIBW_BEFORE_ALL_WINDOWS: "rustup default stable"
+          CIBW_ENVIRONMENT_LINUX: 'PATH="$HOME/.cargo/bin:$PATH"'
+          CIBW_ENVIRONMENT_MACOS: 'PATH="$HOME/.cargo/bin:$PATH" MACOSX_DEPLOYMENT_TARGET=10.15'
 
       - uses: actions/upload-artifact@v4
         with:

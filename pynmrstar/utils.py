@@ -7,7 +7,9 @@ import os
 from typing import Iterable, Any, Dict
 from urllib.error import HTTPError, URLError
 
-from pynmrstar import definitions, cnmrstar, entry as entry_mod
+import pynmrstar_parser
+
+from pynmrstar import definitions, entry as entry_mod
 from pynmrstar._internal import _interpret_file
 from pynmrstar.schema import Schema
 
@@ -111,17 +113,12 @@ def quote_value(value: Any) -> str:
     This will automatically be called on all values when you use a str()
     method (so don't call it before inserting values into tags or loops).
 
-    Be mindful of the value of STR_CONVERSION_DICT as it will effect the
+    Be mindful of the value of STR_CONVERSION_DICT as it will affect the
     way the value is converted to a string.
 
     """
 
-    # Allow manual specification of conversions for booleans, Nones, etc.
-    if value in definitions.STR_CONVERSION_DICT:
-        if any(isinstance(value, type(x)) for x in definitions.STR_CONVERSION_DICT):
-            value = definitions.STR_CONVERSION_DICT[value]
-
-    return cnmrstar.quote_value(value)
+    return pynmrstar_parser.quote_value(value, definitions.STR_CONVERSION_DICT)
 
 
 def validate(entry_to_validate: 'entry_mod.Entry', schema: 'Schema' = None) -> None:

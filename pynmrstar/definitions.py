@@ -22,7 +22,6 @@ WARNINGS:
 
 NULL_VALUES = ['', ".", "?", None]
 WHITESPACE: str = " \t\n\v"
-RESERVED_KEYWORDS = ["data_", "save_", "loop_", "stop_", "global_"]
 STR_CONVERSION_DICT: dict = {None: "."}
 
 API_URL: str = "https://api.bmrb.io/v2"
