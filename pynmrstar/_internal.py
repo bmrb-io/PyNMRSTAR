@@ -6,6 +6,7 @@ import time
 import zlib
 from datetime import date
 from gzip import GzipFile
+from importlib.metadata import version
 from io import StringIO, BytesIO
 from pathlib import Path
 from typing import Dict, Union, IO, List, Tuple
@@ -15,7 +16,7 @@ import requests
 
 import pynmrstar
 
-__version__: str = "3.4.0b1"
+__version__: str = version("pynmrstar")
 
 # Create a session to reuse for the duration of the program run
 _session = requests.session()
