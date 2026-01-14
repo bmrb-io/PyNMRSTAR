@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "pynmrstar"
-version = "3.4.0b1"
+version = "3.4.0b2"
 description = "PyNMR-STAR provides tools for reading, writing, modifying, and interacting with NMR-STAR files. Maintained by the BMRB."
 readme = "README.rst"
 requires-python = ">3.7"
@@ -41,9 +41,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/bmrb-io/PyNMRSTAR"
 
-[tool.setuptools]
-packages = ["pynmrstar"]
-package-data = {pynmrstar = ["reference_files/schema.csv", "reference_files/comments.str", "reference_files/data_types.csv"]}
-
 [tool.maturin]
 module-name = "pynmrstar_parser"
+python-packages = ["pynmrstar"]
+exclude = ["pynmrstar/unit_tests/**"]
