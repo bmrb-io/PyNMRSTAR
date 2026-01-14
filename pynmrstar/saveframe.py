@@ -5,6 +5,8 @@ from io import StringIO
 from pathlib import Path
 from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Iterable, Tuple
 
+import pynmrstar_parser
+
 from pynmrstar import definitions, entry as entry_mod, loop as loop_mod, utils, parser
 from pynmrstar._internal import _get_comments, _json_serialize, _interpret_file, get_clean_tag_list, write_to_file
 from pynmrstar.exceptions import InvalidStateError
@@ -526,7 +528,7 @@ class Saveframe(object):
                 if skip_empty_tags and each_tag[1] in definitions.NULL_VALUES:
                     continue
                 try:
-                    clean_tag = utils.quote_value(each_tag[1])
+                    clean_tag = pynmrstar_parser.quote_value(each_tag[1], definitions.STR_CONVERSION_DICT)
                 except ValueError:
                     raise InvalidStateError('Cannot generate NMR-STAR for entry, as empty strings are not valid tag'
                                             ' values in NMR-STAR. Please either replace the empty strings with None '

@@ -98,29 +98,6 @@ def iter_entries(metabolomics: bool = False) -> Iterable['entry_mod.Entry']:
         yield entry_mod.Entry.from_database(entry)
 
 
-@functools.lru_cache(maxsize=65536, typed=True)
-def quote_value(value: Any) -> str:
-    """Automatically quotes the value in the appropriate way. Don't
-    quote values you send to this method or they will show up in
-    another set of quotes as part of the actual data. E.g.:
-
-    quote_value('"e. coli"') returns '\'"e. coli"\''
-
-    while
-
-    quote_value("e. coli") returns "'e. coli'"
-
-    This will automatically be called on all values when you use a str()
-    method (so don't call it before inserting values into tags or loops).
-
-    Be mindful of the value of STR_CONVERSION_DICT as it will affect the
-    way the value is converted to a string.
-
-    """
-
-    return pynmrstar_parser.quote_value(value, definitions.STR_CONVERSION_DICT)
-
-
 def validate(entry_to_validate: 'entry_mod.Entry', schema: 'Schema' = None) -> None:
     """Prints a validation report of an object."""
 
