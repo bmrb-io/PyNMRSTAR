@@ -33,7 +33,7 @@ jobs:
           CIBW_BEFORE_ALL_MACOS: "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y && source $HOME/.cargo/env"
           CIBW_BEFORE_ALL_WINDOWS: "rustup default stable"
           CIBW_ENVIRONMENT_LINUX: 'PATH="$HOME/.cargo/bin:$PATH"'
-          CIBW_ENVIRONMENT_MACOS: 'PATH="$HOME/.cargo/bin:$PATH" MACOSX_DEPLOYMENT_TARGET=10.12'
+          CIBW_ENVIRONMENT_MACOS: 'PATH="$HOME/.cargo/bin:$PATH" MACOSX_DEPLOYMENT_TARGET=10.15'
 
       - uses: actions/upload-artifact@v4
         with:
