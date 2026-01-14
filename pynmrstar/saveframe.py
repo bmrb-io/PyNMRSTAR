@@ -528,7 +528,7 @@ class Saveframe(object):
                 if skip_empty_tags and each_tag[1] in definitions.NULL_VALUES:
                     continue
                 try:
-                    clean_tag = pynmrstar_parser.parse(each_tag[1], definitions.STR_CONVERSION_DICT)
+                    clean_tag = pynmrstar_parser.quote_value(each_tag[1], definitions.STR_CONVERSION_DICT)
                 except ValueError:
                     raise InvalidStateError('Cannot generate NMR-STAR for entry, as empty strings are not valid tag'
                                             ' values in NMR-STAR. Please either replace the empty strings with None '
