@@ -506,47 +506,33 @@ class Saveframe(object):
         if self.tag_prefix is None:
             raise InvalidStateError(f"The tag prefix was never set! Error in saveframe named '{self.name}'.")
 
-        return_chunks = []
-
-        # Insert the comment if not disabled
+        # Handle comments in Python (simple, not performance-critical)
+        comment_prefix = ""
         if show_comments:
             if self._category in _get_comments():
                 this_comment = _get_comments()[self._category]
                 if first_in_category or this_comment['every_flag']:
-                    return_chunks.append(_get_comments()[self._category]['comment'])
+                    comment_prefix = _get_comments()[self._category]['comment']
 
-        # Print the saveframe
-        return_chunks.append(f"save_{self.name}\n")
+        # Format the loops first (each loop's format() already uses Rust)
+        formatted_loops = [each_loop.format(skip_empty_loops=skip_empty_loops, skip_empty_tags=skip_empty_tags)
+                          for each_loop in self._loops]
 
-        if len(self._tags) > 0:
-            width = max([len(self.tag_prefix + "." + x[0]) for x in self._tags])
-            pstring = "   %%-%ds  %%s\n" % width
-            mstring = "   %%-%ds\n;\n%%s;\n" % width
-
-            # Print the tags
-            for each_tag in self._tags:
-                if skip_empty_tags and each_tag[1] in definitions.NULL_VALUES:
-                    continue
-                try:
-                    clean_tag = pynmrstar_parser.quote_value(each_tag[1], definitions.STR_CONVERSION_DICT)
-                except ValueError:
-                    raise InvalidStateError('Cannot generate NMR-STAR for entry, as empty strings are not valid tag'
-                                            ' values in NMR-STAR. Please either replace the empty strings with None '
-                                            'objects, or set pynmrstar.definitions.STR_CONVERSION_DICT[\'\'] = None. '
-                                            f'Saveframe: {self.name} Tag: {each_tag[0]}')
-
-                formatted_tag = self.tag_prefix + "." + each_tag[0]
-                if "\n" in clean_tag:
-                    return_chunks.append(mstring % (formatted_tag, clean_tag))
-                else:
-                    return_chunks.append(pstring % (formatted_tag, clean_tag))
-
-        # Print any loops
-        for each_loop in self._loops:
-            return_chunks.append(each_loop.format(skip_empty_loops=skip_empty_loops, skip_empty_tags=skip_empty_tags))
-
-        # Close the saveframe
-        return "".join(return_chunks) + "\nsave_\n"
+        # Use the Rust implementation for the main formatting work
+        try:
+            result = pynmrstar_parser.format_saveframe(
+                self.name,
+                self.tag_prefix,
+                self._tags,
+                formatted_loops,
+                skip_empty_tags,
+                definitions.STR_CONVERSION_DICT,
+                definitions.NULL_VALUES
+            )
+            return comment_prefix + result
+        except ValueError as e:
+            # Convert ValueError from Rust to InvalidStateError for consistency
+            raise InvalidStateError(str(e))
 
     def add_loop(self, loop_to_add: 'loop_mod.Loop') -> None:
         """Add a loop to the saveframe loops."""
