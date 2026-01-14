@@ -1,6 +1,22 @@
 Release notes
 =============
 
+3.4.0
+~~~~~
+
+Major improvements:
+
+The C helper module has been reimplemented in Rust and other performance critical functions have also been
+moved to the Rust module. (Specifically, the Parsing logic and the loop string formatting logic.) Additional effort
+towards maximizing the performance of the Rust module has been made, leading to massive speedups in performance
+of common actions.
+
+- Parsing a file is now nearly twice as fast.
+- Rendering an Entry to a string is now nearly three times as fast.
+
+This change is tested to be and understood to be fully backwards compatible, but due to the major nature of the
+change is getting a new minor version number.
+
 3.3.6
 ~~~~~
 
