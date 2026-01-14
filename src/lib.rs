@@ -360,29 +360,29 @@ struct ParserContext {
     delimiter: char,
     token: Option<(usize, usize)>,
     processed_token: Option<String>,  // For rare cases where we need to process the token
-    entry: PyObject,
-    current_saveframe: Option<PyObject>,
-    current_loop: Option<PyObject>,
+    entry: Py<PyAny>,
+    current_saveframe: Option<Py<PyAny>>,
+    current_loop: Option<Py<PyAny>>,
     loop_data: Vec<TokenValue>,  // Store indices instead of materialized strings
     seen_data: bool,
     in_loop: bool,
     _source: String,
     raise_parse_warnings: bool,
     _convert_data_types: bool,
-    _schema: Option<PyObject>,
-    saveframe_class: PyObject,
-    loop_class: PyObject,
-    source_dict: PyObject,
-    add_tags_kwargs: PyObject,
-    add_data_kwargs: PyObject,
+    _schema: Option<Py<PyAny>>,
+    saveframe_class: Py<PyAny>,
+    loop_class: Py<PyAny>,
+    source_dict: Py<PyAny>,
+    add_tags_kwargs: Py<PyAny>,
+    add_data_kwargs: Py<PyAny>,
     // Loop pre-allocation tracking by loop type
     loop_statistics: std::collections::HashMap<String, LoopStatistics>,
     current_loop_type: Option<String>,
 }
 
 impl ParserContext {
-    fn new(py: Python, entry: PyObject, source: String, raise_parse_warnings: bool,
-           convert_data_types: bool, schema: Option<PyObject>, tokenizer: TokenizerState) -> PyResult<Self> {
+    fn new(py: Python, entry: Py<PyAny>, source: String, raise_parse_warnings: bool,
+           convert_data_types: bool, schema: Option<Py<PyAny>>, tokenizer: TokenizerState) -> PyResult<Self> {
         // Cache module/class lookups at initialization
         let saveframe_mod = py.import("pynmrstar.saveframe")?;
         let saveframe_class = saveframe_mod.getattr("Saveframe")?.into();
@@ -587,7 +587,7 @@ fn parse_entry_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
         let saveframe = ctx.saveframe_class.bind(py).call_method(
             "from_scratch",
             (saveframe_name,),
-            Some(ctx.source_dict.bind(py).downcast()?)
+            Some(ctx.source_dict.bind(py).cast()?)
         )?;
 
         ctx.current_saveframe = Some(saveframe.into());
@@ -613,7 +613,7 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
                 .iter()
                 .map(|(tag, value)| (tag.to_string(&ctx.tokenizer.full_data), value.to_string(&ctx.tokenizer.full_data)))
                 .collect();
-            saveframe.call_method(py, "add_tags", (materialized,), Some(ctx.add_tags_kwargs.bind(py).downcast()?))?;
+            saveframe.call_method(py, "add_tags", (materialized,), Some(ctx.add_tags_kwargs.bind(py).cast()?))?;
         }
         Ok(())
     };
@@ -632,7 +632,7 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
             let new_loop = ctx.loop_class.bind(py).call_method(
                 "from_scratch",
                 (),
-                Some(ctx.source_dict.bind(py).downcast()?)
+                Some(ctx.source_dict.bind(py).cast()?)
             )?;
 
             ctx.current_loop = Some(new_loop.into());
@@ -888,7 +888,7 @@ fn parse_loop_data(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
                     .iter()
                     .map(|tv| tv.to_string(&ctx.tokenizer.full_data))
                     .collect();
-                loop_obj.call_method(py, "add_data", (materialized,), Some(ctx.add_data_kwargs.bind(py).downcast()?))?;
+                loop_obj.call_method(py, "add_data", (materialized,), Some(ctx.add_data_kwargs.bind(py).cast()?))?;
 
                 // Track statistics for adaptive pre-allocation by loop type
                 if let Some(loop_type) = &ctx.current_loop_type {
@@ -983,12 +983,12 @@ fn parse_loop_data(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
 fn parse(
     py: Python,
     data: String,
-    entry: PyObject,
+    entry: Py<PyAny>,
     source: String,
     raise_parse_warnings: bool,
     convert_data_types: bool,
     schema: Option<&Bound<PyAny>>,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     // Convert to PyObject if Some
     let schema = schema.map(|s| s.clone().into());
 
