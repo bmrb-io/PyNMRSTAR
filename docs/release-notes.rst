@@ -1,8 +1,8 @@
 Release notes
 =============
 
-3.4.0
-~~~~~
+3.4.0b1
+~~~~~~~
 
 Major improvements:
 

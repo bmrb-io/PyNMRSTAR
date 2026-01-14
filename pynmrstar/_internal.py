@@ -15,7 +15,7 @@ import requests
 
 import pynmrstar
 
-__version__: str = "3.4.0"
+__version__: str = "3.4.0b1"
 
 # Create a session to reuse for the duration of the program run
 _session = requests.session()
