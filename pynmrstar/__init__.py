@@ -7,6 +7,12 @@ It also provides some utility functions in :py:obj:`pynmrstar.utils`
 
 Use python's built in help function for documentation."""
 
+import platform as _platform
+import sys as _sys
+
+if _platform.python_implementation() == "PyPy" and _sys.version_info < (3, 11):
+    raise ImportError("When using PyPy, pynmrstar requires a version >= 3.11")
+
 import decimal as _decimal
 import logging
 

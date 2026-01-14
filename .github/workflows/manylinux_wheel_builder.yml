@@ -13,8 +13,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        # macos-13 is an intel runner, macos-14 is apple silicon
-        os: [ubuntu-latest, windows-latest, macos-13, macos-14]
+        os: [ubuntu-latest, windows-latest, macos-15, macos-15-intel]
 
     steps:
       - uses: actions/checkout@v4
@@ -25,6 +24,8 @@ jobs:
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.23.3
         env:
+          # Skip PyPy versions below 3.11 (PyO3 minimum requirement for PyPy)
+          CIBW_SKIP: "pp37-* pp38-* pp39-* pp310-*"
           # Ensure cibuildwheel uses PEP 517 build
           CIBW_BUILD_FRONTEND: "build"
           # Install Rust in the cibuildwheel environment
