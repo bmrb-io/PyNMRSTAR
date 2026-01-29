@@ -181,6 +181,12 @@ loop_
         # Different loop should not be equal
         self.assertEqual(test_loop != self.file_entry[0][1], True)
 
+        # Comparing to non-Loop objects should return False
+        self.assertFalse(test_loop == "not a loop")
+        self.assertFalse(test_loop is None)
+        self.assertFalse(test_loop == 123)
+        self.assertFalse(test_loop == {'category': test_loop.category})
+
     def test_len(self):
         """Test Loop.__len__ returns number of data rows."""
         test_loop = self.file_entry[0][0]
@@ -190,6 +196,31 @@ loop_
         """Test Loop.__lt__ comparison for sorting."""
         test_loop = self.file_entry[0][0]
         self.assertEqual(test_loop < self.file_entry[0][1], True)
+
+        # Comparing to non-Loop should return NotImplemented
+        self.assertEqual(test_loop.__lt__("not a loop"), NotImplemented)
+        self.assertEqual(test_loop.__lt__(123), NotImplemented)
+
+    def test_contains(self):
+        """Test Loop.__contains__ for checking if tags exist."""
+        test_loop = self.file_entry[0][0]
+
+        # Single tag as string
+        self.assertTrue('Ordinal' in test_loop)
+        self.assertTrue('_Entry_author.Ordinal' in test_loop)
+        self.assertFalse('NonexistentTag' in test_loop)
+
+        # Multiple tags as list
+        self.assertTrue(['Ordinal', 'Family_name'] in test_loop)
+        self.assertFalse(['Ordinal', 'NonexistentTag'] in test_loop)
+
+        # Multiple tags as tuple
+        self.assertTrue(('Ordinal', 'Family_name') in test_loop)
+        self.assertFalse(('Ordinal', 'NonexistentTag') in test_loop)
+
+        # Non-string/list/tuple items should return False
+        self.assertFalse(123 in test_loop)
+        self.assertFalse(None in test_loop)
 
     def test_getitem(self):
         """Test Loop.__getitem__ for accessing tags and rows."""
