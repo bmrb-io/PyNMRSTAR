@@ -236,6 +236,13 @@ loop_
         self.assertEqual(test_loop[['_Entry_author.Ordinal', '_Entry_author.Middle_initials']],
                          [['1', 'C.'], ['2', '.'], ['3', 'B.'], ['4', 'H.'], ['5', 'L.']])
 
+        # Access by tuple of tag names
+        self.assertEqual(test_loop[('_Entry_author.Ordinal', '_Entry_author.Middle_initials')],
+                         [['1', 'C.'], ['2', '.'], ['3', 'B.'], ['4', 'H.'], ['5', 'L.']])
+
+        # Access by integer index (row access)
+        self.assertEqual(test_loop[0], test_loop.data[0])
+
     def test_setitem(self):
         """Test Loop.__setitem__ for setting tag values."""
         test_loop = self.file_entry[0][0]
@@ -511,3 +518,78 @@ loop_
 
         tmp_loop.clear_data()
         self.assertEqual(tmp_loop.data, [])
+
+    def test_empty(self):
+        """Test Loop.empty property."""
+        # Loop with no data is empty
+        tmp_loop = Loop.from_scratch(category="test")
+        tmp_loop.add_tag(["tag1", "tag2"])
+        self.assertTrue(tmp_loop.empty)
+
+        # Loop with only null values is empty
+        tmp_loop.add_data([['.', '.'], ['?', '?']])
+        self.assertTrue(tmp_loop.empty)
+
+        # Loop with actual data is not empty
+        tmp_loop.add_data([['value', '.']])
+        self.assertFalse(tmp_loop.empty)
+
+    def test_from_json(self):
+        """Test Loop.from_json for creating loops from JSON."""
+        # Create a loop and convert to JSON, then back
+        original = Loop.from_scratch(category="_test")
+        original.add_tag(["tag1", "tag2"])
+        original.add_data([["a", "b"], ["c", "d"]])
+
+        # From JSON string
+        json_str = original.get_json(serialize=True)
+        from_str = Loop.from_json(json_str)
+        self.assertEqual(from_str.category, original.category)
+        self.assertEqual(from_str.tags, original.tags)
+        self.assertEqual(from_str.data, original.data)
+
+        # From dict
+        json_dict = original.get_json(serialize=False)
+        from_dict = Loop.from_json(json_dict)
+        self.assertEqual(from_dict.category, original.category)
+
+        # Invalid JSON string should raise
+        with self.assertRaises(ValueError):
+            Loop.from_json("not valid json")
+
+        # Missing required key should raise
+        with self.assertRaises(ValueError):
+            Loop.from_json({"tags": [], "category": "_test"})  # missing 'data'
+
+    def test_get_json(self):
+        """Test Loop.get_json for serializing loops."""
+        tmp_loop = Loop.from_scratch(category="_test")
+        tmp_loop.add_tag(["tag1", "tag2"])
+        tmp_loop.add_data([["a", "b"]])
+
+        # Serialized (string) output
+        json_str = tmp_loop.get_json(serialize=True)
+        self.assertIsInstance(json_str, str)
+        self.assertIn('"category"', json_str)
+        self.assertIn('"_test"', json_str)
+
+        # Unserialized (dict) output
+        json_dict = tmp_loop.get_json(serialize=False)
+        self.assertIsInstance(json_dict, dict)
+        self.assertEqual(json_dict['category'], '_test')
+        self.assertEqual(json_dict['tags'], ['tag1', 'tag2'])
+        self.assertEqual(json_dict['data'], [['a', 'b']])
+
+    def test_get_tag_names(self):
+        """Test Loop.get_tag_names returns fully qualified tag names."""
+        tmp_loop = Loop.from_scratch(category="_test")
+        tmp_loop.add_tag(["tag1", "tag2"])
+
+        self.assertEqual(tmp_loop.get_tag_names(), ["_test.tag1", "_test.tag2"])
+
+        # Without category set, should raise
+        from pynmrstar.exceptions import InvalidStateError
+        tmp_loop2 = Loop.from_scratch()
+        tmp_loop2._tags = ["tag1"]  # Add tag without category
+        with self.assertRaises(InvalidStateError):
+            tmp_loop2.get_tag_names()
