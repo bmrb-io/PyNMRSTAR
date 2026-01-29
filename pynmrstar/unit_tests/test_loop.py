@@ -222,6 +222,9 @@ loop_
         self.assertFalse(123 in test_loop)
         self.assertFalse(None in test_loop)
 
+        # Non-string items inside a list should return False (not raise)
+        self.assertFalse(['Ordinal', 123] in test_loop)
+
     def test_getitem(self):
         """Test Loop.__getitem__ for accessing tags and rows."""
         test_loop = self.file_entry[0][0]

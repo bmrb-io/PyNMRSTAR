@@ -32,7 +32,10 @@ class Loop(object):
 
         lc_tags = self._lc_tags
         for tag in to_process:
-            if utils.format_tag_lc(tag) not in lc_tags:
+            try:
+                if utils.format_tag_lc(tag) not in lc_tags:
+                    return False
+            except AttributeError:
                 return False
         return True
 
