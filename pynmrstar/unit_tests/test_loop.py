@@ -256,7 +256,7 @@ loop_
         self.assertRaises(ValueError, test_loop.__setitem__, '_Entry_author.Ordinal', [1])
 
         # Non-existent tag should raise
-        self.assertRaises(ValueError, test_loop.__setitem__, '_Wrong_loop.Ordinal', [1, 2, 3, 4, 5])
+        self.assertRaises(ValueError, test_loop.__setitem__, 'NonexistentTag', [1, 2, 3, 4, 5])
 
     def test_str_and_format(self):
         """Test Loop.__str__ and Loop.format output."""
@@ -593,3 +593,384 @@ loop_
         tmp_loop2._tags = ["tag1"]  # Add tag without category
         with self.assertRaises(InvalidStateError):
             tmp_loop2.get_tag_names()
+
+    def test_compare(self):
+        """Test Loop.compare for comparing two loops."""
+        test_loop = self.file_entry[0][0]
+
+        # Comparing to itself should return empty list
+        self.assertEqual(test_loop.compare(test_loop), [])
+
+        # Comparing to string representation
+        self.assertEqual(test_loop.compare(str(test_loop)), [])
+        self.assertEqual(test_loop.compare(str(test_loop) + "extra"), ['String was not exactly equal to loop.'])
+
+        # Comparing to non-Loop object
+        self.assertEqual(test_loop.compare(123), ['Other object is not of class Loop.'])
+
+        # Comparing loops with different categories
+        loop1 = Loop.from_scratch(category="_test1")
+        loop1.add_tag(["tag1", "tag2"])
+        loop1.add_data([["a", "b"]])
+
+        loop2 = Loop.from_scratch(category="_test2")
+        loop2.add_tag(["tag1", "tag2"])
+        loop2.add_data([["a", "b"]])
+        diffs = loop1.compare(loop2)
+        self.assertTrue(any("Category of loops does not match" in d for d in diffs))
+
+        # Comparing loops with different tags
+        loop3 = Loop.from_scratch(category="_test")
+        loop3.add_tag(["tag1", "tag2"])
+        loop3.add_data([["a", "b"]])
+
+        loop4 = Loop.from_scratch(category="_test")
+        loop4.add_tag(["tag1", "different"])
+        loop4.add_data([["a", "b"]])
+        diffs = loop3.compare(loop4)
+        self.assertTrue(any("Loop tag names do not match" in d for d in diffs))
+
+        # Comparing loops with different data (sorted comparison)
+        loop5 = Loop.from_scratch(category="_test")
+        loop5.add_tag(["tag1", "tag2"])
+        loop5.add_data([["a", "b"], ["c", "d"]])
+
+        loop6 = Loop.from_scratch(category="_test")
+        loop6.add_tag(["tag1", "tag2"])
+        loop6.add_data([["x", "y"], ["z", "w"]])
+        diffs = loop5.compare(loop6)
+        self.assertTrue(any("Loop data does not match" in d for d in diffs))
+
+    def test_remove_tag(self):
+        """Test Loop.remove_tag for removing tags."""
+        tmp_loop = Loop.from_scratch(category="_test")
+        tmp_loop.add_tag(["tag1", "tag2", "tag3"])
+        tmp_loop.add_data([["a", "b", "c"], ["d", "e", "f"]])
+
+        # Remove single tag
+        tmp_loop.remove_tag("tag2")
+        self.assertEqual(tmp_loop.tags, ["tag1", "tag3"])
+        self.assertEqual(tmp_loop.data, [["a", "c"], ["d", "f"]])
+
+        # Remove tag as list
+        tmp_loop2 = Loop.from_scratch(category="_test")
+        tmp_loop2.add_tag(["tag1", "tag2", "tag3"])
+        tmp_loop2.add_data([["a", "b", "c"]])
+        tmp_loop2.remove_tag(["tag1", "tag3"])
+        self.assertEqual(tmp_loop2.tags, ["tag2"])
+        self.assertEqual(tmp_loop2.data, [["b"]])
+
+        # Non-existent tag should raise
+        tmp_loop3 = Loop.from_scratch(category="_test")
+        tmp_loop3.add_tag(["tag1"])
+        with self.assertRaises(KeyError):
+            tmp_loop3.remove_tag("nonexistent_tag")
+
+    def test_renumber_rows(self):
+        """Test Loop.renumber_rows for renumbering tag values."""
+        # Basic renumbering
+        tmp_loop = Loop.from_scratch(category="_test")
+        tmp_loop.add_tag(["ID", "Name"])
+        tmp_loop.add_data([["5", "a"], ["10", "b"], ["15", "c"]])
+        tmp_loop.renumber_rows("ID")
+        self.assertEqual(tmp_loop.data, [["1", "a"], ["2", "b"], ["3", "c"]])
+
+        # Renumber with start_value
+        tmp_loop2 = Loop.from_scratch(category="_test")
+        tmp_loop2.add_tag(["ID", "Name"])
+        tmp_loop2.add_data([[5, "a"], [10, "b"], [15, "c"]])
+        tmp_loop2.renumber_rows("ID", start_value=10)
+        self.assertEqual(tmp_loop2.data, [[10, "a"], [11, "b"], [12, "c"]])
+
+        # Renumber with maintain_ordering
+        tmp_loop3 = Loop.from_scratch(category="_test")
+        tmp_loop3.add_tag(["ID", "Name"])
+        tmp_loop3.add_data([["2", "a"], ["3", "b"], ["3", "c"], ["5", "d"]])
+        tmp_loop3.renumber_rows("ID", start_value=1, maintain_ordering=True)
+        self.assertEqual(tmp_loop3.data, [["1", "a"], ["2", "b"], ["2", "c"], ["4", "d"]])
+
+        # Renumber with integer tag index
+        tmp_loop4 = Loop.from_scratch(category="_test")
+        tmp_loop4.add_tag(["ID", "Name"])
+        tmp_loop4.add_data([[5, "a"], [10, "b"]])
+        tmp_loop4.renumber_rows(0)  # Use integer index
+        self.assertEqual(tmp_loop4.data, [[1, "a"], [2, "b"]])
+
+        # Empty loop should do nothing
+        tmp_loop5 = Loop.from_scratch(category="_test")
+        tmp_loop5.add_tag(["ID", "Name"])
+        tmp_loop5.renumber_rows("ID")  # Should not raise
+        self.assertEqual(tmp_loop5.data, [])
+
+        # Invalid tag name should raise
+        tmp_loop6 = Loop.from_scratch(category="_test")
+        tmp_loop6.add_tag(["ID", "Name"])
+        tmp_loop6.add_data([[1, "a"]])
+        with self.assertRaises(ValueError):
+            tmp_loop6.renumber_rows("nonexistent")
+
+        # Category mismatch should raise
+        tmp_loop7 = Loop.from_scratch(category="_test")
+        tmp_loop7.add_tag(["ID", "Name"])
+        tmp_loop7.add_data([[1, "a"]])
+        with self.assertRaises(ValueError):
+            tmp_loop7.renumber_rows("_different.ID")
+
+        # Maintain ordering with non-integer value should raise
+        tmp_loop8 = Loop.from_scratch(category="_test")
+        tmp_loop8.add_tag(["ID", "Name"])
+        tmp_loop8.add_data([["not_a_number", "a"]])
+        with self.assertRaises(ValueError):
+            tmp_loop8.renumber_rows("ID", maintain_ordering=True)
+
+        # Maintain ordering with integer values (not strings)
+        tmp_loop9 = Loop.from_scratch(category="_test")
+        tmp_loop9.add_tag(["ID", "Name"])
+        tmp_loop9.add_data([[2, "a"], [3, "b"], [3, "c"], [5, "d"]])
+        tmp_loop9.renumber_rows("ID", start_value=1, maintain_ordering=True)
+        self.assertEqual(tmp_loop9.data, [[1, "a"], [2, "b"], [2, "c"], [4, "d"]])
+
+    def test_filter_edge_cases(self):
+        """Test Loop.filter edge cases."""
+        tmp_loop = Loop.from_scratch(category="_test")
+        tmp_loop.add_tag(["tag1", "tag2", "tag3"])
+        tmp_loop.add_data([["a", "b", "c"], ["d", "e", "f"]])
+
+        # Filter with single tag (not a list)
+        result = tmp_loop.filter("tag1")
+        self.assertEqual(result.tags, ["tag1"])
+        self.assertEqual(result.data, [["a"], ["d"]])
+
+        # Filter with non-existent tag should raise
+        with self.assertRaises(KeyError):
+            tmp_loop.filter("nonexistent_tag")
+
+        # Filter with ignore_missing_tags
+        result2 = tmp_loop.filter(["tag1", "nonexistent_tag"], ignore_missing_tags=True)
+        self.assertEqual(result2.tags, ["tag1"])
+
+    def test_str_skip_empty_tags(self):
+        """Test Loop.__str__ with skip_empty_tags option."""
+        tmp_loop = Loop.from_scratch(category="_test")
+        tmp_loop.add_tag(["tag1", "tag2", "tag3"])
+        # tag2 has all null values
+        tmp_loop.add_data([["a", ".", "c"], ["d", ".", "f"]])
+
+        # Without skip_empty_tags, all tags appear
+        result_all = tmp_loop.format(skip_empty_tags=False)
+        self.assertIn("tag2", result_all)
+
+        # With skip_empty_tags, tag2 should be omitted
+        result_skip = tmp_loop.format(skip_empty_tags=True)
+        self.assertNotIn("tag2", result_skip)
+        self.assertIn("tag1", result_skip)
+        self.assertIn("tag3", result_skip)
+
+    def test_parsing_edge_cases(self):
+        """Test parsing edge cases like multiple loops or empty string."""
+        # Multiple loops with different categories should raise
+        with self.assertRaises(ParsingError):
+            Loop.from_string("loop_ _test1.tag1 a stop_ loop_ _test2.tag2 b stop_")
+
+        # Empty string should raise
+        with self.assertRaises(ParsingError):
+            Loop.from_string("")
+
+    def test_get_tags_from_schema_invalid_prefix(self):
+        """Test _get_tags_from_schema with invalid tag prefix."""
+        from pynmrstar.exceptions import InvalidStateError
+        with self.assertRaises(InvalidStateError):
+            Loop._get_tags_from_schema("nonexistent_category_xyz")
+
+    def test_add_data_edge_cases(self):
+        """Test add_data edge cases."""
+        # Format 2 with uneven lists (IndexError in format_two_to_one)
+        tmp_loop = Loop.from_scratch(category="_test")
+        tmp_loop.add_tag(["tag1", "tag2"])
+        # Uneven lists - tag1 has 3 values, tag2 has 1 value
+        tmp_loop.add_data({"tag1": ["a", "b", "c"], "tag2": ["x"]})
+        self.assertEqual(tmp_loop.data, [["a", "x"], ["b", None], ["c", None]])
+
+        # Tag not in loop (Format 1)
+        tmp_loop2 = Loop.from_scratch(category="_test")
+        tmp_loop2.add_tag(["tag1", "tag2"])
+        with self.assertRaises(ValueError):
+            tmp_loop2.add_data([{"tag1": "a", "nonexistent": "b"}])
+
+        # Flat list with rearrange but wrong length
+        tmp_loop3 = Loop.from_scratch(category="_test")
+        tmp_loop3.add_tag(["tag1", "tag2"])
+        with self.assertRaises(ValueError):
+            tmp_loop3.add_data(["a", "b", "c"], rearrange=True)  # 3 is not multiple of 2
+
+    def test_add_data_by_tag_deprecated(self):
+        """Test deprecated add_data_by_tag method."""
+        import warnings
+        tmp_loop = Loop.from_scratch(category="_test")
+        tmp_loop.add_tag(["tag1", "tag2"])
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            tmp_loop.add_data_by_tag("tag1", "a")
+            tmp_loop.add_data_by_tag("tag2", "b")
+            # After completing a row, add another row
+            tmp_loop.add_data_by_tag("tag1", "c")
+            tmp_loop.add_data_by_tag("tag2", "d")
+            self.assertEqual(len(w), 4)
+            self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+
+        self.assertEqual(tmp_loop.data, [["a", "b"], ["c", "d"]])
+
+        # Category mismatch should raise
+        with warnings.catch_warnings(record=True):
+            warnings.simplefilter("always")
+            with self.assertRaises(ValueError):
+                tmp_loop.add_data_by_tag("_different.tag1", "e")
+
+        # Non-existent tag should raise
+        with warnings.catch_warnings(record=True):
+            warnings.simplefilter("always")
+            with self.assertRaises(ValueError):
+                tmp_loop.add_data_by_tag("nonexistent", "e")
+
+        # Adding data out of order should raise
+        tmp_loop2 = Loop.from_scratch(category="_test")
+        tmp_loop2.add_tag(["tag1", "tag2"])
+        with warnings.catch_warnings(record=True):
+            warnings.simplefilter("always")
+            tmp_loop2.add_data_by_tag("tag1", "a")
+            with self.assertRaises(ValueError):
+                tmp_loop2.add_data_by_tag("tag1", "c")  # Out of order - should be tag2
+
+    def test_add_missing_tags_sort_exception(self):
+        """Test add_missing_tags when sort_rows raises TypeError."""
+        tmp_loop = Loop.from_string("loop_ _Atom_chem_shift.ID _Atom_chem_shift.Ordinal stop_")
+        # Use None values which can cause TypeError when sorting
+        tmp_loop.add_data([["1", None], ["2", None]])
+        # This should handle TypeError from sort_rows and renumber
+        tmp_loop.add_missing_tags()
+        # Check that ordinal was renumbered
+        ordinal_idx = tmp_loop.tag_index("Ordinal")
+        self.assertEqual(tmp_loop.data[0][ordinal_idx], 1)
+        self.assertEqual(tmp_loop.data[1][ordinal_idx], 2)
+
+    def test_add_tag_edge_cases(self):
+        """Test add_tag edge cases."""
+        # Tag starting with a period (just the tag name)
+        tmp_loop = Loop.from_scratch(category="_test")
+        tmp_loop.add_tag(".tag1")
+        self.assertEqual(tmp_loop.tags, ["tag1"])
+
+        # Null value as tag name should raise
+        tmp_loop2 = Loop.from_scratch(category="_test")
+        with self.assertRaises(ValueError):
+            tmp_loop2.add_tag(".")  # "." is a null value
+
+        with self.assertRaises(ValueError):
+            tmp_loop2.add_tag("?")  # "?" is also a null value
+
+    def test_deprecated_delete_methods(self):
+        """Test deprecated delete_tag and delete_data_by_tag_value methods."""
+        import warnings
+
+        # delete_tag
+        tmp_loop = Loop.from_scratch(category="_test")
+        tmp_loop.add_tag(["tag1", "tag2"])
+        tmp_loop.add_data([["a", "b"]])
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            tmp_loop.delete_tag("tag2")
+            self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(tmp_loop.tags, ["tag1"])
+
+        # delete_data_by_tag_value
+        tmp_loop2 = Loop.from_scratch(category="_test")
+        tmp_loop2.add_tag(["tag1", "tag2"])
+        tmp_loop2.add_data([["a", "b"], ["c", "d"]])
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            tmp_loop2.delete_data_by_tag_value("tag1", "a")
+            self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(tmp_loop2.data, [["c", "d"]])
+
+    def test_get_tag_edge_cases(self):
+        """Test get_tag edge cases."""
+        tmp_loop = Loop.from_scratch(category="_test")
+        tmp_loop.add_tag(["tag1", "tag2", "tag3"])
+        tmp_loop.add_data([["a", "b", "c"], ["d", "e", "f"]])
+
+        # With tags=None and dict_result=False (default) - returns raw data
+        result_raw = tmp_loop.get_tag(tags=None)
+        self.assertEqual(result_raw, [["a", "b", "c"], ["d", "e", "f"]])
+
+        # With tags=None and dict_result=True
+        result = tmp_loop.get_tag(tags=None, dict_result=True)
+        self.assertEqual(result, [
+            {"tag1": "a", "tag2": "b", "tag3": "c"},
+            {"tag1": "d", "tag2": "e", "tag3": "f"}
+        ])
+
+        # Invalid tag name should raise
+        with self.assertRaises(KeyError):
+            tmp_loop.get_tag("nonexistent_tag")
+
+    def test_print_tree(self):
+        """Test Loop.print_tree outputs representation."""
+        import io
+        import sys
+
+        tmp_loop = Loop.from_scratch(category="_test")
+        tmp_loop.add_tag(["tag1"])
+
+        # Capture stdout
+        captured = io.StringIO()
+        sys.stdout = captured
+        tmp_loop.print_tree()
+        sys.stdout = sys.__stdout__
+
+        self.assertIn("_test", captured.getvalue())
+
+    def test_remove_data_by_tag_value_category_mismatch(self):
+        """Test remove_data_by_tag_value with category mismatch."""
+        tmp_loop = Loop.from_scratch(category="_test")
+        tmp_loop.add_tag(["tag1", "tag2"])
+        tmp_loop.add_data([["a", "b"]])
+
+        with self.assertRaises(ValueError):
+            tmp_loop.remove_data_by_tag_value("_different.tag1", "a")
+
+    def test_sort_rows_edge_cases(self):
+        """Test sort_rows edge cases."""
+        # Category mismatch in tag should raise
+        tmp_loop = Loop.from_scratch(category="_test")
+        tmp_loop.add_tag(["tag1", "tag2"])
+        tmp_loop.add_data([["a", "b"]])
+        with self.assertRaises(ValueError):
+            tmp_loop.sort_rows("_different.tag1")
+
+        # Sort with string values (fallback to string sort)
+        tmp_loop2 = Loop.from_scratch(category="_test")
+        tmp_loop2.add_tag(["tag1", "tag2"])
+        tmp_loop2.add_data([["b", "2"], ["a", "1"], ["c", "3"]])
+        tmp_loop2.sort_rows("tag1")  # Will fallback to string sort since "a", "b", "c" aren't numbers
+        self.assertEqual(tmp_loop2.data, [["a", "1"], ["b", "2"], ["c", "3"]])
+
+        # Sort with custom key on string values
+        tmp_loop3 = Loop.from_scratch(category="_test")
+        tmp_loop3.add_tag(["tag1", "tag2"])
+        tmp_loop3.add_data([["b", "2"], ["a", "1"], ["c", "3"]])
+
+        def custom_key(row):
+            return row[0]
+
+        tmp_loop3.sort_rows("tag1", key=custom_key)
+        self.assertEqual(tmp_loop3.data, [["a", "1"], ["b", "2"], ["c", "3"]])
+
+    def test_validate_row_width_mismatch(self):
+        """Test validate catches row width mismatches."""
+        tmp_loop = Loop.from_scratch(category="_test")
+        tmp_loop.add_tag(["tag1", "tag2"])
+        tmp_loop.data = [["a", "b"], ["c"]]  # Second row has wrong width
+
+        errors = tmp_loop.validate(validate_schema=False, validate_star=True)
+        self.assertTrue(any("data width does not match" in e for e in errors))
