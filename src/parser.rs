@@ -48,6 +48,9 @@ impl TokenizerState {
     /// Check if the byte position starts with a Unicode whitespace character.
     /// Returns the number of bytes to advance (0 if not whitespace).
     fn whitespace_len_at(s: &str, pos: usize) -> usize {
+        if pos >= s.len() {
+            return 0;
+        }
         let b = s.as_bytes()[pos];
         // Fast path: ASCII bytes (covers >99% of NMR-STAR content)
         if b < 128 {
