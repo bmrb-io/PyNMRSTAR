@@ -86,3 +86,53 @@ _Entry.multi2
 save_
 """
         #self.assertEqual(test_string, str(Entry.from_string(test_string)))
+
+    def test_unicode_whitespace_warning(self):
+        """Test that non-standard Unicode whitespace outside tag values logs a warning."""
+
+        # U+3000 IDEOGRAPHIC SPACE used as a token separator should warn
+        star = "data_test save_test\u3000_sf.sf_category test _sf.sf_framecode test save_"
+        with self.assertLogs('pynmrstar', level='WARNING') as cm:
+            Entry.from_string(star)
+        self.assertTrue(any("Non-standard whitespace" in msg for msg in cm.output))
+
+        # U+00A0 NO-BREAK SPACE should also warn
+        star = "data_test save_test _sf.sf_category\u00a0test _sf.sf_framecode test save_"
+        with self.assertLogs('pynmrstar', level='WARNING') as cm:
+            Entry.from_string(star)
+        self.assertTrue(any("Non-standard whitespace" in msg for msg in cm.output))
+
+        # U+1680 OGHAM SPACE MARK should also warn
+        star = "data_test\u1680save_test _sf.sf_category test _sf.sf_framecode test save_"
+        with self.assertLogs('pynmrstar', level='WARNING') as cm:
+            Entry.from_string(star)
+        self.assertTrue(any("Non-standard whitespace" in msg for msg in cm.output))
+
+    def test_unicode_whitespace_raises_with_flag(self):
+        """Test that non-standard whitespace raises ParsingError when raise_parse_warnings is set."""
+
+        star = "data_test save_test\u3000_sf.sf_category test _sf.sf_framecode test save_"
+        self.assertRaises(ParsingError, Entry.from_string, star, raise_parse_warnings=True)
+
+    def test_standard_whitespace_no_warning(self):
+        """Test that standard whitespace does not produce a warning."""
+
+        # Space, tab, newline, vertical tab, carriage return - all standard
+        star = "data_test\n save_test\t_sf.sf_category test\r\n_sf.sf_framecode test\n save_\n"
+        # assertLogs would fail if no log is emitted, so we use assertNoLogs (Python 3.10+)
+        # or just parse and verify success
+        entry = Entry.from_string(star)
+        self.assertEqual(entry.entry_id, "test")
+
+    def test_unicode_whitespace_in_quoted_value_no_warning(self):
+        """Test that Unicode whitespace inside quoted values does not trigger a warning."""
+
+        # U+3000 inside a single-quoted value should not warn
+        star = "data_test save_test _sf.sf_category test _sf.sf_framecode test _sf.value '\u3000test\u3000' save_"
+        entry = Entry.from_string(star)
+        self.assertEqual(entry[0]['value'], ['\u3000test\u3000'])
+
+        # U+3000 inside a semicolon-delimited value should not warn
+        star = "data_test save_test _sf.sf_category test _sf.sf_framecode test _sf.value\n;\n\u3000value\u3000\n;\nsave_"
+        entry = Entry.from_string(star)
+        self.assertIn('\u3000', entry[0]['value'][0])

@@ -1,6 +1,25 @@
 Release notes
 =============
 
+3.5.0
+~~~~~
+
+Major improvements:
+
+- The library now scans for whitespace in a fully unicode-aware manner. It warns when whitespace other than
+  that officially allowed in the STAR specification is found (' ', '\\t', '\\r', '\\n', '\\v') but it still parses it without
+  issues. If raise_parse_warnings is set, an exception is thrown.
+Minor improvements:
+
+- :py:attr:`pynmrstar.Loop.category` is now a property to be able to validate it when set. Previously,
+  invalid loop categories (tag prefixes) could be provided.
+
+Potentially breaking changes:
+
+- `pynmrstar.definitions.WHITESPACE` has been removed. This allowed users to set custom characters that they
+  considered whitespace. This functionality was never encouraged. Instead, the standard STAR whitespace characters
+  are considered official whitespace characters, but anything in Unicode considered whitespace is also handled properly.
+
 3.4.0
 ~~~~~
 

@@ -35,7 +35,12 @@ class TestSaveframe(unittest.TestCase):
         for x, string in enumerate(odd_strings):
             if string == '':
                 continue
-            saveframe.add_tag(str(x), string)
+            # Try using the weird string as the tag name and not just value. If it can't be used as the name due
+            #  to whitespace or containing a ".", use an integer for the name and use it for the value.
+            try:
+                saveframe.add_tag(string, string, update=True)
+            except ValueError:
+                saveframe.add_tag(str(x), string)
 
         self.assertEqual(saveframe, Saveframe.from_string(str(saveframe)))
 

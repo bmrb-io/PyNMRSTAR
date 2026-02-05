@@ -316,7 +316,7 @@ class Saveframe(object):
         """ Updates the saveframe name. """
 
         for char in str(name):
-            if char in utils.definitions.WHITESPACE:
+            if char.isspace():
                 raise ValueError("Saveframe names can not contain whitespace characters.")
         if name in definitions.NULL_VALUES:
             raise ValueError("Cannot set the saveframe name to a null-equivalent value.")
@@ -587,7 +587,7 @@ class Saveframe(object):
         if "." in name:
             raise ValueError(f"There cannot be more than one '.' in a tag name. Invalid tag name: '{name}'")
         for char in name:
-            if char in utils.definitions.WHITESPACE:
+            if char.isspace():
                 raise ValueError(f"Tag names can not contain whitespace characters. Invalid tag name: '{name}'")
 
         # No duplicate tags

@@ -29,6 +29,46 @@ class TestLoop(unittest.TestCase):
         test = Loop.from_scratch(category="test")
         self.assertEqual(test.category, "_test")
 
+    def test_category_whitespace_validation(self):
+        """Test that loop category rejects whitespace characters."""
+
+        # ASCII whitespace should be rejected
+        with self.assertRaises(ValueError):
+            Loop.from_scratch(category="test category")
+        with self.assertRaises(ValueError):
+            Loop.from_scratch(category="test\tcategory")
+
+        # Unicode whitespace should also be rejected
+        with self.assertRaises(ValueError):
+            Loop.from_scratch(category="test\u3000category")  # ideographic space
+        with self.assertRaises(ValueError):
+            Loop.from_scratch(category="test\u00a0category")  # no-break space
+        with self.assertRaises(ValueError):
+            Loop.from_scratch(category="test\u1680category")  # ogham space mark
+
+        # Setting category directly should also validate
+        loop = Loop.from_scratch(category="test")
+        with self.assertRaises(ValueError):
+            loop.category = "_has space"
+        with self.assertRaises(ValueError):
+            loop.category = "_has\u3000ideographic_space"
+
+        # set_category should also validate
+        with self.assertRaises(ValueError):
+            loop.set_category("has space")
+
+        # None should be allowed
+        loop.category = None
+        self.assertIsNone(loop.category)
+
+        # Valid categories should still work
+        loop.category = "_valid_category"
+        self.assertEqual(loop.category, "_valid_category")
+
+        # Ensure that adding a tag with a category is also checked
+        loop.category = None
+        self.assertRaises(ValueError, loop.add_tag, "invalid tag.tag", "value")
+
     def test_from_string(self):
         """Test Loop.from_string parsing."""
         test_loop = self.file_entry[0][0]

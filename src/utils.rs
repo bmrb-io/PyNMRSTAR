@@ -147,14 +147,12 @@ pub fn quote_value_str(s: &str) -> String {
         let mut can_wrap_single = true;
         let mut can_wrap_double = true;
 
-        let bytes = s.as_bytes();
-        for i in 0..bytes.len() - 1 {
-            let next = bytes[i + 1];
-            let next_is_ws = matches!(next, b' ' | b'\t' | b'\x0B');
-            if next_is_ws {
-                match bytes[i] {
-                    b'\'' => can_wrap_single = false,
-                    b'"' => can_wrap_double = false,
+        let chars: Vec<char> = s.chars().collect();
+        for i in 0..chars.len() - 1 {
+            if chars[i + 1].is_whitespace() {
+                match chars[i] {
+                    '\'' => can_wrap_single = false,
+                    '"' => can_wrap_double = false,
                     _ => {}
                 }
             }
@@ -197,18 +195,17 @@ pub fn quote_value_str(s: &str) -> String {
         }
 
         if !needs_wrapping {
-            let bytes = s.as_bytes();
             let mut prev_is_ws = true;
-            for &b in bytes {
-                if matches!(b, b' ' | b'\t' | b'\x0B') {
+            for c in s.chars() {
+                if c.is_whitespace() {
                     needs_wrapping = true;
                     break;
                 }
-                if b == b'#' && prev_is_ws {
+                if c == '#' && prev_is_ws {
                     needs_wrapping = true;
                     break;
                 }
-                prev_is_ws = matches!(b, b' ' | b'\t' | b'\x0B');
+                prev_is_ws = c.is_whitespace();
             }
         }
     }

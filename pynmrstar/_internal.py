@@ -42,14 +42,9 @@ def _get_comments(_comment_cache: Dict[str, Dict[str, str]] = {}) -> Dict[str, D
     try:
         comment_entry = Entry.from_file(file_to_load)
     except IOError:
-        # Load the comments from Github if we can't find them locally
-        try:
-            logger.warning('Could not load comments from disk. Loading from web...')
-            comment_entry = Entry.from_file(_interpret_file(pynmrstar.definitions.COMMENT_URL))
-        except Exception:
-            logger.exception('Could not load comments from web. No comments will be shown.')
-            # No comments will be printed
-            return {}
+        logger.warning('Could not load comments from disk. No comments will be shown.')
+        # No comments will be printed
+        return {}
 
     # Load the comments
     comment_records = comment_entry[0][0].get_tag(["category", "comment", "every_flag"])

@@ -82,11 +82,7 @@ class Schema(object):
             types_file = _interpret_file(os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                                       "reference_files/data_types.csv"))
         except IOError:
-            # Load the data types from Github if we can't find them locally
-            try:
-                types_file = _interpret_file(definitions.TYPES_URL)
-            except Exception:
-                raise ValueError("Could not load the data type definition file from disk or the internet!")
+            raise ValueError("Could not load the data type definition file from disk!")
 
         csv_reader_instance = DictReader(types_file, fieldnames=['type_name', 'type_definition'])
         for item in csv_reader_instance:
