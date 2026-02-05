@@ -13,6 +13,8 @@ pub struct TokenizerState {
     index: usize,
     pub line_no: usize,
     pub last_delimiter: char,
+    /// Line number (0-based) where non-standard whitespace was first encountered, if any.
+    pub unusual_whitespace_line: Option<usize>,
 }
 
 impl TokenizerState {
@@ -22,6 +24,7 @@ impl TokenizerState {
             index: 0,
             line_no: 0,
             last_delimiter: ' ',
+            unusual_whitespace_line: None,
         }
     }
 
@@ -30,6 +33,11 @@ impl TokenizerState {
         self.index = 0;
         self.line_no = 0;
         self.last_delimiter = ' ';
+        self.unusual_whitespace_line = None;
+    }
+
+    fn is_standard_whitespace(b: u8) -> bool {
+        matches!(b, b' ' | b'\n' | b'\t' | b'\r' | b'\x0B')
     }
 
     pub fn load_string(&mut self, data: String) {
@@ -37,19 +45,38 @@ impl TokenizerState {
         self.full_data = data;
     }
 
-    fn is_whitespace(c: char) -> bool {
-        matches!(c, ' ' | '\n' | '\t' | '\x0B')
+    /// Check if the byte position starts with a Unicode whitespace character.
+    /// Returns the number of bytes to advance (0 if not whitespace).
+    fn whitespace_len_at(s: &str, pos: usize) -> usize {
+        let b = s.as_bytes()[pos];
+        // Fast path: ASCII bytes (covers >99% of NMR-STAR content)
+        if b < 128 {
+            return if matches!(b, b' ' | b'\n' | b'\t' | b'\r' | b'\x0B' | b'\x0C') { 1 } else { 0 };
+        }
+        // Slow path: multi-byte Unicode whitespace
+        if !s.is_char_boundary(pos) {
+            return 0;
+        }
+        if let Some(c) = s[pos..].chars().next() {
+            if c.is_whitespace() {
+                return c.len_utf8();
+            }
+        }
+        0
     }
 
     fn pass_whitespace(&mut self) {
-        let bytes = self.full_data.as_bytes();
-        while self.index < bytes.len() {
-            let c = bytes[self.index] as char;
-            if Self::is_whitespace(c) {
-                if c == '\n' {
+        while self.index < self.full_data.len() {
+            let len = Self::whitespace_len_at(&self.full_data, self.index);
+            if len > 0 {
+                let b = self.full_data.as_bytes()[self.index];
+                if b == b'\n' {
                     self.line_no += 1;
                 }
-                self.index += 1;
+                if self.unusual_whitespace_line.is_none() && !Self::is_standard_whitespace(b) {
+                    self.unusual_whitespace_line = Some(self.line_no);
+                }
+                self.index += len;
             } else {
                 break;
             }
@@ -111,10 +138,9 @@ impl TokenizerState {
     }
 
     fn get_next_whitespace(&self, start_pos: usize) -> usize {
-        let bytes = self.full_data.as_bytes();
         let mut pos = start_pos;
-        while pos < bytes.len() {
-            if Self::is_whitespace(bytes[pos] as char) {
+        while pos < self.full_data.len() {
+            if Self::whitespace_len_at(&self.full_data, pos) > 0 {
                 return pos;
             }
             pos += 1;
@@ -175,7 +201,7 @@ impl TokenizerState {
                 // Make sure we don't stop for quotes not followed by whitespace
                 loop {
                     let absolute_quote_pos = self.index + end_quote + 1;
-                    if absolute_quote_pos + 1 < bytes.len() && !Self::is_whitespace(bytes[absolute_quote_pos + 1] as char) {
+                    if absolute_quote_pos + 1 < self.full_data.len() && Self::whitespace_len_at(&self.full_data, absolute_quote_pos + 1) == 0 {
                         // Search for next quote starting after this one
                         if let Some(next_relative_idx) = self.find_substring("'", absolute_quote_pos + 1) {
                             // Update end_quote to be relative to self.index + 1 (after opening quote)
@@ -211,7 +237,7 @@ impl TokenizerState {
                 // Make sure we don't stop for quotes not followed by whitespace
                 loop {
                     let absolute_quote_pos = self.index + end_quote + 1;
-                    if absolute_quote_pos + 1 < bytes.len() && !Self::is_whitespace(bytes[absolute_quote_pos + 1] as char) {
+                    if absolute_quote_pos + 1 < self.full_data.len() && Self::whitespace_len_at(&self.full_data, absolute_quote_pos + 1) == 0 {
                         // Search for next quote starting after this one
                         if let Some(next_relative_idx) = self.find_substring("\"", absolute_quote_pos + 1) {
                             // Update end_quote to be relative to self.index + 1 (after opening quote)
@@ -260,7 +286,13 @@ impl TokenizerState {
         }
 
         self.update_line_number(self.index, end_pos - self.index + 1);
-        self.index = end_pos + 1;
+        let ws_len = Self::whitespace_len_at(&self.full_data, end_pos);
+        if ws_len > 0 && self.unusual_whitespace_line.is_none()
+            && !Self::is_standard_whitespace(self.full_data.as_bytes()[end_pos])
+        {
+            self.unusual_whitespace_line = Some(self.line_no);
+        }
+        self.index = end_pos + ws_len.max(1);
         Ok(Some((start, end)))
     }
 }
@@ -317,6 +349,7 @@ struct ParserContext {
     // Loop pre-allocation tracking by loop type
     loop_statistics: std::collections::HashMap<String, LoopStatistics>,
     current_loop_type: Option<String>,
+    warned_unusual_whitespace: bool,
 }
 
 impl ParserContext {
@@ -378,10 +411,11 @@ impl ParserContext {
             add_data_kwargs,
             loop_statistics: std::collections::HashMap::new(),
             current_loop_type: None,
+            warned_unusual_whitespace: false,
         })
     }
 
-    fn get_token(&mut self) -> PyResult<bool> {
+    fn get_token(&mut self, py: Python) -> PyResult<bool> {
         // Clear any previous processed token
         self.processed_token = None;
 
@@ -415,6 +449,27 @@ impl ParserContext {
                         self.token = Some((start, end));
                         self.line_number = self.tokenizer.line_no;
                         self.delimiter = self.tokenizer.last_delimiter;
+
+                        // Check for unusual whitespace (warn/raise once per file)
+                        if !self.warned_unusual_whitespace {
+                            if let Some(line) = self.tokenizer.unusual_whitespace_line {
+                                self.warned_unusual_whitespace = true;
+                                let msg = format!(
+                                    "Non-standard whitespace character found on line {}. \
+                                     Only standard whitespace characters (space, tab, newline, \
+                                     vertical tab, carriage return) are expected in NMR-STAR files.",
+                                    line + 1
+                                );
+                                if self.raise_parse_warnings {
+                                    return Err(self.raise_error(&msg));
+                                } else {
+                                    let logging = py.import("logging")?;
+                                    let logger = logging.call_method1("getLogger", ("pynmrstar",))?;
+                                    logger.call_method1("warning", (msg,))?;
+                                }
+                            }
+                        }
+
                         return Ok(true);
                     }
                     // If it's a comment, continue to get the next token
@@ -446,7 +501,7 @@ impl ParserContext {
 
 fn parse_initial(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
     // Get first token
-    if !ctx.get_token()? {
+    if !ctx.get_token(py)? {
         return Err(ctx.raise_error("Empty file"));
     }
 
@@ -479,7 +534,7 @@ fn parse_initial(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
 }
 
 fn parse_entry_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
-    while ctx.get_token()? {
+    while ctx.get_token(py)? {
         let token = ctx.token_str();
 
         if !starts_with_ignore_case(token, "save_") {
@@ -536,7 +591,7 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
         Ok(())
     };
 
-    while ctx.get_token()? {
+    while ctx.get_token(py)? {
         let token = ctx.token_str();
 
         if token.eq_ignore_ascii_case("loop_") {
@@ -601,7 +656,7 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
             };
 
             // Get tag value
-            if !ctx.get_token()? {
+            if !ctx.get_token(py)? {
                 return Err(ctx.raise_error("Tag without value"));
             }
             let value = ctx.token_str();
@@ -670,7 +725,7 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
 fn parse_loop_tags(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
     let mut tags: Vec<TokenValue> = Vec::new();
 
-    while ctx.in_loop && ctx.get_token()? {
+    while ctx.in_loop && ctx.get_token(py)? {
         let token = ctx.token_str();
 
         // Check if this is a tag
@@ -886,7 +941,7 @@ fn parse_loop_data(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
         }
 
         // Get next token
-        if !ctx.get_token()? {
+        if !ctx.get_token(py)? {
             return Err(ctx.raise_error("Loop improperly terminated at end of file. \
                                         Loops must end with the 'stop_' token, but the \
                                         file ended without the stop token."));

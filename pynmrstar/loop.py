@@ -151,7 +151,7 @@ class Loop(object):
     def category(self, value: Optional[str]) -> None:
         if value is not None:
             for char in value:
-                if char in utils.definitions.WHITESPACE:
+                if char.isspace():
                     raise ValueError(f"Loop category cannot contain whitespace characters. "
                                      f"Invalid category: '{value}'")
         self._category = value
@@ -655,7 +655,7 @@ class Loop(object):
         if "." in name:
             raise ValueError(f"There cannot be more than one '.' in a tag name. Invalid tag name: '{name}'")
         for char in str(name):
-            if char in utils.definitions.WHITESPACE:
+            if char.isspace():
                 raise ValueError(f"Tag names can not contain whitespace characters. Invalid tag name: '{name}")
 
         # Add the tag
