@@ -1,6 +1,14 @@
 Release notes
 =============
 
+3.4.1
+~~~~~
+
+Minor improvements:
+
+- :py:meth:`pynmrstar.Loop.category` is now a property to be able to validate it when set. Previously,
+  invalid loop categories (tag prefixes) could be provided.
+
 3.4.0
 ~~~~~
 

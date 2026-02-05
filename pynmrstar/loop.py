@@ -67,7 +67,7 @@ class Loop(object):
         # Initialize our local variables
         self._tags: List[str] = []
         self.data: List[List[Any]] = []
-        self.category: Optional[str] = None
+        self._category: Optional[str] = None
         self.source: str = "unknown"
 
         star_buffer: StringIO = StringIO("")
@@ -141,6 +141,20 @@ class Loop(object):
         self._tags = tmp_entry[0][0].tags
         self.data = tmp_entry[0][0].data
         self.category = tmp_entry[0][0].category
+
+    @property
+    def category(self) -> Optional[str]:
+        """The loop category (tag prefix)."""
+        return self._category
+
+    @category.setter
+    def category(self, value: Optional[str]) -> None:
+        if value is not None:
+            for char in value:
+                if char in utils.definitions.WHITESPACE:
+                    raise ValueError(f"Loop category cannot contain whitespace characters. "
+                                     f"Invalid category: '{value}'")
+        self._category = value
 
     def __iter__(self) -> Generator[List[Any], Any, None]:
         """ Yields each of the rows contained within the loop. """
