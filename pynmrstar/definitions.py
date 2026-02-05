@@ -25,7 +25,7 @@ WHITESPACE: str = " \t\n\v"
 STR_CONVERSION_DICT: dict = {None: "."}
 
 API_URL: str = "https://api.bmrb.io/v2"
-SCHEMA_URL: str = 'https://raw.githubusercontent.com/uwbmrb/nmr-star-dictionary/master/xlschem_ann.csv'
-COMMENT_URL: str = "https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v3/reference_files/comments.str"
-TYPES_URL: str = "https://raw.githubusercontent.com/uwbmrb/PyNMRSTAR/v3/pynmrstar/reference_files/data_types.csv"
+SCHEMA_URL: str = 'https://raw.githubusercontent.com/bmrb-io/nmr-star-dictionary/master/xlschem_ann.csv'
+COMMENT_URL: str = "https://raw.githubusercontent.com/bmrb-io/PyNMRSTAR/v3/pynmrstar/reference_files/comments.str"
+TYPES_URL: str = "https://raw.githubusercontent.com/bmrb-io/PyNMRSTAR/v3/pynmrstar/reference_files/data_types.csv"
 FTP_URL: str = "https://bmrb.io/ftp/pub/bmrb"
