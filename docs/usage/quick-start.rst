@@ -103,7 +103,7 @@ method.
             [0] <pynmrstar.Loop '_Chem_shift_experiment'>
             [1] <pynmrstar.Loop '_Atom_chem_shift'>
 
-You can see that there are 24 saveframes, and each saveframe contains
+You can see that there are 25 saveframes, and each saveframe contains
 some number of loops.
 
 Accessing saveframes and loops
@@ -257,8 +257,8 @@ format.
 .. code:: python
 
     csv_data = ""
+    print_header = True
     for software_sf in software_saveframes:
-        print_header = True
         # Wrap this in try/catch because it is not guaranteed a software saveframe will have a task loop
         try:
             csv_data += software_sf['_Task'].get_data_as_csv(header=print_header)
@@ -280,13 +280,13 @@ do so is with the ``get_tag()`` method of the entry:
 .. code:: python
 
     entry15000.get_tag('Task.Task')
-    [u'processing','chemical shift assignment',
-     u'data analysis',
-     u'peak picking',
-     u'chemical shift assignment',
-     u'structure solution',
-     u'refinement',
-     u'structure solution']
+    ['processing', 'chemical shift assignment',
+     'data analysis',
+     'peak picking',
+     'chemical shift assignment',
+     'structure solution',
+     'refinement',
+     'structure solution']
 
 Or to get all of the spectrometer information - ``get_tags()`` accepts a
 list of tags to fetch and returns a dictionary pointing to all the
@@ -295,24 +295,24 @@ values of each tag, with the order preserved:
 .. code:: python
 
     entry15000.get_tags(['_NMR_spectrometer.Manufacturer', '_NMR_spectrometer.Model', '_NMR_spectrometer.Field_strength'])
-    {'_NMR_spectrometer.Field_strength': [u'500',
-      u'500',
-      u'750',
-      u'600',
-      u'800',
-      u'900'],
-     '_NMR_spectrometer.Manufacturer': [u'Bruker',
-      u'Bruker',
-      u'Bruker',
-      u'Varian',
-      u'Varian',
-      u'Varian'],
-     '_NMR_spectrometer.Model': [u'Avance',
-      u'Avance',
-      u'Avance',
-      u'INOVA',
-      u'INOVA',
-      u'INOVA']}
+    {'_NMR_spectrometer.Field_strength': ['500',
+      '500',
+      '750',
+      '600',
+      '800',
+      '900'],
+     '_NMR_spectrometer.Manufacturer': ['Bruker',
+      'Bruker',
+      'Bruker',
+      'Varian',
+      'Varian',
+      'Varian'],
+     '_NMR_spectrometer.Model': ['Avance',
+      'Avance',
+      'Avance',
+      'INOVA',
+      'INOVA',
+      'INOVA']}
 
 To view all of the tags in the NMR-STAR schema and their meanings,
 please go `here <https://bmrb.io/dictionary/tag.php>`__. # Assigned
@@ -333,15 +333,15 @@ loops:
     for chemical_shift_loop in entry15000.get_loops_by_category("Atom_chem_shift"):
         cs_result_sets.append(chemical_shift_loop.get_tag(['Comp_index_ID', 'Comp_ID', 'Atom_ID', 'Atom_type', 'Val', 'Val_err']))
     cs_result_sets
-    [[[u'2', u'SER', u'H', u'H', u'9.3070', u'0.01'],
-      [u'2', u'SER', u'HA', u'H', u'4.5970', u'0.01'],
-      [u'2', u'SER', u'HB2', u'H', u'4.3010', u'0.01'],
-      [u'2', u'SER', u'HB3', u'H', u'4.0550', u'0.01'],
-      [u'2', u'SER', u'CB', u'C', u'64.6000', u'0.1'],
-      [u'2', u'SER', u'N', u'N', u'121.5800', u'0.1'],
-      [u'3', u'ASP', u'H', u'H', u'8.0740', u'0.01'],
-      [u'3', u'ASP', u'HA', u'H', u'4.5580', u'0.01'],
-      [u'3', u'ASP', u'HB2', u'H', u'2.835', u'0.01'],
+    [[['2', 'SER', 'H', 'H', '9.3070', '0.01'],
+      ['2', 'SER', 'HA', 'H', '4.5970', '0.01'],
+      ['2', 'SER', 'HB2', 'H', '4.3010', '0.01'],
+      ['2', 'SER', 'HB3', 'H', '4.0550', '0.01'],
+      ['2', 'SER', 'CB', 'C', '64.6000', '0.1'],
+      ['2', 'SER', 'N', 'N', '121.5800', '0.1'],
+      ['3', 'ASP', 'H', 'H', '8.0740', '0.01'],
+      ['3', 'ASP', 'HA', 'H', '4.5580', '0.01'],
+      ['3', 'ASP', 'HB2', 'H', '2.835', '0.01'],
       ...
 
 Note that we used the ``get_tag()`` method of the loop to only pull out
@@ -397,25 +397,25 @@ the file using ``Entry.from_file()``.
     for chemical_shift_loop in entry15000.get_loops_by_category("Atom_chem_shift"):
          cs_result_sets.append(chemical_shift_loop.get_tag(['Comp_index_ID', 'Comp_ID', 'Atom_ID', 'Atom_type', 'Val', 'Val_err']))
     print(cs_result_sets)
-    [[[2, u'SER', u'H', u'H', Decimal('9.3070'), Decimal('0.01')],
-      [2, u'SER', u'HA', u'H', Decimal('4.5970'), Decimal('0.01')],
-      [2, u'SER', u'HB2', u'H', Decimal('4.3010'), Decimal('0.01')],
-      [2, u'SER', u'HB3', u'H', Decimal('4.0550'), Decimal('0.01')],
-      [2, u'SER', u'CB', u'C', Decimal('64.6000'), Decimal('0.1')],
-      [2, u'SER', u'N', u'N', Decimal('121.5800'), Decimal('0.1')],
-      [3, u'ASP', u'H', u'H', Decimal('8.0740'), Decimal('0.01')],
-      [3, u'ASP', u'HA', u'H', Decimal('4.5580'), Decimal('0.01')],
-      [3, u'ASP', u'HB2', u'H', Decimal('2.835'), Decimal('0.01')],
-      [3, u'ASP', u'HB3', u'H', Decimal('2.754'), Decimal('0.01')],
-      [3, u'ASP', u'CA', u'C', Decimal('57.6400'), Decimal('0.1')],
-      [3, u'ASP', u'N', u'N', Decimal('121.1040'), Decimal('0.1')],
+    [[[2, 'SER', 'H', 'H', Decimal('9.3070'), Decimal('0.01')],
+      [2, 'SER', 'HA', 'H', Decimal('4.5970'), Decimal('0.01')],
+      [2, 'SER', 'HB2', 'H', Decimal('4.3010'), Decimal('0.01')],
+      [2, 'SER', 'HB3', 'H', Decimal('4.0550'), Decimal('0.01')],
+      [2, 'SER', 'CB', 'C', Decimal('64.6000'), Decimal('0.1')],
+      [2, 'SER', 'N', 'N', Decimal('121.5800'), Decimal('0.1')],
+      [3, 'ASP', 'H', 'H', Decimal('8.0740'), Decimal('0.01')],
+      [3, 'ASP', 'HA', 'H', Decimal('4.5580'), Decimal('0.01')],
+      [3, 'ASP', 'HB2', 'H', Decimal('2.835'), Decimal('0.01')],
+      [3, 'ASP', 'HB3', 'H', Decimal('2.754'), Decimal('0.01')],
+      [3, 'ASP', 'CA', 'C', Decimal('57.6400'), Decimal('0.1')],
+      [3, 'ASP', 'N', 'N', Decimal('121.1040'), Decimal('0.1')],
        ...
 
 This is a great opportunity to point out that if all you want is the
 chemical shifts, or one or two tags, you may find it significantly
 easier to use the `BMRB
-API <https://github.com/uwbmrb/BMRB-API#bmrb-api>`__ (`chemical shift
-endpoint <https://github.com/uwbmrb/BMRB-API#get-assigned-chemical-shift-list-get>`__)
+API <https://github.com/bmrb-io/BMRB-API#bmrb-api>`__ (`chemical shift
+endpoint <https://github.com/bmrb-io/BMRB-API#get-assigned-chemical-shift-list-get>`__)
 to fetch that data directly and on-demand rather than dealing directly
 with NMR-STAR at all.
 
@@ -536,7 +536,7 @@ BMRB schema corresponding to that loop category.
 Saveframes
 ^^^^^^^^^^
 
-There are five ways to make a new loop: ``from_file()``,
+There are five ways to make a new saveframe: ``from_file()``,
 ``from_json()``, ``from_scratch()``, ``from_string()``, and
 ``from_template()``. All of these are classmethods. ``from_scratch()``
 makes a new saveframe, ``from_string()`` parses an NMR-STAR saveframe
