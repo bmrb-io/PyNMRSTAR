@@ -3,102 +3,32 @@
 ## About
 
 These scripts are developed to ease certain common tasks performed against
-NMR-STAR files. To run, they must be able to find a copy of `pynmrstar.py`
-either in the same directory as them, or in the directory above them. Therefore,
-if you copy the script elsewhere make sure to copy `pynmrstar.py` as well.
+NMR-STAR files. To run them, the `pynmrstar` package must be installed
+(e.g. `pip install pynmrstar`).
 
 Most of the tools' functions are clear from their names, but they are described
-in detail here for reference. If you want to use the bmrb python library but
-are intimidated looking at these scripts will provide you with an idea of how
+in detail here for reference. If you want to use the pynmrstar library but
+are intimidated, looking at these scripts will provide you with an idea of how
 to read data from NMR-STAR files using the library.
 
-### pynmrstar.py
+### Library equivalents
 
-The python module itself has several command line flags that allow it to perform
-useful functions on the command line. Those are:
+In addition to the scripts below, equivalent functionality for tag fetching,
+validation, and entry comparison is available directly through the library:
 
-#### Tag fetching
+```python
+import pynmrstar
 
-Run `pynmrstar.py --tag` and then a filename followed by a list of comma separated
-tag names in order to extract the specified tags from the file and print
-them in a tabular format.
+# Tag fetching
+entry = pynmrstar.Entry.from_file("bmr15000_3.str")
+entry.get_tag("_Citation_author.Given_name")
 
-For example:
+# Validation
+pynmrstar.utils.validate(entry)
 
-```bash
-
-./pynmrstar.py --tag bmr15000_3.str "_Citation_author.Given_name,_Citation_author.Family_name"
-Gabriel Cornilescu
-Erik    Hadley
-Matthew Woll
-John    Markley
-Samuel  Gellman
-Claudia Cornilescu
-```
-
-Note that when there are multiple values for a tag they are separated by newlines,
-and when multiple tags are queried the individual tag results are separated by tabs.
-
-**WARNING** - It is possible to query tags from different saveframes or loops with
-this tool. That means that the tags will not always have the same number of results. To
-properly machine parse the output you *must* look for one tab character `\t` as
-the separator rather than a generic "space" regular expression like such `\s`. The
-following example demonstrates the potential problem for improperly written code:
-
-```bash
-
-./pynmrstar.py --tag bmr15000_3.str "_Citation.Year,_Citation_author.Given_name,_Citation_author.Family_name"
-
-2007    Gabriel Cornilescu
-    Erik    Hadley
-    Matthew Woll
-    John    Markley
-    Samuel  Gellman
-    Claudia Cornilescu
-```
-
-You can see how one could mistakenly interpret "Erik" as a second result for
-the `_Citation.Year` tag. Careful inspection of the tab characters show this isn't
-the case. A warning will print to stdout if the tags you query have a mismatched
-number of results, and you will never have to worry about this if you only query
-one tag at a time.
-
-Finally, and newlines in the value of tags will be replaced with `\n` escape
-sequences, and any tabs will be replaced with the `\t` escape sequence.
-
-An example of parsing the results using the `cut` tool to get just the last name
-from the above query:
-
-```bash
-
-./pynmrstar.py --tag bmr15000_3.str "_Citation.Year,_Citation_author.Given_name,_Citation_author.Family_name" | cut -f3
-
-Cornilescu
-Hadley
-Woll
-Markley
-Gellman
-Cornilescu
-```
-
-#### Entry validation
-
-To validate a NMR-STAR file against the NMR-STAR schema run:
-
-```bash
-
-./pynmrstar.py --validate bmr15000_3.str
-No problems found during validation.
-```
-
-#### Entry comparison
-
-To compare two NMR-STAR entries for equivalence (syntactically aware):
-
-```bash
-
-./pynmrstar.py --diff entry_1.str entry_2.str
-Identical entries.
+# Entry comparison
+entry2 = pynmrstar.Entry.from_file("other_entry.str")
+pynmrstar.utils.diff(entry, entry2)
 ```
 
 ### Command line scripts
@@ -173,7 +103,7 @@ assigned_chem_shift_list_1: assigned_chemical_shifts
 
 Provide the filename of an NMR-STAR file as the first argument.
 
-Prints a list of all the saveframes, loop, and tags that exist in a given
+Prints a list of all the saveframes, loops, and tags that exist in a given
 NMR-STAR file.
 
 ```bash
