@@ -159,19 +159,19 @@ pub fn quote_value_str(s: &str) -> String {
         }
 
         if !can_wrap_single && !can_wrap_double {
+            // Must use multiline format
             let mut result = String::with_capacity(len + 1);
             result.push_str(s);
             result.push('\n');
             return result;
-        }
-        if can_wrap_single {
+        } else if can_wrap_single {
             let mut result = String::with_capacity(len + 2);
             result.push('\'');
             result.push_str(s);
             result.push('\'');
             return result;
-        }
-        if can_wrap_double {
+        } else {
+            // can_wrap_double must be true here
             let mut result = String::with_capacity(len + 2);
             result.push('"');
             result.push_str(s);

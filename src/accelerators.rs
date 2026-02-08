@@ -249,7 +249,7 @@ pub fn format_loop(
                 }
             }
         }
-        result.push_str(" \n");
+        result.push('\n');
     }
 
     // Close the loop
