@@ -92,13 +92,9 @@ pub fn format_saveframe(
             let formatted_tag = format!("{}.{}", tag_prefix, tag_name);
 
             if quoted.contains('\n') {
-                // Multiline value format
+                // Multiline value format (no padding needed before newline)
                 result.push_str("   ");
                 result.push_str(&formatted_tag);
-                // Pad to max_width
-                for _ in formatted_tag.len()..max_width {
-                    result.push(' ');
-                }
                 result.push_str("\n;\n");
                 result.push_str(&quoted);
                 result.push_str(";\n");

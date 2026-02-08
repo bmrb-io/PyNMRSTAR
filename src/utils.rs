@@ -195,17 +195,9 @@ pub fn quote_value_str(s: &str) -> String {
         }
 
         if !needs_wrapping {
-            let mut prev_is_ws = true;
-            for c in s.chars() {
-                if c.is_whitespace() {
-                    needs_wrapping = true;
-                    break;
-                }
-                if c == '#' && prev_is_ws {
-                    needs_wrapping = true;
-                    break;
-                }
-                prev_is_ws = c.is_whitespace();
+            // Check for whitespace anywhere or '#' at start (would be interpreted as comment)
+            if s.starts_with('#') || s.chars().any(|c| c.is_whitespace()) {
+                needs_wrapping = true;
             }
         }
     }
