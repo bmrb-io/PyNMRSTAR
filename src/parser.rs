@@ -622,7 +622,7 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
             // Flush any pending tags before exiting saveframe
             flush_tags(ctx, &mut pending_tags)?;
 
-            if ctx.delimiter != ' ' && ctx.delimiter != ';' {
+            if ctx.delimiter != ' ' {
                 return Err(ctx.raise_error("The save_ keyword may not be quoted or semicolon-delimited."));
             }
 

@@ -40,6 +40,8 @@ class TestParser(unittest.TestCase):
         self.assertRaises(ParsingError, Entry.from_string, "data_1 save_1 _saveframe.tag value loop_ _tag.one _tag.two data data2 loop_ stop_ save_")
         self.assertRaises(ParsingError, Entry.from_string, "data_1 save_1 _saveframe.tag value loop_ _tag.one _tag.two data data2")
         self.assertRaises(ParsingError, Entry.from_string, "data_1 save_1 _saveframe.tag value 'save_'")
+        # Closing save_ cannot be semicolon-delimited
+        self.assertRaises(ParsingError, Entry.from_string, "data_1\nsave_1\n_saveframe.tag value\n;\nsave_\n;\n")
         self.assertRaises(ParsingError, Entry.from_string, "data_1 save_1 save_")
         self.assertRaises(ParsingError, Entry.from_string, "data_1 save_1 stop_")
 
