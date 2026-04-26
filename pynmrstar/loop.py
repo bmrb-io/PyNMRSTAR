@@ -69,6 +69,7 @@ class Loop(object):
 
         # Initialize our local variables
         self._tags: List[str] = []
+        self._lc_tags_cache: Optional[Dict[str, int]] = None
         self.data: List[List[Any]] = []
         self._category: Optional[str] = None
         self.source: str = "unknown"
@@ -240,9 +241,10 @@ class Loop(object):
             raise InvalidStateError(str(e))
 
     @property
-    def _lc_tags(self) -> Dict[str, int]:
-        return {_[1].lower(): _[0] for _ in enumerate(self._tags)}
     def _lc_tags(self) -> Mapping[str, int]:
+        if self._lc_tags_cache is None:
+            self._lc_tags_cache = {t.lower(): i for i, t in enumerate(self._tags)}
+        return self._lc_tags_cache
 
     @property
     def empty(self) -> bool:
@@ -664,6 +666,8 @@ class Loop(object):
 
         # Add the tag
         self._tags.append(name)
+        if self._lc_tags_cache is not None:
+            self._lc_tags_cache[name.lower()] = len(self._tags) - 1
 
         # Add None's to the rows of data
         if update_data:
@@ -985,6 +989,7 @@ class Loop(object):
         for each_tag in tag:
             tag_position: int = self.tag_index(each_tag)
             del self._tags[tag_position]
+            self._lc_tags_cache = None
             for row in self.data:
                 del row[tag_position]
 
@@ -1074,6 +1079,7 @@ class Loop(object):
         else:
             self.data = self.get_tag(sorted_order)
             self._tags = [utils.format_tag(x) for x in sorted_order]
+            self._lc_tags_cache = None
 
     def sort_rows(self, tags: Union[str, List[str]], key: Callable = None) -> None:
         """ Sort the data in the rows by their values for a given tag
