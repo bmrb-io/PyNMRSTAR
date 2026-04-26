@@ -352,6 +352,7 @@ struct ParserContext {
     // Loop pre-allocation tracking by loop type
     loop_statistics: std::collections::HashMap<String, LoopStatistics>,
     current_loop_type: Option<String>,
+    current_loop_tags_len: usize,
     warned_unusual_whitespace: bool,
 }
 
@@ -414,6 +415,7 @@ impl ParserContext {
             add_data_kwargs,
             loop_statistics: std::collections::HashMap::new(),
             current_loop_type: None,
+            current_loop_tags_len: 0,
             warned_unusual_whitespace: false,
         })
     }
@@ -776,6 +778,7 @@ fn parse_loop_tags(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
             // Preallocate loop_data Vec based on number of tags
             // Use adaptive sizing based on loop type statistics
             let tags_len = tags.len();
+            ctx.current_loop_tags_len = tags_len;
             if tags_len > 0 {
                 let estimated_rows = if let Some(loop_type) = &ctx.current_loop_type {
                     // Look up statistics for this specific loop type
@@ -819,8 +822,7 @@ fn parse_loop_data(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
             }
 
             let loop_obj = ctx.current_loop.as_ref().unwrap();
-            let tags = loop_obj.bind(py).getattr("tags")?;
-            let tags_len = tags.len()?;
+            let tags_len = ctx.current_loop_tags_len;
 
             // Warnings/errors for empty loops
             if tags_len == 0 {
@@ -889,6 +891,7 @@ fn parse_loop_data(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
             ctx.loop_data.clear();
             ctx.current_loop = None;
             ctx.current_loop_type = None;
+            ctx.current_loop_tags_len = 0;
             ctx.in_loop = false;
             break;
 
@@ -902,9 +905,7 @@ fn parse_loop_data(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
 
         } else {
             // Data value
-            let loop_obj = ctx.current_loop.as_ref().unwrap();
-            let tags = loop_obj.bind(py).getattr("tags")?;
-            let tags_len = tags.len()?;
+            let tags_len = ctx.current_loop_tags_len;
 
             if tags_len == 0 {
                 return Err(ctx.raise_error(&format!(
