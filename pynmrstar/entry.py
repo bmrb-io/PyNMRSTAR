@@ -4,7 +4,7 @@ import logging
 import warnings
 from io import StringIO
 from pathlib import Path
-from typing import TextIO, BinaryIO, Union, List, Optional, Dict, Any, Tuple
+from typing import TextIO, BinaryIO, Union, List, Optional, Dict, Any, Tuple, Sequence
 
 from pynmrstar import definitions, utils, loop as loop_mod, saveframe as saveframe_mod, parser
 from pynmrstar._internal import _json_serialize, _interpret_file, _get_entry_from_database, write_to_file
@@ -199,7 +199,7 @@ class Entry(object):
         return f"data_{self.entry_id}\n\n" + "\n".join(sf_strings)
 
     @property
-    def category_list(self) -> List[str]:
+    def category_list(self) -> Sequence[str]:
         """ Returns a list of the unique categories present in the entry. """
 
         category_list = []
@@ -278,7 +278,7 @@ class Entry(object):
         return frame_dict
 
     @property
-    def frame_list(self) -> List['saveframe_mod.Saveframe']:
+    def frame_list(self) -> Sequence['saveframe_mod.Saveframe']:
         return self._frame_list
 
     @classmethod

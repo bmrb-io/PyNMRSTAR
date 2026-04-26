@@ -3,7 +3,7 @@ import warnings
 from csv import reader as csv_reader, writer as csv_writer
 from io import StringIO
 from pathlib import Path
-from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Iterable, Tuple
+from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Iterable, Tuple, Sequence, Mapping
 
 from pynmrstar_parser import pynmrstar_parser
 
@@ -252,6 +252,7 @@ class Saveframe(object):
     @property
     def _lc_tags(self) -> Dict[str, int]:
         return {_[1][0].lower(): _[0] for _ in enumerate(self._tags)}
+    def _lc_tags(self) -> Mapping[str, int]:
 
     @property
     def category(self) -> str:
@@ -292,7 +293,7 @@ class Saveframe(object):
         return True
 
     @property
-    def loops(self) -> List['loop_mod.Loop']:
+    def loops(self) -> Sequence['loop_mod.Loop']:
         return self._loops
 
     @property
@@ -328,7 +329,7 @@ class Saveframe(object):
         self._name = name
 
     @property
-    def tags(self) -> List[List[any]]:
+    def tags(self) -> Sequence[List[Any]]:
         return self._tags
 
     @property

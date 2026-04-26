@@ -5,7 +5,7 @@ from csv import reader as csv_reader, writer as csv_writer
 from io import StringIO
 from itertools import chain
 from pathlib import Path
-from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Callable, Tuple, Generator
+from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Callable, Tuple, Generator, Sequence, Mapping
 
 import pynmrstar_parser
 
@@ -242,6 +242,7 @@ class Loop(object):
     @property
     def _lc_tags(self) -> Dict[str, int]:
         return {_[1].lower(): _[0] for _ in enumerate(self._tags)}
+    def _lc_tags(self) -> Mapping[str, int]:
 
     @property
     def empty(self) -> bool:
@@ -255,7 +256,7 @@ class Loop(object):
         return True
 
     @property
-    def tags(self) -> List[str]:
+    def tags(self) -> Sequence[str]:
         return self._tags
 
     @classmethod
@@ -491,7 +492,7 @@ class Loop(object):
             raise ValueError('No valid data provided.')
 
         pending_data: List = []
-        lc_tag_index: Dict[str, int] = self._lc_tags
+        lc_tag_index: Mapping[str, int] = self._lc_tags
 
         def format_two_to_one(format_two: Dict[str, List]):
             max_length = max([len(_) for _ in format_two.values()])
