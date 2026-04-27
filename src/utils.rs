@@ -159,19 +159,19 @@ pub fn quote_value_str(s: &str) -> String {
         }
 
         if !can_wrap_single && !can_wrap_double {
+            // Must use multiline format
             let mut result = String::with_capacity(len + 1);
             result.push_str(s);
             result.push('\n');
             return result;
-        }
-        if can_wrap_single {
+        } else if can_wrap_single {
             let mut result = String::with_capacity(len + 2);
             result.push('\'');
             result.push_str(s);
             result.push('\'');
             return result;
-        }
-        if can_wrap_double {
+        } else {
+            // can_wrap_double must be true here
             let mut result = String::with_capacity(len + 2);
             result.push('"');
             result.push_str(s);
@@ -195,17 +195,9 @@ pub fn quote_value_str(s: &str) -> String {
         }
 
         if !needs_wrapping {
-            let mut prev_is_ws = true;
-            for c in s.chars() {
-                if c.is_whitespace() {
-                    needs_wrapping = true;
-                    break;
-                }
-                if c == '#' && prev_is_ws {
-                    needs_wrapping = true;
-                    break;
-                }
-                prev_is_ws = c.is_whitespace();
+            // Check for whitespace anywhere or '#' at start (would be interpreted as comment)
+            if s.starts_with('#') || s.chars().any(|c| c.is_whitespace()) {
+                needs_wrapping = true;
             }
         }
     }

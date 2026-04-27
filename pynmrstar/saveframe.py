@@ -82,8 +82,8 @@ class Saveframe(object):
         if isinstance(item, int):
             try:
                 return self._loops[item]
-            except KeyError:
-                raise KeyError(f"No loop with index '{item}'.")
+            except IndexError:
+                raise IndexError(f"No loop with index '{item}'.")
         elif isinstance(item, str):
             # Assume it is a loop category based on the proceeding underscore
             #  and lack of the '.' category and tag separator

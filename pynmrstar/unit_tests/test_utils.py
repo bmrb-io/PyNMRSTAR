@@ -29,6 +29,7 @@ class TestUtils(unittest.TestCase):
         utils.quote_value.cache_clear()
         self.assertEqual(utils.quote_value("loop_"), "noloop_")
         definitions.STR_CONVERSION_DICT = {None: "."}
+        utils.quote_value.cache_clear()
 
     def test__format_category(self):
         self.assertEqual(utils.format_category("test"), "_test")

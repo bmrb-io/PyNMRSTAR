@@ -275,12 +275,8 @@ impl TokenizerState {
         let start = self.index;
         let end = end_pos;
 
-        // Determine delimiter
-        if self.index == 0 {
-            self.last_delimiter = ' ';
-        } else {
-            self.last_delimiter = ' ';
-        }
+        // Set delimiter for unquoted tokens
+        self.last_delimiter = ' ';
 
         // Check if it's a reference (starts with $ and delimiter was space)
         let token_slice = &self.full_data[start..end];
@@ -295,7 +291,9 @@ impl TokenizerState {
         {
             self.unusual_whitespace_line = Some(self.line_no);
         }
-        self.index = end_pos + ws_len.max(1);
+        // Advance past the token and any trailing whitespace
+        // If at end of file (ws_len=0), end_pos already equals full_data.len()
+        self.index = end_pos + ws_len;
         Ok(Some((start, end)))
     }
 }
@@ -624,7 +622,7 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
             // Flush any pending tags before exiting saveframe
             flush_tags(ctx, &mut pending_tags)?;
 
-            if ctx.delimiter != ' ' && ctx.delimiter != ';' {
+            if ctx.delimiter != ' ' {
                 return Err(ctx.raise_error("The save_ keyword may not be quoted or semicolon-delimited."));
             }
 

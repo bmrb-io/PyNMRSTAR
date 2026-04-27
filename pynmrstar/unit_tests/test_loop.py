@@ -319,7 +319,7 @@ loop_
         # Once category is set, should work
         tmp_loop.set_category("test")
         self.assertEqual(str(tmp_loop), "\n   loop_\n      _test.tag1\n      _test.tag2\n      _test.tag3\n\n     "
-                                        "1   2   3    \n\n   stop_\n")
+                                        "1   2   3   \n\n   stop_\n")
         self.assertEqual(tmp_loop.category, "_test")
 
     def test_syntax_outliers(self):

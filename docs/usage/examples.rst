@@ -109,7 +109,17 @@ saveframe, and compare it to the original.
     No saveframe with name 'entry_information' in other entry.
 
 Let's look at a loop's tags and its data:
-``python >>> ent15000['entry_information']['_Entry_author'].get_tag_names() [u'_Entry_author.Ordinal',  u'_Entry_author.Given_name',  u'_Entry_author.Family_name',  u'_Entry_author.First_initial',  u'_Entry_author.Middle_initials',  u'_Entry_author.Family_title',  u'_Entry_author.Entry_ID']``
+
+.. code:: python
+
+    >>> ent15000['entry_information']['_Entry_author'].get_tag_names()
+    ['_Entry_author.Ordinal',
+     '_Entry_author.Given_name',
+     '_Entry_author.Family_name',
+     '_Entry_author.First_initial',
+     '_Entry_author.Middle_initials',
+     '_Entry_author.Family_title',
+     '_Entry_author.Entry_ID']
 
 Get the first names of the authors using direct saveframe name and loop
 reference:
@@ -117,7 +127,7 @@ reference:
 .. code:: python
 
     >>> ent15000['entry_information']['_Entry_author'].get_data_by_tag('Given_name')
-    [[u'Claudia', u'Gabriel', u'Erik', u'Samuel', u'John']]
+    [['Claudia', 'Gabriel', 'Erik', 'Samuel', 'John']]
 
 Get the first and last names of the authors by providing multiple tags
 to ``get_data_by_tag``.
@@ -125,11 +135,11 @@ to ``get_data_by_tag``.
 .. code:: python
 
     >>> ent15000['entry_information']['_Entry_author'].get_data_by_tag(['Given_name', 'Family_name'])
-    [[u'Claudia', u'Cornilescu'],
-     [u'Gabriel', u'Cornilescu'],
-     [u'Erik', u'Hadley'],
-     [u'Samuel', u'Gellman'],
-     [u'John', u'Markley']]
+    [['Claudia', 'Cornilescu'],
+     ['Gabriel', 'Cornilescu'],
+     ['Erik', 'Hadley'],
+     ['Samuel', 'Gellman'],
+     ['John', 'Markley']]
 
 Write the modified entry to disk in NMR-STAR format:
 
@@ -345,12 +355,12 @@ to a row:
 
     >>> our_data = peak1['_Peak_char'].get_data_by_tag(['Peak_ID','Chem_shift_val'])
     >>> print(our_data)
-    [[u'1', u'9.857'],
-     [u'1', u'4.922'],
-     [u'2', u'9.857'],
-     [u'2', u'2.167'],
-     [u'3', u'9.855'],
-     [u'3', u'1.994'],
+    [['1', '9.857'],
+     ['1', '4.922'],
+     ['2', '9.857'],
+     ['2', '2.167'],
+     ['3', '9.855'],
+     ['3', '1.994'],
      ...]
 
 Excellent! Now we can iterate through each spectral peak and

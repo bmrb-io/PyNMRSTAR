@@ -4,9 +4,6 @@ Welcome to PyNMR-STAR!
 A Python module for reading, writing, and manipulating NMR-STAR files.
 |License| |Wheel| |PythonVersions|
 
-Previous python versions (back to 2.6) are supported by the v2 branch
-(version 2.x releases on PyPI).
-
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
@@ -32,18 +29,15 @@ or method.
 There are several command-line based tools developed to enable simple
 queries to pull data out of an NMR-STAR file. Those tools also serve as
 great examples of how to use the library. You can view those
-`here <https://github.com/uwbmrb/PyNMRSTAR/tree/v3/cmdline>`__.
+`here <https://github.com/bmrb-io/PyNMRSTAR/tree/v3/cmdline>`__.
 
 For more examples of PyNMRSTAR library usage, please head to
 :doc:`usage/examples`. For the full documentation of all
 available methods and classes, please look at :doc:`usage/full`.
 
 For any questions or suggestions, please create an issue on the
-`GitHub page <https://github.com/uwbmrb/PyNMRSTAR/>`__.
+`GitHub page <https://github.com/bmrb-io/PyNMRSTAR/>`__.
 
-
-.. |BuildStatus| image:: https://travis-ci.org/uwbmrb/PyNMRSTAR.svg?branch=v3
-   :target: https://travis-ci.org/uwbmrb/PyNMRSTAR
 
 .. |PythonVersions| image:: https://img.shields.io/pypi/pyversions/pynmrstar.svg
    :target: https://pypi.org/project/PyNMRSTAR

@@ -27,7 +27,7 @@ Here is a very simple example of a NMR-STAR file:
             _Special_Dates.Type     Holidays
             loop_
                 _Events.Date
-                _Events.Desciption
+                _Events.Description
                 12/31/2017 "New Year's Eve"
                 01/01/2018 "New Year's Day"
             stop_

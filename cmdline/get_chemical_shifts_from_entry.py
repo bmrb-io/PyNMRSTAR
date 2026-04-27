@@ -3,7 +3,7 @@
 import os
 import sys
 
-# Load the pynmrstar.py library
+# Load the pynmrstar library
 import pynmrstar
 from pynmrstar.exceptions import ParsingError
 
@@ -38,7 +38,7 @@ except ParsingError:
         saveframe = shift_frames[0]
 
 try:
-    print(saveframe.get_loop_by_category("_Atom_chem_shift").get_data_as_csv())
+    print(saveframe.get_loop("_Atom_chem_shift").get_data_as_csv())
 except KeyError:
     raise ValueError("The assigned chemical shifts saveframe didn't have an assigned"
                      " chemical shift loop. (Expecting loop: '_Atom_chem_shift')")
