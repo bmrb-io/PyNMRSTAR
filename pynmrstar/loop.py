@@ -220,10 +220,6 @@ class Loop(object):
             raise InvalidStateError("The category was never set for this loop. Either add a tag with the category "
                                     "intact, specify it when generating the loop, or set it using Loop.set_category().")
 
-        # Make sure the tags and data match
-        if len(self.data) > 0:
-            self._check_tags_match_data()
-
         # Use the Rust implementation for the main formatting work
         # Pass STR_CONVERSION_DICT so Rust can handle conversions
         try:
