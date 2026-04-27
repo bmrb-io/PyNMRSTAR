@@ -1,6 +1,17 @@
 Release notes
 =============
 
+3.5.1
+~~~~~
+
+Minor improvements:
+
+- Further code optimizations have decreased NMR-STAR parsing time by nearly another 50%.
+- Saveframe and loop properties which were intended to be read only are now properly typed that way to make it clearer
+  to end users by surfacing type warnings. Specifically :py:attr:`pynmrstar.Entry.frame_list`,
+  :py:attr:`pynmrstar.Saveframe.tags`, :py:attr:`pynmrstar.Saveframe.loops`, and :py:attr:`pynmrstar.Loop.tags`.
+
+
 3.5.0
 ~~~~~
 

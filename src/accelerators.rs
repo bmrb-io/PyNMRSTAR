@@ -1,7 +1,10 @@
 use pyo3::prelude::*;
 use pyo3::exceptions::PyValueError;
+use pyo3::import_exception;
 
 use crate::utils::quote_value_str;
+
+import_exception!(pynmrstar.exceptions, InvalidStateError);
 
 /// Format a saveframe in NMR-STAR format.
 /// Comments are handled by Python, this focuses on the heavy lifting of tag/loop formatting.
@@ -184,6 +187,13 @@ pub fn format_loop(
     let mut col_widths: Vec<usize> = vec![4; num_cols]; // minimum width of 4
 
     for (row_idx, row) in data.iter().enumerate() {
+        if row.len() != num_cols {
+            return Err(InvalidStateError::new_err(format!(
+                "The number of tags must match the width of the data. Error in loop '{}'. \
+                 In this case, there are {} tags, and row number {} has {} tags.",
+                category, num_cols, row_idx, row.len()
+            )));
+        }
         let mut quoted_row: Vec<String> = Vec::with_capacity(num_cols);
 
         for (col_idx, cell) in row.iter().enumerate() {

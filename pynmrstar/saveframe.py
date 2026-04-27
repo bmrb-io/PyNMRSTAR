@@ -3,7 +3,7 @@ import warnings
 from csv import reader as csv_reader, writer as csv_writer
 from io import StringIO
 from pathlib import Path
-from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Iterable, Tuple
+from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Iterable, Tuple, Sequence, Mapping
 
 from pynmrstar_parser import pynmrstar_parser
 
@@ -132,6 +132,7 @@ class Saveframe(object):
 
         # Initialize our local variables
         self._tags: List[Any] = []
+        self._lc_tags_cache: Optional[Dict[str, int]] = None
         self._loops: List[loop_mod.Loop] = []
         self._name: str = ""
         self.source: str = "unknown"
@@ -250,8 +251,10 @@ class Saveframe(object):
         self.tag_prefix = tmp_entry[0].tag_prefix
 
     @property
-    def _lc_tags(self) -> Dict[str, int]:
-        return {_[1][0].lower(): _[0] for _ in enumerate(self._tags)}
+    def _lc_tags(self) -> Mapping[str, int]:
+        if self._lc_tags_cache is None:
+            self._lc_tags_cache = {tag[0].lower(): i for i, tag in enumerate(self._tags)}
+        return self._lc_tags_cache
 
     @property
     def category(self) -> str:
@@ -292,7 +295,7 @@ class Saveframe(object):
         return True
 
     @property
-    def loops(self) -> List['loop_mod.Loop']:
+    def loops(self) -> Sequence['loop_mod.Loop']:
         return self._loops
 
     @property
@@ -315,9 +318,8 @@ class Saveframe(object):
     def name(self, name):
         """ Updates the saveframe name. """
 
-        for char in str(name):
-            if char.isspace():
-                raise ValueError("Saveframe names can not contain whitespace characters.")
+        if str(name).split() != [str(name)]:
+            raise ValueError("Saveframe names can not contain whitespace characters.")
         if name in definitions.NULL_VALUES:
             raise ValueError("Cannot set the saveframe name to a null-equivalent value.")
 
@@ -328,7 +330,7 @@ class Saveframe(object):
         self._name = name
 
     @property
-    def tags(self) -> List[List[any]]:
+    def tags(self) -> Sequence[List[Any]]:
         return self._tags
 
     @property
@@ -586,17 +588,16 @@ class Saveframe(object):
             raise ValueError(f"Cannot use a null-equivalent value as a tag name. Invalid tag name: '{name}'")
         if "." in name:
             raise ValueError(f"There cannot be more than one '.' in a tag name. Invalid tag name: '{name}'")
-        for char in name:
-            if char.isspace():
-                raise ValueError(f"Tag names can not contain whitespace characters. Invalid tag name: '{name}'")
+        if name.split() != [name]:
+            raise ValueError(f"Tag names can not contain whitespace characters. Invalid tag name: '{name}'")
 
         # No duplicate tags
-        if self.get_tag(name):
+        tag_name_lower = name.lower()
+        if tag_name_lower in self._lc_tags:
             if not update:
                 raise ValueError(f"There is already a tag with the name '{name}' in the saveframe '{self.name}."
                                  f" Set update=True if you want to override its value.")
             else:
-                tag_name_lower = name.lower()
                 if tag_name_lower == "sf_category":
                     self._category = value
                 if tag_name_lower == "sf_framecode":
@@ -604,7 +605,7 @@ class Saveframe(object):
                         raise ValueError("Cannot set the saveframe name tag (Sf_framecode) to a null-equivalent "
                                          f"value. Invalid value: '{name}'")
                     self._name = value
-                self.get_tag(name, whole_tag=True)[0][1] = value
+                self._tags[self._lc_tags[tag_name_lower]][1] = value
                 return
 
         # See if we need to convert the data type
@@ -614,7 +615,6 @@ class Saveframe(object):
             new_tag = [name, value]
 
         # Set the category if the tag we are loading is the category
-        tag_name_lower = name.lower()
         if tag_name_lower == "sf_category":
             self._category = value
         if tag_name_lower == "sf_framecode":
@@ -625,6 +625,8 @@ class Saveframe(object):
                                  f'occurred in tag {self.tag_prefix}.Sf_framecode with value {value} which '
                                  f'conflicts with the saveframe name {self._name}.')
         self._tags.append(new_tag)
+        if self._lc_tags_cache is not None:
+            self._lc_tags_cache[new_tag[0].lower()] = len(self._tags) - 1
 
     def add_tags(self, tag_list: list,
                  update: bool = False,
@@ -935,6 +937,7 @@ class Saveframe(object):
         # Create a new list stripping out all of the deleted tags
         positions = [lc_tags[_["formatted"]] for _ in tags]
         self._tags = [_[1] for _ in enumerate(self._tags) if _[0] not in positions]
+        self._lc_tags_cache = None
 
     def set_tag_prefix(self, tag_prefix: str) -> None:
         """Set the tag prefix for this saveframe."""
@@ -952,6 +955,7 @@ class Saveframe(object):
             return schema.tag_key(self.tag_prefix + "." + x[0])
 
         self._tags.sort(key=sort_key)
+        self._lc_tags_cache = None
 
     def tag_iterator(self) -> Iterable[Tuple[str, str]]:
         """Returns an iterator for saveframe tags."""
