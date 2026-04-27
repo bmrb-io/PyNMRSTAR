@@ -199,7 +199,7 @@ class Entry(object):
         return f"data_{self.entry_id}\n\n" + "\n".join(sf_strings)
 
     @property
-    def category_list(self) -> Sequence[str]:
+    def category_list(self) -> List[str]:
         """ Returns a list of the unique categories present in the entry. """
 
         category_list = []
