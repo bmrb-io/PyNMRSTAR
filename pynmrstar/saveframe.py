@@ -318,9 +318,8 @@ class Saveframe(object):
     def name(self, name):
         """ Updates the saveframe name. """
 
-        for char in str(name):
-            if char.isspace():
-                raise ValueError("Saveframe names can not contain whitespace characters.")
+        if str(name).split() != [str(name)]:
+            raise ValueError("Saveframe names can not contain whitespace characters.")
         if name in definitions.NULL_VALUES:
             raise ValueError("Cannot set the saveframe name to a null-equivalent value.")
 
@@ -589,9 +588,8 @@ class Saveframe(object):
             raise ValueError(f"Cannot use a null-equivalent value as a tag name. Invalid tag name: '{name}'")
         if "." in name:
             raise ValueError(f"There cannot be more than one '.' in a tag name. Invalid tag name: '{name}'")
-        for char in name:
-            if char.isspace():
-                raise ValueError(f"Tag names can not contain whitespace characters. Invalid tag name: '{name}'")
+        if name.split() != [name]:
+            raise ValueError(f"Tag names can not contain whitespace characters. Invalid tag name: '{name}'")
 
         # No duplicate tags
         tag_name_lower = name.lower()

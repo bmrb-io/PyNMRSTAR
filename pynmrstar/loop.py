@@ -153,11 +153,9 @@ class Loop(object):
 
     @category.setter
     def category(self, value: Optional[str]) -> None:
-        if value is not None:
-            for char in value:
-                if char.isspace():
-                    raise ValueError(f"Loop category cannot contain whitespace characters. "
-                                     f"Invalid category: '{value}'")
+        if value is not None and value.split() != [value]:
+            raise ValueError(f"Loop category cannot contain whitespace characters. "
+                             f"Invalid category: '{value}'")
         self._category = value
 
     def __iter__(self) -> Generator[List[Any], Any, None]:
@@ -660,9 +658,8 @@ class Loop(object):
             raise ValueError(f"Cannot use a null-equivalent value as a tag name. Invalid tag name: '{name}'")
         if "." in name:
             raise ValueError(f"There cannot be more than one '.' in a tag name. Invalid tag name: '{name}'")
-        for char in str(name):
-            if char.isspace():
-                raise ValueError(f"Tag names can not contain whitespace characters. Invalid tag name: '{name}")
+        if name.split() != [name]:
+            raise ValueError(f"Tag names can not contain whitespace characters. Invalid tag name: '{name}'")
 
         # Add the tag
         self._tags.append(name)
