@@ -3,9 +3,8 @@ import warnings
 from copy import deepcopy
 from csv import reader as csv_reader, writer as csv_writer
 from io import StringIO
-from itertools import chain
 from pathlib import Path
-from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Callable, Tuple, Generator, Sequence, Mapping
+from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Callable, Tuple, Generator, Sequence, Mapping, Literal, overload
 
 import pynmrstar_parser
 
@@ -817,6 +816,10 @@ class Loop(object):
         csv_buffer.seek(0)
         return csv_buffer.read().replace('\r\n', '\n')
 
+    @overload
+    def get_json(self, serialize: Literal[True] = True) -> str: ...
+    @overload
+    def get_json(self, serialize: Literal[False]) -> dict: ...
     def get_json(self, serialize: bool = True) -> Union[dict, str]:
         """ Returns the loop in JSON format. If serialize is set to
         False a dictionary representation of the loop that is
@@ -851,6 +854,16 @@ class Loop(object):
 
         return [self.category + "." + x for x in self._tags]
 
+    @overload
+    def get_tag(self,
+                tags: Optional[Union[str, List[str]]] = ...,
+                whole_tag: bool = ...,
+                dict_result: Literal[False] = ...) -> List[Any]: ...
+    @overload
+    def get_tag(self,
+                tags: Optional[Union[str, List[str]]] = ...,
+                whole_tag: bool = ...,
+                dict_result: Literal[True] = ...) -> List[Dict[str, Any]]: ...
     def get_tag(self,
                 tags: Optional[Union[str, List[str]]] = None,
                 whole_tag: bool = False,

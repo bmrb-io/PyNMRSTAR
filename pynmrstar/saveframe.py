@@ -3,7 +3,7 @@ import warnings
 from csv import reader as csv_reader, writer as csv_writer
 from io import StringIO
 from pathlib import Path
-from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Iterable, Tuple, Sequence, Mapping
+from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Iterable, Tuple, Sequence, Mapping, Literal, overload
 
 from pynmrstar_parser import pynmrstar_parser
 
@@ -805,6 +805,10 @@ class Saveframe(object):
         return self.__str__(skip_empty_loops=skip_empty_loops, show_comments=show_comments,
                             skip_empty_tags=skip_empty_tags)
 
+    @overload
+    def get_json(self, serialize: Literal[True] = True) -> str: ...
+    @overload
+    def get_json(self, serialize: Literal[False]) -> dict: ...
     def get_json(self, serialize: bool = True) -> Union[dict, str]:
         """ Returns the saveframe in JSON format. If serialize is set to
         False a dictionary representation of the saveframe that is
@@ -838,6 +842,10 @@ class Saveframe(object):
         warnings.warn('Deprecated. Please use get_loop() instead.', DeprecationWarning)
         return self.get_loop(name)
 
+    @overload
+    def get_tag(self, query: str, whole_tag: Literal[False] = False) -> List[Any]: ...
+    @overload
+    def get_tag(self, query: str, whole_tag: Literal[True]) -> List[List[Any]]: ...
     def get_tag(self, query: str, whole_tag: bool = False) -> list:
         """Allows fetching the value of a tag by tag name. Returns
         a list of all matching tag values.
