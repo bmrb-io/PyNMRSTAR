@@ -69,10 +69,13 @@ class Entry(object):
     def __getitem__(self, item: Union[int, str]) -> 'saveframe_mod.Saveframe':
         """Get the indicated saveframe."""
 
-        try:
+        if isinstance(item, int):
             return self._frame_list[item]
-        except TypeError:
+        elif isinstance(item, str):
             return self.get_saveframe_by_name(item)
+        else:
+            raise ValueError("You can only get a saveframe by ordinal or name. You attempted to get: "
+                             f"'{repr(item)}'")
 
     def __init__(self, **kwargs) -> None:
         """ You should not directly instantiate an Entry using this method.
