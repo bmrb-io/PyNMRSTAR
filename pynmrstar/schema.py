@@ -33,6 +33,8 @@ class Schema(object):
         self.category_order: List[str] = []
         self.version: str = "unknown"
         self.data_types: Dict[str, str] = {}
+        # tag (lowercase) -> {'closed': bool, 'values': set of allowed values}
+        self.enumerations: Dict[str, Dict[str, Any]] = {}
 
         # Try loading from the internet first
         if schema_file is None:
@@ -87,6 +89,31 @@ class Schema(object):
         csv_reader_instance = DictReader(types_file, fieldnames=['type_name', 'type_definition'])
         for item in csv_reader_instance:
             self.data_types[item['type_name']] = f"^{item['type_definition']}$"
+
+        # Read in the enumeration value lists. schema.csv carries only the
+        # enumerated/closed *flags*, not the values, so membership can't be
+        # checked from it alone. enumerations.csv is a separate, self-contained
+        # reference file (Tag,Enumeration_closed,Value) so it stays valid even
+        # against a slightly different schema.csv release. Missing file just
+        # disables enumeration checks.
+        try:
+            enum_file = _interpret_file(os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                                                     "reference_files/enumerations.csv"))
+        except IOError:
+            enum_file = None
+        if enum_file is not None:
+            for item in DictReader(enum_file):
+                tag = item['Tag'].lower()
+                entry = self.enumerations.get(tag)
+                if entry is None:
+                    entry = self.enumerations[tag] = {'closed': item['Enumeration_closed'] == 'Y',
+                                                      'values': set()}
+                # Store case-folded: closed-enum membership is checked
+                # case-insensitively (see val_type). The dictionary itself is
+                # inconsistent about case (e.g. 'solution' vs 'NON-POLYMER'), and
+                # real entries vary, so exact-case matching produces spurious
+                # errors on valid data.
+                entry['values'].add(item['Value'].lower())
 
     def __repr__(self) -> str:
         """Return how we can be initialized."""
@@ -345,6 +372,14 @@ class Schema(object):
                 return [f"Value does not match specification: '{capitalized_tag}':'{value}'.\n"
                         f"     Type specified: {bmrb_type}\n"
                         f"     Regular expression for type: '{self.data_types[bmrb_type]}'"]
+
+            # Check closed-enumeration membership. Only *closed* enumerations are
+            # enforced; open ones are advisory and not flagged. Matching is
+            # case-insensitive (the enumeration set is stored case-folded); see
+            # the note where enumerations are loaded.
+            enum = self.enumerations.get(tag.lower())
+            if enum is not None and enum['closed'] and value.lower() not in enum['values']:
+                return [f"Value '{value}' is not in the closed enumeration for tag '{capitalized_tag}'."]
 
         # Check the tag capitalization
         if tag != capitalized_tag:

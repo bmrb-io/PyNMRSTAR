@@ -45,3 +45,29 @@ class TestSchema(unittest.TestCase):
 
         self.assertEqual(default.val_type("_Entry.ID", "this should be far too long - much too long"), [
             "Length of '43' is too long for 'CHAR(12)': '_Entry.ID':'this should be far too long - much too long'."])
+
+    def test_enumerations(self):
+        default = Schema()
+
+        # The enumeration value lists loaded from reference_files/enumerations.csv
+        self.assertTrue(len(default.enumerations) > 0)
+
+        # A known closed enumeration
+        subtype = default.enumerations["_entry.experimental_method_subtype"]
+        self.assertTrue(subtype["closed"])
+        self.assertIn("solution", subtype["values"])
+
+        # A value in a closed enumeration passes (case-insensitively)
+        self.assertEqual(default.val_type("_Entry.Experimental_method_subtype", "solution"), [])
+        self.assertEqual(default.val_type("_Entry.Experimental_method_subtype", "SOLUTION"), [])
+
+        # A value that is genuinely not in a closed enumeration fails
+        self.assertEqual(default.val_type("_Entry.Experimental_method_subtype", "not_a_real_subtype"), [
+            "Value 'not_a_real_subtype' is not in the closed enumeration for tag "
+            "'_Entry.Experimental_method_subtype'."])
+
+        # Open (non-closed) enumerations are advisory only: a non-member value is
+        # not flagged as an error.
+        db_code = default.enumerations["_assembly_db_link.database_code"]
+        self.assertFalse(db_code["closed"])
+        self.assertEqual(default.val_type("_Assembly_db_link.Database_code", "NOT_A_REAL_DATABASE"), [])
