@@ -990,6 +990,11 @@ class Saveframe(object):
                 cur_errors = my_schema.val_type(formatted_tag, tag[1], category=my_category)
                 errors.extend(cur_errors)
 
+                # Check that the tag isn't one which only makes sense in a loop
+                tag_schema = my_schema.schema.get(formatted_tag.lower())
+                if tag_schema is not None and tag_schema['Loopflag'] == 'Y':
+                    errors.append(f"The tag '{tag_schema['Tag']}' is a loop tag and must appear in a loop.")
+
         if validate_star:
             # NMR-STAR is an ASCII format
             for tag in self._tags:

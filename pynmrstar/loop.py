@@ -1165,6 +1165,13 @@ class Loop(object):
             # Get the default schema if we are not passed a schema
             my_schema = utils.get_schema(schema)
 
+            # Check that the tags belong in a loop at all
+            for tag in self._tags:
+                full_tag = f"{self.category}.{tag}"
+                tag_schema = my_schema.schema.get(full_tag.lower())
+                if tag_schema is not None and tag_schema['Loopflag'] == 'N':
+                    errors.append(f"The tag '{tag_schema['Tag']}' is a saveframe tag and cannot appear in a loop.")
+
             # Check the data
             for row_num, row in enumerate(self.data):
                 for pos, datum in enumerate(row):
