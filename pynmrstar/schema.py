@@ -14,6 +14,23 @@ from pynmrstar._internal import _interpret_file, load_dictionary
 logger = logging.getLogger('pynmrstar')
 
 
+def _is_valid_date(value: str) -> bool:
+    """Whether a value which already matched one of the dictionary's date type
+    patterns is actually a date. The patterns are loose -- they accept a two
+    digit year, month 13, day 32 -- so the fields have to be checked as well."""
+
+    fields = value.split(':', 1)[0].split('-')
+    if len(fields[0]) != 4:
+        return False
+    try:
+        date(int(fields[0]),
+             int(fields[1]) if len(fields) > 1 else 1,
+             int(fields[2]) if len(fields) > 2 else 1)
+    except ValueError:
+        return False
+    return True
+
+
 class Schema(object):
     """A BMRB schema. Used to validate NMR-STAR files. Unless you need to
        choose a specific schema version, PyNMR-STAR will automatically load
@@ -401,6 +418,9 @@ class Schema(object):
                 return [f"Value does not match specification: '{capitalized_tag}':'{value}'.\n"
                         f"     Type specified: {bmrb_type}\n"
                         f"     Regular expression for type: '{self.data_types[bmrb_type]}'"]
+
+            if bmrb_type.startswith('yyyy-mm-dd') and not _is_valid_date(value):
+                return [f"Value is not a valid date: '{capitalized_tag}':'{value}'."]
 
             # Check closed-enumeration membership. Only *closed* enumerations are
             # enforced; open ones are advisory and not flagged. A value that is in

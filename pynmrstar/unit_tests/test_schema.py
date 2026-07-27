@@ -50,6 +50,17 @@ class TestSchema(unittest.TestCase):
         self.assertEqual(default.val_type("_Entry.ID", "this should be far too long - much too long"), [
             "Length of '43' is too long for 'CHAR(12)': '_Entry.ID':'this should be far too long - much too long'."])
 
+    def test_dates(self):
+        default = Schema()
+
+        self.assertEqual(default.val_type("_Release.Date", "2006-09-07"), [])
+
+        # The type pattern allows these, but they are not dates: a two digit
+        # year, an impossible month and day, and a day that month never has
+        for bad_date in ("10-11-67", "1066-13-32", "2023-02-31"):
+            self.assertEqual(default.val_type("_Release.Date", bad_date),
+                             [f"Value is not a valid date: '_Release.Date':'{bad_date}'."])
+
     def test_enumerations(self):
         default = Schema()
 
