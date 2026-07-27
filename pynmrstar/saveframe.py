@@ -8,7 +8,8 @@ from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Iterable,
 from pynmrstar_parser import pynmrstar_parser
 
 from pynmrstar import definitions, entry as entry_mod, loop as loop_mod, utils, parser
-from pynmrstar._internal import _get_comments, _json_serialize, _interpret_file, get_clean_tag_list, write_to_file
+from pynmrstar._internal import _get_comments, _json_serialize, _interpret_file, _non_ascii_error, get_clean_tag_list, \
+    write_to_file
 from pynmrstar.exceptions import InvalidStateError
 from pynmrstar.schema import Schema
 
@@ -988,6 +989,13 @@ class Saveframe(object):
                 formatted_tag = self.tag_prefix + "." + tag[0]
                 cur_errors = my_schema.val_type(formatted_tag, tag[1], category=my_category)
                 errors.extend(cur_errors)
+
+        if validate_star:
+            # NMR-STAR is an ASCII format
+            for tag in self._tags:
+                value = str(tag[1])
+                if not value.isascii():
+                    errors.append(_non_ascii_error(f"{self.tag_prefix}.{tag[0]}", value))
 
         # Check the loops for errors
         for each_loop in self._loops:

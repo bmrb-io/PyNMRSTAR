@@ -1015,3 +1015,32 @@ loop_
 
         errors = tmp_loop.validate(validate_schema=False, validate_star=True)
         self.assertTrue(any("data width does not match" in e for e in errors))
+
+    def test_validate_empty_rows(self):
+        """Test validate reports loop rows in which every value is null."""
+
+        tmp_loop = Loop.from_scratch(category="_test")
+        tmp_loop.add_tag(["tag1", "tag2"])
+        tmp_loop.data = [["a", "b"], [".", "?"], ["", None], [".", "b"]]
+
+        errors = tmp_loop.validate(validate_schema=False, validate_star=True)
+        self.assertEqual(errors, ["Loop '_test' row '1' contains only null values.",
+                                  "Loop '_test' row '2' contains only null values."])
+
+        # A row with any real value is fine, as is a loop with no rows at all
+        tmp_loop.data = [[".", "b"]]
+        self.assertEqual(tmp_loop.validate(validate_schema=False, validate_star=True), [])
+        tmp_loop.data = []
+        self.assertEqual(tmp_loop.validate(validate_schema=False, validate_star=True), [])
+
+    def test_validate_non_ascii(self):
+        """Test validate reports values containing non-ASCII characters."""
+
+        tmp_loop = Loop.from_scratch(category="_test")
+        tmp_loop.add_tag(["tag1", "tag2"])
+        tmp_loop.data = [["a", "b"], ["Ångström", "b"], ["a", "1–2"]]
+
+        errors = tmp_loop.validate(validate_schema=False, validate_star=True)
+        self.assertEqual(errors, ["Non-ASCII character(s) 'Å' (U+00C5), 'ö' (U+00F6) in tag "
+                                  "'_test.tag1': 'Ångström'.",
+                                  "Non-ASCII character(s) '–' (U+2013) in tag '_test.tag2': '1–2'."])

@@ -10,7 +10,7 @@ from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Callable,
 import pynmrstar_parser
 
 from pynmrstar import definitions, utils, entry as entry_mod, parser
-from pynmrstar._internal import _json_serialize, _interpret_file
+from pynmrstar._internal import _json_serialize, _interpret_file, _non_ascii_error
 from pynmrstar._types import DataInput
 from pynmrstar.exceptions import InvalidStateError, ParsingError
 from pynmrstar.schema import Schema
@@ -1171,12 +1171,23 @@ class Loop(object):
                     errors.extend(my_schema.val_type(f"{self.category}.{self._tags[pos]}", datum, category=category))
 
         if validate_star:
-            # Check for wrong data size
             num_cols = len(self._tags)
             for row_num, row in enumerate(self.data):
                 # Make sure the width matches
                 if len(row) != num_cols:
                     errors.append(f"Loop '{self.category}' data width does not match it's tag width on "
                                   f"row '{row_num}'.")
+
+                # A row in which every value is null carries no information
+                if row and all(datum in definitions.NULL_VALUES for datum in row):
+                    errors.append(f"Loop '{self.category}' row '{row_num}' contains only null values.")
+                    continue
+
+                # NMR-STAR is an ASCII format
+                for pos, datum in enumerate(row):
+                    datum = str(datum)
+                    if not datum.isascii():
+                        tag = f"{self.category}.{self._tags[pos]}" if pos < num_cols else self.category
+                        errors.append(_non_ascii_error(tag, datum))
 
         return errors

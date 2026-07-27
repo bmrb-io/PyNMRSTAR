@@ -309,6 +309,24 @@ def load_dictionary(version: str = None, source: str = None) -> Tuple[Dict[str, 
     return packaged, packaged_version
 
 
+# Anything outside the "Basic Latin" unicode block (0x00-0x7f). NMR-STAR is an
+# ASCII format, so non-ASCII characters are reported during validation.
+_non_ascii_pattern = re.compile(r'[^\x00-\x7f]')
+
+
+def _non_ascii_error(tag: str, value: str) -> str:
+    """ Formats the validation error for a value that contains characters
+    outside of ASCII. The offending characters are listed with their code
+    points, since they are often invisible or ambiguous in the file itself."""
+
+    characters: List[str] = []
+    for character in _non_ascii_pattern.findall(value):
+        if character not in characters:
+            characters.append(character)
+    described = ', '.join(f"'{_}' (U+{ord(_):04X})" for _ in characters)
+    return f"Non-ASCII character(s) {described} in tag '{tag}': '{value}'."
+
+
 def get_clean_tag_list(item: Union[str, List[str], Tuple[str]]) -> List[Dict[str, str]]:
     """ Converts the provided item to a list of dictionaries of
     {
