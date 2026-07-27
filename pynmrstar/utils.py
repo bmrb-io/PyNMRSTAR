@@ -68,18 +68,12 @@ def get_schema(passed_schema: 'Schema' = None, _cached_schema: Dict[str, Schema]
         return passed_schema
 
     if not _cached_schema:
-
-        # Try to load the local file first
+        # Schema() resolves the dictionary itself: on-disk cache, then a fetch
+        # from the internet (cached for next time), then the packaged fallback.
         try:
-            schema_file = os.path.join(os.path.dirname(os.path.realpath(__file__)))
-            schema_file = os.path.join(schema_file, "reference_files/schema.csv")
-            _cached_schema['schema'] = Schema(schema_file=schema_file)
-        except IOError:
-            # Try to load from the internet
-            try:
-                _cached_schema['schema'] = Schema()
-            except (HTTPError, URLError):
-                raise ValueError("Could not load a BMRB schema from the internet or from the local repository.")
+            _cached_schema['schema'] = Schema()
+        except (HTTPError, URLError):
+            raise ValueError("Could not load a BMRB schema from the internet or from the local repository.")
 
     return _cached_schema['schema']
 

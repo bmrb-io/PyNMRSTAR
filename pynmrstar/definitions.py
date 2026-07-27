@@ -23,5 +23,15 @@ NULL_VALUES = ['', ".", "?", None]
 STR_CONVERSION_DICT: dict = {None: "."}
 
 API_URL: str = "https://api.bmrb.io/v2"
-SCHEMA_URL: str = 'https://raw.githubusercontent.com/bmrb-io/nmr-star-dictionary/master/xlschem_ann.csv'
+# Base location of the NMR-STAR dictionary distribution (the built files, not the
+# source spreadsheet). GitHub for now; will point at BMRB.io in future. Only
+# dictionary versions 3.2.14.0 and above are supported. Override the source for
+# development with the PYNMRSTAR_DICTIONARY_SOURCE environment variable (a URL
+# base or a local directory holding the distribution files).
+DICTIONARY_URL: str = 'https://raw.githubusercontent.com/bmrb-io/nmr-star-dictionary/' \
+                      'nmr-star-development/NMR-STAR/internal_106_distribution'
+# The distribution files a Schema is built from.
+DICTIONARY_FILES: tuple = ('xlschem_ann.csv', 'adit_enum_hdr.csv', 'adit_enum_dtl.csv')
+# Kept for backwards compatibility (the schema tag table alone).
+SCHEMA_URL: str = f'{DICTIONARY_URL}/xlschem_ann.csv'
 FTP_URL: str = "https://bmrb.io/ftp/pub/bmrb"

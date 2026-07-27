@@ -9,7 +9,7 @@ from io import StringIO
 from typing import Union, List, Optional, Any, Dict, IO
 
 from pynmrstar import definitions, utils
-from pynmrstar._internal import _interpret_file
+from pynmrstar._internal import _interpret_file, load_dictionary
 
 logger = logging.getLogger('pynmrstar')
 
@@ -21,11 +21,14 @@ class Schema(object):
        create an object of this class and then pass it to the methods
        which allow the specification of a schema. """
 
-    def __init__(self, schema_file: Union[str, IO] = None) -> None:
-        """Initialize a BMRB schema. With no arguments the most
-        up-to-date schema will be fetched from the BMRB FTP site.
-        Otherwise pass a URL or a file to load a schema from using the
-        schema_file keyword argument."""
+    def __init__(self, schema_file: Union[str, IO] = None, version: str = None) -> None:
+        """Initialize a BMRB schema. With no arguments the current dictionary
+        distribution is loaded -- fetched from the internet and cached under
+        ``~/.cache/pynmrstar`` (see ``_internal.load_dictionary``); repeat and
+        command-line invocations then reuse the cache without the network. Pass
+        ``version`` to select a specific cached release (3.2.14.0 or above).
+        Alternatively pass a URL or a file via ``schema_file`` to load just a tag
+        table from there; its enumerations still come from the distribution."""
 
         self.headers: List[str] = []
         self.schema: Dict[str, Dict[str, str]] = {}
@@ -36,35 +39,49 @@ class Schema(object):
         # tag (lowercase) -> {'closed': bool, 'values': set of allowed values}
         self.enumerations: Dict[str, Dict[str, Any]] = {}
 
-        # Try loading from the internet first
-        if schema_file is None:
-            schema_file = definitions.SCHEMA_URL
-        self.schema_file = schema_file
+        enum_hdr: Optional[str] = None
+        enum_dtl: Optional[str] = None
+        if schema_file is not None:
+            # Explicit tag table (URL/file). Enumerations, if reachable, still
+            # come from the cached/packaged distribution.
+            self.schema_file = schema_file
+            xlschem_text = _interpret_file(schema_file).read()
+            try:
+                distribution, _ = load_dictionary(version)
+                enum_hdr, enum_dtl = distribution['adit_enum_hdr.csv'], distribution['adit_enum_dtl.csv']
+            except (ValueError, OSError, IOError):
+                pass
+        else:
+            distribution, _ = load_dictionary(version)
+            self.schema_file = definitions.DICTIONARY_URL
+            xlschem_text = distribution['xlschem_ann.csv']
+            enum_hdr, enum_dtl = distribution['adit_enum_hdr.csv'], distribution['adit_enum_dtl.csv']
 
-        # Get whatever schema they specified, wrap in StringIO and pass that to the csv reader
-        schema_stream = _interpret_file(schema_file)
-        fix_newlines = StringIO('\n'.join(schema_stream.read().splitlines()))
+        self._parse_tag_table(xlschem_text)
+        self._load_data_types()
+        if enum_hdr is not None and enum_dtl is not None:
+            self._build_enumerations(enum_hdr, enum_dtl)
 
+    def _parse_tag_table(self, xlschem_text: str) -> None:
+        """Populate the tag schema from an xlschem_ann.csv body."""
+
+        fix_newlines = StringIO('\n'.join(xlschem_text.splitlines()))
         csv_reader_instance = DictReader(fix_newlines)
         self.headers = csv_reader_instance.fieldnames
 
-        # Skip the header descriptions and header index values and anything
-        #  else before the real data starts
+        # Skip the header descriptions and index values before the real data
         tmp_line = next(csv_reader_instance)
         try:
             while tmp_line['Dictionary sequence'] != "TBL_BEGIN":
                 tmp_line = next(csv_reader_instance)
         except IndexError:
-            raise ValueError(f"Could not parse a schema from the specified URL: {schema_file}")
+            raise ValueError(f"Could not parse a schema from: {self.schema_file}")
         self.version = tmp_line['ADIT category view type']
 
         for line in csv_reader_instance:
-
             if line['Dictionary sequence'] == "TBL_END":
                 break
-
             single_tag_data: Dict[str, any] = dict(line)
-
             # Convert nulls
             if single_tag_data['Nullable'] == "NOT NULL":
                 single_tag_data['Nullable'] = False
@@ -72,48 +89,55 @@ class Schema(object):
                 single_tag_data['Nullable'] = True
             if '' in single_tag_data:
                 del single_tag_data['']
-
             self.schema[single_tag_data['Tag'].lower()] = single_tag_data
             self.schema_order.append(single_tag_data['Tag'])
             formatted = utils.format_category(single_tag_data['Tag'])
             if formatted not in self.category_order:
                 self.category_order.append(formatted)
 
+    def _load_data_types(self) -> None:
+        """Load the value-type regular expressions from the packaged reference."""
+
         try:
-            # Read in the data types
             types_file = _interpret_file(os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                                       "reference_files/data_types.csv"))
         except IOError:
             raise ValueError("Could not load the data type definition file from disk!")
-
         csv_reader_instance = DictReader(types_file, fieldnames=['type_name', 'type_definition'])
         for item in csv_reader_instance:
             self.data_types[item['type_name']] = f"^{item['type_definition']}$"
 
-        # Read in the enumeration value lists. schema.csv carries only the
-        # enumerated/closed *flags*, not the values, so membership can't be
-        # checked from it alone. enumerations.csv is a separate, self-contained
-        # reference file (Tag,Enumeration_closed,Value) so it stays valid even
-        # against a slightly different schema.csv release. Missing file just
-        # disables enumeration checks.
-        try:
-            enum_file = _interpret_file(os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                                     "reference_files/enumerations.csv"))
-        except IOError:
-            enum_file = None
-        if enum_file is not None:
-            for item in DictReader(enum_file):
-                tag = item['Tag'].lower()
-                entry = self.enumerations.get(tag)
-                if entry is None:
-                    entry = self.enumerations[tag] = {'closed': item['Enumeration_closed'] == 'Y',
-                                                      'values': set()}
-                # Store case-folded: closed-enum membership is checked
-                # case-insensitively (see val_type). The dictionary itself is
-                # inconsistent about case (e.g. 'solution' vs 'NON-POLYMER'), and
-                # real entries vary, so exact-case matching produces spurious
-                # errors on valid data.
-                entry['values'].add(item['Value'].lower())
+    def _build_enumerations(self, enum_hdr_text: str, enum_dtl_text: str) -> None:
+        """Build enumeration value lists by joining the dictionary's
+        adit_enum_hdr (enumeration id -> tag) with adit_enum_dtl (id -> values).
+        The closed/open flag comes from the already-parsed tag table. Values are
+        stored case-folded because closed-enumeration membership is checked
+        case-insensitively (the dictionary lists many enums upper-case while
+        entries use lower-case, so exact matching would flag valid data)."""
+
+        id_to_tag: Dict[str, str] = {}
+        for row in DictReader(StringIO(enum_hdr_text)):
+            eid = row.get('Enumeration ID')
+            if eid in (None, 'TBL_BEGIN', 'TBL_END', '?'):
+                continue
+            id_to_tag[eid] = row.get('Tag')
+
+        for row in DictReader(StringIO(enum_dtl_text)):
+            eid = row.get('Enumeration ID')
+            if eid in (None, 'TBL_BEGIN', 'TBL_END', '?'):
+                continue
+            tag = id_to_tag.get(eid)
+            if not tag:
+                continue
+            value = (row.get('Enum value') or '').strip()
+            if value == '':
+                continue
+            tag_lower = tag.lower()
+            entry = self.enumerations.get(tag_lower)
+            if entry is None:
+                closed = self.schema.get(tag_lower, {}).get('Item enumeration closed') == 'Y'
+                entry = self.enumerations[tag_lower] = {'closed': closed, 'values': set()}
+            entry['values'].add(value.lower())
 
     def __repr__(self) -> str:
         """Return how we can be initialized."""

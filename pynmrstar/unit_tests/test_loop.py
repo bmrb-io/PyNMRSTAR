@@ -181,7 +181,8 @@ loop_
         self.assertEqual(Loop.from_template("atom_chem_shift", all_tags=True, schema=my_schema),
                          Loop.from_string(
                              "loop_ _Atom_chem_shift.ID _Atom_chem_shift.Assembly_atom_ID "
-                             "_Atom_chem_shift.Entity_assembly_ID _Atom_chem_shift.Entity_ID "
+                             "_Atom_chem_shift.Entity_assembly_ID "
+                             "_Atom_chem_shift.Entity_assembly_asym_ID _Atom_chem_shift.Entity_ID "
                              "_Atom_chem_shift.Comp_index_ID _Atom_chem_shift.Seq_ID "
                              "_Atom_chem_shift.Comp_ID _Atom_chem_shift.Atom_ID _Atom_chem_shift.New_Tag "
                              "_Atom_chem_shift.Atom_type _Atom_chem_shift.Atom_isotope_number "

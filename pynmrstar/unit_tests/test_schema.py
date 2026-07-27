@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
+import os
+import shutil
+import tempfile
 import unittest
 
 from pynmrstar import Schema
+from pynmrstar._internal import load_dictionary
 
 
 class TestSchema(unittest.TestCase):
@@ -23,7 +27,7 @@ class TestSchema(unittest.TestCase):
                           'Mandatory code overides', 'Overide value', 'Overide view value', 'ADIT auto insert',
                           'Example', 'Prompt', 'Interface', 'bmrbPdbMatchID', 'bmrbPdbTransFunc', 'STAR flag',
                           'DB flag', 'SfNamelFlg', 'Sf category flag', 'Sf pointer', 'Natural primary key',
-                          'Natural foreign key', 'Redundant keys', 'Parent tag', 'public', 'internal', 'small molecule',
+                          'Natural foreign key', 'obsolete tag', 'Parent tag', 'public', 'internal', 'small molecule',
                           'small molecule', 'metabolomics', 'Entry completeness', 'Overide public', 'internal',
                           'small molecule', 'small molecule', 'metabolomic', 'metabolomic', 'default value',
                           'Adit form code', 'Tag category', 'Tag field', 'Local key', 'Datum count flag',
@@ -49,7 +53,7 @@ class TestSchema(unittest.TestCase):
     def test_enumerations(self):
         default = Schema()
 
-        # The enumeration value lists loaded from reference_files/enumerations.csv
+        # The enumeration value lists built from the dictionary's adit_enum files
         self.assertTrue(len(default.enumerations) > 0)
 
         # A known closed enumeration
@@ -71,3 +75,33 @@ class TestSchema(unittest.TestCase):
         db_code = default.enumerations["_assembly_db_link.database_code"]
         self.assertFalse(db_code["closed"])
         self.assertEqual(default.val_type("_Assembly_db_link.Database_code", "NOT_A_REAL_DATABASE"), [])
+
+    def test_dictionary_cache(self):
+        # load_dictionary() reads the distribution, caches it under
+        # $XDG_CACHE_HOME/pynmrstar/<version>, and reuses the cache next time
+        # (so a subsequent load works even with an unreachable source).
+        reference = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+                                 "reference_files")
+        cache = tempfile.mkdtemp(prefix="pynmrstar-cache-test-")
+        saved = {k: os.environ.get(k) for k in ("XDG_CACHE_HOME", "PYNMRSTAR_DICTIONARY_SOURCE")}
+        try:
+            os.environ["XDG_CACHE_HOME"] = cache
+            os.environ["PYNMRSTAR_DICTIONARY_SOURCE"] = reference
+
+            files, version = load_dictionary()
+            self.assertNotEqual(version, "unknown")
+            for name in ("xlschem_ann.csv", "adit_enum_hdr.csv", "adit_enum_dtl.csv"):
+                self.assertIn(name, files)
+            self.assertTrue(os.path.isdir(os.path.join(cache, "pynmrstar", version)))
+
+            # With the source now unreachable, it still resolves from the cache.
+            os.environ["PYNMRSTAR_DICTIONARY_SOURCE"] = "http://invalid.invalid/none"
+            _, cached_version = load_dictionary()
+            self.assertEqual(cached_version, version)
+        finally:
+            shutil.rmtree(cache, ignore_errors=True)
+            for key, value in saved.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value

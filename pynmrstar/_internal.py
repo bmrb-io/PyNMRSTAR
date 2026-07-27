@@ -2,6 +2,7 @@ import decimal
 import json
 import logging
 import os
+import re
 import time
 import zlib
 from datetime import date
@@ -204,6 +205,108 @@ def _interpret_file(the_file: Union[str, Path, IO]) -> StringIO:
 
     buffer.seek(0)
     return StringIO(buffer.read().decode().replace("\r\n", "\n").replace("\r", "\n"))
+
+
+def _dictionary_cache_root() -> str:
+    """Directory that holds cached dictionary distributions, one subdirectory
+    per release version."""
+
+    root = os.environ.get('XDG_CACHE_HOME') or os.path.join(os.path.expanduser('~'), '.cache')
+    return os.path.join(root, 'pynmrstar')
+
+
+def _dictionary_version(xlschem_text: str) -> str:
+    """Read the dictionary release version out of an xlschem_ann.csv body."""
+
+    from csv import DictReader
+    for row in DictReader(StringIO(xlschem_text)):
+        if row.get('Dictionary sequence') == 'TBL_BEGIN':
+            return row.get('ADIT category view type') or 'unknown'
+    return 'unknown'
+
+
+def _version_sort_key(version_string: str) -> Tuple[int, ...]:
+    """Sort key for dotted dictionary versions, e.g. '3.2.14.0'."""
+
+    return tuple(int(x) for x in re.findall(r'\d+', version_string))
+
+
+def load_dictionary(version: str = None, source: str = None) -> Tuple[Dict[str, str], str]:
+    """Return ``({filename: contents}, version)`` for the dictionary distribution
+    files a :class:`Schema` is built from, using an on-disk cache under
+    ``${XDG_CACHE_HOME:-~/.cache}/pynmrstar/<version>/``.
+
+    Resolution order:
+
+    1. a cached copy -- the given ``version``, or the newest cached one when
+       ``version`` is None (so repeat/CLI invocations avoid the network);
+    2. a fresh fetch from ``source`` (written to the cache on success);
+    3. the raw files packaged with pynmrstar (offline fallback).
+
+    ``source`` defaults to the ``PYNMRSTAR_DICTIONARY_SOURCE`` environment
+    variable, then :data:`definitions.DICTIONARY_URL`; it may be a URL base or a
+    local directory holding the distribution files."""
+
+    files = pynmrstar.definitions.DICTIONARY_FILES
+    if source is None:
+        source = os.environ.get('PYNMRSTAR_DICTIONARY_SOURCE') or pynmrstar.definitions.DICTIONARY_URL
+    root = _dictionary_cache_root()
+    reference = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'reference_files')
+
+    def _dir(ver: str) -> str:
+        return os.path.join(root, ver)
+
+    def _complete(directory: str) -> bool:
+        return all(os.path.isfile(os.path.join(directory, name)) for name in files)
+
+    def _read(directory: str) -> Dict[str, str]:
+        return {name: _interpret_file(os.path.join(directory, name)).read() for name in files}
+
+    # 1. Cache hit.
+    if version is not None:
+        if _complete(_dir(version)):
+            return _read(_dir(version)), version
+    else:
+        cached = [v for v in (os.listdir(root) if os.path.isdir(root) else []) if _complete(_dir(v))]
+        if cached:
+            newest = max(cached, key=_version_sort_key)
+            return _read(_dir(newest)), newest
+
+    # 2. Fetch from the source, then cache.
+    if source.startswith(('http://', 'https://', 'ftp://')):
+        def _join(base: str, name: str) -> str:
+            return base.rstrip('/') + '/' + name
+    else:
+        _join = os.path.join
+    try:
+        fetched = {name: _interpret_file(_join(source, name)).read() for name in files}
+        fetched_version = _dictionary_version(fetched['xlschem_ann.csv'])
+    except (requests.exceptions.RequestException, URLError, OSError, IOError):
+        fetched = None
+        fetched_version = None
+
+    if fetched is not None:
+        if version is not None and version != fetched_version:
+            if _complete(_dir(version)):
+                return _read(_dir(version)), version
+            raise ValueError(f"Dictionary version '{version}' is unavailable: the source serves "
+                             f"'{fetched_version}' and it is not cached.")
+        try:
+            os.makedirs(_dir(fetched_version), exist_ok=True)
+            for name, text in fetched.items():
+                with open(os.path.join(_dir(fetched_version), name), 'w') as handle:
+                    handle.write(text)
+        except OSError:
+            pass  # caching is best effort
+        return fetched, fetched_version
+
+    # 3. Packaged offline fallback.
+    packaged = _read(reference)
+    packaged_version = _dictionary_version(packaged['xlschem_ann.csv'])
+    if version is not None and version != packaged_version:
+        raise ValueError(f"Dictionary version '{version}' is unavailable (no network, no cache; the "
+                         f"packaged fallback is '{packaged_version}').")
+    return packaged, packaged_version
 
 
 def get_clean_tag_list(item: Union[str, List[str], Tuple[str]]) -> List[Dict[str, str]]:
