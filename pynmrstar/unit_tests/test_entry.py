@@ -118,8 +118,13 @@ class TestEntry(unittest.TestCase):
                          [[u'Submission_date', u'2006-09-07']])
 
     def test_validate(self):
-        validation = []
-        self.assertEqual(self.file_entry.validate(), [])
+        # The sample entry spells two enumeration values with different
+        # capitalization than the dictionary does
+        validation = ["Value 'non-polymer' of tag '_Chem_comp.Type' is improperly capitalized but otherwise "
+                      "valid. Should be 'NON-POLYMER'.",
+                      "Value 'PDBe' of tag '_Chem_comp.Processing_site' is improperly capitalized but otherwise "
+                      "valid. Should be 'PDBE'."]
+        self.assertEqual(self.file_entry.validate(), validation)
         self.file_entry[-1][-1][0][0] = 'a'
         validation.append(
             "Value does not match specification: '_Atom_chem_shift.ID':'a'.\n     "

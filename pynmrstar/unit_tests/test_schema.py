@@ -56,14 +56,18 @@ class TestSchema(unittest.TestCase):
         # The enumeration value lists built from the dictionary's adit_enum files
         self.assertTrue(len(default.enumerations) > 0)
 
-        # A known closed enumeration
+        # A known closed enumeration, spelled as the dictionary spells it
         subtype = default.enumerations["_entry.experimental_method_subtype"]
         self.assertTrue(subtype["closed"])
         self.assertIn("solution", subtype["values"])
 
-        # A value in a closed enumeration passes (case-insensitively)
+        # A value in a closed enumeration passes
         self.assertEqual(default.val_type("_Entry.Experimental_method_subtype", "solution"), [])
-        self.assertEqual(default.val_type("_Entry.Experimental_method_subtype", "SOLUTION"), [])
+
+        # A value that differs only in capitalization is reported as such
+        self.assertEqual(default.val_type("_Entry.Experimental_method_subtype", "SOLUTION"), [
+            "Value 'SOLUTION' of tag '_Entry.Experimental_method_subtype' is improperly capitalized but "
+            "otherwise valid. Should be 'solution'."])
 
         # A value that is genuinely not in a closed enumeration fails
         self.assertEqual(default.val_type("_Entry.Experimental_method_subtype", "not_a_real_subtype"), [
@@ -75,6 +79,12 @@ class TestSchema(unittest.TestCase):
         db_code = default.enumerations["_assembly_db_link.database_code"]
         self.assertFalse(db_code["closed"])
         self.assertEqual(default.val_type("_Assembly_db_link.Database_code", "NOT_A_REAL_DATABASE"), [])
+
+        # The distribution CSVs encode a comma inside a value as '$'
+        comp_type = default.enumerations["_chem_comp.type"]
+        self.assertIn("D-SACCHARIDE 1,4 AND 1,4 LINKING", comp_type["values"])
+        self.assertFalse(any("$" in _ for _ in comp_type["values"]))
+        self.assertEqual(default.val_type("_Chem_comp.Type", "D-SACCHARIDE 1,4 AND 1,4 LINKING"), [])
 
     def test_dictionary_cache(self):
         # load_dictionary() reads the distribution, caches it under

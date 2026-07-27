@@ -111,9 +111,9 @@ class Schema(object):
         """Build enumeration value lists by joining the dictionary's
         adit_enum_hdr (enumeration id -> tag) with adit_enum_dtl (id -> values).
         The closed/open flag comes from the already-parsed tag table. Values are
-        stored case-folded because closed-enumeration membership is checked
-        case-insensitively (the dictionary lists many enums upper-case while
-        entries use lower-case, so exact matching would flag valid data)."""
+        stored as the dictionary spells them, alongside a case-folded index so
+        that a value which differs from the dictionary only in capitalization can
+        be reported as such rather than as an unknown value."""
 
         id_to_tag: Dict[str, str] = {}
         for row in DictReader(StringIO(enum_hdr_text)):
@@ -129,15 +129,20 @@ class Schema(object):
             tag = id_to_tag.get(eid)
             if not tag:
                 continue
-            value = (row.get('Enum value') or '').strip()
+            # The distribution CSVs are unquoted, so the dictionary build encodes
+            # a comma inside a value as '$' ("Eldon's sure there's no legitimate
+            # '$' anywhere" -- nmr-star-dictionary-scripts/scripts/dictdb.py,
+            # which does the same substitution when loading these files).
+            value = (row.get('Enum value') or '').strip().replace('$', ',')
             if value == '':
                 continue
             tag_lower = tag.lower()
             entry = self.enumerations.get(tag_lower)
             if entry is None:
                 closed = self.schema.get(tag_lower, {}).get('Item enumeration closed') == 'Y'
-                entry = self.enumerations[tag_lower] = {'closed': closed, 'values': set()}
-            entry['values'].add(value.lower())
+                entry = self.enumerations[tag_lower] = {'closed': closed, 'values': set(), 'folded': {}}
+            entry['values'].add(value)
+            entry['folded'][value.lower()] = value
 
     def __repr__(self) -> str:
         """Return how we can be initialized."""
@@ -398,11 +403,15 @@ class Schema(object):
                         f"     Regular expression for type: '{self.data_types[bmrb_type]}'"]
 
             # Check closed-enumeration membership. Only *closed* enumerations are
-            # enforced; open ones are advisory and not flagged. Matching is
-            # case-insensitive (the enumeration set is stored case-folded); see
-            # the note where enumerations are loaded.
+            # enforced; open ones are advisory and not flagged. A value that is in
+            # the enumeration but spelled with different capitalization gets its
+            # own message, since the fix is not the same one.
             enum = self.enumerations.get(tag.lower())
-            if enum is not None and enum['closed'] and value.lower() not in enum['values']:
+            if enum is not None and enum['closed'] and value not in enum['values']:
+                capitalized_value = enum['folded'].get(value.lower())
+                if capitalized_value is not None:
+                    return [f"Value '{value}' of tag '{capitalized_tag}' is improperly capitalized but otherwise "
+                            f"valid. Should be '{capitalized_value}'."]
                 return [f"Value '{value}' is not in the closed enumeration for tag '{capitalized_tag}'."]
 
         # Check the tag capitalization
