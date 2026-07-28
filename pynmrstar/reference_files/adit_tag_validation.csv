@@ -1,0 +1,212 @@
+Control Sf category,Control tag,Flag Value,Sf category,Tag,validateFlgs
+TBL_BEGIN,,,,,?
+citations,_Citation.Type,journal,citations,_Citation.Journal_abbrev,MM
+citations,_Citation.Type,journal,citations,_Citation.Journal_name_full,OM
+citations,_Citation.Type,journal,citations,_Citation.Journal_volume,MM
+citations,_Citation.Type,journal,citations,_Citation.Journal_issue,MM
+citations,_Citation.Type,journal,citations,_Citation.Journal_ASTM,OM
+citations,_Citation.Type,journal,citations,_Citation.Journal_ISSN,OM
+citations,_Citation.Type,journal,citations,_Citation.Journal_CSD,OM
+citations,_Citation.Type,(book)|(book chapter),citations,_Citation.Book_title,MM
+citations,_Citation.Type,(book)|(book chapter),citations,_Citation.Book_chapter_title,OM
+citations,_Citation.Type,(book)|(book chapter),citations,_Citation.Book_volume,OM
+citations,_Citation.Type,(book)|(book chapter),citations,_Citation.Book_series,OM
+citations,_Citation.Type,(book)|(book chapter),citations,_Citation.Book_publisher,MM
+citations,_Citation.Type,(book)|(book chapter),citations,_Citation.Book_publisher_city,MM
+citations,_Citation.Type,(book)|(book chapter),citations,_Citation.Book_ISBN,OM
+citations,_Citation.Type,abstract,citations,_Citation.Conference_title,MM
+citations,_Citation.Type,abstract,citations,_Citation.Conference_site,MM
+citations,_Citation.Type,abstract,citations,_Citation.Conference_state_province,OM
+citations,_Citation.Type,abstract,citations,_Citation.Conference_country,MM
+citations,_Citation.Type,abstract,citations,_Citation.Conference_start_date,MM
+citations,_Citation.Type,abstract,citations,_Citation.Conference_end_date,MM
+citations,_Citation.Type,abstract,citations,_Citation.Conference_abstract_number,OM
+citations,_Citation.Type,thesis,citations,_Citation.Thesis_institution,MM
+citations,_Citation.Type,thesis,citations,_Citation.Thesis_institution_city,MM
+citations,_Citation.Type,thesis,citations,_Citation.Thesis_institution_country,MM
+citations,_Citation.Type,internet,citations,_Citation.Journal_abbrev,MM
+citations,_Citation.Type,internet,citations,_Citation.Journal_name_full,OM
+citations,_Citation.Type,internet,citations,_Citation.Journal_volume,MM
+citations,_Citation.Type,internet,citations,_Citation.Journal_issue,MM
+citations,_Citation.Type,internet,citations,_Citation.Journal_ASTM,OM
+citations,_Citation.Type,internet,citations,_Citation.Journal_ISSN,OM
+citations,_Citation.Type,internet,citations,_Citation.Journal_CSD,OM
+citations,_Citation.Type,internet,citations,_Citation.Book_title,MM
+citations,_Citation.Type,internet,citations,_Citation.Book_chapter_title,OM
+citations,_Citation.Type,internet,citations,_Citation.Book_volume,OM
+citations,_Citation.Type,internet,citations,_Citation.Book_series,OM
+citations,_Citation.Type,internet,citations,_Citation.Book_publisher,MM
+citations,_Citation.Type,internet,citations,_Citation.Book_publisher_city,MM
+citations,_Citation.Type,internet,citations,_Citation.Book_ISBN,OM
+citations,_Citation.Type,internet,citations,_Citation.Conference_title,MM
+citations,_Citation.Type,internet,citations,_Citation.Conference_site,MM
+citations,_Citation.Type,internet,citations,_Citation.Conference_state_province,OM
+citations,_Citation.Type,internet,citations,_Citation.Conference_country,MM
+citations,_Citation.Type,internet,citations,_Citation.Conference_start_date,MM
+citations,_Citation.Type,internet,citations,_Citation.Conference_end_date,MM
+citations,_Citation.Type,internet,citations,_Citation.Conference_abstract_number,OM
+citations,_Citation.Type,internet,citations,_Citation.Thesis_institution,MM
+citations,_Citation.Type,internet,citations,_Citation.Thesis_institution_city,MM
+citations,_Citation.Type,internet,citations,_Citation.Thesis_institution_country,MM
+citations,_Citation.Type,internet,citations,_Citation.WWW_URL,OO
+citations,_Citation.Type,*,citations,_Citation.Page_first,OM
+citations,_Citation.Type,*,citations,_Citation.Page_last,OM
+citations,_Citation.Type,*,citations,_Citation.Year,MM
+citations,_Citation.Type,*,citations,_Citation.Details,OO
+citations,_Citation.Type,personal communication,citations,_Citation.Page_first,OM
+citations,_Citation.Type,personal communication,citations,_Citation.Page_last,OM
+citations,_Citation.Type,*,citations,_Citation_keyword.Keyword,OO
+citations,_Citation.Type,*,citations,_Citation_keyword.Sf_ID,II
+citations,_Citation.Type,*,citations,_Citation_keyword.Entry_ID,OO
+citations,_Citation.Type,*,citations,_Citation_keyword.Citation_ID,OO
+citations,_Citation.Type,(book)|(book chapter),citations,_Citation_editor.Ordinal,OO
+citations,_Citation.Type,(book)|(book chapter),citations,_Citation_editor.Given_name,OO
+citations,_Citation.Type,(book)|(book chapter),citations,_Citation_editor.Family_name,OO
+citations,_Citation.Type,(book)|(book chapter),citations,_Citation_editor.First_initial,OO
+citations,_Citation.Type,(book)|(book chapter),citations,_Citation_editor.Middle_initials,OO
+citations,_Citation.Type,(book)|(book chapter),citations,_Citation_editor.Family_title,OO
+citations,_Citation.Type,*,citations,_Citation_editor.Sf_ID,II
+citations,_Citation.Type,*,citations,_Citation_editor.Entry_ID,II
+citations,_Citation.Type,*,citations,_Citation_editor.Citation_ID,OO
+citations,_Citation.PubMed_ID,*,citations,_Citation.Class,VV
+citations,_Citation.PubMed_ID,*,citations,_Citation.PubMed_ID,MM
+assembly,_Assembly.Non_standard_bonds,yes,assembly,_Bond.ID,OO
+assembly,_Assembly.Non_standard_bonds,yes,assembly,_Bond.Type,OO
+assembly,_Assembly.Non_standard_bonds,yes,assembly,_Bond.Value_order,OO
+assembly,_Assembly.Non_standard_bonds,yes,assembly,_Bond.Auth_entity_assembly_name_1,OO
+assembly,_Assembly.Non_standard_bonds,yes,assembly,_Bond.Auth_seq_ID_1,OO
+assembly,_Assembly.Non_standard_bonds,yes,assembly,_Bond.Auth_comp_ID_1,OO
+assembly,_Assembly.Non_standard_bonds,yes,assembly,_Bond.Auth_atom_ID_1,OO
+assembly,_Assembly.Non_standard_bonds,yes,assembly,_Bond.Auth_entity_assembly_name_2,OO
+assembly,_Assembly.Non_standard_bonds,yes,assembly,_Bond.Auth_seq_ID_2,OO
+assembly,_Assembly.Non_standard_bonds,yes,assembly,_Bond.Auth_comp_ID_2,OO
+assembly,_Assembly.Non_standard_bonds,yes,assembly,_Bond.Auth_atom_ID_2,OO
+entity,_Entity.Type,polymer,entity,_Entity.Polymer_common_type,OO
+entity,_Entity.Type,polymer,entity,_Entity.Polymer_type,VV
+entity,_Entity.Type,polymer,entity,_Entity.Polymer_seq_one_letter_code_can,OO
+entity,_Entity.Type,polymer,entity,_Entity.Polymer_seq_one_letter_code,OO
+entity,_Entity.Type,polymer,entity,_Entity.Polymer_author_defined_seq,OO
+entity,_Entity.Type,polymer,entity,_Entity.Polymer_author_seq_details,OO
+entity,_Entity.Type,non-polymer,entity,_Entity.Ambiguous_chem_comp_sites,VO
+entity,_Entity.Type,non-polymer,entity,_Entity.Nstd_monomer,VO
+entity,_Entity.Type,polymer,entity,_Entity.Number_of_monomers,VV
+entity,_Entity.Type,non-polymer,entity,_Entity.EC_number,OO
+entity,_Entity.Type,non-polymer,entity,_Entity.Formula_weight,OO
+entity,_Entity.Type,non-polymer,entity,_Entity.Formula_weight_exptl,OO
+entity,_Entity.Type,non-polymer,entity,_Entity.Formula_weight_exptl_meth,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_db_link.Author_supplied,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_db_link.Database_code,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_db_link.Accession_code,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_db_link.Entry_mol_code,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_db_link.Entry_mol_name,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_db_link.Entry_experimental_method,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_db_link.Entry_structure_resolution,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_db_link.Entry_relation_type,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_db_link.Entry_details,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_db_link.Chimera_segment_ID,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_db_link.Seq_query_to_submitted_percent,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_db_link.Seq_subject_length,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_db_link.Seq_identity,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_db_link.Seq_positive,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_db_link.Seq_homology_expectation_val,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_db_link.Seq_align_begin,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_db_link.Seq_align_end,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_db_link.Seq_difference_details,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_db_link.Seq_alignment_details,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_db_link.Sf_ID,II
+entity,_Entity.Type,non-polymer,entity,_Entity_db_link.Entry_ID,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_db_link.Entity_ID,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_common_name.Name,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_common_name.Type,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_common_name.Sf_ID,II
+entity,_Entity.Type,non-polymer,entity,_Entity_common_name.Entry_ID,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_common_name.Entity_ID,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_systematic_name.Name,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_systematic_name.Naming_system,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_systematic_name.Sf_ID,II
+entity,_Entity.Type,non-polymer,entity,_Entity_systematic_name.Entry_ID,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_systematic_name.Entity_ID,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_keyword.Keyword,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_keyword.Sf_ID,II
+entity,_Entity.Type,non-polymer,entity,_Entity_keyword.Entry_ID,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_keyword.Entity_ID,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_chimera_segment.Comp_index_ID_begin,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_chimera_segment.Comp_index_ID_end,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_chimera_segment.Seq_ID_begin,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_chimera_segment.Seq_ID_end,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_chimera_segment.Details,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_chimera_segment.Sf_ID,II
+entity,_Entity.Type,non-polymer,entity,_Entity_chimera_segment.Entry_ID,OO
+entity,_Entity.Type,non-polymer,entity,_Entity_chimera_segment.Entity_ID,OO
+natural_source,_Entity_natural_src.Type,no natural source,natural_source,_Entity_natural_src.NCBI_taxonomy_ID,OO
+natural_source,_Entity_natural_src.Type,organism,natural_source,_Entity_natural_src.Organism_name_scientific,OO
+natural_source,_Entity_natural_src.Type,no natural source,natural_source,_Entity_natural_src.Organism_name_common,OO
+natural_source,_Entity_natural_src.Type,no natural source,natural_source,_Entity_natural_src.Organism_acronym,OO
+natural_source,_Entity_natural_src.Type,virus,natural_source,_Entity_natural_src.ICTVdb_decimal_code,OO
+natural_source,_Entity_natural_src.Type,no natural source,natural_source,_Entity_natural_src.Superkingdom,OO
+natural_source,_Entity_natural_src.Type,no natural source,natural_source,_Entity_natural_src.Kingdom,OO
+natural_source,_Entity_natural_src.Type,no natural source,natural_source,_Entity_natural_src.Genus,OO
+natural_source,_Entity_natural_src.Type,no natural source,natural_source,_Entity_natural_src.Species,OO
+natural_source,_Entity_natural_src.Type,organism,natural_source,_Entity_natural_src.Strain,OO
+natural_source,_Entity_natural_src.Type,organism,natural_source,_Entity_natural_src.Variant,OO
+natural_source,_Entity_natural_src.Type,no natural source,natural_source,_Entity_natural_src.Subvariant,OO
+natural_source,_Entity_natural_src.Type,no natural source,natural_source,_Entity_natural_src.Organ,OO
+natural_source,_Entity_natural_src.Type,no natural source,natural_source,_Entity_natural_src.Tissue,OO
+natural_source,_Entity_natural_src.Type,no natural source,natural_source,_Entity_natural_src.Tissue_fraction,OO
+natural_source,_Entity_natural_src.Type,no natural source,natural_source,_Entity_natural_src.Cell_line,OO
+natural_source,_Entity_natural_src.Type,no natural source,natural_source,_Entity_natural_src.Cell_type,OO
+natural_source,_Entity_natural_src.Type,no natural source,natural_source,_Entity_natural_src.ATCC_number,OO
+natural_source,_Entity_natural_src.Type,no natural source,natural_source,_Entity_natural_src.Organelle,OO
+natural_source,_Entity_natural_src.Type,no natural source,natural_source,_Entity_natural_src.Cellular_location,OO
+natural_source,_Entity_natural_src.Type,no natural source,natural_source,_Entity_natural_src.Fragment,OO
+natural_source,_Entity_natural_src.Type,no natural source,natural_source,_Entity_natural_src.Fraction,OO
+natural_source,_Entity_natural_src.Type,no natural source,natural_source,_Entity_natural_src.Secretion,OO
+natural_source,_Entity_natural_src.Type,no natural source,natural_source,_Entity_natural_src.Gene_mnemonic,OO
+natural_source,_Entity_natural_src.Type,no natural source,natural_source,_Entity_natural_src.Dev_stage,OO
+experimental_source,_Entity_experimental_src.Production_method,recombinant technology,experimental_source,_Entity_experimental_src.Host_org_scientific_name,OO
+experimental_source,_Entity_experimental_src.Production_method,recombinant technology,experimental_source,_Entity_experimental_src.Vector_type,OO
+experimental_source,_Entity_experimental_src.Production_method,recombinant technology,experimental_source,_Entity_experimental_src.Vector_name,OO
+entity,_Entity.Nstd_monomer,yes,chem_comp,_Chem_comp.Name,MM
+entity,_Entity.Nstd_monomer,yes,chem_comp,_Chem_comp.Paramagnetic,VV
+entity,_Entity.Nstd_monomer,yes,chem_comp,_Chem_comp.Aromatic,VV
+entity,_Entity.Nstd_monomer,yes,chem_comp,_Chem_comp.Formula,OO
+chem_comp,_Chem_comp.Name,*,chem_comp,_Chem_comp.Paramagnetic,VV
+chem_comp,_Chem_comp.Name,*,chem_comp,_Chem_comp.Aromatic,VV
+chem_comp,_Chem_comp.Name,*,chem_comp,_Chem_comp.Formula,OO
+assembly,_Assembly.Organic_ligands,[1-9]+,chem_comp,_Chem_comp.Name,MM
+assembly,_Assembly.Organic_ligands,[1-9]+,chem_comp,_Chem_comp.Paramagnetic,VV
+assembly,_Assembly.Organic_ligands,[1-9]+,chem_comp,_Chem_comp.Aromatic,VV
+assembly,_Assembly.Organic_ligands,[1-9]+,chem_comp,_Chem_comp.Formula,OO
+assembly,_Assembly.Metal_ions,[1-9]+,chem_comp,_Chem_comp.Name,MM
+assembly,_Assembly.Metal_ions,[1-9]+,chem_comp,_Chem_comp.Paramagnetic,VV
+assembly,_Assembly.Metal_ions,[1-9]+,chem_comp,_Chem_comp.Aromatic,VV
+assembly,_Assembly.Metal_ions,[1-9]+,chem_comp,_Chem_comp.Formula,OO
+deposited_data_files,_Upload_data.Data_file_content_type,Image file.*,chem_comp,_Chem_comp.Image_file_name,OO
+deposited_data_files,_Upload_data.Data_file_content_type,Image file.*,chem_comp,_Chem_comp.Image_file_format,OO
+chem_comp,_Chem_comp.PDB_code,[A-Za-z0-9]+,chem_comp,_Chem_comp.PDB_code,OO
+chem_comp,_Chem_comp.PDB_code,[A-Za-z0-9]+,chem_comp,_Chem_comp.Name,MM
+chem_comp,_Chem_comp.PDB_code,[A-Za-z0-9]+,chem_comp,_Chem_comp.Paramagnetic,VV
+chem_comp,_Chem_comp.PDB_code,[A-Za-z0-9]+,chem_comp,_Chem_comp.Aromatic,VV
+chem_comp,_Chem_comp.PDB_code,[A-Za-z0-9]+,chem_comp,_Chem_comp.Details,OO
+entity,_Entity.Type,non-polymer,entity,_Entity.Polymer_seq_one_letter_code,OO
+entity,_Entity.Type,non-polymer,entity,_Entity.Fragment,OO
+entity,_Entity.Type,non-polymer,entity,_Entity.Mutation,OO
+natural_source,_Entity_natural_src.Type,(organism)|(virus)|(plasmid)|(cosmid),natural_source,_Entity_natural_src.Organism_name_scientific,OO
+natural_source,_Entity_natural_src.Type,(organism)|(virus)|(plasmid)|(cosmid),natural_source,_Entity_natural_src.Gene_mnemonic,OO
+experimental_source,_Entity_experimental_src.Production_method,(recombinant technology)|(cell free synthesis),experimental_source,_Entity_experimental_src.Host_org_scientific_name,OO
+experimental_source,_Entity_experimental_src.Production_method,(recombinant technology)|(cell free synthesis),experimental_source,_Entity_experimental_src.Host_org_strain,OO
+experimental_source,_Entity_experimental_src.Production_method,(recombinant technology)|(cell free synthesis),experimental_source,_Entity_experimental_src.Host_org_variant,OO
+experimental_source,_Entity_experimental_src.Production_method,(recombinant technology)|(cell free synthesis),experimental_source,_Entity_experimental_src.Vector_type,OO
+experimental_source,_Entity_experimental_src.Production_method,(recombinant technology)|(cell free synthesis),experimental_source,_Entity_experimental_src.Vector_name,OO
+experimental_source,_Entity_experimental_src.Production_method,obtained from a vendor,experimental_source,_Entity_experimental_src.Vendor_name,OO
+experimental_source,_Entity_experimental_src.Production_method,(chemical synthesis)|(purified from the natural source)|(enzymatic semisynthesis)|(reverse transcriptase)|(obtained from a vendor),experimental_source,_Entity_experimental_src.Host_org_name_common,OO
+experimental_source,_Entity_experimental_src.Production_method,(chemical synthesis)|(purified from the natural source)|(enzymatic semisynthesis)|(reverse transcriptase)|(obtained from a vendor),experimental_source,_Entity_experimental_src.Host_org_variant,OO
+experimental_source,_Entity_experimental_src.Production_method,(chemical synthesis)|(purified from the natural source)|(enzymatic semisynthesis)|(reverse transcriptase)|(obtained from a vendor),experimental_source,_Entity_experimental_src.Host_org_cell_line,OO
+experimental_source,_Entity_experimental_src.Production_method,(chemical synthesis)|(purified from the natural source)|(enzymatic semisynthesis)|(reverse transcriptase)|(obtained from a vendor),experimental_source,_Entity_experimental_src.Host_org_ATCC_number,OO
+experimental_source,_Entity_experimental_src.Production_method,(chemical synthesis)|(purified from the natural source)|(enzymatic semisynthesis)|(reverse transcriptase)|(obtained from a vendor),experimental_source,_Entity_experimental_src.Vector_details,OO
+experimental_source,_Entity_experimental_src.Production_method,(chemical synthesis)|(purified from the natural source)|(enzymatic semisynthesis)|(reverse transcriptase)|(obtained from a vendor),experimental_source,_Entity_experimental_src.Host_org_scientific_name,OO
+experimental_source,_Entity_experimental_src.Production_method,(chemical synthesis)|(purified from the natural source)|(enzymatic semisynthesis)|(reverse transcriptase)|(obtained from a vendor),experimental_source,_Entity_experimental_src.Host_org_strain,OO
+experimental_source,_Entity_experimental_src.Production_method,(chemical synthesis)|(purified from the natural source)|(enzymatic semisynthesis)|(reverse transcriptase)|(obtained from a vendor),experimental_source,_Entity_experimental_src.Vector_type,OO
+experimental_source,_Entity_experimental_src.Production_method,(chemical synthesis)|(purified from the natural source)|(enzymatic semisynthesis)|(reverse transcriptase)|(obtained from a vendor),experimental_source,_Entity_experimental_src.Vector_name,OO
+experimental_source,_Entity_experimental_src.Production_method,(chemical synthesis)|(purified from the natural source)|(enzymatic semisynthesis)|(reverse transcriptase)|(obtained from a vendor),experimental_source,_Entity_experimental_src.Vendor_name,OO
+TBL_END,,,,,?

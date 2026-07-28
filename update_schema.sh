@@ -12,7 +12,7 @@
 base="https://raw.githubusercontent.com/bmrb-io/nmr-star-dictionary/nmr-star-development/NMR-STAR/internal_106_distribution"
 ref="pynmrstar/reference_files"
 
-for f in xlschem_ann.csv adit_enum_hdr.csv adit_enum_dtl.csv; do
+for f in xlschem_ann.csv adit_enum_hdr.csv adit_enum_dtl.csv adit_cat_grp_o.csv adit_tag_validation.csv; do
     curl "$base/$f" > "$ref/$f"
     mac2unix "$ref/$f"
 done

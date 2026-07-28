@@ -2,7 +2,7 @@ import decimal
 import logging
 import os
 import re
-from csv import DictReader
+from csv import DictReader, reader
 from datetime import date
 from functools import lru_cache
 from io import StringIO
@@ -12,6 +12,10 @@ from pynmrstar import definitions, utils
 from pynmrstar._internal import _interpret_file, load_dictionary
 
 logger = logging.getLogger('pynmrstar')
+
+# Saveframe category names, used to tell real rows in the dictionary's category
+# table from its header rules and sentinels.
+_CATEGORY_NAME = re.compile(r'^[A-Za-z][A-Za-z0-9_]*$')
 
 
 def _is_valid_date(value: str) -> bool:
@@ -55,9 +59,17 @@ class Schema(object):
         self.data_types: Dict[str, str] = {}
         # tag (lowercase) -> {'closed': bool, 'values': set of allowed values}
         self.enumerations: Dict[str, Dict[str, Any]] = {}
+        # saveframe category -> {'id': int, 'flags': str, 'unique': bool}
+        self.saveframe_categories: Dict[str, Dict[str, Any]] = {}
+        # tag (lowercase) -> list of conditional mandatory rules
+        self.conditional_rules: Dict[str, List[Dict[str, str]]] = {}
+        # profile name -> resolved mandatory codes, built on demand
+        self._profiles: Dict[str, Dict[str, Dict[str, str]]] = {}
 
         enum_hdr: Optional[str] = None
         enum_dtl: Optional[str] = None
+        cat_grp: Optional[str] = None
+        tag_validation: Optional[str] = None
         if schema_file is not None:
             # Explicit tag table (URL/file). Enumerations, if reachable, still
             # come from the cached/packaged distribution.
@@ -66,6 +78,8 @@ class Schema(object):
             try:
                 distribution, _ = load_dictionary(version)
                 enum_hdr, enum_dtl = distribution['adit_enum_hdr.csv'], distribution['adit_enum_dtl.csv']
+                cat_grp = distribution['adit_cat_grp_o.csv']
+                tag_validation = distribution['adit_tag_validation.csv']
             except (ValueError, OSError, IOError):
                 pass
         else:
@@ -73,32 +87,66 @@ class Schema(object):
             self.schema_file = definitions.DICTIONARY_URL
             xlschem_text = distribution['xlschem_ann.csv']
             enum_hdr, enum_dtl = distribution['adit_enum_hdr.csv'], distribution['adit_enum_dtl.csv']
+            cat_grp = distribution['adit_cat_grp_o.csv']
+            tag_validation = distribution['adit_tag_validation.csv']
 
         self._parse_tag_table(xlschem_text)
         self._load_data_types()
         if enum_hdr is not None and enum_dtl is not None:
             self._build_enumerations(enum_hdr, enum_dtl)
+        if cat_grp is not None:
+            self._parse_saveframe_categories(cat_grp)
+        if tag_validation is not None:
+            self._parse_conditional_rules(tag_validation)
 
     def _parse_tag_table(self, xlschem_text: str) -> None:
-        """Populate the tag schema from an xlschem_ann.csv body."""
+        """Populate the tag schema from an xlschem_ann.csv body.
 
-        fix_newlines = StringIO('\n'.join(xlschem_text.splitlines()))
-        csv_reader_instance = DictReader(fix_newlines)
-        self.headers = csv_reader_instance.fieldnames
+        Read positionally rather than with :class:`csv.DictReader`, because the
+        header repeats names across column groups -- ``public`` and ``internal``
+        each name both a ``Validate`` column and an ``Overide`` one, and ``small
+        molecule`` appears twice within ``Validate`` alone. Keying by name would
+        silently collapse those to whichever came last, so the per-view
+        validation flags have to be taken by index. The third header row labels
+        the groups, which is what identifies the ``Validate`` block."""
 
-        # Skip the header descriptions and index values before the real data
-        tmp_line = next(csv_reader_instance)
+        rows = reader(StringIO('\n'.join(xlschem_text.splitlines())))
         try:
-            while tmp_line['Dictionary sequence'] != "TBL_BEGIN":
-                tmp_line = next(csv_reader_instance)
-        except IndexError:
+            self.headers = next(rows)
+        except StopIteration:
             raise ValueError(f"Could not parse a schema from: {self.schema_file}")
-        self.version = tmp_line['ADIT category view type']
+        width = len(self.headers)
 
-        for line in csv_reader_instance:
-            if line['Dictionary sequence'] == "TBL_END":
+        def as_dict(row: List[str]) -> Dict[str, Any]:
+            if len(row) < width:
+                row = row + [''] * (width - len(row))
+            return dict(zip(self.headers, row))
+
+        # Skip the header descriptions and index values before the real data. The
+        # group-label row on the way past tells us where the Validate block is.
+        validate_columns: List[int] = []
+        while True:
+            try:
+                row = next(rows)
+            except StopIteration:
+                raise ValueError(f"Could not parse a schema from: {self.schema_file}")
+            found = [i for i, group in enumerate(row) if group.strip() == 'Validate']
+            if found:
+                validate_columns = found
+            if row and row[0] == 'TBL_BEGIN':
+                self.version = as_dict(row)['ADIT category view type']
                 break
-            single_tag_data: Dict[str, any] = dict(line)
+        self._validate_columns = validate_columns
+
+        for row in rows:
+            if row and row[0] == "TBL_END":
+                break
+            single_tag_data: Dict[str, Any] = as_dict(row)
+            # Take the per-view validation flags by position, before the
+            # name-keyed dict loses the duplicated column names.
+            single_tag_data['_validate_flags'] = ''.join(
+                (row[i].strip().upper() or ' ')[:1] if i < len(row) else ' '
+                for i in validate_columns)
             # Convert nulls
             if single_tag_data['Nullable'] == "NOT NULL":
                 single_tag_data['Nullable'] = False
@@ -156,6 +204,116 @@ class Schema(object):
                 entry = self.enumerations[tag_lower] = {'closed': closed, 'values': set(), 'folded': {}}
             entry['values'].add(value)
             entry['folded'][value.lower()] = value
+
+    def _parse_saveframe_categories(self, cat_grp_text: str) -> None:
+        """Load the saveframe category table from adit_cat_grp_o.csv.
+
+        Each category carries a per-view flag string (see
+        ``definitions.VALIDATION_PROFILES``) and a uniqueness flag: a category
+        that ADIT may replicate can legitimately appear more than once in an
+        entry, any other may not. The category's ordinal is the lowest
+        dictionary sequence among its tags, which is how the dictionary build
+        numbers them."""
+
+        lowest: Dict[str, int] = {}
+        for tag_data in self.schema.values():
+            category = (tag_data.get('SFCategory') or '').strip()
+            sequence = (tag_data.get('Dictionary sequence') or '').strip()
+            if not category or not sequence.isdigit():
+                continue
+            value = int(sequence)
+            if category not in lowest or value < lowest[category]:
+                lowest[category] = value
+
+        for row in DictReader(StringIO('\n'.join(cat_grp_text.splitlines()))):
+            category = (row.get('saveframe_category') or '').strip()
+            # The file carries a rule-off row of dashes between the header and
+            # the data, as well as the usual TBL_BEGIN/TBL_END sentinels.
+            if not _CATEGORY_NAME.match(category):
+                continue
+            replicable = (row.get('ADIT replicable') or '').strip().lower().startswith('y')
+            self.saveframe_categories[category] = {
+                'flags': (row.get('validateFlgs') or '').strip().upper(),
+                'unique': not replicable,
+                'id': lowest.get(category),
+            }
+
+    def _parse_conditional_rules(self, tag_validation_text: str) -> None:
+        """Load the conditional mandatory rules from adit_tag_validation.csv.
+
+        A rule says: when ``control_tag`` has ``value``, the mandatory code of
+        ``tag`` becomes the one in ``flags`` (again indexed by profile). This is
+        what makes, for example, ``_Citation.Journal_abbrev`` mandatory only for
+        a citation whose ``_Citation.Type`` is ``journal``. The control tag is
+        frequently in a *different* saveframe from the tag it governs, which is
+        why resolving these can only be done with the whole entry in hand."""
+
+        for row in DictReader(StringIO('\n'.join(tag_validation_text.splitlines()))):
+            tag = (row.get('Tag') or '').strip()
+            if not tag.startswith('_'):
+                continue
+            self.conditional_rules.setdefault(tag.lower(), []).append({
+                'control_category': (row.get('Control Sf category') or '').strip(),
+                'control_tag': (row.get('Control tag') or '').strip(),
+                'value': (row.get('Flag Value') or '').strip(),
+                'category': (row.get('Sf category') or '').strip(),
+                'flags': (row.get('validateFlgs') or '').strip().upper(),
+            })
+
+    @staticmethod
+    def _profile_index(profile: Optional[str]) -> int:
+        """The position of a named validation profile in a dictionary flag string."""
+
+        if profile is None:
+            profile = definitions.DEFAULT_VALIDATION_PROFILE
+        try:
+            return definitions.VALIDATION_PROFILES.index(profile)
+        except ValueError:
+            raise ValueError(f"Unknown validation profile '{profile}'. Known profiles: "
+                             f"{', '.join(definitions.VALIDATION_PROFILES)}")
+
+    def validation_profile(self, profile: str = None) -> Dict[str, Dict[str, str]]:
+        """The mandatory codes for one view of the dictionary, as
+        ``{'tags': {tag: code}, 'categories': {category: code}}``.
+
+        Codes are the ones the dictionary and the BMRB validator share:
+
+        ==== ====================================================================
+        ``I`` invalid -- the tag may not appear here at all
+        ``O`` optional
+        ``M`` mandatory -- the tag must be present
+        ``V`` value-mandatory -- present *and* non-null
+        ``C`` conditional -- mandatory if its saveframe is present
+        ``R`` value-conditional -- non-null if its saveframe is present
+        ==== ====================================================================
+
+        ``M`` and ``V`` are demoted to ``C`` and ``R`` for a tag whose saveframe
+        category is itself optional: "mandatory" there can only mean "mandatory
+        if that saveframe exists at all". The dictionary build applies the same
+        demotion (``validator.py: fix_loopmandatory``), and reproducing it is
+        what makes these codes match the shipped validator dictionary exactly."""
+
+        if profile is None:
+            profile = definitions.DEFAULT_VALIDATION_PROFILE
+        if profile in self._profiles:
+            return self._profiles[profile]
+
+        index = self._profile_index(profile)
+
+        categories: Dict[str, str] = {}
+        for category, data in self.saveframe_categories.items():
+            categories[category] = data['flags'][index:index + 1].strip() or 'O'
+
+        tags: Dict[str, str] = {}
+        for tag, tag_data in self.schema.items():
+            flags = tag_data.get('_validate_flags') or ''
+            code = flags[index:index + 1].strip().upper() or 'O'
+            if code in ('M', 'V') and categories.get((tag_data.get('SFCategory') or '').strip()) == 'O':
+                code = 'C' if code == 'M' else 'R'
+            tags[tag] = code
+
+        self._profiles[profile] = {'tags': tags, 'categories': categories}
+        return self._profiles[profile]
 
     def __repr__(self) -> str:
         """Return how we can be initialized."""

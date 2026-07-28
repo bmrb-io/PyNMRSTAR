@@ -97,6 +97,64 @@ class TestSchema(unittest.TestCase):
         self.assertFalse(any("$" in _ for _ in comp_type["values"]))
         self.assertEqual(default.val_type("_Chem_comp.Type", "D-SACCHARIDE 1,4 AND 1,4 LINKING"), [])
 
+    def test_validation_profiles(self):
+        default = Schema()
+
+        # The saveframe category table, from adit_cat_grp_o.csv
+        self.assertTrue(len(default.saveframe_categories) > 0)
+        self.assertIn('entry_information', default.saveframe_categories)
+
+        internal = default.validation_profile('internal')
+        public = default.validation_profile('public')
+
+        # Every tag and every category resolves to a code
+        self.assertEqual(len(internal['tags']), len(default.schema))
+        self.assertEqual(len(internal['categories']), len(default.saveframe_categories))
+        self.assertTrue(set(internal['tags'].values()) <= set('IOMVCR'))
+        self.assertTrue(set(internal['categories'].values()) <= set('IOMVCR'))
+
+        # entry_information is mandatory; a tag in it is value-mandatory
+        self.assertEqual(internal['categories']['entry_information'], 'M')
+        self.assertEqual(internal['tags']['_entry.sf_category'], 'V')
+
+        # The views genuinely differ -- this is why the profile has to be
+        # selectable rather than baked in.
+        self.assertNotEqual(internal['tags'], public['tags'])
+
+        # Demotion for tags in an optional saveframe category: 'study_list' is
+        # optional, so a mandatory tag there can only be conditionally mandatory
+        # (fix_loopmandatory in the dictionary build does the same). Neither M
+        # nor V may survive in such a category.
+        self.assertEqual(internal['categories']['study_list'], 'O')
+        study_codes = {internal['tags'][t] for t, d in default.schema.items()
+                       if d.get('SFCategory') == 'study_list'}
+        self.assertIn('C', study_codes)
+        self.assertFalse(study_codes & {'M', 'V'})
+
+        # Only real categories are loaded -- the file's rule-off row of dashes
+        # between header and data is not one.
+        self.assertFalse([_ for _ in default.saveframe_categories if not _[0].isalpha()])
+
+        # The profile is memoized, and unknown profiles are rejected
+        self.assertIs(default.validation_profile('internal'), internal)
+        self.assertRaises(ValueError, default.validation_profile, 'no_such_profile')
+
+    def test_conditional_rules(self):
+        default = Schema()
+
+        # The conditional mandatory rules, from adit_tag_validation.csv
+        self.assertTrue(len(default.conditional_rules) > 0)
+
+        # _Citation.Journal_abbrev is mandatory only for a journal citation
+        rules = default.conditional_rules['_citation.journal_abbrev']
+        journal = [_ for _ in rules if _['value'] == 'journal']
+        self.assertEqual(len(journal), 1)
+        self.assertEqual(journal[0]['control_tag'], '_Citation.Type')
+        self.assertEqual(journal[0]['control_category'], 'citations')
+
+        # Rules carry one flag per view, like every other dictionary flag string
+        self.assertTrue(all(_['flags'] for _ in rules))
+
     def test_dictionary_cache(self):
         # load_dictionary() reads the distribution, caches it under
         # $XDG_CACHE_HOME/pynmrstar/<version>, and reuses the cache next time
