@@ -3,8 +3,10 @@ import json
 import logging
 import os
 import re
+import threading
 import time
 import zlib
+from contextlib import contextmanager
 from datetime import date
 from gzip import GzipFile
 from importlib.metadata import version
@@ -375,3 +377,51 @@ def write_to_file(nmrstar_object: Union['pynmrstar.Entry', 'pynmrstar.Saveframe'
     out_file = open(str(file_name), "w")
     out_file.write(data_to_write)
     out_file.close()
+
+
+# ---------------------------------------------------------------------------
+# Parse-time leniency
+#
+# A few structural problems are detected while building the object model rather
+# than while tokenizing (Saveframe.add_tag). Raising on them makes the library
+# unusable for validation: a validator's input is by definition the not-yet-
+# correct file, and refusing to load it means the very problem you exist to
+# report cannot be reported. These conditions are therefore treated like the
+# tokenizer's existing parse warnings -- logged by default, raised when the
+# caller passes raise_parse_warnings=True.
+#
+# Outside a parse the behaviour is unchanged: building an inconsistent object
+# through the API is a programming error, so it still raises.
+# ---------------------------------------------------------------------------
+
+_parse_state = threading.local()
+
+
+@contextmanager
+def parsing(raise_parse_warnings: bool):
+    """ Marks the enclosing block as a parse, during which recoverable
+    structural problems become warnings rather than exceptions. """
+
+    previous = getattr(_parse_state, 'raise_parse_warnings', None)
+    _parse_state.raise_parse_warnings = raise_parse_warnings
+    try:
+        yield
+    finally:
+        _parse_state.raise_parse_warnings = previous
+
+
+def parse_warning(message: str) -> bool:
+    """ Report a recoverable structural problem.
+
+    Returns True if the caller should recover and continue, False if it should
+    raise its own exception (which keeps the existing error messages and types
+    for direct API use). Raises ParsingError when parsing with
+    raise_parse_warnings=True. """
+
+    state = getattr(_parse_state, 'raise_parse_warnings', None)
+    if state is None:
+        return False
+    if state:
+        raise pynmrstar.exceptions.ParsingError(message)
+    logger.warning(message)
+    return True

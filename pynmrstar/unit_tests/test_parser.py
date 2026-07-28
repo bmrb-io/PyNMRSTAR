@@ -138,3 +138,34 @@ save_
         star = "data_test save_test _sf.sf_category test _sf.sf_framecode test _sf.value\n;\n\u3000value\u3000\n;\nsave_"
         entry = Entry.from_string(star)
         self.assertIn('\u3000', entry[0]['value'][0])
+
+    def test_sf_framecode_mismatch_is_a_parse_warning(self):
+        """A saveframe whose Sf_framecode differs from its save_ label is a
+        thing a validator must be able to *report*, so parsing keeps both
+        strings and warns rather than refusing the file."""
+
+        star = "data_1\nsave_the_name\n_sf.Sf_category cat\n_sf.Sf_framecode a_different_name\nsave_\n"
+
+        with self.assertLogs('pynmrstar', level='WARNING'):
+            entry = Entry.from_string(star)
+        saveframe = entry[0]
+        self.assertEqual(saveframe.name, 'the_name')
+        self.assertEqual(saveframe['Sf_framecode'], ['a_different_name'])
+
+        # ...and it survives a write/re-parse, so the file round-trips
+        reparsed = Entry.from_string(entry.format())
+        self.assertEqual(reparsed[0].name, 'the_name')
+        self.assertEqual(reparsed[0]['Sf_framecode'], ['a_different_name'])
+
+    def test_sf_framecode_mismatch_raises_when_strict(self):
+        """raise_parse_warnings=True keeps the old, strict behavior."""
+
+        star = "data_1\nsave_the_name\n_sf.Sf_category cat\n_sf.Sf_framecode a_different_name\nsave_\n"
+        self.assertRaises(ParsingError, Entry.from_string, star, raise_parse_warnings=True)
+
+    def test_sf_framecode_mismatch_still_raises_outside_a_parse(self):
+        """Building an inconsistent saveframe through the API is a programming
+        error, not malformed input, so it still raises."""
+
+        saveframe = Saveframe.from_scratch('the_name', tag_prefix='_sf')
+        self.assertRaises(ValueError, saveframe.add_tag, '_sf.Sf_framecode', 'a_different_name')

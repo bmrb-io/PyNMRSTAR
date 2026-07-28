@@ -2,6 +2,7 @@ import logging
 
 import pynmrstar_parser
 
+from pynmrstar import _internal
 from pynmrstar import entry as entry_mod, schema as schema_mod
 from pynmrstar.exceptions import ParsingError
 
@@ -14,6 +15,7 @@ def parse(data: str,
           convert_data_types: bool = False,
           schema: 'schema_mod.Schema' = None) -> None:
     try:
-        pynmrstar_parser.parse(data, parse_into, source, raise_parse_warnings, convert_data_types, schema)
+        with _internal.parsing(raise_parse_warnings):
+            pynmrstar_parser.parse(data, parse_into, source, raise_parse_warnings, convert_data_types, schema)
     except ValueError as e:
         raise ParsingError(str(e))

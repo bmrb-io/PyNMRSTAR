@@ -7,7 +7,7 @@ from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Iterable,
 
 from pynmrstar_parser import pynmrstar_parser
 
-from pynmrstar import definitions, entry as entry_mod, loop as loop_mod, utils, parser
+from pynmrstar import _internal, definitions, entry as entry_mod, loop as loop_mod, utils, parser
 from pynmrstar._internal import _get_comments, _json_serialize, _interpret_file, _non_ascii_error, get_clean_tag_list, \
     write_to_file
 from pynmrstar.exceptions import InvalidStateError
@@ -622,9 +622,16 @@ class Saveframe(object):
             if not self._name:
                 self._name = value
             elif self._name != value:
-                raise ValueError('The Sf_framecode tag cannot be different from the saveframe name. Error '
-                                 f'occurred in tag {self.tag_prefix}.Sf_framecode with value {value} which '
-                                 f'conflicts with the saveframe name {self._name}.')
+                message = ('The Sf_framecode tag cannot be different from the saveframe name. Error '
+                           f'occurred in tag {self.tag_prefix}.Sf_framecode with value {value} which '
+                           f'conflicts with the saveframe name {self._name}.')
+                # While parsing, keep both strings rather than refusing the file:
+                # the saveframe keeps the name from its save_ label and the tag
+                # keeps its own value, so a validator can compare the two and
+                # report the mismatch. Writing the entry back out reproduces the
+                # file as it was read.
+                if not _internal.parse_warning(message):
+                    raise ValueError(message)
         self._tags.append(new_tag)
         if self._lc_tags_cache is not None:
             self._lc_tags_cache[new_tag[0].lower()] = len(self._tags) - 1
