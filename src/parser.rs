@@ -12,9 +12,17 @@ pub struct TokenizerState {
     pub full_data: String,
     index: usize,
     pub line_no: usize,
+    /// Line number (1-based) on which the token last returned by get_token began.
+    /// line_no cannot be used for this: it is advanced past the token, and past
+    /// the whitespace which follows it, so it names the token's last line - and
+    /// for a token followed by a newline, the line after that.
+    pub token_line: usize,
     pub last_delimiter: char,
     /// Line number (0-based) where non-standard whitespace was first encountered, if any.
     pub unusual_whitespace_line: Option<usize>,
+    /// Lines this tokenizer's data gained over the file it was read from, from
+    /// fix_multiline_semicolons() splitting `;content` in two. See source_line().
+    inserted_lines: Vec<usize>,
 }
 
 impl TokenizerState {
@@ -23,8 +31,10 @@ impl TokenizerState {
             full_data: String::new(),
             index: 0,
             line_no: 0,
+            token_line: 0,
             last_delimiter: ' ',
             unusual_whitespace_line: None,
+            inserted_lines: Vec::new(),
         }
     }
 
@@ -32,17 +42,31 @@ impl TokenizerState {
         self.full_data.clear();
         self.index = 0;
         self.line_no = 0;
+        self.token_line = 0;
         self.last_delimiter = ' ';
         self.unusual_whitespace_line = None;
+        self.inserted_lines.clear();
+    }
+
+    /// Translate a line number in the data being tokenized back to the line of
+    /// the file it came from. They differ only where a `;content` value was
+    /// split across two lines before tokenizing; without this, every line
+    /// reported after such a value would be off by one, and confidently so.
+    pub fn source_line(&self, line: usize) -> usize {
+        if self.inserted_lines.is_empty() {
+            return line;
+        }
+        line - self.inserted_lines.partition_point(|&inserted| inserted < line)
     }
 
     fn is_standard_whitespace(b: u8) -> bool {
         matches!(b, b' ' | b'\n' | b'\t' | b'\r' | b'\x0B')
     }
 
-    pub fn load_string(&mut self, data: String) {
+    pub fn load_string(&mut self, data: String, inserted_lines: Vec<usize>) {
         self.reset();
         self.full_data = data;
+        self.inserted_lines = inserted_lines;
     }
 
     /// Check if the byte position starts with a Unicode whitespace character.
@@ -163,6 +187,10 @@ impl TokenizerState {
             return Ok(None);
         }
 
+        // The whitespace before the token has been passed, so line_no now names
+        // the line the token starts on. Record it before the token is consumed.
+        self.token_line = self.source_line(self.line_no + 1);
+
         let bytes = self.full_data.as_bytes();
 
         // Handle comments
@@ -194,7 +222,7 @@ impl TokenizerState {
                 self.index += length;
                 return Ok(Some((start, end)));
             } else {
-                return Err(format!("Invalid file. Semicolon-delineated value was not terminated. Error on line: {}", self.line_no + 1));
+                return Err(format!("Invalid file. Semicolon-delineated value was not terminated. Error on line: {}", self.token_line));
             }
         }
 
@@ -219,7 +247,7 @@ impl TokenizerState {
 
                 // Check for newlines
                 if self.check_multiline(end_quote + 1) {
-                    return Err(format!("Invalid file. Single quoted value was not terminated on the same line it began. Error on line: {}", self.line_no + 1));
+                    return Err(format!("Invalid file. Single quoted value was not terminated on the same line it began. Error on line: {}", self.token_line));
                 }
 
                 self.index += 1;
@@ -230,7 +258,7 @@ impl TokenizerState {
                 self.index += end_quote + 1;
                 return Ok(Some((start, end)));
             } else {
-                return Err(format!("Invalid file. Single quoted value was not terminated. Error on line: {}", self.line_no + 1));
+                return Err(format!("Invalid file. Single quoted value was not terminated. Error on line: {}", self.token_line));
             }
         }
 
@@ -255,7 +283,7 @@ impl TokenizerState {
 
                 // Check for newlines
                 if self.check_multiline(end_quote + 1) {
-                    return Err(format!("Invalid file. Double quoted value was not terminated on the same line it began. Error on line: {}", self.line_no + 1));
+                    return Err(format!("Invalid file. Double quoted value was not terminated on the same line it began. Error on line: {}", self.token_line));
                 }
 
                 self.index += 1;
@@ -266,7 +294,7 @@ impl TokenizerState {
                 self.index += end_quote + 1;
                 return Ok(Some((start, end)));
             } else {
-                return Err(format!("Invalid file. Double quoted value was not terminated. Error on line: {}", self.line_no + 1));
+                return Err(format!("Invalid file. Double quoted value was not terminated. Error on line: {}", self.token_line));
             }
         }
 
@@ -450,7 +478,7 @@ impl ParserContext {
                         }
 
                         self.token = Some((start, end));
-                        self.line_number = self.tokenizer.line_no;
+                        self.line_number = self.tokenizer.token_line;
                         self.delimiter = self.tokenizer.last_delimiter;
 
                         // Check for unusual whitespace (warn/raise once per file)
@@ -461,7 +489,7 @@ impl ParserContext {
                                     "Non-standard whitespace character found on line {}. \
                                      Only standard whitespace characters (space, tab, newline, \
                                      vertical tab, carriage return) are expected in NMR-STAR files.",
-                                    line + 1
+                                    self.tokenizer.source_line(line + 1)
                                 );
                                 if self.raise_parse_warnings {
                                     return Err(self.raise_error(&msg));
@@ -481,7 +509,7 @@ impl ParserContext {
                     self.token = None;
                     return Ok(false);
                 }
-                Err(e) => return Err(ParsingError::new_err(e)),
+                Err(e) => return Err(ParsingError::new_err((e, self.tokenizer.token_line))),
             }
         }
     }
@@ -498,7 +526,55 @@ impl ParserContext {
     }
 
     fn raise_error(&self, message: &str) -> PyErr {
-        ParsingError::new_err(format!("{} (line {})", message, self.line_number))
+        parsing_error(message, self.line_number)
+    }
+}
+
+/// Build a ParsingError against a line of the file.
+///
+/// ParsingError takes (message, line_number=None) and renders the line itself,
+/// so the caller gets it as an attribute rather than glued into the message
+/// text. Line 0 means no token has been read yet, so there is no line to name.
+fn parsing_error(message: &str, line_number: usize) -> PyErr {
+    if line_number == 0 {
+        ParsingError::new_err(message.to_string())
+    } else {
+        ParsingError::new_err((message.to_string(), line_number))
+    }
+}
+
+/// The number of tags currently held by a Saveframe or a Loop.
+fn tag_count(py: Python, object: &Py<PyAny>) -> PyResult<usize> {
+    object.getattr(py, "tags")?.bind(py).len()
+}
+
+/// The message carried by a Python exception.
+fn error_message(py: Python, error: &PyErr) -> String {
+    match error.value(py).str() {
+        Ok(message) => message.to_string(),
+        Err(_) => error.to_string(),
+    }
+}
+
+/// Attach the right line number to a failure raised while adding a batch of tags.
+///
+/// Tags are read one at a time but handed to Python in batches, so by the time
+/// one is rejected the tokenizer has moved on to whatever ended the batch. The
+/// batch is added one tag at a time and stops at the first failure, so the
+/// number of tags that landed is the index of the offending one within the
+/// batch - and the line each was read from was recorded as it was read.
+fn locate_failed_tag(py: Python, error: PyErr, object: &Py<PyAny>,
+                     tags_before: usize, lines: &[usize]) -> PyErr {
+    if !error.is_instance_of::<pyo3::exceptions::PyValueError>(py) {
+        return error;
+    }
+    let added = match tag_count(py, object) {
+        Ok(after) if after >= tags_before => after - tags_before,
+        _ => return error,
+    };
+    match lines.get(added) {
+        Some(line) => parsing_error(&error_message(py, &error), *line),
+        None => error,
     }
 }
 
@@ -577,19 +653,26 @@ fn parse_entry_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
 }
 
 fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
-    let mut pending_tags: Vec<(TokenValue, TokenValue)> = Vec::new();
+    // Each pending tag carries the line it was read from, so that a tag rejected
+    // at flush time can still be reported against its own line.
+    let mut pending_tags: Vec<(TokenValue, TokenValue, usize)> = Vec::new();
 
     // Helper to flush pending tags
-    let flush_tags = |ctx: &ParserContext, pending: &mut Vec<(TokenValue, TokenValue)>| -> PyResult<()> {
+    let flush_tags = |ctx: &ParserContext, pending: &mut Vec<(TokenValue, TokenValue, usize)>| -> PyResult<()> {
         if !pending.is_empty() {
             let saveframe = ctx.current_saveframe.as_ref().unwrap();
             // Materialize TokenValues into (String, String) tuples for Python
             let tags_to_add = std::mem::take(pending);
             let materialized: Vec<(String, String)> = tags_to_add
                 .iter()
-                .map(|(tag, value)| (tag.to_string(&ctx.tokenizer.full_data), value.to_string(&ctx.tokenizer.full_data)))
+                .map(|(tag, value, _)| (tag.to_string(&ctx.tokenizer.full_data), value.to_string(&ctx.tokenizer.full_data)))
                 .collect();
-            saveframe.call_method(py, "add_tags", (materialized,), Some(ctx.add_tags_kwargs.bind(py).cast()?))?;
+            let tags_before = tag_count(py, saveframe)?;
+            if let Err(error) = saveframe.call_method(py, "add_tags", (materialized,),
+                                                      Some(ctx.add_tags_kwargs.bind(py).cast()?)) {
+                let lines: Vec<usize> = tags_to_add.iter().map(|(_, _, line)| *line).collect();
+                return Err(locate_failed_tag(py, error, saveframe, tags_before, &lines));
+            }
         }
         Ok(())
     };
@@ -650,6 +733,7 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
             }
 
             // Capture tag name as TokenValue
+            let tag_line = ctx.line_number;
             let tag_name = if let Some(ref processed) = ctx.processed_token {
                 TokenValue::Materialized(processed.clone())
             } else if let Some((start, end)) = ctx.token {
@@ -692,7 +776,7 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
             };
 
             // Collect tag-value pair for batch addition
-            pending_tags.push((tag_name, value_token));
+            pending_tags.push((tag_name, value_token, tag_line));
         } else {
             // Invalid token in saveframe
             let frame_name = ctx.current_saveframe.as_ref().unwrap()
@@ -726,7 +810,9 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
 }
 
 fn parse_loop_tags(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
-    let mut tags: Vec<TokenValue> = Vec::new();
+    // As with saveframe tags, each tag carries the line it was read from: they
+    // are added to the loop in one batch, once the first data value is seen.
+    let mut tags: Vec<(TokenValue, usize)> = Vec::new();
 
     while ctx.in_loop && ctx.get_token(py)? {
         let token = ctx.token_str();
@@ -756,7 +842,7 @@ fn parse_loop_tags(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
             };
 
             // Collect tag for batch addition
-            tags.push(tag_value);
+            tags.push((tag_value, ctx.line_number));
         } else {
             // First non-tag token, batch add all tags to loop
             let loop_obj = ctx.current_loop.as_ref().unwrap();
@@ -765,9 +851,13 @@ fn parse_loop_tags(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
             if !tags.is_empty() {
                 let materialized: Vec<String> = tags
                     .iter()
-                    .map(|tv| tv.to_string(&ctx.tokenizer.full_data))
+                    .map(|(tv, _)| tv.to_string(&ctx.tokenizer.full_data))
                     .collect();
-                loop_obj.call_method1(py, "add_tag", (materialized.as_slice(),))?;
+                let tags_before = tag_count(py, loop_obj)?;
+                if let Err(error) = loop_obj.call_method1(py, "add_tag", (materialized.as_slice(),)) {
+                    let lines: Vec<usize> = tags.iter().map(|(_, line)| *line).collect();
+                    return Err(locate_failed_tag(py, error, loop_obj, tags_before, &lines));
+                }
             }
 
             let saveframe = ctx.current_saveframe.as_ref().unwrap();
@@ -971,11 +1061,11 @@ pub fn parse(
     // Fix DOS line endings
     let data = data.replace("\r\n", "\n").replace("\r", "\n");
     // Change '\n; data ' started multi-lines to '\n;\ndata'
-    let data = fix_multiline_semicolons(&data);
+    let (data, inserted_lines) = fix_multiline_semicolons(&data);
 
     // Create tokenizer and load data
     let mut tokenizer = TokenizerState::new();
-    tokenizer.load_string(data);
+    tokenizer.load_string(data, inserted_lines);
 
     // Create parser context
     let mut ctx = ParserContext::new(py, entry.clone_ref(py), source,

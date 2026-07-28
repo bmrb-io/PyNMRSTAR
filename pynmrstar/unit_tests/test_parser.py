@@ -169,3 +169,127 @@ save_
 
         saveframe = Saveframe.from_scratch('the_name', tag_prefix='_sf')
         self.assertRaises(ValueError, saveframe.add_tag, '_sf.Sf_framecode', 'a_different_name')
+
+    def test_structural_error_line_numbers(self):
+        """A file that will not parse must still say *where*.
+
+        Duplicate tags and tags whose category doesn't match their container are
+        rejected while building the object model, after the tokenizer has moved
+        on, so the line has to be carried from where the tag was read."""
+
+        duplicate = ("data_test\n\nsave_entry_information\n"
+                     "    _Entry.Sf_category    entry_information\n"
+                     "    _Entry.Sf_framecode   entry_information\n"
+                     "    _Entry.Title          'first title'\n"
+                     "    _Entry.Title          'second title'\n"
+                     "save_\n")
+        with self.assertRaises(ParsingError) as caught:
+            Entry.from_string(duplicate)
+        # The *second* occurrence is the offending one
+        self.assertEqual(caught.exception.line_number, 7)
+
+        foreign = ("data_test\n\nsave_entry_information\n"
+                   "    _Entry.Sf_category    entry_information\n"
+                   "    _Entry.Sf_framecode   entry_information\n"
+                   "    _Entry.Title          'a title'\n"
+                   "    _Citation.Class       journal\n"
+                   "save_\n")
+        with self.assertRaises(ParsingError) as caught:
+            Entry.from_string(foreign)
+        self.assertEqual(caught.exception.line_number, 7)
+
+        # A tag name appearing inside a semicolon block is not the tag itself:
+        # the duplicate is on line 11, not the 10 it would be if line 8 counted.
+        semicolon = ("data_test\n\nsave_entry_information\n"
+                     "    _Entry.Sf_category    entry_information\n"
+                     "    _Entry.Sf_framecode   entry_information\n"
+                     "    _Entry.Details\n;\n_Entry.Title is discussed here\n;\n"
+                     "    _Entry.Title          'first title'\n"
+                     "    _Entry.Title          'second title'\n"
+                     "save_\n")
+        with self.assertRaises(ParsingError) as caught:
+            Entry.from_string(semicolon)
+        self.assertEqual(caught.exception.line_number, 11)
+
+    def test_loop_tag_line_numbers(self):
+        """Loop tags are batched too, so they need the same treatment."""
+
+        header = ("data_test\n\nsave_x\n"
+                  "    _Entry.Sf_category    entry_information\n"
+                  "    _Entry.Sf_framecode   x\n"
+                  "    loop_\n"
+                  "        _Entry_author.Ordinal\n"
+                  "        _Entry_author.Given_name\n")
+
+        duplicate = header + "        _Entry_author.Ordinal\n        1 Jon 2\n    stop_\nsave_\n"
+        with self.assertRaises(ParsingError) as caught:
+            Entry.from_string(duplicate)
+        self.assertEqual(caught.exception.line_number, 9)
+
+        foreign = header + "        _Citation.Class\n        1 Jon journal\n    stop_\nsave_\n"
+        with self.assertRaises(ParsingError) as caught:
+            Entry.from_string(foreign)
+        self.assertEqual(caught.exception.line_number, 9)
+
+    def test_tokenizer_error_line_numbers(self):
+        """Errors raised by the tokenizer itself carry the line of the token
+        they were reading, not of the line the tokenizer had advanced to."""
+
+        # A token which is rejected mid-line: the tag is followed by spaces
+        # rather than a newline, so the tokenizer has not left line 6 yet.
+        quoted_tag = ("data_test\n\nsave_entry_information\n"
+                      "    _Entry.Sf_category    entry_information\n"
+                      "    _Entry.Sf_framecode   entry_information\n"
+                      "    '_Entry.Title'        'x'\n"
+                      "save_\n")
+        with self.assertRaises(ParsingError) as caught:
+            Entry.from_string(quoted_tag)
+        self.assertEqual(caught.exception.line_number, 6)
+
+        # ...and one rejected at the end of a line
+        underscore_value = ("data_test\n\nsave_entry_information\n"
+                            "    _Entry.Sf_category    entry_information\n"
+                            "    _Entry.Sf_framecode   entry_information\n"
+                            "    _Entry.Title          _bad_value\n"
+                            "save_\n")
+        with self.assertRaises(ParsingError) as caught:
+            Entry.from_string(underscore_value)
+        self.assertEqual(caught.exception.line_number, 6)
+
+        # A multi-line value is reported against the line it opens on
+        unterminated = ("data_test\n\nsave_entry_information\n"
+                        "    _Entry.Sf_category    entry_information\n"
+                        "    _Entry.Sf_framecode   entry_information\n"
+                        "    _Entry.Title\n;\nno closing semicolon\n")
+        with self.assertRaises(ParsingError) as caught:
+            Entry.from_string(unterminated)
+        self.assertEqual(caught.exception.line_number, 7)
+
+    def test_line_numbers_survive_semicolon_rewriting(self):
+        """A `;content` value is split over two lines before tokenizing, which
+        pushes the rest of the file down a line. Reported lines must still name
+        the line of the file the caller actually has."""
+
+        # _Entry.Details holds a value written as ';content' on one line. Without
+        # the correction the duplicate below would be reported one line late.
+        star = ("data_test\n\nsave_entry_information\n"
+                "    _Entry.Sf_category    entry_information\n"
+                "    _Entry.Sf_framecode   entry_information\n"
+                "    _Entry.Details\n; some details on the semicolon line\n;\n"
+                "    _Entry.Title          'first title'\n"
+                "    _Entry.Title          'second title'\n"
+                "save_\n")
+        with self.assertRaises(ParsingError) as caught:
+            Entry.from_string(star)
+        self.assertEqual(caught.exception.line_number, 10)
+
+        # ...and the same for an error the tokenizer raises itself
+        star = ("data_test\n\nsave_entry_information\n"
+                "    _Entry.Sf_category    entry_information\n"
+                "    _Entry.Sf_framecode   entry_information\n"
+                "    _Entry.Details\n; some details on the semicolon line\n;\n"
+                "    '_Entry.Title'        'x'\n"
+                "save_\n")
+        with self.assertRaises(ParsingError) as caught:
+            Entry.from_string(star)
+        self.assertEqual(caught.exception.line_number, 9)
