@@ -146,11 +146,7 @@ class Schema(object):
             tag = id_to_tag.get(eid)
             if not tag:
                 continue
-            # The distribution CSVs are unquoted, so the dictionary build encodes
-            # a comma inside a value as '$' ("Eldon's sure there's no legitimate
-            # '$' anywhere" -- nmr-star-dictionary-scripts/scripts/dictdb.py,
-            # which does the same substitution when loading these files).
-            value = (row.get('Enum value') or '').strip().replace('$', ',')
+            value = (row.get('Enum value') or '').strip()
             if value == '':
                 continue
             tag_lower = tag.lower()

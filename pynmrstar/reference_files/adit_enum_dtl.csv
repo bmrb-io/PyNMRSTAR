@@ -30,8 +30,8 @@ TBL_BEGIN,?,?,?
 57,1,Extremely slow exchange,Components are very tightly bound
 57,2,Slow exchange,Would expect to observe separate resonances for the bound and free components of the system.
 57,3,Intermediate exchange,May not observe signals from the component or signals may be quite broad.
-57,4,Fast exchange,On the NMR time scale$ a single averaged signal will be observed for the components in the bound and free state.
-57,5,No interaction,The components exist in the sample but do not interact (i.e.$ a molecule that is exchanging between a native and an unfolded conformation).
+57,4,Fast exchange,"On the NMR time scale, a single averaged signal will be observed for the components in the bound and free state."
+57,5,No interaction,"The components exist in the sample but do not interact (i.e., a molecule that is exchanging between a native and an unfolded conformation)."
 57,6,na,not available or equivalent
 56,1,IUPAC,enumeration_text
 56,2,CAS name,enumeration_text
@@ -77,13 +77,13 @@ TBL_BEGIN,?,?,?
 49,9,free and other bound,enumeration_text
 49,10,free disulfide and other bound,enumeration_text
 49,11,disulfide and other bound,enumeration_text
-164,1,1,Unique$ not ambiguous
+164,1,1,"Unique, not ambiguous"
 164,2,2,Ambiguity of geminal atoms or geminal groups
 164,3,3,Aromatic atoms on opposite sides of the ring (e.g. Tyr HE1 and HE2 protons)
 164,4,4,Intraresidue ambiguities (e.g. Lys HG and HD protons)
 164,5,5,Interresidue ambiguities (Lys 12 vs. Lys 27)
 164,6,6,Chemical shift ambiguity is between atoms that are located on different entities within the molecular assembly
-164,7,9,Ambiguous$ but specific ambiguity not defined
+164,7,9,"Ambiguous, but specific ambiguity not defined"
 263,1,1,Flag indicating that the atom is in an ordered region of the structure.
 263,2,0,Flag indicating that the atom is in a poorly ordered region of the structure.
 41,1,Preliminary version,enumeration_text
@@ -206,15 +206,15 @@ TBL_BEGIN,?,?,?
 298,2,anisotropic,enumeration_text
 298,3,solid,enumeration_text
 97,1,N,atom is not a chiral center
-97,2,E,(E)- alkene (German$ entgegen = opposite)
-97,3,Z,(Z)- alkene (German$ zusammen = together)
+97,2,E,"(E)- alkene (German, entgegen = opposite)"
+97,3,Z,"(Z)- alkene (German, zusammen = together)"
 97,4,R,rectus - right handed configuration
 97,5,S,sinister - left handed configuration
 97,6,pro-R,If substituted for a higher molecular weight entity will make the attached atom an R chiral center
 97,7,pro-S,If substituted for a higher molecular weight entity will make the attached atom an S chiral center
 98,1,N,atom is not a chiral center
-98,2,E,(E)- alkene (German$ entgegen = opposite)
-98,3,Z,(Z)- alkene (German$ zusammen = together)
+98,2,E,"(E)- alkene (German, entgegen = opposite)"
+98,3,Z,"(Z)- alkene (German, zusammen = together)"
 98,4,R,rectus - right handed configuration
 98,5,S,sinister - left handed configuration
 99,1,main,main chain of an amino acid
@@ -339,20 +339,20 @@ TBL_BEGIN,?,?,?
 82,12,RNA OH 5 PRIME TERMINUS,enumeration_text
 82,13,DNA OH 3 PRIME TERMINUS,enumeration_text
 82,14,RNA OH 3 PRIME TERMINUS,enumeration_text
-82,15,D-SACCHARIDE 1$4 AND 1$4 LINKING,enumeration_text
-82,16,L-SACCHARIDE 1$4 AND 1$4 LINKING,enumeration_text
-82,17,D-SACCHARIDE 1$4 AND 1$6 LINKING,enumeration_text
-82,18,L-SACCHARIDE 1$4 AND 1$6 LINKING,enumeration_text
+82,15,"D-SACCHARIDE 1,4 AND 1,4 LINKING",enumeration_text
+82,16,"L-SACCHARIDE 1,4 AND 1,4 LINKING",enumeration_text
+82,17,"D-SACCHARIDE 1,4 AND 1,6 LINKING",enumeration_text
+82,18,"L-SACCHARIDE 1,4 AND 1,6 LINKING",enumeration_text
 82,19,L-SACCHARIDE,enumeration_text
 82,20,D-SACCHARIDE,enumeration_text
 82,21,SACCHARIDE,enumeration_text
 82,22,NON-POLYMER,enumeration_text
 82,23,PEPTIDE LINKING,enumeration_text
 82,24,PEPTIDE-LIKE,enumeration_text
-82,25,L-GAMMA-PEPTIDE$ C-DELTA LINKING,enumeration_text
-82,26,D-GAMMA-PEPTIDE$ C-DELTA LINKING,enumeration_text
-82,27,L-BETA-PEPTIDE$ C-GAMMA LINKING,enumeration_text
-82,28,D-BETA-PEPTIDE$ C-GAMMA LINKING,enumeration_text
+82,25,"L-GAMMA-PEPTIDE, C-DELTA LINKING",enumeration_text
+82,26,"D-GAMMA-PEPTIDE, C-DELTA LINKING",enumeration_text
+82,27,"L-BETA-PEPTIDE, C-GAMMA LINKING",enumeration_text
+82,28,"D-BETA-PEPTIDE, C-GAMMA LINKING",enumeration_text
 82,29,OTHER,enumeration_text
 88,1,Sigma,enumeration_text
 88,2,Aldrich,enumeration_text
@@ -415,7 +415,7 @@ TBL_BEGIN,?,?,?
 153,13,ammonium hydroxide,N ammonium nitrogen
 153,14,ammonium nitrate,N ammonium nitrogen
 153,15,[15N] ammonium nitrate,N ammonium nitrogen
-153,16,[15N$ 15N] ammonium nitrate,N ammonium nitrogen
+153,16,"[15N, 15N] ammonium nitrate",N ammonium nitrogen
 153,17,ammonium nitrite,N ammonium nitrogen
 153,18,ammonium sulfate,N ammonium nitrogen
 153,19,[15N] ammonium sulfate,N ammonium nitrogen
@@ -575,7 +575,7 @@ TBL_BEGIN,?,?,?
 45,36,RNA,enumeration_text
 45,37,Science,enumeration_text
 45,38,Structure,enumeration_text
-45,39,Structure (Cambridge$ MA$ U.S.),enumeration_text
+45,39,"Structure (Cambridge, MA, U.S.)",enumeration_text
 45,40,Acc. Chem. Res.,enumeration_text
 45,41,ACS Symp. Ser.,enumeration_text
 45,42,Acta Biochim. Pol.,enumeration_text
@@ -2030,15 +2030,15 @@ TBL_BEGIN,?,?,?
 45,1491,Zh. Neorg. Khim.,enumeration_text
 43,1,in preparation,A manuscript is being prepared but has not been submitted for publication.
 43,2,submitted,A manuscript has been submitted for publication.
-43,3,in press,A manuscript has been accepted for publication$ but has not yet appeared in press.
+43,3,in press,"A manuscript has been accepted for publication, but has not yet appeared in press."
 43,4,published,A published article exists that contains or describes the data in the entry.
 43,5,retracted,A published article has been retracted by the authors or journal.
 43,6,na,The status of the citation is not available. This value is for older entries where the status can not be determined but should not be allowed for current entries.
 44,1,journal,enumeration_text
 44,2,book,enumeration_text
 44,3,book chapter,enumeration_text
-44,4,thesis,A document written and published as a requirement for a degree or other scholarly endeavor (e.g.$ senior$ masters$ or doctoral thesis)
-44,5,abstract,A brief text describing the contents of a presentation$ oral$$ poster$ or other$ given at a conference or other formal gathering.
+44,4,thesis,"A document written and published as a requirement for a degree or other scholarly endeavor (e.g., senior, masters, or doctoral thesis)"
+44,5,abstract,"A brief text describing the contents of a presentation, oral,, poster, or other, given at a conference or other formal gathering."
 44,6,personal communication,The BMRB entry is the only known published source for the data.
 44,7,internet,The data were only found published on the internet and no other publication is available.
 44,8,BMRB only,The only publication related to the data submitted will be the BMRB entry.
@@ -2120,16 +2120,16 @@ TBL_BEGIN,?,?,?
 271,2,calculated for dihedral violations only,enumeration_text
 270,1,calculated over all distance constraints,enumeration_text
 270,2,calculated for distance violations only,enumeration_text
-267,1,r-6,R=(<Rij^-6>)^(-1/6)$ X-PLOR formula 18.1. Rij runs over all combinations of distance constraints between  atoms i in set 1 and atoms j in set 2.
-267,2,r-3,R=(<Rij^-3>)^(-1/3)$ X-PLOR formula 18.2.
-267,3,sum,R=(SUM(Rij^-6)/n_mono)^(-1/6)$ X-PLOR formula 18.3.
-267,4,center,R= r1_center-r2_center$ X-PLOR formula 18.4.
+267,1,r-6,"R=(<Rij^-6>)^(-1/6), X-PLOR formula 18.1. Rij runs over all combinations of distance constraints between  atoms i in set 1 and atoms j in set 2."
+267,2,r-3,"R=(<Rij^-3>)^(-1/3), X-PLOR formula 18.2."
+267,3,sum,"R=(SUM(Rij^-6)/n_mono)^(-1/6), X-PLOR formula 18.3."
+267,4,center,"R= r1_center-r2_center, X-PLOR formula 18.4."
 266,1,Tryptophan ring proton NOE intensities,enumeration_text
 266,2,Glycine alpha proton NOE intensities,enumeration_text
-269,1,r-6,R=(<Rij^-6>)^(-1/6)$ X-PLOR formula 18.1. Rij runs over all combinations of distance constraints between  atoms i in set 1 and atoms j in set 2.
-269,2,r-3,R=(<Rij^-3>)^(-1/3)$ X-PLOR formula 18.2.
-269,3,sum,R=(SUM(Rij^-6)/n_mono)^(-1/6)$ X-PLOR formula 18.3.
-269,4,center,R= r1_center-r2_center$ X-PLOR formula 18.4.
+269,1,r-6,"R=(<Rij^-6>)^(-1/6), X-PLOR formula 18.1. Rij runs over all combinations of distance constraints between  atoms i in set 1 and atoms j in set 2."
+269,2,r-3,"R=(<Rij^-3>)^(-1/3), X-PLOR formula 18.2."
+269,3,sum,"R=(SUM(Rij^-6)/n_mono)^(-1/6), X-PLOR formula 18.3."
+269,4,center,"R= r1_center-r2_center, X-PLOR formula 18.4."
 268,1,Tryptophan ring proton NOE intensities,enumeration_text
 268,2,Glycine alpha proton NOE intensities,enumeration_text
 27,1,Sr.,Senior
@@ -2639,11 +2639,11 @@ purpose. E.g. restaint between
 61,9,free and other bound,enumeration_text
 61,10,free disulfide and other bound,enumeration_text
 61,11,disulfide and other bound,enumeration_text
-58,1,polymer,A biological polymer (protein$ peptide$ nucleic acid$ etc.)
-58,2,non-polymer,Ligand$ metal ion$ or other non-polymeric molecule
-58,3,water,Water is defined as a special case. Multiple water molecules may be components of the molecular assembly$ but are not assigned unique entity_assembly_ID values.
-58,4,aggregate,Used where a large number of molecules are reported as part of a molecular assembly$ but are not listed individually as components of the assembly and are not assigned unique entity_assembly_ID values. One entity_assembly_ID value is used to represent the aggregate number of molecules of a specific compound.
-58,5,solvent,Applies to compounds other than water that are part of molecular assembly$ but are not assigned unique entity_assembly_ID values. One entity_assembly_ID value is used to represent all molecules of a specific compound.
+58,1,polymer,"A biological polymer (protein, peptide, nucleic acid, etc.)"
+58,2,non-polymer,"Ligand, metal ion, or other non-polymeric molecule"
+58,3,water,"Water is defined as a special case. Multiple water molecules may be components of the molecular assembly, but are not assigned unique entity_assembly_ID values."
+58,4,aggregate,"Used where a large number of molecules are reported as part of a molecular assembly, but are not listed individually as components of the assembly and are not assigned unique entity_assembly_ID values. One entity_assembly_ID value is used to represent the aggregate number of molecules of a specific compound."
+58,5,solvent,"Applies to compounds other than water that are part of molecular assembly, but are not assigned unique entity_assembly_ID values. One entity_assembly_ID value is used to represent all molecules of a specific compound."
 30,1,Sr.,Senior
 30,2,Jr.,Junior
 30,3,I,First
@@ -2665,10 +2665,10 @@ purpose. E.g. restaint between
 1,1,PDB/BMRB,enumeration_text
 1,2,BMRB Only,enumeration_text
 34,1,Accelerated Technologies Center for Gene to 3D Structure,enumeration_text
-34,2,Assembly$ Dynamics and Evolution of Cell-Cell and Cell-Matrix Adhesions,enumeration_text
+34,2,"Assembly, Dynamics and Evolution of Cell-Cell and Cell-Matrix Adhesions",enumeration_text
 34,3,Architecture and Function of Biological Macromolecules Structure Genomics,ASG
 34,4,Atoms-to-Animals: The Immune Function Network,enumeration_text
-34,5,Bacterial targets at IGS-CNRS$ France,enumeration_text
+34,5,"Bacterial targets at IGS-CNRS, France",enumeration_text
 34,6,Berkeley Structural Genomics Center,BSGC
 34,7,Center for Eukaryotic Structural Genomics,CESG
 34,8,Center for High-Throughput Structural Biology,enumeration_text
@@ -2714,7 +2714,7 @@ purpose. E.g. restaint between
 34,48,Structural Proteomics in Europe,enumeration_text
 34,49,Structural Proteomics in Europe 2,enumeration_text
 34,50,Structure 2 Function Project,enumeration_text
-34,51,Structure$ Dynamics and Activation Mechanisms of Chemokine Receptors,enumeration_text
+34,51,"Structure, Dynamics and Activation Mechanisms of Chemokine Receptors",enumeration_text
 34,52,Structure-Function Studies of Tight Junction Membrane Proteins,enumeration_text
 34,53,Structures of Mtb Proteins Conferring Susceptibility to Known Mtb Inhibitors,enumeration_text
 34,54,TB Structural Genomics Consortium,enumeration_text
@@ -2853,7 +2853,7 @@ purpose. E.g. restaint between
 9,3,obsolete,The entry is no longer released by BMRB to the public.
 133,1,NMR experiment directory,Contains variety of files for acquiring and processing the NMR experimental data
 133,2,Time-domain (raw spectral data),enumeration_text
-133,3,Pulse sequence image file,jpeg$ gif$ or other file type that is an image of the pulse sequence as shown as a figure in many publications
+133,3,Pulse sequence image file,"jpeg, gif, or other file type that is an image of the pulse sequence as shown as a figure in many publications"
 133,4,Pulse sequence,enumeration_text
 133,5,Pulse field gradient,enumeration_text
 133,6,Peak list,enumeration_text
@@ -3062,8 +3062,8 @@ E = 2k(l2-l)(r - (l2+l)/2) for r < l2"
 212,1,s-1,enumeration_text
 212,2,ms-1,enumeration_text
 212,3,us-1,enumeration_text
-210,1,I(+$-),single quantum
-210,2,S(+$-),single quantum
+210,1,"I(+,-)",single quantum
+210,2,"S(+,-)",single quantum
 211,1,s-1,enumeration_text
 211,2,ms-1,enumeration_text
 211,3,s,enumeration_text
@@ -3083,8 +3083,8 @@ E = 2k(l2-l)(r - (l2+l)/2) for r < l2"
 218,1,s-1,enumeration_text
 218,2,ms-1,enumeration_text
 218,3,us-1,enumeration_text
-216,1,I(+$-),single quantum
-216,2,S(+$-),single quantum
+216,1,"I(+,-)",single quantum
+216,2,"S(+,-)",single quantum
 217,1,s-1,enumeration_text
 217,2,ms-1,enumeration_text
 217,3,s,enumeration_text
@@ -3353,7 +3353,7 @@ E = 2k(l2-l)(r - (l2+l)/2) for r < l2"
 141,3,ramp,enumeration_text
 138,1,NMR experiment directory,Contains variety of files for acquiring and processing the NMR experimental data
 138,2,Time-domain (raw spectral data),enumeration_text
-138,3,Pulse sequence image file,jpeg$ gif$ or other file type that is an image of the pulse sequence as shown as a figure in many publications
+138,3,Pulse sequence image file,"jpeg, gif, or other file type that is an image of the pulse sequence as shown as a figure in many publications"
 138,4,Pulse sequence,enumeration_text
 138,5,Pulse field gradient,enumeration_text
 138,6,Peak list,enumeration_text
@@ -3502,17 +3502,17 @@ E = 2k(l2-l)(r - (l2+l)/2) for r < l2"
 123,23,OMEGA PSG,from General Electric
 249,1,Rex,enumeration_text
 249,2,S2,enumeration_text
-249,3,S2$ te,enumeration_text
-249,4,S2$ Rex,enumeration_text
-249,5,S2$ te$ Rex,enumeration_text
-249,6,S2f$ S2$ ts,enumeration_text
-249,7,S2f$ S2s$ ts,enumeration_text
-249,8,S2f$ tf$ S2$ ts,enumeration_text
-249,9,S2f$ tf$ S2s$ ts,enumeration_text
-249,10,S2f$ S2$ ts$ Rex,enumeration_text
-249,11,S2f$ S2s$ ts$ Rex,enumeration_text
-249,12,S2f$ tf$ S2$ ts$ Rex,enumeration_text
-249,13,S2f$ tf$ S2s$ ts$ Rex,enumeration_text
+249,3,"S2, te",enumeration_text
+249,4,"S2, Rex",enumeration_text
+249,5,"S2, te, Rex",enumeration_text
+249,6,"S2f, S2, ts",enumeration_text
+249,7,"S2f, S2s, ts",enumeration_text
+249,8,"S2f, tf, S2, ts",enumeration_text
+249,9,"S2f, tf, S2s, ts",enumeration_text
+249,10,"S2f, S2, ts, Rex",enumeration_text
+249,11,"S2f, S2s, ts, Rex",enumeration_text
+249,12,"S2f, tf, S2, ts, Rex",enumeration_text
+249,13,"S2f, tf, S2s, ts, Rex",enumeration_text
 248,1,isotropic,enumeration_text
 248,2,anisotropic,enumeration_text
 248,3,solid,enumeration_text
@@ -3633,7 +3633,7 @@ E = 2k(l2-l)(r - (l2+l)/2) for r < l2"
 37,2,XML,enumeration_text
 38,1,original,First release of the data to the public.
 38,2,na,not available
-38,3,update,Additional releases of the entry that involve changes in the reported quantitative data$ dictionary changes$ or other revisions that represent non-trivial changes in the entry.
+38,3,update,"Additional releases of the entry that involve changes in the reported quantitative data, dictionary changes, or other revisions that represent non-trivial changes in the entry."
 38,4,revision,not used now as it is redundant with update aa all revisions are updates
 38,5,reformat,reformatted for new format specification
 265,1,distance geometry,enumeration_text
@@ -3645,7 +3645,7 @@ E = 2k(l2-l)(r - (l2+l)/2) for r < l2"
 265,7,na,enumeration_text
 264,1,experimental,Derived directly from experimental data
 264,2,derived experimentally,Derived from conformers that fit experimental data
-264,3,theoretical,The coordinates represent a theoretical chemical system. They may be derived from an experimental coordinate set$ but have been constructed for use in carrying out theoretical calculations or for other purposes that have specific requirements that necessitate the use of non-standard atoms or other conditions.
+264,3,theoretical,"The coordinates represent a theoretical chemical system. They may be derived from an experimental coordinate set, but have been constructed for use in carrying out theoretical calculations or for other purposes that have specific requirements that necessitate the use of non-standard atoms or other conditions."
 108,1,M,Molar
 108,2,mM,millimolar
 108,3,uM,micromolar
@@ -3695,7 +3695,7 @@ E = 2k(l2-l)(r - (l2+l)/2) for r < l2"
 107,19,[U-13C; U-15N],Uniformly labeled with 13C and 15N at unknown percentages
 107,20,[U-100% 13C; U-100% 15N; U-80% 2H],enumeration_text
 107,21,"[U-13C; U-15N; U-2H; 99% 1HD-Ile,Leu; 99% 1HG-Val]",Uniformly labeled with 13C and 15N and 2H with ILV methyls 1H labeled
-107,22,[U-13C; U-15N; U-2H],Uniformly labeled with 13C$ 15N$ and 2H at unknown percentages
+107,22,[U-13C; U-15N; U-2H],"Uniformly labeled with 13C, 15N, and 2H at unknown percentages"
 107,23,[U-100% 2H],enumeration_text
 107,24,[U-99% 2H],enumeration_text
 107,25,[U-2H],enumeration_text
@@ -3762,26 +3762,26 @@ E = 2k(l2-l)(r - (l2+l)/2) for r < l2"
 109,3,pD,Reading for a D2O solution measured with a glass electrode filled with D2O. No unit is required.
 109,4,temperature,Preferred unit is Kelvin (K)
 109,5,pressure,Preferred unit is bar (10^5 Pa)
-109,6,ionic strength,I = 1/2 of the summation of C(i) times Z(i)^2$ where the summation is taken over all of the different ions (i) in a solution$ multiplying the molarity C(i) by the square of the charge Z(i). Preferred unit is M (mol/l)
+109,6,ionic strength,"I = 1/2 of the summation of C(i) times Z(i)^2, where the summation is taken over all of the different ions (i) in a solution, multiplying the molarity C(i) by the square of the charge Z(i). Preferred unit is M (mol/l)"
 109,7,viscosity,"dynamic viscosity is Pa.s which equals (kg) x (m^-1) x (s^-1)
 1 poise (P) is (g) x (cm^-1) x (s^-1)
 1 centipoise (cP) is 10^-3 kg.m^-1.s^-1
 kinematic viscosity is m^2/s or (m^2) x (s^-1)"
 109,8,dielectric constant,Pure water at 298 K has a dielectric constant of 78.54. No unit is required.
-109,9,temperature controller setting,For solid-state experiments$ this is the temperature setting on the NMR spectrometer control unit.
-110,1,Pa,Pascal$ 1 Pa = 1 N m^-2
-110,2,bar,bar$ 1 bar = 10^5 Pa
-110,3,atm,atmosphere$ 1 atm = 1.01325 * 10^5 Pa$ atm is not a SI unit
-110,4,mmHg,millimetres of mercury$ 1 mmHg = 133.3224 Pa$ mmHg is not a SI unit
-110,5,Torr,Torricelli$ 1 Torr = 133.322 Pa$ Torr is not a SI unit
+109,9,temperature controller setting,"For solid-state experiments, this is the temperature setting on the NMR spectrometer control unit."
+110,1,Pa,"Pascal, 1 Pa = 1 N m^-2"
+110,2,bar,"bar, 1 bar = 10^5 Pa"
+110,3,atm,"atmosphere, 1 atm = 1.01325 * 10^5 Pa, atm is not a SI unit"
+110,4,mmHg,"millimetres of mercury, 1 mmHg = 133.3224 Pa, mmHg is not a SI unit"
+110,5,Torr,"Torricelli, 1 Torr = 133.322 Pa, Torr is not a SI unit"
 110,6,mbar,millibar
 110,7,K,Kelvin
 110,8,C,"Celsius
 1 degree Celcius equals 1 K but is always 273.150 lower.
 E.g. 25.000 C equals 298.150 K."
 110,9,pH,unit of pH
-110,10,M,Molar$ concentration unit for ionic strength
-110,11,mM,milimolar$ concentration unit for ionic strength
+110,10,M,"Molar, concentration unit for ionic strength"
+110,11,mM,"milimolar, concentration unit for ionic strength"
 110,12,P,Poise
 110,13,cP,Centipoise
 110,14,m^2/s,kinematic viscosity
@@ -3828,10 +3828,10 @@ E.g. 25.000 C equals 298.150 K."
 144,1,ml,enumeration_text
 32,1,not applicable,enumeration_text
 32,2,Accelerated Technologies Center for Gene to 3D Structure,enumeration_text
-32,3,Assembly$ Dynamics and Evolution of Cell-Cell and Cell-Matrix Adhesions,enumeration_text
+32,3,"Assembly, Dynamics and Evolution of Cell-Cell and Cell-Matrix Adhesions",enumeration_text
 32,4,Atoms-to-Animals: The Immune Function Network,enumeration_text
 32,5,Architecture and Function of Biological Macromolecules Structure Genomics,ASG
-32,6,Bacterial targets at IGS-CNRS$ France,enumeration_text
+32,6,"Bacterial targets at IGS-CNRS, France",enumeration_text
 32,7,Berkeley Structural Genomics Center,BSGC
 32,8,Center for Eukaryotic Structural Genomics,CESG
 32,9,Center for High-Throughput Structural Biology,enumeration_text
@@ -3927,8 +3927,8 @@ E.g. 25.000 C equals 298.150 K."
 31,1,not applicable,enumeration_text
 31,2,Enzyme Function Initiative,enumeration_text
 31,3,PSI:Biology,enumeration_text
-31,4,PSI$ Protein Structure Initiative,enumeration_text
-31,5,NPPSFA$ National Project on Protein Structural and Functional Analyses,enumeration_text
+31,4,"PSI, Protein Structure Initiative",enumeration_text
+31,5,"NPPSFA, National Project on Protein Structural and Functional Analyses",enumeration_text
 31,6,SPINE,enumeration_text
 31,7,SPINE2,enumeration_text
 31,8,Protein 3000,enumeration_text
@@ -4570,8 +4570,8 @@ E.g. 25.000 C equals 298.150 K."
 207,1,isotropic,enumeration_text
 207,2,anisotropic,enumeration_text
 207,3,solid,enumeration_text
-205,1,Iz,zero quantum$ longitudinal
-205,2,Sz,zero quantum$ longitudinal
+205,1,Iz,"zero quantum, longitudinal"
+205,2,Sz,"zero quantum, longitudinal"
 206,1,s,enumeration_text
 206,2,s-1,enumeration_text
 206,3,ms,enumeration_text
@@ -4582,8 +4582,8 @@ E.g. 25.000 C equals 298.150 K."
 222,1,s-1,enumeration_text
 222,2,ms-1,enumeration_text
 222,3,us-1,enumeration_text
-220,1,I(+$-),enumeration_text
-220,2,S(+$-),enumeration_text
+220,1,"I(+,-)",enumeration_text
+220,2,"S(+,-)",enumeration_text
 221,1,s-1,enumeration_text
 221,2,ms-1,enumeration_text
 221,3,s,enumeration_text
@@ -4658,65 +4658,65 @@ E = 2k(l2-l)(r - (l2+l)/2) for r < l2"
 6,1,NMR-STAR 3.2,enumeration_text
 6,2,NMR-STAR 3.1,enumeration_text
 6,3,NMR-STAR 2.1,enumeration_text
-114,1,(ACME) - Delaglio$ Zhengrong and Bax,enumeration_text
-114,2,(AMBER) - Case$ Darden$ Cheatham$ III$ Simmerling$ Wang$ Duke$ Luo$ ... and Kollman,enumeration_text
+114,1,"(ACME) - Delaglio, Zhengrong and Bax",enumeration_text
+114,2,"(AMBER) - Case, Darden, Cheatham, III, Simmerling, Wang, Duke, Luo, ... and Kollman",enumeration_text
 114,3,(ANSIG) - Kraulis,enumeration_text
 114,4,(Analysis) - CCPN,enumeration_text
-114,5,(AQUA) - Rullmann$ Doreleijers and Kaptein,enumeration_text
-114,6,(ARIA) - Linge$ O'Donoghue and Nilges,enumeration_text
-114,7,(AURELIA) - Neidig$ Geyer$ Gorler$ Antz$ Saffrich$ Beneicke$ Kalbitzer,enumeration_text
+114,5,"(AQUA) - Rullmann, Doreleijers and Kaptein",enumeration_text
+114,6,"(ARIA) - Linge, O'Donoghue and Nilges",enumeration_text
+114,7,"(AURELIA) - Neidig, Geyer, Gorler, Antz, Saffrich, Beneicke, Kalbitzer",enumeration_text
 114,8,(AUREMOL) - Bruker Biospin,enumeration_text
-114,9,(AutoAssign) - Zimmerman$ Moseley$ Kulikowski and Montelione,enumeration_text
-114,10,(AutoStruct) - Huang$ Tejero$ Powers and Montelione,enumeration_text
+114,9,"(AutoAssign) - Zimmerman, Moseley, Kulikowski and Montelione",enumeration_text
+114,10,"(AutoStruct) - Huang, Tejero, Powers and Montelione",enumeration_text
 114,11,(AVS) - Moseley and Montelione,enumeration_text
 114,12,(AZARA) - Boucher,enumeration_text
-114,13,(CANDID) - Herrmann$ Guntert and Wuthrich,enumeration_text
+114,13,"(CANDID) - Herrmann, Guntert and Wuthrich",enumeration_text
 114,14,(CAPP) - Garrett,enumeration_text
 114,15,(CARA) - Keller and Wuthrich,enumeration_text
 114,16,(CcpNMR) - CCPN,enumeration_text
-114,17,(CNS) - Brunger$ Adams$ Clore$ Gros$ Nilges and Read,enumeration_text
-114,18,(CS-Rosetta) - Shen$ Vernon$ Baker and Bax,enumeration_text
-114,19,(CYANA) -  Guntert$ Mumenthaler and Wuthrich,enumeration_text
+114,17,"(CNS) - Brunger, Adams, Clore, Gros, Nilges and Read",enumeration_text
+114,18,"(CS-Rosetta) - Shen, Vernon, Baker and Bax",enumeration_text
+114,19,"(CYANA) -  Guntert, Mumenthaler and Wuthrich",enumeration_text
 114,20,(DGII) - Accelrys Software Inc.,enumeration_text
-114,21,(DIANA) - Guntert$ Braun and Wuthrich,enumeration_text
+114,21,"(DIANA) - Guntert, Braun and Wuthrich",enumeration_text
 114,22,(DISCOVER) - Accelrys Software Inc.,enumeration_text
 114,23,(DSPACE) - Hare,enumeration_text
-114,24,(DYANA) - Guntert$ Braun and Wuthrich,enumeration_text
+114,24,"(DYANA) - Guntert, Braun and Wuthrich",enumeration_text
 114,25,(DYNAMO) - Delaglio and Kuszewski,enumeration_text
-114,26,(EMBOSS - Rice$ Longden and Bleasby,enumeration_text
+114,26,"(EMBOSS - Rice, Longden and Bleasby",enumeration_text
 114,27,(FANTOM) - Braun,enumeration_text
 114,28,(Felix) - Accelrys Software Inc.,enumeration_text
-114,29,(GARANT) - Bartels$ Guntert$ Billeter and Wuthrich,enumeration_text
-114,30,(Gaussian) - Gaussian$ Inc.,enumeration_text
+114,29,"(GARANT) - Bartels, Guntert, Billeter and Wuthrich",enumeration_text
+114,30,"(Gaussian) - Gaussian, Inc.",enumeration_text
 114,31,(GIFA) - Delsuc,enumeration_text
 114,32,(GROMOS) - van Gunsteren and Berendsen,enumeration_text
 114,33,(HADDOCK) - Alexandre Bonvin,enumeration_text
-114,34,(HYPER) - Tejero$ Monleon$ Celda$ Powers and Montelione,enumeration_text
+114,34,"(HYPER) - Tejero, Monleon, Celda, Powers and Montelione",enumeration_text
 114,35,(InsightII) -  Accelrys Software Inc.,enumeration_text
 114,36,(ModelFree) - Palmer,enumeration_text
-114,37,(Molmol) - Koradi$ Billeter and Wuthrich,enumeration_text
+114,37,"(Molmol) - Koradi, Billeter and Wuthrich",enumeration_text
 114,38,(MOLPROBITY) - Richardson,enumeration_text
 114,39,(MORASS) - Luxon,enumeration_text
 114,40,(NDEE) - Roesch and Herrmann,enumeration_text
 114,41,(NMRbox) - UConn Health Center,enumeration_text
-114,42,(NMRDraw) - Delaglio$ Grzesiek$ Vuister$ Zhu$ Pfeifer and Bax,enumeration_text
-114,43,(NMRPipe) - Delaglio$ Grzesiek$ Vuister$ Zhu$ Pfeifer and Bax,enumeration_text
-114,44,(NMRView) - Johnson$ One Moon Scientific,enumeration_text
+114,42,"(NMRDraw) - Delaglio, Grzesiek, Vuister, Zhu, Pfeifer and Bax",enumeration_text
+114,43,"(NMRPipe) - Delaglio, Grzesiek, Vuister, Zhu, Pfeifer and Bax",enumeration_text
+114,44,"(NMRView) - Johnson, One Moon Scientific",enumeration_text
 114,45,(NUTS) - Acorn NMR Inc.,enumeration_text
-114,46,(OPAL) - Luginbuhl$ Guntert$ Billeter and Wuthrich,enumeration_text
-114,47,(PECAN) - Eghbalnia$ Wang$ Bahrami$ Assadi$ and Markley,enumeration_text
-114,48,(PINE) - Bahrami$ Markley$ Assadi$ and Eghbalnia,enumeration_text
+114,46,"(OPAL) - Luginbuhl, Guntert, Billeter and Wuthrich",enumeration_text
+114,47,"(PECAN) - Eghbalnia, Wang, Bahrami, Assadi, and Markley",enumeration_text
+114,48,"(PINE) - Bahrami, Markley, Assadi, and Eghbalnia",enumeration_text
 114,49,(PIPP) - Garrett,enumeration_text
-114,50,(PISTACHIO) - Eghbalnia$ Bahrami$ Wang$ Assadi and Markley,enumeration_text
-114,51,(Procheck) - Laskowski$ MacArthur$ Smith$ Jones$ Hutchinson$ Morris$ Moss and Thornton,enumeration_text
+114,50,"(PISTACHIO) - Eghbalnia, Bahrami, Wang, Assadi and Markley",enumeration_text
+114,51,"(Procheck) - Laskowski, MacArthur, Smith, Jones, Hutchinson, Morris, Moss and Thornton",enumeration_text
 114,52,(ProcheckNMR) - Laskowski and MacArthur,enumeration_text
 114,53,(P-ROI) - Kohda,enumeration_text
-114,54,(PRONTO) - Kjur$ Andersen and Poulsen,enumeration_text
+114,54,"(PRONTO) - Kjur, Andersen and Poulsen",enumeration_text
 114,55,(PROSA) - Guntert,enumeration_text
 114,56,(PSVS) - Bhattacharya and Montelione,enumeration_text
-114,57,(QUEEN) - Nabuurs$ Spronk$ Krieger$ Maassen$ Vriend and Vuister,enumeration_text
+114,57,"(QUEEN) - Nabuurs, Spronk, Krieger, Maassen, Vriend and Vuister",enumeration_text
 114,58,(RESCUE) - Pons and Delsuc,enumeration_text
-114,59,(SANE) - Duggan$ Legge$ Dyson & Wright,enumeration_text
+114,59,"(SANE) - Duggan, Legge, Dyson & Wright",enumeration_text
 114,60,(SPARKY) - Goddard,enumeration_text
 114,61,(SPARTA) - Shen and Bax,enumeration_text
 114,62,(SPARTA+) - Shen and Bax,enumeration_text
@@ -4724,7 +4724,7 @@ E = 2k(l2-l)(r - (l2+l)/2) for r < l2"
 114,64,(STAPP) - Garrett,enumeration_text
 114,65,(Surflex-Dock) - Tripos,enumeration_text
 114,66,(SYBYL) - Tripos,enumeration_text
-114,67,(TALOS) - Cornilescu$ Delaglio and Bax,enumeration_text
+114,67,"(TALOS) - Cornilescu, Delaglio and Bax",enumeration_text
 114,68,(TINKER) - Ponder,enumeration_text
 114,69,(TOPSPIN) - Bruker Biospin,enumeration_text
 114,70,(TRIAD) - Tripos,enumeration_text
@@ -4735,6 +4735,6 @@ E = 2k(l2-l)(r - (l2+l)/2) for r < l2"
 114,75,(Wattos) - Doreleijers,enumeration_text
 114,76,(XEASY) - Bartels et al.,enumeration_text
 114,77,(X-PLOR) - Brunger,enumeration_text
-114,78,(X-PLOR NIH) - Schwieters$ Kuszewski$ Tjandra and Clore,enumeration_text
+114,78,"(X-PLOR NIH) - Schwieters, Kuszewski, Tjandra and Clore",enumeration_text
 114,79,(xwinnmr) - Bruker Biospin,enumeration_text
 TBL_END,?,?,?
