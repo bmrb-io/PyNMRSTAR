@@ -12,7 +12,7 @@ from gzip import GzipFile
 from importlib.metadata import version
 from io import StringIO, BytesIO
 from pathlib import Path
-from typing import Dict, Union, IO, List, Optional, Tuple
+from typing import Dict, Union, IO, List, Tuple
 from urllib.error import URLError
 
 import requests
@@ -425,23 +425,3 @@ def parse_warning(message: str) -> bool:
         raise pynmrstar.exceptions.ParsingError(message)
     logger.warning(message)
     return True
-
-
-def record_structural_error(kind: str, tag: str, saveframe: str) -> None:
-    """Note which tag a structural parse failure was about.
-
-    ``Saveframe.add_tag`` detects these, but it raises a plain ``ValueError``
-    that crosses the Rust parser boundary as a string -- any attribute attached
-    to the exception is lost on the way. A thread-local note survives, which is
-    what lets :func:`pynmrstar.parser.parse` work out the line number.
-    """
-
-    _parse_state.structural_error = {'kind': kind, 'tag': tag, 'saveframe': saveframe}
-
-
-def take_structural_error() -> Optional[dict]:
-    """Pop the note left by :func:`record_structural_error`, if any."""
-
-    error = getattr(_parse_state, 'structural_error', None)
-    _parse_state.structural_error = None
-    return error

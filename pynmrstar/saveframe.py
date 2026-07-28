@@ -577,7 +577,6 @@ class Saveframe(object):
                 if self.tag_prefix is None:
                     self.tag_prefix = prefix
                 elif self.tag_prefix != prefix:
-                    _internal.record_structural_error('foreign_prefix', name, self.name)
                     raise ValueError(
                         "One saveframe cannot have tags with different categories (or tags that don't "
                         f"match the set category)! Saveframe tag prefix is '{self.tag_prefix}' but the added tag, "
@@ -597,7 +596,6 @@ class Saveframe(object):
         tag_name_lower = name.lower()
         if tag_name_lower in self._lc_tags:
             if not update:
-                _internal.record_structural_error('duplicate_tag', f'{self.tag_prefix}.{name}', self.name)
                 raise ValueError(f"There is already a tag with the name '{name}' in the saveframe '{self.name}."
                                  f" Set update=True if you want to override its value.")
             else:
