@@ -23,6 +23,7 @@ from pynmrstar.entry import Entry
 from pynmrstar.loop import Loop
 from pynmrstar.saveframe import Saveframe
 from pynmrstar.schema import Schema
+from pynmrstar.validation import Severity, ValidationIssue
 
 # Set up logging
 logger = logging.getLogger('pynmrstar')
@@ -35,4 +36,5 @@ del entry
 del saveframe
 del schema
 
-__all__ = ['Loop', 'Saveframe', 'Entry', 'Schema', 'definitions', 'utils', '__version__', 'exceptions']
+__all__ = ['Loop', 'Saveframe', 'Entry', 'Schema', 'Severity', 'ValidationIssue',
+           'definitions', 'utils', '__version__', 'exceptions']

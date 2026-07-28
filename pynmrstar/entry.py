@@ -10,6 +10,7 @@ from pynmrstar import definitions, utils, loop as loop_mod, saveframe as savefra
 from pynmrstar._internal import _json_serialize, _interpret_file, _get_entry_from_database, write_to_file
 from pynmrstar.exceptions import InvalidStateError
 from pynmrstar.schema import Schema
+from pynmrstar.validation import Severity, ValidationIssue, check_saveframes
 
 logger = logging.getLogger('pynmrstar')
 
@@ -907,6 +908,47 @@ class Entry(object):
                         if val == old_reference:
                             each_row[pos] = new_reference
 
+    def validate_full(self, schema: Schema = None, profile: str = None,
+                      severities: Sequence[str] = None) -> List[ValidationIssue]:
+        """Validate the entry against the NMR-STAR dictionary, returning a list
+        of :class:`pynmrstar.validation.ValidationIssue`.
+
+        This supersedes :meth:`validate`. It differs in two ways that matter:
+
+        * **It returns structured findings rather than strings**, so a caller can
+          filter by severity, identify a finding across runs by its ``check``
+          name, and locate the tag it came from.
+        * **It is entry-wide.** The dictionary's mandatory rules are conditional
+          -- whether a tag is required can depend on the value of a tag in a
+          *different* saveframe -- so they cannot be evaluated one saveframe at a
+          time. ``Saveframe.validate()`` and ``Loop.validate()`` remain for the
+          checks that genuinely are per-object.
+
+        :param schema: The schema to validate against; the cached one by default.
+        :param profile: Which set of the dictionary's validation flags to apply
+            (see ``definitions.VALIDATION_PROFILES``). Defaults to ``public``,
+            the requirements of the public archive. BMRB's annotation tooling
+            uses ``internal``.
+        :param severities: Restrict the result to these severities. By default
+            every severity is returned except :attr:`Severity.STRICT`, which
+            holds dictionary violations that BMRB's own validator does not
+            report -- opt into those explicitly.
+        """
+
+        my_schema: Schema = utils.get_schema(schema)
+        if profile is None:
+            profile = definitions.DEFAULT_VALIDATION_PROFILE
+
+        if severities is None:
+            wanted = {_ for _ in Severity if _ != Severity.STRICT}
+        else:
+            wanted = {Severity(_) for _ in severities}
+
+        issues: List[ValidationIssue] = []
+        issues.extend(check_saveframes(self, my_schema, profile))
+
+        return [_ for _ in issues if _.severity in wanted]
+
     def validate(self, validate_schema: bool = True, schema: Schema = None,
                  validate_star: bool = True) -> List[str]:
         """Validate an entry in a variety of ways. Returns a list of
@@ -917,7 +959,19 @@ class Entry(object):
         the NMR-STAR schema. You can pass your own custom schema if desired,
         otherwise the cached schema will be used.
 
-        validate_star - Determines if the STAR syntax checks are ran."""
+        validate_star - Determines if the STAR syntax checks are ran.
+
+        .. deprecated::
+            Use :meth:`validate_full`, which returns structured findings and can
+            evaluate the dictionary's conditional mandatory rules. This method
+            returns plain strings and checks each saveframe independently, so it
+            cannot express either.
+        """
+
+        warnings.warn('Entry.validate() is deprecated; use Entry.validate_full(), which returns '
+                      'structured ValidationIssue objects and applies the dictionary\'s '
+                      'entry-wide conditional rules.',
+                      DeprecationWarning, stacklevel=2)
 
         errors = []
 

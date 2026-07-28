@@ -2,10 +2,11 @@
 import os
 import random
 import unittest
+import warnings
 from copy import deepcopy as copy
 from pathlib import Path
 
-from pynmrstar import Entry, Saveframe, Loop
+from pynmrstar import Entry, Saveframe, Loop, Severity
 from pynmrstar.exceptions import ParsingError
 
 our_path = os.path.dirname(os.path.realpath(__file__))
@@ -117,7 +118,59 @@ class TestEntry(unittest.TestCase):
         self.assertEqual(self.file_entry.get_tag("entry.Submission_date", whole_tag=True),
                          [[u'Submission_date', u'2006-09-07']])
 
+    def test_validate_full(self):
+        # A real archived entry is structurally clean
+        self.assertEqual(self.file_entry.validate_full(), [])
+
+        entry = copy(self.file_entry)
+
+        # The Sf_framecode tag disagreeing with the saveframe's own name. Set it
+        # through the tag rather than through .name, which keeps the two in step.
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+        frame.get_tag('Sf_framecode', whole_tag=True)[0][1] = 'something_else'
+        issues = entry.validate_full()
+        self.assertEqual([_.check for _ in issues], ['saveframe.framecode_mismatch'])
+        self.assertEqual(issues[0].severity, Severity.ERROR)
+        self.assertEqual(issues[0].saveframe, frame.name)
+        self.assertEqual(issues[0].value, 'something_else')
+        self.assertEqual(issues[0].tag, '_Entry.Sf_framecode')
+
+        # An Sf_category value that disagrees with the dictionary. The category
+        # a saveframe *is* comes from its tags, so this is a wrong value, not a
+        # different category -- nothing else should be reported.
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+        frame.get_tag('Sf_category', whole_tag=True)[0][1] = 'not_a_category'
+        issues = entry.validate_full()
+        self.assertEqual([_.check for _ in issues], ['saveframe.invalid_category'])
+        self.assertEqual(issues[0].category, 'entry_information')
+
+        # A missing mandatory saveframe category
+        entry = copy(self.file_entry)
+        entry.remove_saveframe(entry.get_saveframes_by_category('citations')[0])
+        issues = entry.validate_full()
+        self.assertIn('saveframe.missing_mandatory_category', [_.check for _ in issues])
+
+        # Profiles differ, and an unknown one is rejected
+        self.assertEqual(self.file_entry.validate_full(profile='internal'), [])
+        self.assertRaises(ValueError, self.file_entry.validate_full, profile='nope')
+
+        # Severity filtering
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+        frame.get_tag('Sf_framecode', whole_tag=True)[0][1] = 'something_else'
+        self.assertEqual(entry.validate_full(severities=['warning']), [])
+        self.assertEqual(len(entry.validate_full(severities=['error'])), 1)
+
+    def test_validate_deprecated(self):
+        # validate() still works, but says it is on the way out
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            self.file_entry.validate()
+        self.assertTrue(any(issubclass(_.category, DeprecationWarning) for _ in caught))
+
     def test_validate(self):
+        warnings.simplefilter("ignore", DeprecationWarning)
         # The sample entry spells two enumeration values with different
         # capitalization than the dictionary does
         validation = ["Value 'non-polymer' of tag '_Chem_comp.Type' is improperly capitalized but otherwise "
