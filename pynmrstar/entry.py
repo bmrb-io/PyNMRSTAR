@@ -10,7 +10,7 @@ from pynmrstar import definitions, utils, loop as loop_mod, saveframe as savefra
 from pynmrstar._internal import _json_serialize, _interpret_file, _get_entry_from_database, write_to_file
 from pynmrstar.exceptions import InvalidStateError
 from pynmrstar.schema import Schema
-from pynmrstar.validation import Severity, ValidationIssue, check_saveframes
+from pynmrstar.validation import Severity, ValidationIssue, check_saveframes, check_mandatory_tags
 
 logger = logging.getLogger('pynmrstar')
 
@@ -946,6 +946,7 @@ class Entry(object):
 
         issues: List[ValidationIssue] = []
         issues.extend(check_saveframes(self, my_schema, profile))
+        issues.extend(check_mandatory_tags(self, my_schema, profile))
 
         return [_ for _ in issues if _.severity in wanted]
 

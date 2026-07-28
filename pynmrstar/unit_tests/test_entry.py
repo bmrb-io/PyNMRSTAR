@@ -119,8 +119,14 @@ class TestEntry(unittest.TestCase):
                          [[u'Submission_date', u'2006-09-07']])
 
     def test_validate_full(self):
+        def structural(entry, **kwargs):
+            """Only the saveframe-structure findings. An archived entry is
+            structurally clean but does not carry every tag the dictionary
+            wants, so the mandatory-tag findings are a separate question."""
+            return [_ for _ in entry.validate_full(**kwargs) if _.check.startswith('saveframe.')]
+
         # A real archived entry is structurally clean
-        self.assertEqual(self.file_entry.validate_full(), [])
+        self.assertEqual(structural(self.file_entry), [])
 
         entry = copy(self.file_entry)
 
@@ -128,7 +134,7 @@ class TestEntry(unittest.TestCase):
         # through the tag rather than through .name, which keeps the two in step.
         frame = entry.get_saveframes_by_category('entry_information')[0]
         frame.get_tag('Sf_framecode', whole_tag=True)[0][1] = 'something_else'
-        issues = entry.validate_full()
+        issues = structural(entry)
         self.assertEqual([_.check for _ in issues], ['saveframe.framecode_mismatch'])
         self.assertEqual(issues[0].severity, Severity.ERROR)
         self.assertEqual(issues[0].saveframe, frame.name)
@@ -141,18 +147,21 @@ class TestEntry(unittest.TestCase):
         entry = copy(self.file_entry)
         frame = entry.get_saveframes_by_category('entry_information')[0]
         frame.get_tag('Sf_category', whole_tag=True)[0][1] = 'not_a_category'
-        issues = entry.validate_full()
+        issues = structural(entry)
         self.assertEqual([_.check for _ in issues], ['saveframe.invalid_category'])
         self.assertEqual(issues[0].category, 'entry_information')
 
         # A missing mandatory saveframe category
         entry = copy(self.file_entry)
         entry.remove_saveframe(entry.get_saveframes_by_category('citations')[0])
-        issues = entry.validate_full()
+        issues = structural(entry)
         self.assertIn('saveframe.missing_mandatory_category', [_.check for _ in issues])
 
-        # Profiles differ, and an unknown one is rejected
-        self.assertEqual(self.file_entry.validate_full(profile='internal'), [])
+        # Profiles differ, and an unknown one is rejected. The internal view is
+        # stricter than the public one, so it wants strictly more tags.
+        self.assertEqual(structural(self.file_entry, profile='internal'), [])
+        self.assertGreater(len(self.file_entry.validate_full(profile='internal')),
+                           len(self.file_entry.validate_full(profile='public')))
         self.assertRaises(ValueError, self.file_entry.validate_full, profile='nope')
 
         # Severity filtering
@@ -160,7 +169,42 @@ class TestEntry(unittest.TestCase):
         frame = entry.get_saveframes_by_category('entry_information')[0]
         frame.get_tag('Sf_framecode', whole_tag=True)[0][1] = 'something_else'
         self.assertEqual(entry.validate_full(severities=['warning']), [])
-        self.assertEqual(len(entry.validate_full(severities=['error'])), 1)
+        self.assertEqual(len(structural(entry, severities=['error'])), 1)
+
+    def test_validate_full_mandatory(self):
+        entry = copy(self.file_entry)
+        checks = lambda: [_ for _ in entry.validate_full(profile='internal') if _.check.startswith('tag.')]
+
+        # Emptying a value-mandatory tag is reported as a missing value, and
+        # removing it outright as a missing tag -- two different findings.
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+        frame.get_tag('_Entry.Title', whole_tag=True)[0][1] = '.'
+        found = [_ for _ in checks() if _.tag == '_Entry.Title']
+        self.assertEqual([_.check for _ in found], ['tag.missing_value'])
+
+        frame.remove_tag('Title')
+        found = [_ for _ in checks() if _.tag == '_Entry.Title']
+        self.assertEqual([_.check for _ in found], ['tag.missing'])
+        self.assertEqual(found[0].saveframe, frame.name)
+        self.assertEqual(found[0].category, 'entry_information')
+
+    def test_validate_full_conditional(self):
+        # _Citation.Journal_abbrev is required only of a journal citation, so
+        # changing the citation's type changes whether its absence is reported.
+        entry = copy(self.file_entry)
+        citation = entry.get_saveframes_by_category('citations')[0]
+        citation.get_tag('_Citation.Class', whole_tag=True)[0][1] = 'entry citation'
+
+        def abbrev_reported():
+            return any(_.tag == '_Citation.Journal_abbrev'
+                       for _ in entry.validate_full(profile='internal'))
+
+        citation.get_tag('_Citation.Type', whole_tag=True)[0][1] = 'journal'
+        citation.remove_tag('Journal_abbrev')
+        self.assertTrue(abbrev_reported())
+
+        citation.get_tag('_Citation.Type', whole_tag=True)[0][1] = 'thesis'
+        self.assertFalse(abbrev_reported())
 
     def test_validate_deprecated(self):
         # validate() still works, but says it is on the way out
