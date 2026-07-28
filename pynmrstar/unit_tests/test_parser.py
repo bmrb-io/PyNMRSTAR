@@ -169,3 +169,45 @@ save_
 
         saveframe = Saveframe.from_scratch('the_name', tag_prefix='_sf')
         self.assertRaises(ValueError, saveframe.add_tag, '_sf.Sf_framecode', 'a_different_name')
+
+    def test_structural_error_line_numbers(self):
+        """A file that will not parse must still say *where*.
+
+        These two problems are detected while building the object model rather
+        than while tokenizing, so the line number has to be recovered from the
+        source. Without it a caller is told only that the file is bad."""
+
+        duplicate = ("data_test\n\nsave_entry_information\n"
+                     "    _Entry.Sf_category    entry_information\n"
+                     "    _Entry.Sf_framecode   entry_information\n"
+                     "    _Entry.Title          'first title'\n"
+                     "    _Entry.Title          'second title'\n"
+                     "save_\n")
+        with self.assertRaises(ParsingError) as caught:
+            Entry.from_string(duplicate)
+        # The *second* occurrence is the offending one
+        self.assertEqual(caught.exception.line_number, 7)
+
+        foreign = ("data_test\n\nsave_entry_information\n"
+                   "    _Entry.Sf_category    entry_information\n"
+                   "    _Entry.Sf_framecode   entry_information\n"
+                   "    _Entry.Title          'a title'\n"
+                   "    _Citation.Class       journal\n"
+                   "save_\n")
+        with self.assertRaises(ParsingError) as caught:
+            Entry.from_string(foreign)
+        self.assertEqual(caught.exception.line_number, 7)
+
+        # A tag name quoted inside a semicolon block is not the tag itself: the
+        # duplicate is line 11, not the 10 it would be if line 8 had counted.
+        semicolon = ("data_test\n\nsave_entry_information\n"
+                     "    _Entry.Sf_category    entry_information\n"
+                     "    _Entry.Sf_framecode   entry_information\n"
+                     "    _Entry.Details\n;\n_Entry.Title is discussed here\n;\n"
+                     "    _Entry.Title          'first title'\n"
+                     "    _Entry.Title          'second title'\n"
+                     "save_\n")
+        with self.assertRaises(ParsingError) as caught:
+            Entry.from_string(semicolon)
+        self.assertEqual(caught.exception.line_number, 11)
+
