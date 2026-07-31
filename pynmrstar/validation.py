@@ -577,6 +577,85 @@ def _ordered_tags(saveframe, schema, category: Optional[str]):
                 yield full_tag, found, loop.category
 
 
+def _row_index_tag(loop, schema) -> Optional[str]:
+    """The tag that numbers a loop's rows, or ``None`` if it has none.
+
+    The dictionary marks one tag per loop category as its row index. A loop
+    whose category it does not recognise has no index to check."""
+
+    for tag in loop.tags:
+        tag_data = schema.schema.get(f'{loop.category}.{tag}'.lower())
+        if tag_data is not None and (tag_data.get('Row Index Key') or '').strip() == 'Y':
+            return tag
+    return None
+
+
+def check_row_indexes(entry, schema, profile: str) -> List[ValidationIssue]:
+    """Report loops whose row-index column does not count 1, 2, 3, ...
+
+    Ported from the BMRB validator's ``CheckRowIndexes`` (function 18) -- the
+    one check the original runs over the file directly rather than over the
+    database, which here makes no difference at all.
+
+    After a wrong index the expectation resyncs to *that* value plus one, so a
+    loop numbered from zero, or one with a row inserted, reports its first bad
+    row and not every row after it. A lone outlier consequently costs two
+    findings -- itself, and the row after it that goes back to counting where it
+    left off. Both behaviours are the original's, verified against it.
+
+    A negative index is neither "not a number" nor compared: the original
+    guards its comparison with ``index >= 0``, so a negative value only
+    advances the count. Reproduced rather than tidied -- it is the difference
+    between reporting a row and not, and quietly diverging on a real entry is
+    worse than an odd-looking branch.
+
+    ``profile`` is unused; it is accepted so that every entry-level check has
+    the same signature.
+    """
+
+    issues: List[ValidationIssue] = []
+
+    for saveframe in entry:
+        category = schema.schema.get(f'{saveframe.tag_prefix.lower()}.sf_category', {}).get('SFCategory')
+        if category is not None:
+            category = category.strip() or None
+
+        for loop in saveframe:
+            index_tag = _row_index_tag(loop, schema)
+            if index_tag is None:
+                continue
+
+            full_tag = f'{loop.category}.{index_tag}'
+            position = loop.tags.index(index_tag)
+            expected = 1
+
+            for number, row in enumerate(loop.data):
+                value = row[position] if position < len(row) else None
+                try:
+                    index = int(str(value))
+                except (TypeError, ValueError):
+                    issues.append(ValidationIssue(
+                        Severity.ERROR, 'row.index_not_a_number',
+                        f"Not a number: {value}({full_tag})",
+                        saveframe=saveframe.name, category=category, tag=full_tag,
+                        loop=loop.category, row=number, value=value))
+                    expected += 1
+                    continue
+
+                if index < 0:
+                    expected += 1
+                    continue
+                if index != expected:
+                    issues.append(ValidationIssue(
+                        Severity.ERROR, 'row.index_wrong',
+                        f"Incorrect row index, expected {expected}({full_tag})",
+                        saveframe=saveframe.name, category=category, tag=full_tag,
+                        loop=loop.category, row=number, value=value))
+                expected = index + 1
+
+    return issues
+
+
 def check_tag_order(entry, schema, profile: str) -> List[ValidationIssue]:
     """Report tags written out of the dictionary's order.
 

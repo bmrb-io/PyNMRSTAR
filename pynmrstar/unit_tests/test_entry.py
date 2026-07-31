@@ -266,6 +266,52 @@ class TestEntry(unittest.TestCase):
         self.assertIsNone(found[0].loop)
         self.assertIn('should be before', found[0].message)
 
+    def test_validate_full_row_indexes(self):
+        entry = copy(self.file_entry)
+        loop = entry.get_saveframes_by_category('entity')[0]['_Entity_comp_index']
+        column = loop.tag_index('ID')
+
+        def indexes():
+            return [_ for _ in entry.validate_full(profile='internal')
+                    if _.check.startswith('row.')]
+
+        # An archived entry numbers its rows 1, 2, 3, ...
+        self.assertEqual(indexes(), [])
+
+        # A non-numeric index
+        loop.data[2][column] = '.'
+        found = indexes()
+        self.assertEqual([_.check for _ in found], ['row.index_not_a_number'])
+        self.assertEqual(found[0].row, 2)
+        self.assertEqual(found[0].tag, '_Entity_comp_index.ID')
+        self.assertEqual(found[0].loop, '_Entity_comp_index')
+        loop.data[2][column] = '3'
+
+        # A lone wrong index costs two findings: the row itself, and the row
+        # after it, which goes back to counting from where it left off.
+        loop.data[2][column] = '99'
+        found = indexes()
+        self.assertEqual([_.check for _ in found], ['row.index_wrong'] * 2)
+        self.assertIn('expected 3', found[0].message)
+        self.assertIn('expected 100', found[1].message)
+        loop.data[2][column] = '3'
+
+        # A whole loop numbered from zero is reported once, not once per row:
+        # the count resyncs to the value actually found, and every row after
+        # the first is consistent with it.
+        for number, row in enumerate(loop.data):
+            row[column] = str(number)
+        found = indexes()
+        self.assertEqual([_.check for _ in found], ['row.index_wrong'])
+        self.assertIn('expected 1', found[0].message)
+        for number, row in enumerate(loop.data):
+            row[column] = str(number + 1)
+
+        # A negative index is neither "not a number" nor compared -- it only
+        # advances the count, which is what the original does.
+        loop.data[2][column] = '-1'
+        self.assertEqual(indexes(), [])
+
     def test_validate_full_conditional(self):
         # _Citation.Journal_abbrev is required only of a journal citation, so
         # changing the citation's type changes whether its absence is reported.
