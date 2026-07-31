@@ -188,6 +188,56 @@ class TestEntry(unittest.TestCase):
         self.assertEqual(found[0].saveframe, frame.name)
         self.assertEqual(found[0].category, 'entry_information')
 
+    def test_validate_full_invalid_tags(self):
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+
+        def invalid():
+            return [_ for _ in entry.validate_full(profile='internal')
+                    if _.check in ('tag.unknown', 'tag.miscapitalized', 'tag.free_in_loop',
+                                   'tag.duplicate', 'tag.invalid')]
+
+        # An archived entry uses no tag it should not
+        self.assertEqual(invalid(), [])
+
+        # A tag the dictionary has never heard of
+        frame.add_tag('_Entry.Bogus_invented_tag', 'fnord')
+        found = invalid()
+        self.assertEqual([_.check for _ in found], ['tag.unknown'])
+        self.assertEqual(found[0].tag, '_Entry.Bogus_invented_tag')
+        self.assertEqual(found[0].saveframe, frame.name)
+        frame.remove_tag('Bogus_invented_tag')
+
+        # A real tag spelled with the wrong capitalization. pynmrstar's own
+        # lookups ignore case, but the dictionary does not, so this is reported
+        # -- with the spelling it should have had.
+        submission_date = frame.get_tag('_Entry.Submission_date', whole_tag=True)[0]
+        submission_date[0] = 'SUBMISSION_date'
+        found = invalid()
+        self.assertEqual([_.check for _ in found], ['tag.miscapitalized'])
+        self.assertIn("Should be '_Entry.Submission_date'", found[0].message)
+        submission_date[0] = 'Submission_date'
+
+        # A tag the profile forbids outright. _Entry.Sf_ID is bookkeeping the
+        # internal view does not accept in the file.
+        frame.add_tag('_Entry.Sf_ID', '1')
+        self.assertEqual([_.check for _ in invalid()], ['tag.invalid'])
+        frame.remove_tag('Sf_ID')
+
+        # A loop whose columns are all tags the dictionary marks as free. That
+        # is one category, so it parses, but every column is misplaced -- and
+        # both columns are already free tags of this saveframe, so each is also
+        # reported as a duplicate, once per occurrence.
+        loop = Loop.from_scratch(category='_Entry')
+        loop.add_tag(['_Entry.Experimental_method', '_Entry.Origination'])
+        loop.add_data(['NMR', 'author'])
+        frame.add_loop(loop)
+        found = invalid()
+        self.assertEqual(sorted(_.check for _ in found),
+                         ['tag.duplicate'] * 4 + ['tag.free_in_loop'] * 2)
+        self.assertEqual({_.tag for _ in found},
+                         {'_Entry.Experimental_method', '_Entry.Origination'})
+
     def test_validate_full_conditional(self):
         # _Citation.Journal_abbrev is required only of a journal citation, so
         # changing the citation's type changes whether its absence is reported.
