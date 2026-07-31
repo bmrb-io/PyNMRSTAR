@@ -539,3 +539,73 @@ def check_invalid_tags(entry, schema, profile: str) -> List[ValidationIssue]:
                     saveframe=saveframe.name, category=category, tag=display, loop=loop))
 
     return issues
+
+
+def _ordered_tags(saveframe, schema, category: Optional[str]):
+    """Every tag of a saveframe in the order it is written, with its dictionary
+    sequence number.
+
+    Yields ``(full tag, sequence, loop category or None)``, skipping tags the
+    dictionary does not place in this saveframe's category -- those have no
+    sequence to compare, and are ``check_invalid_tags``' business anyway.
+
+    "The order it is written" is the order pynmrstar renders: a saveframe's own
+    tags, then each loop's declarations. The model does not record an original
+    interleaving of free tags and loops, which costs nothing here because the
+    validator normalizes the buffer before validating -- the render *is* the file
+    the line numbers refer to.
+    """
+
+    def sequence(full_tag: str) -> Optional[int]:
+        tag_data = schema.schema.get(full_tag.lower())
+        if tag_data is None or (tag_data.get('SFCategory') or '').strip() != category:
+            return None
+        raw = (tag_data.get('Dictionary sequence') or '').strip()
+        return int(raw) if raw.isdigit() else None
+
+    for tag in saveframe.tags:
+        full_tag = f'{saveframe.tag_prefix}.{tag[0]}'
+        found = sequence(full_tag)
+        if found is not None:
+            yield full_tag, found, None
+
+    for loop in saveframe:
+        for tag in loop.tags:
+            full_tag = f'{loop.category}.{tag}'
+            found = sequence(full_tag)
+            if found is not None:
+                yield full_tag, found, loop.category
+
+
+def check_tag_order(entry, schema, profile: str) -> List[ValidationIssue]:
+    """Report tags written out of the dictionary's order.
+
+    Ported from the BMRB validator's ``CheckTagOrder`` (function 5). Order is
+    only ever compared *within* a saveframe, and only against the tag
+    immediately before -- so a single misplaced tag is reported once, where
+    comparing against the highest sequence seen so far would report every tag
+    after it as well.
+
+    ``profile`` is unused; it is accepted so that every entry-level check has
+    the same signature.
+    """
+
+    issues: List[ValidationIssue] = []
+
+    for saveframe in entry:
+        category = schema.schema.get(f'{saveframe.tag_prefix.lower()}.sf_category', {}).get('SFCategory')
+        if category is not None:
+            category = category.strip() or None
+
+        previous_tag: Optional[str] = None
+        previous_sequence: Optional[int] = None
+        for full_tag, sequence, loop in _ordered_tags(saveframe, schema, category):
+            if previous_sequence is not None and sequence < previous_sequence:
+                issues.append(ValidationIssue(
+                    Severity.ERROR, 'tag.order',
+                    f"Invalid tag order: {full_tag} ({sequence}) should be before "
+                    f"{previous_tag} ({previous_sequence})",
+                    saveframe=saveframe.name, category=category, tag=full_tag, loop=loop))
+            previous_tag, previous_sequence = full_tag, sequence
+
+    return issues

@@ -238,6 +238,34 @@ class TestEntry(unittest.TestCase):
         self.assertEqual({_.tag for _ in found},
                          {'_Entry.Experimental_method', '_Entry.Origination'})
 
+    def test_validate_full_tag_order(self):
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+
+        def order():
+            return [_ for _ in entry.validate_full(profile='internal') if _.check == 'tag.order']
+
+        # An archived entry is written in dictionary order
+        self.assertEqual(order(), [])
+
+        # Move the fourth of four consecutive tags to the front of them, so the
+        # run reads 10, 40, 20, 30. Exactly one finding is right: order is
+        # compared against the tag immediately before, so only the tag that
+        # actually goes backwards is reported. Comparing against the highest
+        # sequence seen so far would report the two after it as well.
+        tags = frame.tags
+        start = next(i for i in range(len(tags) - 3)
+                     if not any('.' in tags[i + n][0] for n in range(4)))
+        run = tags[start:start + 4]
+        tags[start:start + 4] = [run[0], run[3], run[1], run[2]]
+
+        found = order()
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0].tag, f'{frame.tag_prefix}.{run[1][0]}')
+        self.assertEqual(found[0].saveframe, frame.name)
+        self.assertIsNone(found[0].loop)
+        self.assertIn('should be before', found[0].message)
+
     def test_validate_full_conditional(self):
         # _Citation.Journal_abbrev is required only of a journal citation, so
         # changing the citation's type changes whether its absence is reported.
