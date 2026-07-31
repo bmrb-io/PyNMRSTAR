@@ -11,9 +11,11 @@ it, suppress it, or render it in its own format.
 import enum
 import re
 from functools import lru_cache
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterator, List, NamedTuple, Optional
 
 from pynmrstar import definitions
+from pynmrstar._internal import _non_ascii_error
+from pynmrstar.schema import _is_valid_date
 
 __all__ = ['Severity', 'ValidationIssue']
 
@@ -1050,5 +1052,370 @@ def check_sample_saveframe(entry, schema, profile: str) -> List[ValidationIssue]
                         "must have a value",
                         saveframe=saveframe.name, category='sample',
                         tag='_Sample_component.Concentration_val', loop=loop.category, row=number))
+
+    return issues
+
+
+class _Value(NamedTuple):
+    """One value of an entry, with everything a finding needs to locate it."""
+
+    saveframe: str
+    category: Optional[str]
+    tag: str
+    loop: Optional[str]
+    row: Optional[int]
+    value: Any
+
+
+def _values(entry, schema, scope: '_MetadataScope') -> Iterator[_Value]:
+    """Every metadata value in an entry, saveframe tags and loop values alike.
+
+    The three per-value checks below all want the same walk, and all want it
+    over the same subset: what the historical validator loads into its database
+    is metadata only, so a check reading that database never sees a chemical
+    shift. Iterating in one place keeps the three in step, and keeps the cost of
+    a check proportional to the metadata rather than to the file.
+    """
+
+    for saveframe in entry:
+        category = _saveframe_category(schema, saveframe)
+
+        for tag, value in saveframe.tags:
+            full_tag = f'{saveframe.tag_prefix}.{tag}'
+            if scope.free(full_tag):
+                yield _Value(saveframe.name, category, full_tag, None, None, value)
+
+        for loop in saveframe:
+            if not scope.loop(loop.category):
+                continue
+            for position, tag in enumerate(loop.tags):
+                full_tag = f'{loop.category}.{tag}'
+                for number, row in enumerate(loop.data):
+                    if position < len(row):
+                        yield _Value(saveframe.name, category, full_tag,
+                                     loop.category, number, row[position])
+
+
+def _measured(value: str) -> str:
+    """A value without the newline that closed its ``;`` block.
+
+    A semicolon-delimited value ends ``...text\\n;``, and the parser keeps that
+    final newline. It is the delimiter rather than data -- the historical
+    validator's lexer drops it -- so a value that exactly fills its column would
+    otherwise look one character too long, and one that exactly matches an
+    enumeration would not match it.
+    """
+
+    return value[:-1] if value.endswith('\n') else value
+
+
+def _shown(value: str) -> str:
+    """A value as it can appear in a one-line message.
+
+    Findings are consumed a line at a time, so an embedded newline would split
+    one finding into two. The original mangles them (its replacement string is
+    read as an escape, so a newline becomes the letter ``n``); they are escaped
+    here instead."""
+
+    return _measured(value).replace('\n', '\\n').replace('\r', '\\r')
+
+
+def check_charset(entry, schema, profile: str) -> List[ValidationIssue]:
+    """Report values containing characters NMR-STAR cannot carry.
+
+    Ported from the BMRB validator's ``CheckCharset`` (function 19). The format
+    is ASCII, so anything outside ``0x00``-``0x7f`` is a finding -- most often a
+    typographic quote or a dash pasted in from a word processor.
+
+    The message names the offending characters and their code points, which the
+    original does not: they are frequently invisible in the file, and "there is
+    a non-ASCII character somewhere in this paragraph" is not actionable.
+
+    ``profile`` is unused; it is accepted so that every entry-level check has
+    the same signature.
+    """
+
+    issues: List[ValidationIssue] = []
+
+    for item in _values(entry, schema, _MetadataScope(schema)):
+        if item.value is None:
+            continue
+        text = str(item.value)
+        if text.isascii():
+            continue
+        issues.append(ValidationIssue(
+            Severity.ERROR, 'value.non_ascii', _non_ascii_error(item.tag, _shown(text)),
+            saveframe=item.saveframe, category=item.category, tag=item.tag,
+            loop=item.loop, row=item.row, value=item.value))
+
+    return issues
+
+
+def check_empty_rows(entry, schema, profile: str) -> List[ValidationIssue]:
+    """Report loop rows in which every value is null.
+
+    Ported from the BMRB validator's ``CheckEmptyRows`` (function 15). Such a
+    row carries no information and is almost always the residue of a deletion.
+
+    ``profile`` is unused; it is accepted so that every entry-level check has
+    the same signature.
+    """
+
+    issues: List[ValidationIssue] = []
+    scope = _MetadataScope(schema)
+
+    for saveframe in entry:
+        category = _saveframe_category(schema, saveframe)
+        for loop in saveframe:
+            if not scope.loop(loop.category):
+                continue
+            for number, row in enumerate(loop.data):
+                if row and all(value in definitions.NULL_VALUES for value in row):
+                    issues.append(ValidationIssue(
+                        Severity.ERROR, 'row.empty', "Empty loop row",
+                        saveframe=saveframe.name, category=category, loop=loop.category,
+                        row=number))
+
+    return issues
+
+
+def check_data_values(entry, schema, profile: str) -> List[ValidationIssue]:
+    """Report values outside the closed enumeration their tag allows.
+
+    Ported from the BMRB validator's ``CheckDataValues`` (function 12). Only
+    *closed* enumerations are enforced; an open one lists the values seen so far
+    and is advisory.
+
+    Matching is case-sensitive, as the original's is, but a value that is right
+    apart from its capitalization gets its own message naming the spelling to
+    use -- the same finding, with the fix in it. That case is not rare: a
+    quarter of archived entries contain at least one.
+
+    ``profile`` is unused; it is accepted so that every entry-level check has
+    the same signature.
+    """
+
+    issues: List[ValidationIssue] = []
+
+    for item in _values(entry, schema, _MetadataScope(schema)):
+        if item.value in definitions.NULL_VALUES:
+            continue
+        enumeration = schema.enumerations.get(item.tag.lower())
+        if enumeration is None or not enumeration['closed']:
+            continue
+        value = _measured(str(item.value))
+        if value in enumeration['values']:
+            continue
+
+        capitalized = enumeration['folded'].get(value.lower())
+        if capitalized is not None:
+            check = 'value.miscapitalized'
+            message = (f"Enumerated value is improperly capitalized: {_shown(value)}, should be "
+                       f"{capitalized} ({item.tag})")
+        else:
+            check = 'value.not_in_enumeration'
+            message = f"Enumerated value is not in the list: {_shown(value)} ({item.tag})"
+
+        issues.append(ValidationIssue(
+            Severity.ERROR, check, message, saveframe=item.saveframe, category=item.category,
+            tag=item.tag, loop=item.loop, row=item.row, value=item.value))
+
+    return issues
+
+
+#: The ISO date shape the historical validator's ``TypeChecker`` insists on.
+_ISO_DATE = re.compile(r'\d{4}-\d{2}-\d{2}')
+_DIGITS = frozenset('0123456789')
+#: A SQL type of the ``VARCHAR(n)`` family, whose ``n`` is a length limit.
+_SIZED_TYPE = re.compile(r'char(?:\((\d+)\))?$', re.IGNORECASE)
+_WHITESPACE = re.compile(r'\s')
+
+
+def _is_int(value: str) -> bool:
+    """Whether a value is an integer, by the historical validator's rule.
+
+    ``TypeChecker.isInt``: optional leading sign, then digits. It is written by
+    hand rather than with :func:`int` because the two disagree at the edges --
+    a bare ``+`` passes here, and ``int()`` accepts underscores and non-Latin
+    digits -- and a check that reports a value the original accepts is a false
+    positive on data that has always been considered clean.
+    """
+
+    for position, character in enumerate(value.strip()):
+        if character in '+-':
+            if position > 0:
+                return False
+        elif character not in _DIGITS:
+            return False
+    return True
+
+
+def _is_float(value: str) -> bool:
+    """Whether a value is a floating-point number, by the historical
+    validator's rule.
+
+    ``TypeChecker.isFloat``, transliterated: digits with at most one decimal
+    point and at most one exponent, a sign only at the start or straight after
+    the ``e``, and ``+inf``/``-inf``. Two of its quirks are load-bearing and are
+    kept -- a bare ``inf`` is *not* accepted (the sign is required), and the
+    ``i`` branch falls through to the decimal-point branch when the letters
+    after it are not ``nf``.
+    """
+
+    text = value.strip()
+    digit, exponent, dot, sign = 0, 1, 2, 3
+    seen_dot = seen_exponent = has_exponent = need_digit = False
+    previous = -1
+
+    for position, character in enumerate(text):
+        if character in '+-':
+            if need_digit:
+                return False
+            if position != 0 and text[position - 1] not in 'eE':
+                return False
+            previous = sign
+        elif character in 'eE':
+            if seen_exponent or need_digit:
+                return False
+            seen_exponent = True
+            previous = exponent
+        elif character in 'iI.':
+            if character in 'iI':
+                if position > 1 or previous != sign or position + 2 >= len(text):
+                    return False
+                if text[position + 1] in 'nN' and text[position + 2] in 'fF':
+                    return True
+                # Not "inf" after all; the original falls through to the '.' case.
+            if seen_dot:
+                return False
+            if previous != digit:
+                # "1." and "-.1" are fine, "-." is not: something has to follow.
+                if position + 1 >= len(text):
+                    return False
+                need_digit = True
+            seen_dot = True
+            previous = dot
+        elif character in _DIGITS:
+            if seen_exponent:
+                has_exponent = True
+            need_digit = False
+            previous = digit
+        else:
+            return False
+
+    return not (seen_exponent and not has_exponent)
+
+
+def _is_iso_date(value: str) -> bool:
+    """Whether a value is a date, by the historical validator's rule.
+
+    ``TypeChecker.isIsoDate``: ``yyyy-mm-dd`` with a month of 1-12 and a day of
+    1-31. It does not know how long a month is, so ``2024-02-31`` passes -- see
+    :func:`_is_real_date` for the finding that catches it."""
+
+    text = value.strip()
+    if not _ISO_DATE.fullmatch(text):
+        return False
+    return 1 <= int(text[5:7]) <= 12 and 1 <= int(text[8:]) <= 31
+
+
+def _value_type(tag_data: Dict[str, Any]) -> tuple:
+    """A tag's value type and length limit, as the validator dictionary derives
+    them.
+
+    The dictionary states a SQL column type; the validator turns that into one
+    of ``FRAMECODE``, ``INTEGER``, ``FLOAT``, ``DATE`` or ``STRING`` plus a
+    size, and checks values against *that*
+    (``nmr-star-dictionary-scripts/scripts/validator.py: load_tags``). A tag
+    flagged as a saveframe pointer is a framecode whatever its column type says,
+    which is why that test comes first.
+    """
+
+    if (tag_data.get('Sf pointer') or '').strip().upper().startswith('Y'):
+        return 'FRAMECODE', None
+
+    sql_type = (tag_data.get('Data Type') or '').strip().lower()
+    sized = _SIZED_TYPE.search(sql_type)
+    if sized:
+        return 'STRING', int(sized.group(1)) if sized.group(1) else None
+    if 'text' in sql_type:
+        return 'STRING', None
+    if 'integer' in sql_type:
+        return 'INTEGER', None
+    if 'float' in sql_type or 'real' in sql_type:
+        return 'FLOAT', None
+    if 'date' in sql_type:
+        return 'DATE', None
+    return 'STRING', None
+
+
+def check_data_types(entry, schema, profile: str) -> List[ValidationIssue]:
+    """Report values that are not of the type their tag is declared to hold.
+
+    Ported from the BMRB validator's ``CheckDataTypes`` (function 11): numbers
+    that are not numbers, dates that are not dates, values longer than their
+    column, and saveframe pointers written without the ``$`` that makes them
+    pointers.
+
+    One finding is added that the original cannot make. Its date test knows only
+    that a month is 1-12 and a day 1-31, so ``2024-02-31`` passes it; a day that
+    does not exist is reported at :attr:`Severity.STRICT`, keeping the
+    Java-equivalent band exactly what it always was.
+
+    ``profile`` is unused; it is accepted so that every entry-level check has
+    the same signature.
+    """
+
+    issues: List[ValidationIssue] = []
+    types: Dict[str, tuple] = {}
+
+    for item in _values(entry, schema, _MetadataScope(schema)):
+        if item.value in definitions.NULL_VALUES:
+            continue
+
+        folded = item.tag.lower()
+        if folded not in types:
+            tag_data = schema.schema.get(folded)
+            types[folded] = _value_type(tag_data) if tag_data is not None else (None, None)
+        kind, size = types[folded]
+        if kind is None:
+            continue
+
+        value = _measured(str(item.value))
+        shown = _shown(value)
+        found: List[tuple] = []
+
+        if kind == 'FRAMECODE':
+            # A pointer is written "$name". The original reads the delimiter the
+            # lexer recorded; here the marker is still on the value.
+            if not value.startswith('$'):
+                found.append((Severity.ERROR, 'value.not_a_framecode',
+                              f"Not a framecode value: {shown} ({item.tag})"))
+                if _WHITESPACE.search(value):
+                    found.append((Severity.ERROR, 'value.framecode_whitespace',
+                                  f"Whitespace in framecode value: {shown} ({item.tag})"))
+        elif kind == 'INTEGER':
+            if not _is_int(value):
+                found.append((Severity.ERROR, 'value.not_an_integer',
+                              f"Not an integer value: {shown} ({item.tag})"))
+        elif kind == 'FLOAT':
+            if not _is_float(value):
+                found.append((Severity.ERROR, 'value.not_a_float',
+                              f"Not a floating-point value: {shown} ({item.tag})"))
+        elif kind == 'DATE':
+            if not _is_iso_date(value):
+                found.append((Severity.ERROR, 'value.not_a_date',
+                              f"Not a valid date: {shown} ({item.tag})"))
+            elif not _is_valid_date(value.strip()):
+                found.append((Severity.STRICT, 'value.impossible_date',
+                              f"No such date: {shown} ({item.tag})"))
+        elif size is not None and len(value) > size:
+            found.append((Severity.ERROR, 'value.too_long',
+                          f"Value too long: {shown} ({item.tag} maxlength = {size})"))
+
+        for severity, check, message in found:
+            issues.append(ValidationIssue(
+                severity, check, message, saveframe=item.saveframe, category=item.category,
+                tag=item.tag, loop=item.loop, row=item.row, value=item.value))
 
     return issues

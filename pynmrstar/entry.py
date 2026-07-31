@@ -12,7 +12,8 @@ from pynmrstar.exceptions import InvalidStateError
 from pynmrstar.schema import Schema
 from pynmrstar.validation import Severity, ValidationIssue, check_saveframes, check_mandatory_tags, \
     check_invalid_tags, check_tag_order, check_row_indexes, check_related_tags, check_local_ids, \
-    check_frame_codes, check_sample_saveframe
+    check_frame_codes, check_sample_saveframe, check_charset, check_empty_rows, check_data_values, \
+    check_data_types
 
 logger = logging.getLogger('pynmrstar')
 
@@ -956,6 +957,10 @@ class Entry(object):
         issues.extend(check_local_ids(self, my_schema, profile))
         issues.extend(check_frame_codes(self, my_schema, profile))
         issues.extend(check_sample_saveframe(self, my_schema, profile))
+        issues.extend(check_data_types(self, my_schema, profile))
+        issues.extend(check_data_values(self, my_schema, profile))
+        issues.extend(check_empty_rows(self, my_schema, profile))
+        issues.extend(check_charset(self, my_schema, profile))
 
         return [_ for _ in issues if _.severity in wanted]
 

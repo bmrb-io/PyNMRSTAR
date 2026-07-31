@@ -979,7 +979,12 @@ class Saveframe(object):
         the NMR-STAR schema. You can pass your own custom schema if desired,
         otherwise the schema will be fetched from the BMRB servers.
 
-        validate_star - Determines if the STAR syntax checks are ran."""
+        validate_star - Determines if the STAR syntax checks are ran.
+
+        Only the checks a saveframe can answer on its own live here. Anything
+        that depends on the rest of the entry -- whether a tag belongs in a loop
+        at all, whether a mandatory tag is missing, whether a value refers to
+        something that exists -- is in :meth:`pynmrstar.Entry.validate_full`."""
 
         errors = []
 
@@ -996,11 +1001,6 @@ class Saveframe(object):
                 formatted_tag = self.tag_prefix + "." + tag[0]
                 cur_errors = my_schema.val_type(formatted_tag, tag[1], category=my_category)
                 errors.extend(cur_errors)
-
-                # Check that the tag isn't one which only makes sense in a loop
-                tag_schema = my_schema.schema.get(formatted_tag.lower())
-                if tag_schema is not None and tag_schema['Loopflag'] == 'Y':
-                    errors.append(f"The tag '{tag_schema['Tag']}' is a loop tag and must appear in a loop.")
 
         if validate_star:
             # NMR-STAR is an ASCII format

@@ -1016,17 +1016,6 @@ loop_
         errors = tmp_loop.validate(validate_schema=False, validate_star=True)
         self.assertTrue(any("data width does not match" in e for e in errors))
 
-    def test_validate_tag_placement(self):
-        """Test validate catches saveframe tags used inside a loop."""
-
-        tmp_loop = Loop.from_scratch(category="_Entry")
-        tmp_loop.add_tag(["NMR_STAR_version"])
-        tmp_loop.data = [["3.2.1.1"]]
-
-        errors = tmp_loop.validate(validate_star=False)
-        self.assertEqual(errors, ["The tag '_Entry.NMR_STAR_version' is a saveframe tag and cannot appear "
-                                  "in a loop."])
-
     def test_validate_empty_rows(self):
         """Test validate reports loop rows in which every value is null."""
 

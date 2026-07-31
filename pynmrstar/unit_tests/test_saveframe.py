@@ -1237,14 +1237,6 @@ class TestSaveframe(unittest.TestCase):
         errors = sf.validate()
         self.assertTrue(any("Cannot properly validate" in e for e in errors))
 
-    def test_validate_tag_placement(self):
-        """Validating a saveframe reports loop tags used as free tags."""
-
-        sf = Saveframe.from_scratch("release", tag_prefix="_Release")
-        sf.add_tag("Release_number", "1")
-        errors = sf.validate()
-        self.assertIn("The tag '_Release.Release_number' is a loop tag and must appear in a loop.", errors)
-
     def test_validate_non_ascii(self):
         """Validating a saveframe reports tag values containing non-ASCII characters."""
 

@@ -6,7 +6,7 @@ import warnings
 from copy import deepcopy as copy
 from pathlib import Path
 
-from pynmrstar import Entry, Saveframe, Loop, Severity
+from pynmrstar import Entry, Saveframe, Loop, Severity, utils
 from pynmrstar.exceptions import ParsingError
 
 our_path = os.path.dirname(os.path.realpath(__file__))
@@ -402,6 +402,135 @@ class TestEntry(unittest.TestCase):
         self.assertTrue(found)
         self.assertTrue(all(_.message == 'Saveframe not found: sample_conditions' for _ in found))
         self.assertTrue(any(_.loop == '_Experiment' for _ in found))
+
+    def test_validate_full_data_types(self):
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+
+        def typed(severities=None):
+            return [_ for _ in entry.validate_full(profile='internal', severities=severities)
+                    if _.check.startswith('value.') and _.check != 'value.miscapitalized']
+
+        # An archived entry holds the types it declares
+        self.assertEqual(typed(), [])
+
+        # A saveframe pointer written without the '$' that makes it one, and
+        # with a space in it, which is two findings rather than one
+        sample = entry.get_saveframes_by_category('sample')[0]['_Sample_component']
+        column = sample.tag_index('Entity_label')
+        sample.data[0][column] = 'F5 Phe cVHP'
+        self.assertEqual([_.check for _ in typed()],
+                         ['value.not_a_framecode', 'value.framecode_whitespace'])
+        sample.data[0][column] = '$F5-Phe-cVHP'
+
+        # An integer, a float and a date that are none of those things
+        datum = frame['_Datum']
+        count = datum.tag_index('Count')
+        datum.data[0][count] = 'six hundred'
+        found = typed()
+        self.assertEqual([_.check for _ in found], ['value.not_an_integer'])
+        self.assertEqual((found[0].loop, found[0].row), ('_Datum', 0))
+        datum.data[0][count] = '602'
+
+        entity = entry.get_saveframes_by_category('entity')[0]
+        entity['Formula_weight'] = '1.2.3'
+        self.assertEqual([_.check for _ in typed()], ['value.not_a_float'])
+        entity['Formula_weight'] = '3958.3'
+
+        submission = frame.get_tag('_Entry.Submission_date', whole_tag=True)[0]
+        submission[1] = '2010-13-01'
+        self.assertEqual([_.check for _ in typed()], ['value.not_a_date'])
+
+        # A date of the right shape naming a day that does not exist. The
+        # original's test knows only that a month is 1-12 and a day 1-31, so
+        # this is ours alone and is filed under STRICT.
+        submission[1] = '2010-02-31'
+        self.assertEqual(typed(), [])
+        strict = typed(severities=['strict'])
+        self.assertEqual([_.check for _ in strict], ['value.impossible_date'])
+        self.assertEqual(strict[0].tag, '_Entry.Submission_date')
+        submission[1] = '2010-02-19'
+
+        # A value longer than its column. The size comes from the dictionary's
+        # SQL type; _Entry.Title is TEXT and so has none at all.
+        version = frame.get_tag('_Entry.NMR_STAR_version', whole_tag=True)[0]
+        version[1] = 'v' * 40
+        found = typed()
+        self.assertEqual([_.check for _ in found], ['value.too_long'])
+        self.assertIn('maxlength = 31', found[0].message)
+        version[1] = '3.1.1.61'
+
+        frame.get_tag('_Entry.Title', whole_tag=True)[0][1] = 't' * 5000
+        self.assertEqual(typed(), [])
+
+    def test_validate_full_data_values(self):
+        entry = copy(self.file_entry)
+        chem_comp = entry.get_saveframes_by_category('chem_comp')[0]
+
+        def enumerated():
+            return [_ for _ in entry.validate_full(profile='internal')
+                    if _.check in ('value.not_in_enumeration', 'value.miscapitalized')]
+
+        # The sample entry writes two closed-enumeration values in the wrong
+        # case. They are findings -- the original compares case-sensitively --
+        # but they get the message that names the spelling to use.
+        found = enumerated()
+        self.assertEqual([_.check for _ in found], ['value.miscapitalized'] * 2)
+        self.assertEqual([_.tag for _ in found],
+                         ['_Chem_comp.Type', '_Chem_comp.Processing_site'])
+        self.assertIn('should be NON-POLYMER', found[0].message)
+
+        # A value that is not in the list at any capitalization
+        chem_comp.get_tag('_Chem_comp.Type', whole_tag=True)[0][1] = 'gaseous'
+        found = [_ for _ in enumerated() if _.tag == '_Chem_comp.Type']
+        self.assertEqual([_.check for _ in found], ['value.not_in_enumeration'])
+        self.assertEqual(found[0].message,
+                         'Enumerated value is not in the list: gaseous (_Chem_comp.Type)')
+
+        # An open enumeration lists what has been seen, not what is allowed, so
+        # a value outside it is not a finding
+        self.assertFalse(utils.get_schema().enumerations['_software.name']['closed'])
+        software = entry.get_saveframes_by_category('software')[0]
+        software['Name'] = 'A program nobody has used before'
+        self.assertFalse([_ for _ in enumerated() if _.tag == '_Software.Name'])
+
+    def test_validate_full_empty_rows_and_charset(self):
+        entry = copy(self.file_entry)
+        loop = entry.get_saveframes_by_category('entity')[0]['_Entity_comp_index']
+
+        def found(check):
+            return [_ for _ in entry.validate_full(profile='internal') if _.check == check]
+
+        self.assertEqual(found('row.empty'), [])
+        self.assertEqual(found('value.non_ascii'), [])
+
+        # A row of nothing but nulls, in all the spellings of null
+        loop.data.append(['.', '?', '', None] + ['.'] * (len(loop.tags) - 4))
+        empty = found('row.empty')
+        self.assertEqual(len(empty), 1)
+        self.assertEqual(empty[0].row, len(loop.data) - 1)
+        self.assertEqual(empty[0].loop, '_Entity_comp_index')
+
+        # One non-null value is enough to make a row worth keeping, however
+        # little it says
+        loop.data[-1][0] = 'x'
+        self.assertEqual(found('row.empty'), [])
+        loop.data.pop()
+
+        # NMR-STAR is ASCII. The message names the characters and their code
+        # points, because they are usually invisible in the file.
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+        frame['Title'] = 'Solution structure of a ubiquitin–like protein'
+        non_ascii = found('value.non_ascii')
+        self.assertEqual([_.tag for _ in non_ascii], ['_Entry.Title'])
+        self.assertIn("'–' (U+2013)", non_ascii[0].message)
+
+        # A finding is consumed one line at a time, so a multi-line value must
+        # not put a newline in the message
+        frame['Title'] = 'Two\nlines–long\n'
+        non_ascii = found('value.non_ascii')
+        self.assertEqual(len(non_ascii), 1)
+        self.assertNotIn('\n', non_ascii[0].message)
 
     def test_validate_full_conditional(self):
         # _Citation.Journal_abbrev is required only of a journal citation, so
