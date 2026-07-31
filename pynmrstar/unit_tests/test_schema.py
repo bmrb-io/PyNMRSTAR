@@ -155,6 +155,33 @@ class TestSchema(unittest.TestCase):
         # Rules carry one flag per view, like every other dictionary flag string
         self.assertTrue(all(_['flags'] for _ in rules))
 
+    def test_relationships(self):
+        default = Schema()
+
+        # Ties, resolved from the tag table's Foreign Table/Foreign Column pair
+        self.assertEqual(default.parent_tags['_sample_component.entity_label'],
+                         '_Entity.Sf_framecode')
+        # Ties chain: a loop's Entry_ID answers to its saveframe's, which
+        # answers to the entry's own ID.
+        self.assertEqual(default.parent_tags['_entity_comp_index.entry_id'], '_Entity.Entry_ID')
+        self.assertEqual(default.parent_tags['_entity.entry_id'], '_Entry.ID')
+
+        # Both sides of a tie are real tags, spelled as the dictionary spells
+        # them -- a reference to a category that does not exist is dropped
+        # rather than kept as an unresolvable pair.
+        self.assertTrue(all(_ in default.schema for _ in default.parent_tags))
+        self.assertTrue(all(_.lower() in default.schema for _ in default.parent_tags.values()))
+
+        # Local IDs: the tag that numbers a saveframe within its category, and
+        # the loop columns that repeat it
+        self.assertIn('_sample.id', default.local_id_tags)
+        self.assertIn('_sample_component.sample_id', default.local_id_tags)
+
+        # The entry's own ID is not a local ID: it identifies the entry, which
+        # is the same in every saveframe.
+        self.assertNotIn('_entry.id', default.local_id_tags)
+        self.assertNotIn('_sample.entry_id', default.local_id_tags)
+
     def test_dictionary_cache(self):
         # load_dictionary() reads the distribution, caches it under
         # $XDG_CACHE_HOME/pynmrstar/<version>, and reuses the cache next time

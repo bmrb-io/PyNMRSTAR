@@ -312,6 +312,97 @@ class TestEntry(unittest.TestCase):
         loop.data[2][column] = '-1'
         self.assertEqual(indexes(), [])
 
+    def test_validate_full_related_tags(self):
+        entry = copy(self.file_entry)
+        sample = entry.get_saveframes_by_category('sample')[0]
+        components = sample['_Sample_component']
+
+        def related():
+            return [_ for _ in entry.validate_full(profile='internal')
+                    if _.check == 'tag.parent_value_missing']
+
+        # Every reference in an archived entry resolves
+        self.assertEqual(related(), [])
+
+        # A loop value pointing at a saveframe that is not there. The reference
+        # is written '$name' and the saveframe is named plainly, so the two only
+        # compare once the marker is stripped -- if they did not, this would be
+        # reported even when correct.
+        column = components.tag_index('Entity_label')
+        components.data[0][column] = '$no_such_entity'
+        found = related()
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0].tag, '_Sample_component.Entity_label')
+        self.assertEqual(found[0].loop, '_Sample_component')
+        self.assertEqual(found[0].row, 0)
+        self.assertIn('parent tag _Entity.Sf_framecode with value no_such_entity',
+                      found[0].message)
+        components.data[0][column] = '$F5-Phe-cVHP'
+        self.assertEqual(related(), [])
+
+        # ... and the same mistake in a saveframe's own tag
+        shifts = entry.get_saveframes_by_category('assigned_chemical_shifts')[0]
+        shifts['Sample_condition_list_label'] = '$no_such_conditions'
+        found = related()
+        self.assertEqual(len(found), 1)
+        self.assertIsNone(found[0].loop)
+        self.assertEqual(found[0].tag, '_Assigned_chem_shift_list.Sample_condition_list_label')
+
+    def test_validate_full_local_ids(self):
+        entry = copy(self.file_entry)
+        sample = entry.get_saveframes_by_category('sample')[0]
+        components = sample['_Sample_component']
+        column = components.tag_index('Sample_ID')
+
+        def local_ids():
+            return [_ for _ in entry.validate_full(profile='internal')
+                    if _.check.endswith('local_id') or _.check.endswith('local_id_tag')]
+
+        self.assertEqual(local_ids(), [])
+
+        # A row filed under a different saveframe of the same category
+        components.data[0][column] = '2'
+        found = local_ids()
+        self.assertEqual([_.check for _ in found], ['row.invalid_local_id'])
+        self.assertEqual(found[0].row, 0)
+        self.assertEqual(found[0].tag, '_Sample_component.Sample_ID')
+        self.assertIn('should be 1', found[0].message)
+
+        # A null is not excused: a row that does not say which saveframe it
+        # belongs to is as unusable as one naming the wrong saveframe.
+        components.data[0][column] = '.'
+        self.assertEqual([_.check for _ in local_ids()], ['row.invalid_local_id'])
+        components.data[0][column] = '1'
+
+        # A saveframe whose own ID is null cannot be compared against at all,
+        # and its loops are not reported -- one finding, not one per row.
+        sample['ID'] = '.'
+        self.assertEqual([_.check for _ in local_ids()], ['saveframe.invalid_local_id'])
+
+        # No ID tag at all is two findings: the missing tag and the missing
+        # value. The entry information saveframe is exempt -- its ID is the
+        # entry's accession number, which is not local to it.
+        sample.remove_tag('ID')
+        self.assertEqual([_.check for _ in local_ids()],
+                         ['saveframe.no_local_id_tag', 'saveframe.invalid_local_id'])
+
+    def test_validate_full_frame_codes(self):
+        entry = copy(self.file_entry)
+
+        def dangling():
+            return [_ for _ in entry.validate_full(profile='internal')
+                    if _.check == 'value.dangling_framecode']
+
+        self.assertEqual(dangling(), [])
+
+        # Renaming a saveframe without updating the references to it -- which
+        # is what rename_saveframe() exists to avoid -- leaves them dangling
+        entry.get_saveframe_by_name('sample_conditions').name = 'sample_conditions_1'
+        found = dangling()
+        self.assertTrue(found)
+        self.assertTrue(all(_.message == 'Saveframe not found: sample_conditions' for _ in found))
+        self.assertTrue(any(_.loop == '_Experiment' for _ in found))
+
     def test_validate_full_conditional(self):
         # _Citation.Journal_abbrev is required only of a journal citation, so
         # changing the citation's type changes whether its absence is reported.

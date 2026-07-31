@@ -6,7 +6,7 @@ from csv import DictReader, reader
 from datetime import date
 from functools import lru_cache
 from io import StringIO
-from typing import Union, List, Optional, Any, Dict, IO
+from typing import Union, List, Optional, Any, Dict, IO, Set
 
 from pynmrstar import definitions, utils
 from pynmrstar._internal import _interpret_file, load_dictionary
@@ -61,6 +61,10 @@ class Schema(object):
         self.enumerations: Dict[str, Dict[str, Any]] = {}
         # saveframe category -> {'id': int, 'flags': str, 'unique': bool}
         self.saveframe_categories: Dict[str, Dict[str, Any]] = {}
+        # child tag (lowercase) -> the tag whose values it must be drawn from
+        self.parent_tags: Dict[str, str] = {}
+        # tags holding a saveframe's local ID (lowercase)
+        self.local_id_tags: Set[str] = set()
         # tag (lowercase) -> list of conditional mandatory rules
         self.conditional_rules: Dict[str, List[Dict[str, str]]] = {}
         # profile name -> resolved mandatory codes, built on demand
@@ -91,6 +95,7 @@ class Schema(object):
             tag_validation = distribution['adit_tag_validation.csv']
 
         self._parse_tag_table(xlschem_text)
+        self._parse_relationships()
         self._load_data_types()
         if enum_hdr is not None and enum_dtl is not None:
             self._build_enumerations(enum_hdr, enum_dtl)
@@ -159,6 +164,45 @@ class Schema(object):
             formatted = utils.format_category(single_tag_data['Tag'])
             if formatted not in self.category_order:
                 self.category_order.append(formatted)
+
+    def _parse_relationships(self) -> None:
+        """Derive the ties between tags from the already-parsed tag table.
+
+        Two facts, both of which the tag table states obliquely:
+
+        * **Which tag a value must be drawn from.** A tag that refers to
+          something defined elsewhere -- a residue's entity, an experiment's
+          sample, every ``Entry_ID`` -- names that definition's category and
+          field in ``Foreign Table``/``Foreign Column`` rather than naming the
+          tag. Resolving the pair to a tag once, here, is what lets a check ask
+          "what is this tag's parent" directly. Six references name a category
+          that does not exist (``Constraint_list``, ``Spectral_Peak_list``,
+          ``Org_constr_file_comment_list``) and are dropped, as the dictionary
+          build's own join drops them.
+        * **Which tag carries a saveframe's local ID.** ``lclSfIdFlg`` marks it,
+          with one subtlety: ``_Entry.ID`` and every ``*.Entry_ID`` carry the
+          flag as well, and those identify the *entry*, which is the same in
+          every saveframe. Treating them as local IDs would make every saveframe
+          in a well-formed entry look wrong.
+        """
+
+        by_field: Dict[tuple, str] = {}
+        for tag_data in self.schema.values():
+            category = (tag_data.get('Tag category') or '').strip()
+            field = (tag_data.get('Tag field') or '').strip()
+            if category and field:
+                by_field[(category, field)] = tag_data['Tag']
+
+        for tag, tag_data in self.schema.items():
+            table = (tag_data.get('Foreign Table') or '').strip()
+            column = (tag_data.get('Foreign Column') or '').strip()
+            parent = by_field.get((table, column))
+            if parent is not None:
+                self.parent_tags[tag] = parent
+
+            if (tag_data.get('lclSfIdFlg') or '').strip().upper().startswith('Y'):
+                if tag != '_entry.id' and not tag.endswith('.entry_id'):
+                    self.local_id_tags.add(tag)
 
     def _load_data_types(self) -> None:
         """Load the value-type regular expressions from the packaged reference."""

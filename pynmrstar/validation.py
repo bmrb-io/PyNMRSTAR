@@ -112,6 +112,65 @@ def _free_tag(saveframe, name: str) -> List[Any]:
     return [value for tag, value in saveframe.tags if tag.lower() == folded]
 
 
+def _dereference(value: Any) -> Any:
+    """A saveframe pointer's value without the ``$`` that marks it as one.
+
+    STAR writes a reference to a saveframe as ``$name`` while the saveframe
+    itself is named plainly, so the two only compare equal once the marker is
+    removed. The marker is read off the value rather than off the dictionary
+    because that is where it is unambiguous: a value written ``$x`` is a
+    reference whatever the tag's flags say it should be."""
+
+    if isinstance(value, str) and value.startswith('$'):
+        return value[1:]
+    return value
+
+
+class _MetadataScope:
+    """Which of an entry's tags describe it, as opposed to being its data.
+
+    The dictionary flags each tag, and the distinction is the difference between
+    the few hundred tags an annotator works with and the millions of numbers
+    underneath them. The referential checks below only apply to the former --
+    they are statements about how an entry's descriptions hang together, and
+    running them over every chemical shift would cost far more and say nothing.
+
+    The rule has one wrinkle worth stating: **a loop is in or out as a whole**.
+    Its tags are judged by the category, not individually, so a category with
+    even one data tag takes the whole loop out. Four of the dictionary's 354 loop
+    categories are mixed in this way (``History``, ``Software_applied_methods``,
+    ``Coupling_constant``, ``Peak_row_format``), and two of them are common in
+    real entries -- so judging tag by tag there would check columns that are
+    supposed to be out of scope. A category the dictionary does not know at all
+    is in scope, so that an unrecognised loop is still examined rather than
+    silently ignored.
+    """
+
+    def __init__(self, schema) -> None:
+        self._schema = schema
+        self._categories: Optional[Dict[str, bool]] = None
+
+    def free(self, full_tag: str) -> bool:
+        """Whether a saveframe's own tag is metadata. An unknown tag is."""
+
+        tag_data = self._schema.schema.get(full_tag.lower())
+        return tag_data is None or tag_data.get('Meta data') == 'Y'
+
+    def loop(self, category: Optional[str]) -> bool:
+        """Whether a loop of this category is metadata, judged over every tag
+        the dictionary places in it."""
+
+        if self._categories is None:
+            self._categories = {}
+            for tag, tag_data in self._schema.schema.items():
+                folded = tag.rsplit('.', 1)[0]
+                metadata = tag_data.get('Meta data') == 'Y'
+                self._categories[folded] = self._categories.get(folded, True) and metadata
+        if category is None:
+            return True
+        return self._categories.get(category.lower(), True)
+
+
 def check_saveframes(entry, schema, profile: str) -> List[ValidationIssue]:
     """Structural checks over an entry's saveframes.
 
@@ -686,5 +745,310 @@ def check_tag_order(entry, schema, profile: str) -> List[ValidationIssue]:
                     f"{previous_tag} ({previous_sequence})",
                     saveframe=saveframe.name, category=category, tag=full_tag, loop=loop))
             previous_tag, previous_sequence = full_tag, sequence
+
+    return issues
+
+
+def _saveframe_category(schema, saveframe) -> Optional[str]:
+    """A saveframe's category according to the dictionary, or ``None``."""
+
+    category = schema.schema.get(f'{saveframe.tag_prefix.lower()}.sf_category', {}).get('SFCategory')
+    if category is not None:
+        category = category.strip() or None
+    return category
+
+
+def _parent_values(entry, schema, scope: _MetadataScope) -> Dict[str, set]:
+    """Every value each parent tag holds in this entry, indexed by tag.
+
+    Only tags that something refers to are collected -- a few hundred of the
+    dictionary's 6 760 -- so this is one cheap pass rather than an index of the
+    whole entry. Values are dereferenced, since a reference is written ``$name``
+    and the definition it points at is not.
+    """
+
+    wanted = {parent.lower() for parent in schema.parent_tags.values()}
+    values: Dict[str, set] = {}
+
+    def record(full_tag: str, value: Any) -> None:
+        folded = full_tag.lower()
+        if folded not in wanted or value in definitions.NULL_VALUES:
+            return
+        values.setdefault(folded, set()).add(_dereference(value))
+
+    for saveframe in entry:
+        for tag, value in saveframe.tags:
+            full_tag = f'{saveframe.tag_prefix}.{tag}'
+            if scope.free(full_tag):
+                record(full_tag, value)
+        for loop in saveframe:
+            if not scope.loop(loop.category):
+                continue
+            for position, tag in enumerate(loop.tags):
+                full_tag = f'{loop.category}.{tag}'
+                if full_tag.lower() not in wanted:
+                    continue
+                for row in loop.data:
+                    if position < len(row):
+                        record(full_tag, row[position])
+
+    return values
+
+
+def check_related_tags(entry, schema, profile: str) -> List[ValidationIssue]:
+    """Report values that refer to something the entry does not define.
+
+    Ported from the BMRB validator's ``CheckRelatedTags`` (function 13). The
+    dictionary ties many tags to a parent -- ``_Experiment.Sample_label`` to
+    ``_Sample.Sf_framecode``, every ``Comp_index_ID`` to ``_Entity_comp_index.ID``
+    -- and a child's value has to be one the parent actually holds somewhere in
+    the entry. It is the check that catches a reference to a deleted saveframe or
+    a renumbered residue.
+
+    Ties whose parent is a saveframe's *local* ID are left to
+    :func:`check_local_ids`, which knows that such a value has to match the
+    saveframe it is written in rather than merely existing somewhere.
+
+    **A missing parent tag is reported for a free tag and not for a loop
+    column.** The original resolves the two cases by different routes -- a query
+    per free value, a cached list of the parent's values per loop -- and the
+    cached list cannot tell "the parent has no values" from "the tag has no
+    parent", so it stays silent. Reproduced rather than tidied: the asymmetry is
+    the difference between reporting a finding and not, and every real entry that
+    reaches this check has already been through the mandatory-tag one, which is
+    what reports a missing parent tag properly.
+
+    ``profile`` is unused; it is accepted so that every entry-level check has
+    the same signature.
+    """
+
+    issues: List[ValidationIssue] = []
+    scope = _MetadataScope(schema)
+    values = _parent_values(entry, schema, scope)
+
+    def parent_of(full_tag: str) -> Optional[str]:
+        parent = schema.parent_tags.get(full_tag.lower())
+        if parent is None or parent.lower() in schema.local_id_tags:
+            return None
+        return parent
+
+    for saveframe in entry:
+        category = _saveframe_category(schema, saveframe)
+
+        for tag, value in saveframe.tags:
+            full_tag = f'{saveframe.tag_prefix}.{tag}'
+            parent = parent_of(full_tag)
+            if parent is None or value in definitions.NULL_VALUES or not scope.free(full_tag):
+                continue
+            if _dereference(value) not in values.get(parent.lower(), set()):
+                issues.append(ValidationIssue(
+                    Severity.ERROR, 'tag.parent_value_missing',
+                    f"Cannot find parent tag {parent} with value {_dereference(value)} ({full_tag})",
+                    saveframe=saveframe.name, category=category, tag=full_tag, value=value))
+
+        for loop in saveframe:
+            if not scope.loop(loop.category):
+                continue
+            for position, tag in enumerate(loop.tags):
+                full_tag = f'{loop.category}.{tag}'
+                parent = parent_of(full_tag)
+                if parent is None:
+                    continue
+                known = values.get(parent.lower())
+                if not known:
+                    continue
+                for number, row in enumerate(loop.data):
+                    value = row[position] if position < len(row) else None
+                    if value in definitions.NULL_VALUES:
+                        continue
+                    if _dereference(value) not in known:
+                        issues.append(ValidationIssue(
+                            Severity.ERROR, 'tag.parent_value_missing',
+                            f"Cannot find parent tag {parent} with value {_dereference(value)} ({full_tag})",
+                            saveframe=saveframe.name, category=category, tag=full_tag,
+                            loop=loop.category, row=number, value=value))
+
+    return issues
+
+
+def check_local_ids(entry, schema, profile: str) -> List[ValidationIssue]:
+    """Report loop rows that claim to belong to a different saveframe.
+
+    Ported from the BMRB validator's ``CheckLocalIds`` (function 14). Every
+    saveframe has an ID of its own, and each of its loops repeats that ID in a
+    column, so that the loop's rows can be stored in a table shared with every
+    other saveframe of the category. The two have to agree, and a mismatch means
+    rows that will be filed under the wrong saveframe.
+
+    A saveframe with no ID tag at all is reported as well -- twice, as the
+    original does, once for the missing tag and once for the missing value. The
+    entry information saveframe is exempt: its ID is the entry's accession
+    number, which is global rather than local, and the dictionary marks it so.
+
+    ``profile`` is unused; it is accepted so that every entry-level check has
+    the same signature.
+    """
+
+    issues: List[ValidationIssue] = []
+    scope = _MetadataScope(schema)
+
+    def is_local_id(full_tag: str, in_loop: bool) -> bool:
+        tag_data = schema.schema.get(full_tag.lower())
+        if tag_data is None or full_tag.lower() not in schema.local_id_tags:
+            return False
+        return tag_data.get('Loopflag') == ('Y' if in_loop else 'N')
+
+    for saveframe in entry:
+        category = _saveframe_category(schema, saveframe)
+
+        local_id = None
+        for tag, value in saveframe.tags:
+            full_tag = f'{saveframe.tag_prefix}.{tag}'
+            if is_local_id(full_tag, in_loop=False) and scope.free(full_tag):
+                local_id = value
+                break
+
+        if local_id is None:
+            # No ID tag at all. The entry information saveframe legitimately has
+            # none; anywhere else the dictionary has one and the entry is
+            # missing it, which is two findings rather than one because the
+            # original reports the tag and the value separately.
+            if category == 'entry_information':
+                continue
+            issues.append(ValidationIssue(
+                Severity.ERROR, 'saveframe.no_local_id_tag',
+                "Invalid saveframe: no local ID tag in dictionary",
+                saveframe=saveframe.name, category=category))
+
+        if local_id in definitions.NULL_VALUES:
+            issues.append(ValidationIssue(
+                Severity.ERROR, 'saveframe.invalid_local_id', "Invalid local ID",
+                saveframe=saveframe.name, category=category))
+            continue
+
+        for loop in saveframe:
+            if not scope.loop(loop.category):
+                continue
+            for position, tag in enumerate(loop.tags):
+                full_tag = f'{loop.category}.{tag}'
+                if not is_local_id(full_tag, in_loop=True):
+                    continue
+                for number, row in enumerate(loop.data):
+                    value = row[position] if position < len(row) else None
+                    # Null is not excused here: a row that does not say which
+                    # saveframe it belongs to is exactly as unusable as one that
+                    # names the wrong saveframe.
+                    if value != local_id:
+                        issues.append(ValidationIssue(
+                            Severity.ERROR, 'row.invalid_local_id',
+                            f"Invalid local ID {value}, should be {local_id}",
+                            saveframe=saveframe.name, category=category, tag=full_tag,
+                            loop=loop.category, row=number, value=value))
+
+    return issues
+
+
+def check_frame_codes(entry, schema, profile: str) -> List[ValidationIssue]:
+    """Report references to saveframes the entry does not contain.
+
+    Ported from the BMRB validator's ``CheckFrameCodes`` (function 10). A value
+    written ``$name`` points at the saveframe called ``name``; if there is no
+    such saveframe the reference dangles.
+
+    This overlaps :func:`check_related_tags`, which reaches most of the same
+    values through the dictionary's ties to ``Sf_framecode``. It is not
+    redundant: this one reads the reference off the value itself, so it also
+    covers a pointer the dictionary does not tie to anything, and it says plainly
+    that a saveframe is missing rather than that a parent value is.
+
+    ``profile`` is unused; it is accepted so that every entry-level check has
+    the same signature.
+    """
+
+    issues: List[ValidationIssue] = []
+    scope = _MetadataScope(schema)
+    names = {saveframe.name for saveframe in entry}
+
+    def examine(value: Any, **location) -> None:
+        if not isinstance(value, str) or not value.startswith('$'):
+            return
+        if value[1:] not in names:
+            issues.append(ValidationIssue(
+                Severity.ERROR, 'value.dangling_framecode',
+                f"Saveframe not found: {value[1:]}", value=value, **location))
+
+    for saveframe in entry:
+        category = _saveframe_category(schema, saveframe)
+
+        for tag, value in saveframe.tags:
+            full_tag = f'{saveframe.tag_prefix}.{tag}'
+            if scope.free(full_tag):
+                examine(value, saveframe=saveframe.name, category=category, tag=full_tag)
+
+        for loop in saveframe:
+            if not scope.loop(loop.category):
+                continue
+            for position, tag in enumerate(loop.tags):
+                full_tag = f'{loop.category}.{tag}'
+                for number, row in enumerate(loop.data):
+                    if position < len(row):
+                        examine(row[position], saveframe=saveframe.name, category=category,
+                                tag=full_tag, loop=loop.category, row=number)
+
+    return issues
+
+
+def check_sample_saveframe(entry, schema, profile: str) -> List[ValidationIssue]:
+    """Report sample components that do not say what they are or how much.
+
+    Ported from the BMRB validator's ``CheckSampleSaveframe`` (function 35). A
+    sample's components are the one place where the dictionary's per-tag
+    requirements cannot express the requirement: any *one* of ``Mol_common_name``
+    and ``Entity_label`` identifies a component, and a concentration may be given
+    either exactly or as a range, so no single tag is individually mandatory
+    while a row with none of them is useless.
+
+    Both rules are only applied where they can be: a loop that does not carry
+    the columns at all is left to the mandatory-tag check, which is what knows
+    whether they were required in the first place.
+
+    ``profile`` is unused; it is accepted so that every entry-level check has
+    the same signature.
+    """
+
+    issues: List[ValidationIssue] = []
+
+    def null(row, position: Optional[int]) -> bool:
+        return position is None or position >= len(row) or row[position] in definitions.NULL_VALUES
+
+    for saveframe in entry:
+        if _saveframe_category(schema, saveframe) != 'sample':
+            continue
+
+        for loop in saveframe:
+            if loop.category != '_Sample_component':
+                continue
+
+            columns = {tag.lower(): position for position, tag in enumerate(loop.tags)}
+            name, entity = columns.get('mol_common_name'), columns.get('entity_label')
+            value = columns.get('concentration_val')
+            minimum, maximum = columns.get('concentration_val_min'), columns.get('concentration_val_max')
+
+            for number, row in enumerate(loop.data):
+                if name is not None and entity is not None and null(row, name) and null(row, entity):
+                    issues.append(ValidationIssue(
+                        Severity.ERROR, 'row.unidentified_sample_component',
+                        "Mol_common_name or Entity_label must have a value",
+                        saveframe=saveframe.name, category='sample',
+                        tag='_Sample_component.Mol_common_name', loop=loop.category, row=number))
+
+                if (value is not None and minimum is not None and maximum is not None
+                        and null(row, value) and null(row, minimum) and null(row, maximum)):
+                    issues.append(ValidationIssue(
+                        Severity.ERROR, 'row.missing_concentration',
+                        "Either Concentration_val or both Concentration_min_val and _max_val "
+                        "must have a value",
+                        saveframe=saveframe.name, category='sample',
+                        tag='_Sample_component.Concentration_val', loop=loop.category, row=number))
 
     return issues
