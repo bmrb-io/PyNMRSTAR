@@ -280,6 +280,41 @@ class TestEntry(unittest.TestCase):
         entry.mark_framecode_values()
         self.assertFalse(pointer[1].startswith('$$'))
 
+    def test_add_row_indexes(self):
+        """AddRowIndexes (85), including the part that is easy to get wrong."""
+
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+        loop = frame['_Entry_author']
+        position = loop.tags.index('Ordinal')
+
+        # A gap is filled, and the whole column is renumbered from 1.
+        loop.data[1][position] = '.'
+        entry.add_row_indexes()
+        self.assertEqual([_[position] for _ in loop.data],
+                         [str(_) for _ in range(1, len(loop.data) + 1)])
+
+    def test_add_row_indexes_leaves_a_complete_column_alone(self):
+        """A loop whose index column has no gap is not touched at all -- even
+        when the numbering is wrong.
+
+        That is the original's behaviour and it is load-bearing: its query looks
+        for a row-index tag having at least one null value and returns without
+        touching the loop if it finds none. Renumbering unconditionally, which
+        is the natural thing to write, would silently repair what
+        CheckRowIndexes (18) exists to report."""
+
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+        loop = frame['_Entry_author']
+        position = loop.tags.index('Ordinal')
+
+        wrong = [str(_ * 10) for _ in range(1, len(loop.data) + 1)]
+        for row, value in zip(loop.data, wrong):
+            row[position] = value
+        entry.add_row_indexes()
+        self.assertEqual([_[position] for _ in loop.data], wrong)
+
     def test_validate_full_invalid_tags(self):
         entry = copy(self.file_entry)
         frame = entry.get_saveframes_by_category('entry_information')[0]

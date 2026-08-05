@@ -11,7 +11,7 @@ from pynmrstar import definitions, utils, loop as loop_mod, saveframe as savefra
 from pynmrstar._internal import _json_serialize, _interpret_file, _get_entry_from_database, write_to_file
 from pynmrstar.exceptions import InvalidStateError
 from pynmrstar.schema import Schema
-from pynmrstar.validation import Severity, ValidationIssue, _value_type, check_saveframes, check_mandatory_tags, \
+from pynmrstar.validation import Severity, ValidationIssue, _row_index_tag, _value_type, check_saveframes, check_mandatory_tags, \
     check_invalid_tags, check_tag_order, check_row_indexes, check_related_tags, check_local_ids, \
     check_frame_codes, check_sample_saveframe, check_charset, check_empty_rows, check_data_values, \
     check_data_types
@@ -881,6 +881,38 @@ class Entry(object):
             collapsed = re.sub(r'\s+', '_', value)
             if collapsed != value:
                 assign(collapsed)
+
+    def add_row_indexes(self, schema: Optional[Schema] = None) -> None:
+        """Number the rows of any loop whose row-index column is incomplete.
+
+        The BMRB validator's ``AddRowIndexes`` (function 85). The dictionary
+        marks one tag per loop category as its row index; where that column has
+        a gap, this fills the whole column with 1, 2, 3, ...
+
+        **A loop whose index column is complete is left alone entirely, even if
+        the numbering is wrong.** That is the original's behaviour and it is
+        load-bearing rather than incidental: its query looks for a row-index tag
+        having at least one null value and returns without touching the loop if
+        it finds none. So a column reading 1, 2, 4 keeps its gap in the
+        numbering -- ``CheckRowIndexes`` (18) is what reports that -- while a
+        column with a genuinely missing value is renumbered from scratch.
+
+        (The class Javadoc says "Does nothing: reindexing is a function of
+        STARDB unparser". That is stale; ``edit()`` reindexes every loop.)
+        """
+
+        my_schema: Schema = utils.get_schema(schema)
+
+        for saveframe in self._frame_list:
+            for loop in saveframe.loops:
+                index_tag = _row_index_tag(loop, my_schema)
+                if index_tag is None:
+                    continue
+                position = loop.tags.index(index_tag)
+                if any(row[position] in definitions.NULL_VALUES or
+                       (isinstance(row[position], str) and row[position].strip() in ('.', '?'))
+                       for row in loop.data):
+                    loop.renumber_rows(index_tag)
 
     def mark_framecode_values(self, schema: Optional[Schema] = None) -> None:
         """Ensure every saveframe-pointer value carries its ``$``.
