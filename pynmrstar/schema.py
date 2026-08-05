@@ -65,6 +65,10 @@ class Schema(object):
         self.parent_tags: Dict[str, str] = {}
         # tags holding a saveframe's local ID (lowercase)
         self.local_id_tags: Set[str] = set()
+        # tag (lowercase) -> the value to give it when creating it empty
+        self.default_values: Dict[str, str] = {}
+        # tags a deposition tool fills in by itself (lowercase)
+        self.auto_inserted_tags: Set[str] = set()
         # tag (lowercase) -> list of conditional mandatory rules
         self.conditional_rules: Dict[str, List[Dict[str, str]]] = {}
         # profile name -> resolved mandatory codes, built on demand
@@ -184,6 +188,19 @@ class Schema(object):
           flag as well, and those identify the *entry*, which is the same in
           every saveframe. Treating them as local IDs would make every saveframe
           in a well-formed entry look wrong.
+        * **What to put in a tag created empty, and which tags to create at
+          all.** ``default value`` supplies the first; ``ADIT auto insert``
+          marks tags a deposition tool fills in itself, which a caller adding
+          missing tags should leave to it. Two rules come from the dictionary
+          build (``validator.py: load_tags``) rather than from a column: a tag
+          that *has* a default is auto-inserted by definition, and every
+          ``*.Entry_ID`` is auto-inserted because the accession number is the
+          depositing tool's to write. Reproducing them makes both of these
+          agree with the shipped validator dictionary on all 6 760 tags. (The
+          build also gives ``*.Entry_ID`` a default of BMRB's ``NEED_ACC_NUM``
+          placeholder. That is BMRB's, not the dictionary's, so it stays out of
+          here -- :meth:`pynmrstar.Entry.insert_mandatory_tags` takes the value
+          as an argument.)
         """
 
         by_field: Dict[tuple, str] = {}
@@ -203,6 +220,20 @@ class Schema(object):
             if (tag_data.get('lclSfIdFlg') or '').strip().upper().startswith('Y'):
                 if tag != '_entry.id' and not tag.endswith('.entry_id'):
                     self.local_id_tags.add(tag)
+
+            default = (tag_data.get('default value') or '').strip()
+            if default in ('', '?', '.'):
+                default = None
+            if default is not None:
+                self.default_values[tag] = default
+            if default is not None or tag.endswith('.entry_id'):
+                self.auto_inserted_tags.add(tag)
+
+            # The column is a form code rather than a flag: anything above zero
+            # means "inserted automatically", except 8, which the build excludes.
+            auto = (tag_data.get('ADIT auto insert') or '').strip()
+            if auto.isdigit() and int(auto) not in (0, 8):
+                self.auto_inserted_tags.add(tag)
 
     def _load_data_types(self) -> None:
         """Load the value-type regular expressions from the packaged reference."""

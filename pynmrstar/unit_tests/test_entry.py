@@ -366,6 +366,111 @@ class TestEntry(unittest.TestCase):
         entry.add_row_indexes()
         self.assertEqual([_[position] for _ in loop.data], wrong)
 
+    def test_insert_mandatory_tags(self):
+        """InsertMandatoryTags (105): a missing required free tag arrives as '?'."""
+
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+        self.assertEqual(frame.get_tag('Title'), file_entry.get_tag('_Entry.Title'))
+        frame.remove_tag('Title')
+
+        entry.insert_mandatory_tags(profile='internal')
+        self.assertEqual(frame.get_tag('Title'), ['?'])
+
+    def test_insert_mandatory_tags_skips_optional_and_auto(self):
+        """Two kinds of tag it must not add, for two different reasons.
+
+        An optional tag is nobody's to add. An *auto-inserted* one is the
+        depositing tool's -- and since every tag carrying a dictionary default
+        value is in that set, this is also what makes the value written by this
+        method always '?'. Judged on what the method *adds*, since an entry read
+        from a file already carries plenty of both, and on the free tags alone,
+        since a loop it has to create deliberately arrives whole."""
+
+        entry = copy(self.file_entry)
+        schema = utils.get_schema()
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+        codes = schema.validation_profile('internal')['tags']
+
+        def entry_tags(kind) -> set:
+            return {_ for _ in schema.schema
+                    if schema.schema[_].get('SFCategory') == 'entry_information'
+                    and (schema.schema[_].get('Loopflag') or '').strip() != 'Y'
+                    and (kind(codes.get(_), _ in schema.auto_inserted_tags))}
+
+        optional = entry_tags(lambda code, auto: code == 'O' and not auto)
+        auto = entry_tags(lambda code, auto: code in ('M', 'V') and auto)
+        self.assertTrue(optional and auto)
+
+        def present() -> set:
+            return {f'{frame.tag_prefix}.{name}'.lower() for name, _ in frame.tags}
+
+        before = present()
+        entry.insert_mandatory_tags(profile='internal')
+        added = present() - before
+        self.assertTrue(added)
+        self.assertEqual(added.intersection(optional | auto), set())
+
+    def test_insert_mandatory_tags_creates_a_missing_loop(self):
+        """A required tag whose whole loop is missing brings the loop with it --
+        every column of the category, one row, the row index numbered 0."""
+
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+        frame.remove_loop(frame['_Entry_author'])
+
+        entry.insert_mandatory_tags(profile='internal', entry_id='NEED_ACC_NUM')
+        loop = frame['_Entry_author']
+
+        self.assertEqual(len(loop.data), 1)
+        self.assertEqual(loop.data[0][loop.tag_index('Ordinal')], '0')
+        self.assertEqual(loop.data[0][loop.tag_index('Entry_ID')], 'NEED_ACC_NUM')
+        self.assertEqual(loop.data[0][loop.tag_index('Family_name')], '?')
+        # Optional columns come along too: the loop is a form to fill in.
+        self.assertIn('middle_initials', [_.lower() for _ in loop.tags])
+        # Sf_ID is bookkeeping, not a column for anyone to fill in.
+        self.assertNotIn('sf_id', [_.lower() for _ in loop.tags])
+
+    def test_insert_mandatory_tags_fills_an_existing_loop(self):
+        """A loop that exists gets the missing column, valued in every row."""
+
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+        loop = frame['_Entry_author']
+        self.assertGreater(len(loop.data), 1)
+        position = loop.tag_index('Family_name')
+        for row in loop.data:
+            del row[position]
+        del loop.tags[position]
+        loop._lc_tags_cache = None
+
+        entry.insert_mandatory_tags(profile='internal')
+        loop = frame['_Entry_author']
+        self.assertEqual([_[loop.tag_index('Family_name')] for _ in loop.data],
+                         ['?'] * len(loop.data))
+
+    def test_insert_mandatory_tags_honours_a_conditional_rule(self):
+        """A conditional rule decides it, and it is scoped to the saveframe.
+
+        _Entity.Nstd_monomer is value-mandatory, except in an entity whose Type
+        is 'non-polymer', where the dictionary demotes it to optional. Two
+        entities differing only in that tag must therefore come out
+        differently."""
+
+        entry = copy(self.file_entry)
+        polymer, non_polymer = entry.get_saveframes_by_category('entity')[0], None
+        non_polymer = copy(polymer)
+        non_polymer.name = 'entity_non_polymer'
+        for frame in (polymer, non_polymer):
+            frame.remove_tag('Nstd_monomer')
+        polymer.add_tag('Type', 'polymer', update=True)
+        non_polymer.add_tag('Type', 'non-polymer', update=True)
+        entry.add_saveframe(non_polymer)
+
+        entry.insert_mandatory_tags(profile='internal')
+        self.assertEqual(polymer.get_tag('Nstd_monomer'), ['?'])
+        self.assertEqual(non_polymer.get_tag('Nstd_monomer'), [])
+
     def test_validate_full_invalid_tags(self):
         entry = copy(self.file_entry)
         frame = entry.get_saveframes_by_category('entry_information')[0]
