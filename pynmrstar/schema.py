@@ -191,16 +191,15 @@ class Schema(object):
         * **What to put in a tag created empty, and which tags to create at
           all.** ``default value`` supplies the first; ``ADIT auto insert``
           marks tags a deposition tool fills in itself, which a caller adding
-          missing tags should leave to it. Two rules come from the dictionary
-          build (``validator.py: load_tags``) rather than from a column: a tag
-          that *has* a default is auto-inserted by definition, and every
-          ``*.Entry_ID`` is auto-inserted because the accession number is the
-          depositing tool's to write. Reproducing them makes both of these
-          agree with the shipped validator dictionary on all 6 760 tags. (The
-          build also gives ``*.Entry_ID`` a default of BMRB's ``NEED_ACC_NUM``
-          placeholder. That is BMRB's, not the dictionary's, so it stays out of
-          here -- :meth:`pynmrstar.Entry.insert_mandatory_tags` takes the value
-          as an argument.)
+          missing tags should leave to it. Two rules come from the dictionary's
+          own build scripts rather than from a column: a tag that *has* a
+          default is auto-inserted by definition, and every ``*.Entry_ID`` is
+          auto-inserted because the accession number is the depositing tool's to
+          write. (The build also gives every ``*.Entry_ID`` the placeholder
+          BMRB uses before an accession number is assigned. That is one
+          organization's convention rather than the dictionary's, so it stays
+          out of here -- :func:`pynmrstar.repair.insert_mandatory_tags` takes
+          the value as an argument.)
         """
 
         by_field: Dict[tuple, str] = {}

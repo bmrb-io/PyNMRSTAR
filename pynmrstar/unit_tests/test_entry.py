@@ -6,7 +6,7 @@ import warnings
 from copy import deepcopy as copy
 from pathlib import Path
 
-from pynmrstar import Entry, Saveframe, Loop, Severity, utils
+from pynmrstar import Entry, Saveframe, Loop, Severity, repair, utils
 from pynmrstar.exceptions import ParsingError
 
 our_path = os.path.dirname(os.path.realpath(__file__))
@@ -237,7 +237,7 @@ class TestEntry(unittest.TestCase):
         # keeps the two in step and the inconsistency only ever arrives from a
         # parsed file.
         frame.get_tag('Sf_framecode', whole_tag=True)[0][1] = 'something_else'
-        entry.fix_framecodes()
+        entry._fix_framecodes()
         self.assertEqual(frame.get_tag('Sf_framecode')[0], frame.name)
 
         # Half two: whitespace inside a saveframe-pointer value collapses to a
@@ -245,7 +245,7 @@ class TestEntry(unittest.TestCase):
         # $reference.
         shifts = entry.get_saveframes_by_category('assigned_chemical_shifts')[0]
         shifts.get_tag('Sample_condition_list_label', whole_tag=True)[0][1] = '$a b\tc'
-        entry.fix_framecodes()
+        entry._fix_framecodes()
         self.assertEqual(shifts.get_tag('Sample_condition_list_label')[0], '$a_b_c')
 
     def test_fix_framecodes_leaves_nulls_alone(self):
@@ -256,7 +256,7 @@ class TestEntry(unittest.TestCase):
         shifts = entry.get_saveframes_by_category('assigned_chemical_shifts')[0]
         for null in ('.', '?'):
             shifts.get_tag('Sample_condition_list_label', whole_tag=True)[0][1] = null
-            entry.fix_framecodes()
+            entry._fix_framecodes()
             self.assertEqual(shifts.get_tag('Sample_condition_list_label')[0], null)
 
     def test_mark_framecode_values(self):
@@ -272,12 +272,12 @@ class TestEntry(unittest.TestCase):
         self.assertTrue(pointer[1].startswith('$'))
 
         pointer[1] = pointer[1].lstrip('$')
-        entry.mark_framecode_values()
+        entry._mark_framecode_values()
         self.assertEqual(pointer[1], f'${shifts.get_tag("Sample_condition_list_label")[0].lstrip("$")}')
         self.assertTrue(pointer[1].startswith('$'))
 
         # Idempotent: running it again must not stack markers.
-        entry.mark_framecode_values()
+        entry._mark_framecode_values()
         self.assertFalse(pointer[1].startswith('$$'))
 
     def test_normalize_repairs_framecodes(self):
@@ -304,69 +304,47 @@ class TestEntry(unittest.TestCase):
         self.assertEqual([_ for _ in entry.validate_full(profile='internal')
                           if _.check == 'saveframe.framecode_mismatch'], [])
 
-    def test_insert_local_ids(self):
-        """InsertLocalIDs (100): a per-category counter, in document order."""
-
-        entry = copy(self.file_entry)
-        frame = entry.get_saveframes_by_category('entity')[0]
-        frame.get_tag('ID', whole_tag=True)[0][1] = '99'
-
-        entry.insert_local_ids()
-        self.assertEqual(frame.get_tag('ID')[0], '1')
-
-        # The counter is per category and follows document order.
-        for position, each in enumerate(entry.get_saveframes_by_category('entity'), start=1):
-            self.assertEqual(each.get_tag('ID')[0], str(position))
-
-    def test_insert_local_ids_leaves_entry_id_alone(self):
-        """Entry_ID tags carry the accession number, not a per-category counter.
-
-        They have lclSfIdFlg set, so a port that keys on that flag alone
-        overwrites every one of them with '1'. Schema.local_id_tags already
-        excludes _Entry.ID and the *.Entry_ID tags; this checks it stays that
-        way."""
-
-        entry = copy(self.file_entry)
-        before = entry.get_saveframes_by_category('entity')[0].get_tag('Entry_ID')[0]
-        entry.insert_local_ids()
-        self.assertEqual(entry.get_saveframes_by_category('entity')[0].get_tag('Entry_ID')[0], before)
-
     def test_add_row_indexes(self):
-        """AddRowIndexes (85), including the part that is easy to get wrong."""
+        """Every loop with a row-index column is renumbered 1, 2, 3, ..."""
 
         entry = copy(self.file_entry)
         frame = entry.get_saveframes_by_category('entry_information')[0]
         loop = frame['_Entry_author']
         position = loop.tags.index('Ordinal')
+        expected = [str(_) for _ in range(1, len(loop.data) + 1)]
 
-        # A gap is filled, and the whole column is renumbered from 1.
+        # A gap is filled ...
         loop.data[1][position] = '.'
         entry.add_row_indexes()
-        self.assertEqual([_[position] for _ in loop.data],
-                         [str(_) for _ in range(1, len(loop.data) + 1)])
+        self.assertEqual([_[position] for _ in loop.data], expected)
 
-    def test_add_row_indexes_leaves_a_complete_column_alone(self):
-        """A loop whose index column has no gap is not touched at all -- even
-        when the numbering is wrong.
-
-        That is the original's behaviour and it is load-bearing: its query looks
-        for a row-index tag having at least one null value and returns without
-        touching the loop if it finds none. Renumbering unconditionally, which
-        is the natural thing to write, would silently repair what
-        CheckRowIndexes (18) exists to report."""
-
-        entry = copy(self.file_entry)
-        frame = entry.get_saveframes_by_category('entry_information')[0]
-        loop = frame['_Entry_author']
-        position = loop.tags.index('Ordinal')
-
-        wrong = [str(_ * 10) for _ in range(1, len(loop.data) + 1)]
-        for row, value in zip(loop.data, wrong):
+        # ... and so is a column that is complete but wrong. The dictionary
+        # names the index tag, so it is found under 'Ordinal' here and 'ID'
+        # elsewhere without the caller saying which.
+        for row, value in zip(loop.data, [str(_ * 10) for _ in range(1, len(loop.data) + 1)]):
             row[position] = value
         entry.add_row_indexes()
-        self.assertEqual([_[position] for _ in loop.data], wrong)
+        self.assertEqual([_[position] for _ in loop.data], expected)
 
-    def test_insert_mandatory_tags(self):
+    def test_normalize_leaves_referenced_row_indexes_alone(self):
+        """normalize() renumbers a row index only when nothing points at it.
+
+        _Entity_comp_index.ID is a row index that _Atom_chem_shift.Comp_index_ID
+        refers to, and the reference remapping cannot follow a loop ID (the same
+        number means a different residue in each entity saveframe). So it is
+        left as it is rather than renumbered without its references."""
+
+        entry = copy(self.file_entry)
+        loop = entry.get_saveframes_by_category('entity')[0]['_Entity_comp_index']
+        position = loop.tags.index('ID')
+        scrambled = [str(_ * 10) for _ in range(1, len(loop.data) + 1)]
+        for row, value in zip(loop.data, scrambled):
+            row[position] = value
+
+        entry.normalize()
+        self.assertEqual([_[position] for _ in loop.data], scrambled)
+
+    def test_repair_insert_mandatory_tags(self):
         """InsertMandatoryTags (105): a missing required free tag arrives as '?'."""
 
         entry = copy(self.file_entry)
@@ -374,10 +352,10 @@ class TestEntry(unittest.TestCase):
         self.assertEqual(frame.get_tag('Title'), file_entry.get_tag('_Entry.Title'))
         frame.remove_tag('Title')
 
-        entry.insert_mandatory_tags(profile='internal')
+        repair.insert_mandatory_tags(entry, profile='internal')
         self.assertEqual(frame.get_tag('Title'), ['?'])
 
-    def test_insert_mandatory_tags_skips_optional_and_auto(self):
+    def test_repair_insert_mandatory_tags_skips_optional_and_auto(self):
         """Two kinds of tag it must not add, for two different reasons.
 
         An optional tag is nobody's to add. An *auto-inserted* one is the
@@ -406,12 +384,12 @@ class TestEntry(unittest.TestCase):
             return {f'{frame.tag_prefix}.{name}'.lower() for name, _ in frame.tags}
 
         before = present()
-        entry.insert_mandatory_tags(profile='internal')
+        repair.insert_mandatory_tags(entry, profile='internal')
         added = present() - before
         self.assertTrue(added)
         self.assertEqual(added.intersection(optional | auto), set())
 
-    def test_insert_mandatory_tags_creates_a_missing_loop(self):
+    def test_repair_insert_mandatory_tags_creates_a_missing_loop(self):
         """A required tag whose whole loop is missing brings the loop with it --
         every column of the category, one row, the row index numbered 0."""
 
@@ -419,7 +397,7 @@ class TestEntry(unittest.TestCase):
         frame = entry.get_saveframes_by_category('entry_information')[0]
         frame.remove_loop(frame['_Entry_author'])
 
-        entry.insert_mandatory_tags(profile='internal', entry_id='NEED_ACC_NUM')
+        repair.insert_mandatory_tags(entry, profile='internal', entry_id='NEED_ACC_NUM')
         loop = frame['_Entry_author']
 
         self.assertEqual(len(loop.data), 1)
@@ -431,7 +409,7 @@ class TestEntry(unittest.TestCase):
         # Sf_ID is bookkeeping, not a column for anyone to fill in.
         self.assertNotIn('sf_id', [_.lower() for _ in loop.tags])
 
-    def test_insert_mandatory_tags_fills_an_existing_loop(self):
+    def test_repair_insert_mandatory_tags_fills_an_existing_loop(self):
         """A loop that exists gets the missing column, valued in every row."""
 
         entry = copy(self.file_entry)
@@ -444,12 +422,12 @@ class TestEntry(unittest.TestCase):
         del loop.tags[position]
         loop._lc_tags_cache = None
 
-        entry.insert_mandatory_tags(profile='internal')
+        repair.insert_mandatory_tags(entry, profile='internal')
         loop = frame['_Entry_author']
         self.assertEqual([_[loop.tag_index('Family_name')] for _ in loop.data],
                          ['?'] * len(loop.data))
 
-    def test_insert_mandatory_tags_honours_a_conditional_rule(self):
+    def test_repair_insert_mandatory_tags_honours_a_conditional_rule(self):
         """A conditional rule decides it, and it is scoped to the saveframe.
 
         _Entity.Nstd_monomer is value-mandatory, except in an entity whose Type
@@ -467,93 +445,9 @@ class TestEntry(unittest.TestCase):
         non_polymer.add_tag('Type', 'non-polymer', update=True)
         entry.add_saveframe(non_polymer)
 
-        entry.insert_mandatory_tags(profile='internal')
+        repair.insert_mandatory_tags(entry, profile='internal')
         self.assertEqual(polymer.get_tag('Nstd_monomer'), ['?'])
         self.assertEqual(non_polymer.get_tag('Nstd_monomer'), [])
-
-    def _pointer_entry(self, chem_comps=('LIG',)) -> Entry:
-        """An entry with one entity pointing at nothing in particular, and as
-        many chem_comp saveframes as asked for."""
-
-        entry = Entry.from_scratch('related')
-        for name in chem_comps:
-            frame = Saveframe.from_scratch(f'chem_comp_{name}', tag_prefix='_Chem_comp')
-            frame.add_tags([['Sf_category', 'chem_comp'], ['Sf_framecode', f'chem_comp_{name}'],
-                            ['ID', name]])
-            entry.add_saveframe(frame)
-
-        entity = Saveframe.from_scratch('entity_1', tag_prefix='_Entity')
-        entity.add_tags([['Sf_category', 'entity'], ['Sf_framecode', 'entity_1'], ['ID', '1'],
-                         ['Parent_entity_ID', '7'],
-                         ['Nonpolymer_comp_ID', '.'], ['Nonpolymer_comp_label', '.']])
-        entry.add_saveframe(entity)
-        return entry
-
-    def test_update_related_tags_fills_a_lone_pointer(self):
-        """UpdateRelatedTags (101), passes 1 and 2: an empty pointer is filled in
-        when the entry holds exactly one saveframe it could mean, and the ID
-        beside it is then resolved from it."""
-
-        entry = self._pointer_entry()
-        entry.update_related_tags()
-        entity = entry.get_saveframe_by_name('entity_1')
-
-        self.assertEqual(entity.get_tag('Nonpolymer_comp_label'), ['$chem_comp_LIG'])
-        self.assertEqual(entity.get_tag('Nonpolymer_comp_ID'), ['LIG'])
-
-    def test_update_related_tags_will_not_guess_between_two(self):
-        """With two candidates there is nothing to choose between them, so the
-        pointer is left empty -- and the ID with it."""
-
-        entry = self._pointer_entry(chem_comps=('LIG', 'HEM'))
-        entry.update_related_tags()
-        entity = entry.get_saveframe_by_name('entity_1')
-
-        self.assertEqual(entity.get_tag('Nonpolymer_comp_label'), ['.'])
-        self.assertEqual(entity.get_tag('Nonpolymer_comp_ID'), ['.'])
-
-    def test_update_related_tags_overwrites_a_child(self):
-        """Pass 3 pushes a parent's value down over whatever the child held.
-
-        The original's test for "these already agree" guards a debug print
-        rather than the update, so the update is unconditional -- and writing
-        the parent's value over a different one is the point of the function.
-        _Entity.Parent_entity_ID starts at 7 here and must come out as the
-        entity's own ID."""
-
-        entry = self._pointer_entry()
-        entry.update_related_tags()
-        self.assertEqual(entry.get_saveframe_by_name('entity_1').get_tag('Parent_entity_ID'), ['1'])
-
-    def test_update_related_tags_reports_an_empty_label(self):
-        """An empty pointer that pass 1 would not guess at is reported instead --
-        unless the row names a standard residue, in which case the reference can
-        be reconstructed and the original stays quiet.
-
-        Reported against the ID tag rather than the row, which is the original's
-        own choice: it reports the line the tag was read from, so several empty
-        rows of one column collapse to a single finding once the validator's
-        error list has deduplicated them."""
-
-        entry = copy(self.file_entry)
-        entity = entry.get_saveframes_by_category('entity')[0]
-        loop = entity['_Entity_comp_index']
-        label, comp = loop.tag_index('Comp_label'), loop.tag_index('Comp_ID')
-        for row in loop.data:
-            row[label] = '.'
-        loop.data[0][comp] = 'XYZ'
-
-        issues = [_ for _ in entry.update_related_tags()
-                  if _.tag == '_Entity_comp_index.Comp_ID']
-        self.assertTrue(issues)
-        self.assertEqual(issues[0].check, 'tag.missing_saveframe_label')
-        self.assertIsNone(issues[0].row)
-
-        # ... and with every residue standard, nothing is reported.
-        for row in loop.data:
-            row[comp] = 'ALA'
-        self.assertEqual([_ for _ in entry.update_related_tags()
-                          if _.tag == '_Entity_comp_index.Comp_ID'], [])
 
     def test_validate_full_invalid_tags(self):
         entry = copy(self.file_entry)

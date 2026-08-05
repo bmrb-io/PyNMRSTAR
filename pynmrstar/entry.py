@@ -11,7 +11,7 @@ from pynmrstar import definitions, utils, loop as loop_mod, saveframe as savefra
 from pynmrstar._internal import _json_serialize, _interpret_file, _get_entry_from_database, write_to_file
 from pynmrstar.exceptions import InvalidStateError
 from pynmrstar.schema import Schema
-from pynmrstar.validation import Severity, ValidationIssue, _MandatoryResolver, _row_index_tag, _value_type, check_saveframes, check_mandatory_tags, \
+from pynmrstar.validation import Severity, ValidationIssue, _row_index_tag, _value_type, check_saveframes, check_mandatory_tags, \
     check_invalid_tags, check_tag_order, check_row_indexes, check_related_tags, check_local_ids, \
     check_frame_codes, check_sample_saveframe, check_charset, check_empty_rows, check_data_values, \
     check_data_types
@@ -612,8 +612,8 @@ class Entry(object):
         # updating below dereferences a value by stripping its leading '$' and
         # looking the saveframe up by name, so a reference missing its marker or
         # carrying whitespace has to be fixed first or that lookup misses.
-        self.fix_framecodes(schema=my_schema)
-        self.mark_framecode_values(schema=my_schema)
+        self._fix_framecodes(schema=my_schema)
+        self._mark_framecode_values(schema=my_schema)
 
         # Sort the saveframes according to ID, if an ID exists. Otherwise, still sort by category
         ordering = my_schema.category_order
@@ -768,6 +768,29 @@ class Entry(object):
                         logger.warning(f'The tag {saveframe.tag_prefix}.{tag[0]} has value {tag[1]} '
                                        f'but there is no valid primary key.')
 
+                # A free saveframe pointer with an ID tag beside it: the pointer
+                # names the saveframe, so the ID is whatever that saveframe's
+                # own ID tag says. The loop version of this is below; free tags
+                # need it too, and _Entity.Nonpolymer_comp_label paired with
+                # _Entity.Nonpolymer_comp_ID is the common case.
+                elif tag_schema['Foreign Table'] and tag_schema['Foreign Column'] == 'Sf_framecode':
+                    if tag[1] in definitions.NULL_VALUES:
+                        continue
+                    for candidate in saveframe.tags:
+                        candidate_schema = my_schema.schema.get(
+                            f"{saveframe.tag_prefix}.{candidate[0]}".lower())
+                        if not candidate_schema:
+                            continue
+                        if candidate_schema['Foreign Table'] == tag_schema['Foreign Table'] and \
+                                candidate_schema['Foreign Column'] == 'ID' and \
+                                candidate_schema['entryIdFlg'] != 'Y':
+                            try:
+                                candidate[1] = self.get_saveframe_by_name(
+                                    str(tag[1])[1:]).get_tag('ID')[0]
+                            except (KeyError, IndexError):
+                                logger.warning(f'Missing frame of type {tag[0]} pointed to by {candidate[0]}')
+                            break
+
             # Now apply the remapping to loops...
             for loop in saveframe:
                 for x, tag in enumerate(loop.tags):
@@ -828,19 +851,46 @@ class Entry(object):
                                     except KeyError:
                                         logger.warning(f"Missing frame of type {tag} pointed to by {conditional_tag}")
 
-        # Renumber the 'ID' column in a loop
+        # Renumber the row-index column of every loop that has one -- but only
+        # where nothing refers to it.
+        #
+        # This used to renumber any loop with a column literally named 'ID',
+        # with '_Experiment' excluded by name. Both halves of that were wrong.
+        # 'ID' is not the dictionary's idea of a row index: 26 loop categories
+        # have an ID column that is not one, and 10 categories index their rows
+        # under another name (_Entry_author.Ordinal and its like), so the old
+        # rule renumbered columns it should not have and missed ones it should.
+        #
+        # The exclusion was patching the real problem, which is that a row index
+        # can also be a key other loops point at -- _Experiment.ID is named as a
+        # parent by 54 tags. Renumbering one of those is only safe if every
+        # reference is rewritten to match, and the remapping above cannot do it:
+        # its keys are Category.Tag.value, which is unique for a saveframe-level
+        # local ID but not for a loop one. _Entity_comp_index.ID 5 means a
+        # different residue in each entity saveframe, and _Atom_chem_shift
+        # disambiguates it with the Entity_ID beside it, so a single old -> new
+        # map would rewrite every entity's shifts from one entity's renumbering.
+        # _Entity_comp_index.ID is renumbered here today for exactly that
+        # reason -- it is not named _Experiment.
+        #
+        # So: renumber what nothing points at, and leave the rest until the
+        # remapping understands composite keys.
+        referenced = {parent.lower() for parent in my_schema.parent_tags.values()}
         for each_frame in self._frame_list:
             for loop in each_frame.loops:
-                if loop.tag_index('ID') is not None and loop.category != '_Experiment':
-                    loop.renumber_rows('ID')
+                index_tag = _row_index_tag(loop, my_schema)
+                if index_tag is None:
+                    continue
+                if f'{loop.category}.{index_tag}'.lower() in referenced:
+                    continue
+                loop.renumber_rows(index_tag)
 
     def _framecode_values(self, schema: Schema):
         """Every saveframe-pointer value in the entry, as (container, setter) pairs.
 
         A tag points at a saveframe when the dictionary sets its ``Sf pointer``
         flag -- the same rule ``validation._value_type`` uses to call a tag's
-        type ``FRAMECODE``, which is in turn how the BMRB validator's
-        ``TAGS.VALTYPE`` is derived. Yields a callable rather than a reference
+        type ``FRAMECODE``. Yields a callable rather than a reference
         because a value may live in a saveframe tag pair or in a loop row, and
         the caller should not have to care which."""
 
@@ -858,26 +908,21 @@ class Entry(object):
                         yield row[position], \
                             lambda value, _row=row, _at=position: _row.__setitem__(_at, value)
 
-    def fix_framecodes(self, schema: Optional[Schema] = None) -> None:
-        """Repair saveframe labels and the references to them.
-
-        Two repairs, which are the two halves of the BMRB validator's
-        ``FixFramecodes`` (function 75):
+    def _fix_framecodes(self, schema: Optional[Schema] = None) -> None:
+        """Repair saveframe labels and the references to them. Two repairs:
 
         * every ``Sf_framecode`` tag is set to the name of the saveframe holding
-          it, which is what ``CheckSaveFrames`` sub-check 0-2 reports when they
-          disagree;
+          it, since the name is what a reference resolves against;
         * in every saveframe-pointer value, runs of whitespace become a single
           underscore -- a framecode with a space in it is not writable as a
           ``$reference``.
 
-        Null values are left alone: the original's query excludes ``NULL``,
-        ``.`` and ``?`` explicitly, and a missing reference is not a misspelt
-        one.
+        Null values are left alone: a missing reference is not a misspelt one.
 
-        **This erases a validation finding, so do not call it before
-        validating.** That is not a caveat about this method so much as the
-        point of it -- it is the repair paired with the check.
+        Called by :meth:`normalize` before anything reads a pointer, because
+        dereferencing one means stripping its ``$`` and looking the saveframe up
+        by name -- so a reference carrying whitespace has to be repaired before
+        that lookup rather than after it.
         """
 
         my_schema: Schema = utils.get_schema(schema)
@@ -896,497 +941,19 @@ class Entry(object):
             if collapsed != value:
                 assign(collapsed)
 
-    def insert_local_ids(self, schema: Optional[Schema] = None) -> None:
-        """Number each saveframe within its category, and write that number into
-        every local-ID tag it contains.
-
-        The BMRB validator's ``InsertLocalIDs`` (function 100). A local ID is a
-        tag the dictionary flags ``lclSfIdFlg`` -- ``Schema.local_id_tags``,
-        which already excludes ``_Entry.ID`` and the ``*.Entry_ID`` tags, since
-        those carry the entry's accession number rather than a per-category
-        counter and belong to :attr:`entry_id`.
-
-        The counter restarts per saveframe category and runs in document order,
-        so the third ``entity`` saveframe gets 3 in its own ``_Entity.ID`` and in
-        every loop column that refers to it.
-
-        **``chem_comp`` is a special case, and it is by category name.** Its
-        local ID is a residue code such as ``ALA`` rather than a number, so the
-        original reads the saveframe's existing *free* local-ID tag and reuses
-        that value instead of the counter, falling back to the counter only when
-        it is null. (:meth:`normalize` reaches nearly the same place from a
-        different direction -- it renumbers only tags whose BMRB data type is
-        ``int``, which spares a residue code because it is not one. The two
-        agree on real entries; this reproduces the original's rule so that they
-        agree by construction rather than by luck.)
-        """
-
-        my_schema: Schema = utils.get_schema(schema)
-        counters: Dict[str, int] = {}
-
-        def is_local_id(prefix: str, name: str) -> bool:
-            return f'{prefix}.{name}'.lower() in my_schema.local_id_tags
-
-        for saveframe in self._frame_list:
-            category = saveframe.category
-            if category is None:
-                continue
-
-            counters[category] = counters.get(category, 0) + 1
-            value = str(counters[category])
-
-            if category == 'chem_comp':
-                for tag in saveframe.tags:
-                    if is_local_id(saveframe.tag_prefix, tag[0]):
-                        if tag[1] is not None and tag[1] not in definitions.NULL_VALUES:
-                            value = tag[1]
-                        break
-
-            for tag in saveframe.tags:
-                if is_local_id(saveframe.tag_prefix, tag[0]):
-                    tag[1] = value
-            for loop in saveframe.loops:
-                for position, name in enumerate(loop.tags):
-                    if is_local_id(loop.category, name):
-                        for row in loop.data:
-                            row[position] = value
-
-    def insert_mandatory_tags(self, schema: Optional[Schema] = None,
-                              profile: Optional[str] = None,
-                              entry_id: Optional[str] = None) -> None:
-        """Add the tags the dictionary requires but the entry does not supply,
-        each with its dictionary default or ``?``.
-
-        The BMRB validator's ``InsertMandatoryTags`` (function 105), and the
-        repair paired with :meth:`validate_full`'s ``check_mandatory_tags``: it
-        adds exactly the tags that check reports. A tag is added when all of the
-        following hold, which is that check's rule plus two more:
-
-        * the dictionary places it in this saveframe's category;
-        * it is **metadata** -- annotation, not measurement. A missing chemical
-          shift is not something to conjure a column for;
-        * it is **not auto-inserted**. A tag a deposition tool fills in by
-          itself is that tool's to write, and every tag carrying a default value
-          is in this set (see :attr:`Schema.auto_inserted_tags`), which is why
-          in practice the value written here is always ``?``;
-        * its mandatory code, once any conditional rule is applied, is neither
-          optional nor invalid -- so ``M``, ``V``, ``C`` and ``R`` alike are
-          added. Conditional means "required once this saveframe exists", and
-          the saveframe does exist.
-
-        **A required tag whose whole loop is missing brings the loop with it.**
-        The new loop gets every column the dictionary gives its category -- not
-        only the required ones -- and a single row: the row-index column
-        numbered ``0``, ``*.Entry_ID`` set to ``entry_id``, every other column
-        its default or ``?``. That is the original's doing and it is deliberate
-        there: a loop is a form for the annotator to fill in, so it arrives
-        whole. (``Sf_ID`` columns are the exception; they are bookkeeping the
-        tools maintain, and the validator's own unparser strips them on the way
-        out again.)
-
-        :param schema: the dictionary to read; the cached current one by default
-        :param profile: which view of the dictionary's mandatory flags to apply
-        :param entry_id: the value for ``*.Entry_ID`` columns of any loop this
-            creates. Defaults to the entry's own ``_Entry.ID``, or ``?`` when
-            that is absent or null. BMRB's tool passes its ``NEED_ACC_NUM``
-            placeholder here.
-
-        .. note::
-            **The original aborts partway and this does not.** Having created a
-            loop, it does not know it: the next required tag of that category
-            still looks missing, so it tries to insert a column that now exists
-            and throws ``Tag already exists``, which stops the edit with only
-            the saveframes it had already reached changed. Every entry tried
-            hits this in ``entry_information``, which is why the class Javadoc
-            has said "This function is not working yet" since 2003. A crash is
-            not an edit; this is the function carried to completion.
-        """
-
-        my_schema: Schema = utils.get_schema(schema)
-        resolver = _MandatoryResolver(self, my_schema, profile)
-
-        if entry_id is None:
-            entry_id = '?'
-            for value in self.get_tag('_Entry.ID'):
-                if value is not None and str(value).strip() not in definitions.NULL_VALUES:
-                    entry_id = value
-                break
-
-        def default_for(tag: str) -> str:
-            """What to write into a tag being created empty."""
-
-            if tag.endswith('.entry_id'):
-                return entry_id
-            return my_schema.default_values.get(tag, '?')
-
-        # The tags worth considering, grouped by the saveframe category they
-        # belong to and ordered as the dictionary orders them. Auto-inserted
-        # tags are dropped here rather than per saveframe: they are never added,
-        # whatever their mandatory code says.
-        by_category: Dict[str, List[str]] = {}
-        for tag, tag_data in my_schema.schema.items():
-            if tag_data.get('Meta data') != 'Y' or tag in my_schema.auto_inserted_tags:
-                continue
-            category = (tag_data.get('SFCategory') or '').strip()
-            if category:
-                by_category.setdefault(category, []).append(tag)
-        for tags in by_category.values():
-            tags.sort(key=lambda _: int(my_schema.schema[_].get('Dictionary sequence') or 0))
-
-        # Every loop column the dictionary gives a category, in dictionary
-        # order, for the loops this may have to create.
-        columns: Dict[str, List[str]] = {}
-        for tag, tag_data in my_schema.schema.items():
-            if (tag_data.get('Loopflag') or '').strip() != 'Y':
-                continue
-            if (tag_data.get('Saveframe ID tag') or '').strip() == 'Y':
-                continue
-            columns.setdefault(f"{(tag_data.get('SFCategory') or '').strip()}|"
-                               f"{tag.rsplit('.', 1)[0]}", []).append(tag)
-        for tags in columns.values():
-            tags.sort(key=lambda _: int(my_schema.schema[_].get('Dictionary sequence') or 0))
-
-        for saveframe in self._frame_list:
-            category = my_schema.schema.get(
-                f'{saveframe.tag_prefix.lower()}.sf_category', {}).get('SFCategory')
-            if not category:
-                continue
-
-            present = {f'{saveframe.tag_prefix}.{name}'.lower() for name, _ in saveframe.tags}
-            for loop in saveframe.loops:
-                present.update(f'{loop.category}.{name}'.lower() for name in loop.tags)
-
-            for tag in by_category.get(category, []):
-                if tag in present:
-                    continue
-                code = resolver.code(tag, saveframe, category)
-                if code in ('O', 'I'):
-                    continue
-
-                full_tag = my_schema.schema[tag]['Tag']
-                if (my_schema.schema[tag].get('Loopflag') or '').strip() != 'Y':
-                    saveframe.add_tag(full_tag, default_for(tag))
-                    present.add(tag)
-                    continue
-
-                loop_category = full_tag.rsplit('.', 1)[0]
-                loop = None
-                for candidate in saveframe.loops:
-                    if (candidate.category or '').lower() == loop_category.lower():
-                        loop = candidate
-                        break
-
-                if loop is not None:
-                    loop.add_tag(full_tag, update_data=True)
-                    position = loop.tag_index(full_tag)
-                    for row in loop.data:
-                        row[position] = default_for(tag)
-                    present.add(tag)
-                    continue
-
-                new_columns = columns.get(f'{category}|{loop_category.lower()}', [tag])
-                loop = loop_mod.Loop.from_scratch(category=loop_category)
-                row = []
-                for column in new_columns:
-                    loop.add_tag(my_schema.schema[column]['Tag'])
-                    index_key = (my_schema.schema[column].get('Row Index Key') or '').strip()
-                    row.append('0' if index_key == 'Y' else default_for(column))
-                loop.data.append(row)
-                saveframe.add_loop(loop)
-                present.update(new_columns)
-
-    #: Saveframe pointers :meth:`update_related_tags` will not guess at, even
-    #: when the entry holds exactly one candidate saveframe. The original lists
-    #: them by name, and they have a shape in common: each is a pointer an
-    #: annotator chooses between several of, so "the only one there is" is not
-    #: evidence. A sample component names an entity, an experiment names a
-    #: sample, anything may cite a citation, and a residue names its chemical
-    #: component. Matched the way the original matches them -- prefix, infix or
-    #: whole name, per entry.
-    _POINTERS_NOT_GUESSED = (('prefix', '_Sample_component.'),
-                             ('infix', '_experiment.Sample_label'),
-                             ('infix', '.Citation_label'),
-                             ('infix', '.Indirect_shift_ratio_cit_label'),
-                             ('infix', '.Correction_val_cit_label'),
-                             ('whole', '_Deleted_atom.Comp_label'),
-                             ('whole', '_Entity_comp_index.Comp_label'))
-
-    #: The residue codes that excuse a missing ``Comp_label``: with one of
-    #: these in the row's ``Comp_ID`` the reference can be reconstructed, so the
-    #: original reports nothing. Standard amino acids only -- the list is
-    #: written out longhand in ``checkCompId()`` and carries no nucleotides.
-    _RECONSTRUCTABLE_RESIDUES = frozenset(
-        ('ALA', 'ARG', 'ASP', 'ASN', 'CYS', 'GLU', 'GLN', 'GLY', 'HIS', 'ILE',
-         'LEU', 'LYS', 'MET', 'PHE', 'PRO', 'SER', 'THR', 'TRP', 'TYR', 'VAL'))
-
-    def update_related_tags(self, schema: Optional[Schema] = None) -> List[ValidationIssue]:
-        """Bring the tags that refer to other saveframes back into step, and
-        report the references that cannot be resolved.
-
-        The BMRB validator's ``UpdateRelatedTags`` (function 101), and the only
-        edit that also reports findings. Three passes, run in this order because
-        each feeds the next:
-
-        1. **An empty saveframe pointer is filled in, where only one saveframe
-           could be meant.** A ``*_label`` value that is null, ``.`` or ``?`` is
-           set to ``$<name>`` of the saveframe its dictionary parent lives in --
-           but only when the entry holds exactly one of them, and not for the
-           pointers in :attr:`_POINTERS_NOT_GUESSED`.
-        2. **A pointer and its ID are kept in step.** For every ``*_ID`` tag the
-           dictionary derives from a ``*_label``, the label says which saveframe
-           is meant and this writes that saveframe's local ID into the ID tag --
-           per row, for a loop. A label that is empty is reported as
-           ``Missing saveframe label value`` unless the row's ``Comp_ID`` names a
-           standard residue, in which case the reference can be reconstructed
-           and the original stays quiet.
-        3. **A parent tag's value is pushed down to its children inside the
-           saveframe.** Free tags only, both ends: where a saveframe carries a
-           tag and also carries tags the dictionary makes its children, the
-           children are set to the parent's value. This is how
-           ``_Entity.Parent_entity_ID`` comes to equal ``_Entity.ID``.
-
-        Pass 3 **overwrites a child that already has a value**, and that is the
-        original's behaviour rather than an accident of this port: its test for
-        "the value already agrees" guards a debug print rather than the update,
-        so the update is unconditional. Writing the parent's value over a
-        different one is the point of the function.
-
-        :return: the findings of pass 2, as
-            :class:`pynmrstar.validation.ValidationIssue`.
-        """
-
-        my_schema: Schema = utils.get_schema(schema)
-        self._update_sf_labels(my_schema)
-        issues = self._update_sf_link_tags(my_schema)
-        self._update_child_free_tags(my_schema)
-        return issues
-
-    @staticmethod
-    def _pointer_tags(schema: Schema) -> set:
-        """The tags whose value names a saveframe. The dictionary's ``Sf
-        pointer`` flag, which is also what makes the validator call a tag's type
-        ``FRAMECODE`` whatever its SQL column says."""
-
-        return {tag for tag, data in schema.schema.items()
-                if (data.get('Sf pointer') or '').strip().upper().startswith('Y')}
-
-    def _update_sf_labels(self, schema: Schema) -> None:
-        """Pass 1: fill in an empty saveframe pointer from the only saveframe it
-        could mean."""
-
-        pointers = self._pointer_tags(schema)
-
-        # Where each tag occurs, and the first value it has. A pointer is only
-        # guessed at when its parent occurs exactly once in the whole entry --
-        # with two candidates there is nothing to choose between them.
-        counts: Dict[str, int] = {}
-        first: Dict[str, Any] = {}
-        for saveframe in self._frame_list:
-            for name, value in saveframe.tags:
-                tag = f'{saveframe.tag_prefix}.{name}'.lower()
-                counts[tag] = counts.get(tag, 0) + 1
-                if tag not in first:
-                    first[tag] = value
-            for loop in saveframe.loops:
-                for position, name in enumerate(loop.tags):
-                    tag = f'{loop.category}.{name}'.lower()
-                    counts[tag] = counts.get(tag, 0) + 1
-                    if tag not in first and loop.data:
-                        first[tag] = loop.data[0][position]
-
-        def guessable(tag: str) -> bool:
-            name = schema.schema[tag]['Tag']
-            for kind, pattern in self._POINTERS_NOT_GUESSED:
-                if kind == 'whole' and name == pattern:
-                    return False
-                if kind == 'prefix' and name.startswith(pattern):
-                    return False
-                # find() > 0 rather than 'in': the original's test skips a match
-                # at the very start of the name, which for an infix beginning
-                # with '.' or naming a category cannot happen anyway.
-                if kind == 'infix' and name.find(pattern) > 0:
-                    return False
-            return True
-
-        def replacement(tag: str, values: List[Any]) -> Optional[str]:
-            """What this pointer should say, or None to leave it alone."""
-
-            if tag not in pointers or tag not in schema.parent_tags:
-                return None
-            if not any(_ in definitions.NULL_VALUES for _ in values):
-                return None
-            if not guessable(tag):
-                return None
-            parent = schema.parent_tags[tag].lower()
-            if counts.get(parent) != 1:
-                return None
-            source = first.get(parent)
-            # Only a genuine null stops it here. '?' does not, and cannot occur:
-            # the parent of a pointer is a saveframe's own Sf_framecode.
-            if source is None or source in ('', '.'):
-                return None
-            return f'${source}'
-
-        for saveframe in self._frame_list:
-            for tag_pair in saveframe.tags:
-                value = replacement(f'{saveframe.tag_prefix}.{tag_pair[0]}'.lower(), [tag_pair[1]])
-                if value is not None:
-                    tag_pair[1] = value
-            for loop in saveframe.loops:
-                for position, name in enumerate(loop.tags):
-                    value = replacement(f'{loop.category}.{name}'.lower(),
-                                        [row[position] for row in loop.data])
-                    # One null row rewrites the whole column: the original
-                    # updates by tag id, with no row of its own to restrict it.
-                    if value is not None:
-                        for row in loop.data:
-                            row[position] = value
-
-    def _update_sf_link_tags(self, schema: Schema) -> List[ValidationIssue]:
-        """Pass 2: resolve each ``*_ID`` from the ``*_label`` beside it."""
-
-        issues: List[ValidationIssue] = []
-
-        # The dictionary marks an ID tag as a saveframe link by deriving its
-        # name from a pointer's: _Entity.Nonpolymer_comp_label ->
-        # _Entity.Nonpolymer_comp_ID (validator.py: load_tags). Going back the
-        # other way is the original's own rule, and it is not quite the inverse
-        # -- it rewrites the *first* '_ID' rather than every one.
-        links: Dict[str, str] = {}
-        for pointer in self._pointer_tags(schema):
-            name = schema.schema[pointer]['Tag']
-            identifier = name.replace('_label', '_ID')
-            if identifier.lower() not in schema.schema:
-                continue
-            position = identifier.find('_ID')
-            links[identifier.lower()] = (identifier[:position] + '_label'
-                                         + identifier[position + 3:])
-
-        by_name = {saveframe.name: saveframe for saveframe in self._frame_list}
-
-        def label_values(saveframe, name: str) -> List[Tuple[Any, Optional[int]]]:
-            """Every value of a tag in one saveframe, with the loop row it came
-            from -- the original looks the label up by name across the whole
-            saveframe rather than inside a particular loop."""
-
-            found: List[Tuple[Any, Optional[int]]] = []
-            for tag_name, value in saveframe.tags:
-                if f'{saveframe.tag_prefix}.{tag_name}'.lower() == name.lower():
-                    found.append((value, None))
-            for loop in saveframe.loops:
-                position = loop.tag_index(name)
-                if position is not None and (loop.category or '').lower() == \
-                        name.rsplit('.', 1)[0].lower():
-                    found.extend((row[position], index) for index, row in enumerate(loop.data))
-            return found
-
-        def reconstructable(saveframe, label_tag: str, row: Optional[int]) -> bool:
-            """Whether the row's ``Comp_ID`` makes an empty ``Comp_label``
-            harmless. Only the two component pointers are excused, and only for
-            a standard residue."""
-
-            if label_tag not in ('_Entity_comp_index.Comp_label', '_Deleted_atom.Comp_label'):
-                return False
-            for value, index in label_values(saveframe, label_tag.replace('_label', '_ID')):
-                if index == row and value in self._RECONSTRUCTABLE_RESIDUES:
-                    return True
-            return False
-
-        for saveframe in self._frame_list:
-            targets: List[Tuple[str, Any, Optional[int]]] = []
-            for tag_pair in saveframe.tags:
-                targets.append((f'{saveframe.tag_prefix}.{tag_pair[0]}'.lower(), tag_pair, None))
-            for loop in saveframe.loops:
-                for position, name in enumerate(loop.tags):
-                    targets.append((f'{loop.category}.{name}'.lower(), loop, position))
-
-            for tag, holder, position in targets:
-                if tag not in links or tag not in schema.parent_tags:
-                    continue
-                label_tag = links[tag]
-                parent = schema.parent_tags[tag]
-
-                for label, row in label_values(saveframe, label_tag):
-                    if label is None or str(label).strip() in ('', '.', '?'):
-                        if not reconstructable(saveframe, label_tag, row):
-                            # Against the ID tag rather than the row it was
-                            # found in, which is the original's own choice: it
-                            # reports the line the *tag* was read from, so a
-                            # column with several empty labels produces
-                            # several findings that are equal in every field --
-                            # and the validator's error list keeps one.
-                            issues.append(ValidationIssue(
-                                Severity.WARNING, 'tag.missing_saveframe_label',
-                                'Missing saveframe label value',
-                                saveframe=saveframe.name, tag=schema.schema[tag]['Tag']))
-                        continue
-
-                    target = by_name.get(str(label)[1:] if str(label).startswith('$')
-                                         else str(label))
-                    if target is None:
-                        continue
-                    for value, _ in label_values(target, parent):
-                        if position is None:
-                            # A free ID tag can only be set from a free label:
-                            # the original's loop update keys on a row number a
-                            # free value does not have.
-                            if row is None:
-                                holder[1] = value
-                        elif row is None:
-                            # ... and the reverse, where a free label rewrites
-                            # every row of a loop's ID column.
-                            for each in holder.data:
-                                each[position] = value
-                        elif row < len(holder.data):
-                            holder.data[row][position] = value
-
-        return issues
-
-    def _update_child_free_tags(self, schema: Schema) -> None:
-        """Pass 3: push a free parent tag's value into its free children, within
-        each saveframe."""
-
-        free = {tag for tag, data in schema.schema.items()
-                if (data.get('Loopflag') or '').strip() != 'Y'}
-        children: Dict[str, List[str]] = {}
-        for child, parent in schema.parent_tags.items():
-            if child in free and parent.lower() in free:
-                children.setdefault(parent.lower(), []).append(child)
-
-        for saveframe in self._frame_list:
-            tags: Dict[str, Any] = {}
-            for tag_pair in saveframe.tags:
-                tags.setdefault(f'{saveframe.tag_prefix}.{tag_pair[0]}'.lower(), tag_pair)
-
-            for parent, family in children.items():
-                if parent not in tags:
-                    continue
-                value = tags[parent][1]
-                # Null and '?' stop it; '.' only because the loader stores that
-                # as null. Nothing else does, not even the empty string.
-                if value is None or value in ('.', '?'):
-                    continue
-                for child in family:
-                    if child in tags:
-                        tags[child][1] = value
-
     def add_row_indexes(self, schema: Optional[Schema] = None) -> None:
-        """Number the rows of any loop whose row-index column is incomplete.
+        """Number the rows of every loop that has a row-index column, 1, 2, 3, …
 
-        The BMRB validator's ``AddRowIndexes`` (function 85). The dictionary
-        marks one tag per loop category as its row index; where that column has
-        a gap, this fills the whole column with 1, 2, 3, ...
+        The dictionary marks one tag per loop category as its row index
+        (``Row Index Key``), so a caller does not have to know that it is
+        ``Ordinal`` in one category and ``ID`` in another. Loops without one are
+        left alone.
 
-        **A loop whose index column is complete is left alone entirely, even if
-        the numbering is wrong.** That is the original's behaviour and it is
-        load-bearing rather than incidental: its query looks for a row-index tag
-        having at least one null value and returns without touching the loop if
-        it finds none. So a column reading 1, 2, 4 keeps its gap in the
-        numbering -- ``CheckRowIndexes`` (18) is what reports that -- while a
-        column with a genuinely missing value is renumbered from scratch.
-
-        (The class Javadoc says "Does nothing: reindexing is a function of
-        STARDB unparser". That is stale; ``edit()`` reindexes every loop.)
+        **A row index may also be a key other loops refer to** -- ``_Experiment.ID``
+        is named as a parent by 54 tags -- and renumbering one of those without
+        rewriting its references breaks them. This method renumbers regardless,
+        because it does exactly what it says; :meth:`normalize` is the one that
+        has to be conservative about it.
         """
 
         my_schema: Schema = utils.get_schema(schema)
@@ -1394,27 +961,16 @@ class Entry(object):
         for saveframe in self._frame_list:
             for loop in saveframe.loops:
                 index_tag = _row_index_tag(loop, my_schema)
-                if index_tag is None:
-                    continue
-                position = loop.tags.index(index_tag)
-                if any(row[position] in definitions.NULL_VALUES or
-                       (isinstance(row[position], str) and row[position].strip() in ('.', '?'))
-                       for row in loop.data):
+                if index_tag is not None:
                     loop.renumber_rows(index_tag)
 
-    def mark_framecode_values(self, schema: Optional[Schema] = None) -> None:
+    def _mark_framecode_values(self, schema: Optional[Schema] = None) -> None:
         """Ensure every saveframe-pointer value carries its ``$``.
 
-        The BMRB validator's ``MarkFramecodeValues`` (function 73). It is a
-        no-op on an entry read from a well-formed file -- the marker is part of
-        the value as pynmrstar holds it, so a parsed reference already has one.
-        It earns its place on an entry assembled through the API, where a
+        A no-op on an entry read from a well-formed file -- the marker is part
+        of the value as pynmrstar holds it, so a parsed reference already has
+        one. It earns its place on an entry assembled through the API, where a
         pointer is easily written as a bare saveframe name.
-
-        The original reaches the same place by a different route: its lexer
-        strips the ``$`` on the way in and records it as the value's delimiter,
-        so the function sets that delimiter and the unparser writes the marker
-        back out.
         """
 
         my_schema: Schema = utils.get_schema(schema)
