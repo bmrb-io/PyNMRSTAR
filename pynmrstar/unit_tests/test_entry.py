@@ -188,6 +188,44 @@ class TestEntry(unittest.TestCase):
         self.assertEqual(found[0].saveframe, frame.name)
         self.assertEqual(found[0].category, 'entry_information')
 
+    def test_validate_full_mandatory_first_value_only(self):
+        """A value-mandatory tag in a loop is judged on its *first* value.
+
+        This is what the BMRB validator does -- CheckMandatoryTags reads one row
+        of its result set and never loops -- and it is not what testing every
+        value would do. Pinned in both directions because getting it wrong in
+        either is silent: `all(...)` under-reports (which it did, missing two
+        findings the Java tool makes on bmr7154) and `any(...)` would
+        over-report.
+        """
+
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('sample_conditions')[0]
+        loop = frame['_Sample_condition_variable']
+        column = loop.tags.index('Val')
+        self.assertGreater(len(loop.data), 1, 'the fixture needs a multi-row loop')
+
+        def missing_value():
+            return [_ for _ in entry.validate_full(profile='internal')
+                    if _.check == 'tag.missing_value' and _.tag == '_Sample_condition_variable.Val']
+
+        # Every row populated: nothing to report.
+        self.assertEqual(missing_value(), [])
+
+        # Null in a row that is not the first: the original never looks at it.
+        original = loop.data[-1][column]
+        loop.data[-1][column] = '.'
+        self.assertEqual(missing_value(), [])
+        loop.data[-1][column] = original
+
+        # Null in the first row: reported, even though every other row has one.
+        original = loop.data[0][column]
+        loop.data[0][column] = '.'
+        found = missing_value()
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0].saveframe, frame.name)
+        loop.data[0][column] = original
+
     def test_validate_full_invalid_tags(self):
         entry = copy(self.file_entry)
         frame = entry.get_saveframes_by_category('entry_information')[0]

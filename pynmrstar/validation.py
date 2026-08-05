@@ -340,6 +340,13 @@ def _tag_values(saveframe, full_tag: str) -> List[Any]:
         return []
 
 
+def _is_null(value: Any) -> bool:
+    """Null as ``CheckMandatoryTags`` counts it: a SQL NULL, or a value that is
+    a bare ``?`` or ``.`` once trimmed."""
+
+    return value in definitions.NULL_VALUES or str(value).strip() in ('?', '.')
+
+
 class _MandatoryResolver:
     """Resolves a tag's mandatory code for one entry, conditional rules included.
 
@@ -453,7 +460,16 @@ def check_mandatory_tags(entry, schema, profile: str) -> List[ValidationIssue]:
                         Severity.ERROR, 'tag.missing',
                         f"Missing tag that requires a value: {full_tag}",
                         saveframe=saveframe.name, category=category, tag=full_tag))
-                elif all(_ in definitions.NULL_VALUES or str(_).strip() in ('?', '.') for _ in values):
+                # The first value, and only the first. CheckMandatoryTags does
+                # `has_tag = rs2.next()` and then reads that row's VAL, with no
+                # loop over the result set -- so a value-mandatory column that is
+                # null in the first row of a loop is a finding even when a later
+                # row supplies one. Testing every value instead (which is what
+                # this did) silently missed exactly that shape: `bmr7154` has a
+                # _Sample_condition_variable loop whose pH row leaves Val and
+                # Val_units null and whose temperature row does not, and Java
+                # reports both where we reported neither.
+                elif _is_null(values[0]):
                     issues.append(ValidationIssue(
                         Severity.ERROR, 'tag.missing_value',
                         f"Missing value for tag: {full_tag}",
