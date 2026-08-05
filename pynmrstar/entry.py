@@ -896,6 +896,61 @@ class Entry(object):
             if collapsed != value:
                 assign(collapsed)
 
+    def insert_local_ids(self, schema: Optional[Schema] = None) -> None:
+        """Number each saveframe within its category, and write that number into
+        every local-ID tag it contains.
+
+        The BMRB validator's ``InsertLocalIDs`` (function 100). A local ID is a
+        tag the dictionary flags ``lclSfIdFlg`` -- ``Schema.local_id_tags``,
+        which already excludes ``_Entry.ID`` and the ``*.Entry_ID`` tags, since
+        those carry the entry's accession number rather than a per-category
+        counter and belong to :attr:`entry_id`.
+
+        The counter restarts per saveframe category and runs in document order,
+        so the third ``entity`` saveframe gets 3 in its own ``_Entity.ID`` and in
+        every loop column that refers to it.
+
+        **``chem_comp`` is a special case, and it is by category name.** Its
+        local ID is a residue code such as ``ALA`` rather than a number, so the
+        original reads the saveframe's existing *free* local-ID tag and reuses
+        that value instead of the counter, falling back to the counter only when
+        it is null. (:meth:`normalize` reaches nearly the same place from a
+        different direction -- it renumbers only tags whose BMRB data type is
+        ``int``, which spares a residue code because it is not one. The two
+        agree on real entries; this reproduces the original's rule so that they
+        agree by construction rather than by luck.)
+        """
+
+        my_schema: Schema = utils.get_schema(schema)
+        counters: Dict[str, int] = {}
+
+        def is_local_id(prefix: str, name: str) -> bool:
+            return f'{prefix}.{name}'.lower() in my_schema.local_id_tags
+
+        for saveframe in self._frame_list:
+            category = saveframe.category
+            if category is None:
+                continue
+
+            counters[category] = counters.get(category, 0) + 1
+            value = str(counters[category])
+
+            if category == 'chem_comp':
+                for tag in saveframe.tags:
+                    if is_local_id(saveframe.tag_prefix, tag[0]):
+                        if tag[1] is not None and tag[1] not in definitions.NULL_VALUES:
+                            value = tag[1]
+                        break
+
+            for tag in saveframe.tags:
+                if is_local_id(saveframe.tag_prefix, tag[0]):
+                    tag[1] = value
+            for loop in saveframe.loops:
+                for position, name in enumerate(loop.tags):
+                    if is_local_id(loop.category, name):
+                        for row in loop.data:
+                            row[position] = value
+
     def add_row_indexes(self, schema: Optional[Schema] = None) -> None:
         """Number the rows of any loop whose row-index column is incomplete.
 

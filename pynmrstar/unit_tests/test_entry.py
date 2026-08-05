@@ -304,6 +304,33 @@ class TestEntry(unittest.TestCase):
         self.assertEqual([_ for _ in entry.validate_full(profile='internal')
                           if _.check == 'saveframe.framecode_mismatch'], [])
 
+    def test_insert_local_ids(self):
+        """InsertLocalIDs (100): a per-category counter, in document order."""
+
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('entity')[0]
+        frame.get_tag('ID', whole_tag=True)[0][1] = '99'
+
+        entry.insert_local_ids()
+        self.assertEqual(frame.get_tag('ID')[0], '1')
+
+        # The counter is per category and follows document order.
+        for position, each in enumerate(entry.get_saveframes_by_category('entity'), start=1):
+            self.assertEqual(each.get_tag('ID')[0], str(position))
+
+    def test_insert_local_ids_leaves_entry_id_alone(self):
+        """Entry_ID tags carry the accession number, not a per-category counter.
+
+        They have lclSfIdFlg set, so a port that keys on that flag alone
+        overwrites every one of them with '1'. Schema.local_id_tags already
+        excludes _Entry.ID and the *.Entry_ID tags; this checks it stays that
+        way."""
+
+        entry = copy(self.file_entry)
+        before = entry.get_saveframes_by_category('entity')[0].get_tag('Entry_ID')[0]
+        entry.insert_local_ids()
+        self.assertEqual(entry.get_saveframes_by_category('entity')[0].get_tag('Entry_ID')[0], before)
+
     def test_add_row_indexes(self):
         """AddRowIndexes (85), including the part that is easy to get wrong."""
 
