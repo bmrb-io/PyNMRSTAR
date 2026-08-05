@@ -226,6 +226,60 @@ class TestEntry(unittest.TestCase):
         self.assertEqual(found[0].saveframe, frame.name)
         loop.data[0][column] = original
 
+    def test_fix_framecodes(self):
+        """Both halves of the BMRB validator's FixFramecodes (75)."""
+
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+
+        # Half one: Sf_framecode is set to the saveframe's own name. Written
+        # through the tag pair rather than the name setter, because the setter
+        # keeps the two in step and the inconsistency only ever arrives from a
+        # parsed file.
+        frame.get_tag('Sf_framecode', whole_tag=True)[0][1] = 'something_else'
+        entry.fix_framecodes()
+        self.assertEqual(frame.get_tag('Sf_framecode')[0], frame.name)
+
+        # Half two: whitespace inside a saveframe-pointer value collapses to a
+        # single underscore -- a framecode with a space cannot be written as a
+        # $reference.
+        shifts = entry.get_saveframes_by_category('assigned_chemical_shifts')[0]
+        shifts.get_tag('Sample_condition_list_label', whole_tag=True)[0][1] = '$a b\tc'
+        entry.fix_framecodes()
+        self.assertEqual(shifts.get_tag('Sample_condition_list_label')[0], '$a_b_c')
+
+    def test_fix_framecodes_leaves_nulls_alone(self):
+        """The original's query excludes NULL, '.' and '?' explicitly: a missing
+        reference is not a misspelt one."""
+
+        entry = copy(self.file_entry)
+        shifts = entry.get_saveframes_by_category('assigned_chemical_shifts')[0]
+        for null in ('.', '?'):
+            shifts.get_tag('Sample_condition_list_label', whole_tag=True)[0][1] = null
+            entry.fix_framecodes()
+            self.assertEqual(shifts.get_tag('Sample_condition_list_label')[0], null)
+
+    def test_mark_framecode_values(self):
+        """MarkFramecodeValues (73): every saveframe pointer carries its $.
+
+        A no-op on an entry read from a well-formed file, since pynmrstar keeps
+        the marker in the value -- so the test has to take one off first, which
+        is the state an entry assembled through the API arrives in."""
+
+        entry = copy(self.file_entry)
+        shifts = entry.get_saveframes_by_category('assigned_chemical_shifts')[0]
+        pointer = shifts.get_tag('Sample_condition_list_label', whole_tag=True)[0]
+        self.assertTrue(pointer[1].startswith('$'))
+
+        pointer[1] = pointer[1].lstrip('$')
+        entry.mark_framecode_values()
+        self.assertEqual(pointer[1], f'${shifts.get_tag("Sample_condition_list_label")[0].lstrip("$")}')
+        self.assertTrue(pointer[1].startswith('$'))
+
+        # Idempotent: running it again must not stack markers.
+        entry.mark_framecode_values()
+        self.assertFalse(pointer[1].startswith('$$'))
+
     def test_validate_full_invalid_tags(self):
         entry = copy(self.file_entry)
         frame = entry.get_saveframes_by_category('entry_information')[0]

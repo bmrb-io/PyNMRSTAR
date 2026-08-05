@@ -1,6 +1,7 @@
 import hashlib
 import json
 import logging
+import re
 import warnings
 from io import StringIO
 from pathlib import Path
@@ -10,7 +11,7 @@ from pynmrstar import definitions, utils, loop as loop_mod, saveframe as savefra
 from pynmrstar._internal import _json_serialize, _interpret_file, _get_entry_from_database, write_to_file
 from pynmrstar.exceptions import InvalidStateError
 from pynmrstar.schema import Schema
-from pynmrstar.validation import Severity, ValidationIssue, check_saveframes, check_mandatory_tags, \
+from pynmrstar.validation import Severity, ValidationIssue, _value_type, check_saveframes, check_mandatory_tags, \
     check_invalid_tags, check_tag_order, check_row_indexes, check_related_tags, check_local_ids, \
     check_frame_codes, check_sample_saveframe, check_charset, check_empty_rows, check_data_values, \
     check_data_types
@@ -818,6 +819,93 @@ class Entry(object):
             for loop in each_frame.loops:
                 if loop.tag_index('ID') is not None and loop.category != '_Experiment':
                     loop.renumber_rows('ID')
+
+    def _framecode_values(self, schema: Schema):
+        """Every saveframe-pointer value in the entry, as (container, setter) pairs.
+
+        A tag points at a saveframe when the dictionary sets its ``Sf pointer``
+        flag -- the same rule ``validation._value_type`` uses to call a tag's
+        type ``FRAMECODE``, which is in turn how the BMRB validator's
+        ``TAGS.VALTYPE`` is derived. Yields a callable rather than a reference
+        because a value may live in a saveframe tag pair or in a loop row, and
+        the caller should not have to care which."""
+
+        for saveframe in self._frame_list:
+            for tag in saveframe.tags:
+                tag_schema = schema.schema.get(f'{saveframe.tag_prefix}.{tag[0]}'.lower())
+                if tag_schema and _value_type(tag_schema)[0] == 'FRAMECODE':
+                    yield tag[1], lambda value, _tag=tag: _tag.__setitem__(1, value)
+            for loop in saveframe.loops:
+                for position, name in enumerate(loop.tags):
+                    tag_schema = schema.schema.get(f'{loop.category}.{name}'.lower())
+                    if not tag_schema or _value_type(tag_schema)[0] != 'FRAMECODE':
+                        continue
+                    for row in loop.data:
+                        yield row[position], \
+                            lambda value, _row=row, _at=position: _row.__setitem__(_at, value)
+
+    def fix_framecodes(self, schema: Optional[Schema] = None) -> None:
+        """Repair saveframe labels and the references to them.
+
+        Two repairs, which are the two halves of the BMRB validator's
+        ``FixFramecodes`` (function 75):
+
+        * every ``Sf_framecode`` tag is set to the name of the saveframe holding
+          it, which is what ``CheckSaveFrames`` sub-check 0-2 reports when they
+          disagree;
+        * in every saveframe-pointer value, runs of whitespace become a single
+          underscore -- a framecode with a space in it is not writable as a
+          ``$reference``.
+
+        Null values are left alone: the original's query excludes ``NULL``,
+        ``.`` and ``?`` explicitly, and a missing reference is not a misspelt
+        one.
+
+        **This erases a validation finding, so do not call it before
+        validating.** That is not a caveat about this method so much as the
+        point of it -- it is the repair paired with the check.
+        """
+
+        my_schema: Schema = utils.get_schema(schema)
+
+        for saveframe in self._frame_list:
+            for tag in saveframe.tags:
+                if tag[0].lower() == 'sf_framecode':
+                    tag[1] = saveframe.name
+
+        for value, assign in self._framecode_values(my_schema):
+            if value is None or not isinstance(value, str):
+                continue
+            if value in definitions.NULL_VALUES or value.strip() in ('.', '?'):
+                continue
+            collapsed = re.sub(r'\s+', '_', value)
+            if collapsed != value:
+                assign(collapsed)
+
+    def mark_framecode_values(self, schema: Optional[Schema] = None) -> None:
+        """Ensure every saveframe-pointer value carries its ``$``.
+
+        The BMRB validator's ``MarkFramecodeValues`` (function 73). It is a
+        no-op on an entry read from a well-formed file -- the marker is part of
+        the value as pynmrstar holds it, so a parsed reference already has one.
+        It earns its place on an entry assembled through the API, where a
+        pointer is easily written as a bare saveframe name.
+
+        The original reaches the same place by a different route: its lexer
+        strips the ``$`` on the way in and records it as the value's delimiter,
+        so the function sets that delimiter and the unparser writes the marker
+        back out.
+        """
+
+        my_schema: Schema = utils.get_schema(schema)
+
+        for value, assign in self._framecode_values(my_schema):
+            if value is None or not isinstance(value, str):
+                continue
+            if value in definitions.NULL_VALUES or value.strip() in ('.', '?'):
+                continue
+            if not value.startswith('$'):
+                assign(f'${value}')
 
     def print_tree(self) -> None:
         """Prints a summary, tree style, of the frames and loops in
