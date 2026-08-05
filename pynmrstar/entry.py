@@ -851,39 +851,158 @@ class Entry(object):
                                     except KeyError:
                                         logger.warning(f"Missing frame of type {tag} pointed to by {conditional_tag}")
 
-        # Renumber the row-index column of every loop that has one -- but only
-        # where nothing refers to it.
-        #
-        # This used to renumber any loop with a column literally named 'ID',
-        # with '_Experiment' excluded by name. Both halves of that were wrong.
-        # 'ID' is not the dictionary's idea of a row index: 26 loop categories
-        # have an ID column that is not one, and 10 categories index their rows
-        # under another name (_Entry_author.Ordinal and its like), so the old
-        # rule renumbered columns it should not have and missed ones it should.
-        #
-        # The exclusion was patching the real problem, which is that a row index
-        # can also be a key other loops point at -- _Experiment.ID is named as a
-        # parent by 54 tags. Renumbering one of those is only safe if every
-        # reference is rewritten to match, and the remapping above cannot do it:
-        # its keys are Category.Tag.value, which is unique for a saveframe-level
-        # local ID but not for a loop one. _Entity_comp_index.ID 5 means a
-        # different residue in each entity saveframe, and _Atom_chem_shift
-        # disambiguates it with the Entity_ID beside it, so a single old -> new
-        # map would rewrite every entity's shifts from one entity's renumbering.
-        # _Entity_comp_index.ID is renumbered here today for exactly that
-        # reason -- it is not named _Experiment.
-        #
-        # So: renumber what nothing points at, and leave the rest until the
-        # remapping understands composite keys.
-        referenced = {parent.lower() for parent in my_schema.parent_tags.values()}
-        for each_frame in self._frame_list:
-            for loop in each_frame.loops:
-                index_tag = _row_index_tag(loop, my_schema)
-                if index_tag is None:
+        # Renumber every loop's row-index column, and rewrite the references
+        # to the numbers that change. See _renumber_row_indexes().
+        self._renumber_row_indexes(my_schema)
+
+    def _renumber_row_indexes(self, schema: Schema) -> None:
+        """Renumber every loop's row-index column 1, 2, 3, … and rewrite the
+        references to the numbers that change.
+
+        The dictionary marks one tag per loop category as its row index
+        (``Row Index Key``). Renumbering one is only safe if everything pointing
+        at it is rewritten to match, and that is harder than it is for a
+        saveframe's local ID, because **a loop row number is not unique in the
+        entry**. ``_Entity_comp_index.ID`` 5 means a different residue in each
+        entity saveframe, and ``_Atom_chem_shift`` tells them apart by the
+        ``Entity_ID`` beside it. A single old → new map would rewrite every
+        entity's shifts from one entity's renumbering.
+
+        The dictionary states the full key: ``Table Primary Key`` marks the
+        columns that identify a row, and for a loop that is the row index plus
+        ``Entry_ID`` plus the local ID of the saveframe the loop sits in --
+        ``(ID, Entry_ID, Entity_ID)`` for ``_Entity_comp_index``,
+        ``(ID, Entry_ID, Experiment_list_ID)`` for ``_Experiment``. ``Entry_ID``
+        is one value for the whole entry and discriminates nothing, so what is
+        left is the saveframe's own ID -- which the referring loop may or may
+        not carry. Of the 463 references to a loop row index in the dictionary,
+        211 carry it; the other 252 rely on there being one assembly, one
+        experiment list, one of whatever it is.
+
+        So the rule is decided per entry rather than per dictionary:
+
+        * **one loop of that category in this entry** -- its row numbers are
+          unique entry-wide, so no discriminator is needed and the references
+          are rewritten from the row number alone. This is the common case;
+        * **several, and the referring side carries the discriminator** -- key
+          the map on the composite value;
+        * **several, and it does not** -- the reference is genuinely ambiguous,
+          so the column is left exactly as it is. Corrupting it would be worse
+          than leaving the numbering untidy.
+
+        A column that already contains duplicates is also left alone when
+        anything refers to it: old → new is not a function there, so there is no
+        correct way to follow it. ``validate_full``'s ``check_row_indexes`` is
+        what reports that.
+        """
+
+        # Which tags refer to which, and the primary key of each loop category
+        # minus Entry_ID.
+        children_of: Dict[str, List[str]] = {}
+        for child, parent in schema.parent_tags.items():
+            children_of.setdefault(parent.lower(), []).append(child)
+
+        key_columns: Dict[str, List[str]] = {}
+        for tag, data in schema.schema.items():
+            if (data.get('Table Primary Key') or '').strip().upper().startswith('Y') \
+                    and not tag.endswith('.entry_id'):
+                key_columns.setdefault(tag.rsplit('.', 1)[0], []).append(tag)
+
+        def points_at(tag: str) -> Optional[str]:
+            """The tag this one draws its values from, as a lowercase name."""
+
+            data = schema.schema.get(tag)
+            if not data:
+                return None
+            table = (data.get('Foreign Table') or '').strip()
+            column = (data.get('Foreign Column') or '').strip()
+            return f'_{table}.{column}'.lower() if table and column else None
+
+        # One loop of a category means its row numbers are unique entry-wide.
+        loop_count: Dict[str, int] = {}
+        for saveframe in self._frame_list:
+            for loop in saveframe.loops:
+                key = (loop.category or '').lower()
+                loop_count[key] = loop_count.get(key, 0) + 1
+
+        # index tag -> (discriminator tags, {(discriminator values, old): new})
+        remaps: Dict[str, Tuple[List[str], Dict[tuple, Any]]] = {}
+
+        for saveframe in self._frame_list:
+            for loop in saveframe.loops:
+                index_tag = _row_index_tag(loop, schema)
+                if index_tag is None or not loop.data:
                     continue
-                if f'{loop.category}.{index_tag}'.lower() in referenced:
+                category = (loop.category or '').lower()
+                full_index = f'{category}.{index_tag}'.lower()
+                position = loop.tags.index(index_tag)
+
+                if full_index not in children_of:
+                    # Nothing points at it, so there is nothing to keep in step.
+                    loop.renumber_rows(index_tag)
                     continue
+
+                discriminators = [_ for _ in key_columns.get(category, []) if _ != full_index]
+                columns = [loop.tag_index(_) for _ in discriminators]
+                if any(_ is None for _ in columns):
+                    if loop_count.get(category) != 1:
+                        continue
+                    discriminators, columns = [], []
+
+                before = [row[position] for row in loop.data]
+                keys = [tuple(str(row[_]) for _ in columns) for row in loop.data]
+                if len(set(zip(keys, (str(_) for _ in before)))) != len(before):
+                    continue
+
                 loop.renumber_rows(index_tag)
+
+                _, table = remaps.setdefault(full_index, (discriminators, {}))
+                for key, old, row in zip(keys, before, loop.data):
+                    table[(key, str(old))] = row[position]
+
+        for parent_index, (discriminators, table) in remaps.items():
+            wanted = [points_at(_) for _ in discriminators]
+            if any(_ is None for _ in wanted):
+                continue
+
+            for child in children_of[parent_index]:
+                child_category = child.rsplit('.', 1)[0]
+                # The columns on the referring side that mean the same as the
+                # parent's discriminators: the ones drawing from the same tag.
+                counterparts: List[str] = []
+                for target in wanted:
+                    match = [_ for _ in schema.schema
+                             if _.rsplit('.', 1)[0] == child_category and points_at(_) == target]
+                    if not match:
+                        break
+                    counterparts.append(match[0])
+                if len(counterparts) != len(wanted):
+                    continue
+
+                child_name = schema.schema[child]['Tag']
+                names = [schema.schema[_]['Tag'] for _ in counterparts]
+                for saveframe in self._frame_list:
+                    for loop in saveframe.loops:
+                        position = loop.tag_index(child_name)
+                        if position is None:
+                            continue
+                        columns = [loop.tag_index(_) for _ in names]
+                        if any(_ is None for _ in columns):
+                            continue
+                        for row in loop.data:
+                            replacement = table.get(
+                                (tuple(str(row[_]) for _ in columns), str(row[position])))
+                            if replacement is not None:
+                                row[position] = replacement
+                    if not counterparts:
+                        # A free tag can only be matched when there is nothing
+                        # to match on beyond the number itself.
+                        for tag in saveframe.tags:
+                            if f'{saveframe.tag_prefix}.{tag[0]}'.lower() != child:
+                                continue
+                            replacement = table.get(((), str(tag[1])))
+                            if replacement is not None:
+                                tag[1] = replacement
 
     def _framecode_values(self, schema: Schema):
         """Every saveframe-pointer value in the entry, as (container, setter) pairs.

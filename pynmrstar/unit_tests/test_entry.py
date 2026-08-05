@@ -326,23 +326,78 @@ class TestEntry(unittest.TestCase):
         entry.add_row_indexes()
         self.assertEqual([_[position] for _ in loop.data], expected)
 
-    def test_normalize_leaves_referenced_row_indexes_alone(self):
-        """normalize() renumbers a row index only when nothing points at it.
+    def test_normalize_renumbers_a_referenced_row_index(self):
+        """normalize() renumbers a referenced row index and brings its
+        references with it.
 
-        _Entity_comp_index.ID is a row index that _Atom_chem_shift.Comp_index_ID
-        refers to, and the reference remapping cannot follow a loop ID (the same
-        number means a different residue in each entity saveframe). So it is
-        left as it is rather than renumbered without its references."""
+        _Entity_comp_index.ID is a row index that both _Entity_poly_seq and
+        _Atom_chem_shift point at. Renumbering it without rewriting those would
+        silently reassign every chemical shift to the wrong residue."""
+
+        entry = copy(self.file_entry)
+        entity = entry.get_saveframes_by_category('entity')[0]
+        index = entity['_Entity_comp_index']
+        at_index = index.tags.index('ID')
+        shifts = entry['assigned_chem_shift_list_1']['_Atom_chem_shift']
+        at_shift = shifts.tags.index('Comp_index_ID')
+
+        # Multiply every residue number by ten, on both sides, so the numbering
+        # is consistent but wrong.
+        for row in index.data:
+            row[at_index] = str(int(row[at_index]) * 10)
+        for row in shifts.data:
+            row[at_shift] = str(int(row[at_shift]) * 10)
+
+        entry.normalize()
+        self.assertEqual([_[at_index] for _ in index.data],
+                         [str(_) for _ in range(1, len(index.data) + 1)])
+        self.assertTrue({str(_[at_shift]) for _ in shifts.data}
+                        .issubset({str(_[at_index]) for _ in index.data}))
+
+    def test_normalize_will_not_renumber_an_ambiguous_row_index(self):
+        """With two loops of a category and no discriminator on the referring
+        side, the reference cannot be followed -- so the column is left exactly
+        as it is rather than corrupted.
+
+        Reached here by removing the Entity_ID column the second entity's
+        residues would otherwise be told apart by."""
+
+        entry = copy(self.file_entry)
+        entity = entry.get_saveframes_by_category('entity')[0]
+        second = copy(entity)
+        second.name = 'entity_2'
+        entry.add_saveframe(second)
+
+        for frame in (entity, second):
+            loop = frame['_Entity_comp_index']
+            position = loop.tag_index('Entity_ID')
+            for row in loop.data:
+                del row[position]
+            del loop.tags[position]
+            loop._lc_tags_cache = None
+
+        loop = entity['_Entity_comp_index']
+        at_index = loop.tags.index('ID')
+        scrambled = [str(int(_[at_index]) * 10) for _ in loop.data]
+        for row, value in zip(loop.data, scrambled):
+            row[at_index] = value
+
+        entry.normalize()
+        self.assertEqual([_[at_index] for _ in loop.data], scrambled)
+
+    def test_normalize_leaves_a_duplicated_row_index_alone(self):
+        """A referenced index column that already repeats a value has no
+        old -> new mapping to follow, so it is left for check_row_indexes to
+        report rather than guessed at."""
 
         entry = copy(self.file_entry)
         loop = entry.get_saveframes_by_category('entity')[0]['_Entity_comp_index']
-        position = loop.tags.index('ID')
-        scrambled = [str(_ * 10) for _ in range(1, len(loop.data) + 1)]
-        for row, value in zip(loop.data, scrambled):
-            row[position] = value
+        at_index = loop.tags.index('ID')
+        loop.data[1][at_index] = loop.data[0][at_index]
+        before = [_[at_index] for _ in loop.data]
 
         entry.normalize()
-        self.assertEqual([_[position] for _ in loop.data], scrambled)
+        self.assertEqual([_[at_index] for _ in loop.data], before)
 
     def test_repair_insert_mandatory_tags(self):
         """InsertMandatoryTags (105): a missing required free tag arrives as '?'."""
