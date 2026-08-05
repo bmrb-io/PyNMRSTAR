@@ -280,6 +280,30 @@ class TestEntry(unittest.TestCase):
         entry.mark_framecode_values()
         self.assertFalse(pointer[1].startswith('$$'))
 
+    def test_normalize_repairs_framecodes(self):
+        """normalize() includes the framecode repairs, deliberately.
+
+        It means normalizing can remove a validation finding: validate_full()
+        reports a Sf_framecode that disagrees with its saveframe's name, and
+        this fixes exactly that. BMRB's call -- there is no harm in repairing it
+        without warning first -- but it is worth a test saying so out loud, so
+        that nobody 'fixes' the interaction later by accident."""
+
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+        frame.get_tag('Sf_framecode', whole_tag=True)[0][1] = 'something_else'
+
+        # The mismatch is a finding before normalizing ...
+        mismatches = [_ for _ in entry.validate_full(profile='internal')
+                      if _.check == 'saveframe.framecode_mismatch']
+        self.assertEqual(len(mismatches), 1)
+
+        # ... and normalize() repairs it, so it is not one afterwards.
+        entry.normalize()
+        self.assertEqual(frame.get_tag('Sf_framecode')[0], frame.name)
+        self.assertEqual([_ for _ in entry.validate_full(profile='internal')
+                          if _.check == 'saveframe.framecode_mismatch'], [])
+
     def test_add_row_indexes(self):
         """AddRowIndexes (85), including the part that is easy to get wrong."""
 

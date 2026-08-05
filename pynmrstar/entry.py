@@ -596,10 +596,24 @@ class Entry(object):
         """ Sorts saveframes, loops, and tags according to the schema
         provided (or BMRB default if none provided).
 
-        Also re-assigns ID tag values and updates tag links to ID values."""
+        Also repairs saveframe labels and the references to them, re-assigns ID
+        tag values, and updates tag links to ID values.
+
+        Note that the framecode repairs mean normalizing an entry can *remove* a
+        validation finding -- ``validate_full()`` reports a ``Sf_framecode`` that
+        disagrees with its saveframe's name, and this fixes exactly that. Run
+        validation first if you want to see it. (:meth:`Entry.format` is pure and
+        does not normalize, so rendering an entry never has this effect.)"""
 
         # Assign all the ID tags, and update all links to ID tags
         my_schema = utils.get_schema(schema)
+
+        # Repair the saveframe pointers before anything reads them: the link
+        # updating below dereferences a value by stripping its leading '$' and
+        # looking the saveframe up by name, so a reference missing its marker or
+        # carrying whitespace has to be fixed first or that lookup misses.
+        self.fix_framecodes(schema=my_schema)
+        self.mark_framecode_values(schema=my_schema)
 
         # Sort the saveframes according to ID, if an ID exists. Otherwise, still sort by category
         ordering = my_schema.category_order
