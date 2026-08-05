@@ -471,6 +471,90 @@ class TestEntry(unittest.TestCase):
         self.assertEqual(polymer.get_tag('Nstd_monomer'), ['?'])
         self.assertEqual(non_polymer.get_tag('Nstd_monomer'), [])
 
+    def _pointer_entry(self, chem_comps=('LIG',)) -> Entry:
+        """An entry with one entity pointing at nothing in particular, and as
+        many chem_comp saveframes as asked for."""
+
+        entry = Entry.from_scratch('related')
+        for name in chem_comps:
+            frame = Saveframe.from_scratch(f'chem_comp_{name}', tag_prefix='_Chem_comp')
+            frame.add_tags([['Sf_category', 'chem_comp'], ['Sf_framecode', f'chem_comp_{name}'],
+                            ['ID', name]])
+            entry.add_saveframe(frame)
+
+        entity = Saveframe.from_scratch('entity_1', tag_prefix='_Entity')
+        entity.add_tags([['Sf_category', 'entity'], ['Sf_framecode', 'entity_1'], ['ID', '1'],
+                         ['Parent_entity_ID', '7'],
+                         ['Nonpolymer_comp_ID', '.'], ['Nonpolymer_comp_label', '.']])
+        entry.add_saveframe(entity)
+        return entry
+
+    def test_update_related_tags_fills_a_lone_pointer(self):
+        """UpdateRelatedTags (101), passes 1 and 2: an empty pointer is filled in
+        when the entry holds exactly one saveframe it could mean, and the ID
+        beside it is then resolved from it."""
+
+        entry = self._pointer_entry()
+        entry.update_related_tags()
+        entity = entry.get_saveframe_by_name('entity_1')
+
+        self.assertEqual(entity.get_tag('Nonpolymer_comp_label'), ['$chem_comp_LIG'])
+        self.assertEqual(entity.get_tag('Nonpolymer_comp_ID'), ['LIG'])
+
+    def test_update_related_tags_will_not_guess_between_two(self):
+        """With two candidates there is nothing to choose between them, so the
+        pointer is left empty -- and the ID with it."""
+
+        entry = self._pointer_entry(chem_comps=('LIG', 'HEM'))
+        entry.update_related_tags()
+        entity = entry.get_saveframe_by_name('entity_1')
+
+        self.assertEqual(entity.get_tag('Nonpolymer_comp_label'), ['.'])
+        self.assertEqual(entity.get_tag('Nonpolymer_comp_ID'), ['.'])
+
+    def test_update_related_tags_overwrites_a_child(self):
+        """Pass 3 pushes a parent's value down over whatever the child held.
+
+        The original's test for "these already agree" guards a debug print
+        rather than the update, so the update is unconditional -- and writing
+        the parent's value over a different one is the point of the function.
+        _Entity.Parent_entity_ID starts at 7 here and must come out as the
+        entity's own ID."""
+
+        entry = self._pointer_entry()
+        entry.update_related_tags()
+        self.assertEqual(entry.get_saveframe_by_name('entity_1').get_tag('Parent_entity_ID'), ['1'])
+
+    def test_update_related_tags_reports_an_empty_label(self):
+        """An empty pointer that pass 1 would not guess at is reported instead --
+        unless the row names a standard residue, in which case the reference can
+        be reconstructed and the original stays quiet.
+
+        Reported against the ID tag rather than the row, which is the original's
+        own choice: it reports the line the tag was read from, so several empty
+        rows of one column collapse to a single finding once the validator's
+        error list has deduplicated them."""
+
+        entry = copy(self.file_entry)
+        entity = entry.get_saveframes_by_category('entity')[0]
+        loop = entity['_Entity_comp_index']
+        label, comp = loop.tag_index('Comp_label'), loop.tag_index('Comp_ID')
+        for row in loop.data:
+            row[label] = '.'
+        loop.data[0][comp] = 'XYZ'
+
+        issues = [_ for _ in entry.update_related_tags()
+                  if _.tag == '_Entity_comp_index.Comp_ID']
+        self.assertTrue(issues)
+        self.assertEqual(issues[0].check, 'tag.missing_saveframe_label')
+        self.assertIsNone(issues[0].row)
+
+        # ... and with every residue standard, nothing is reported.
+        for row in loop.data:
+            row[comp] = 'ALA'
+        self.assertEqual([_ for _ in entry.update_related_tags()
+                          if _.tag == '_Entity_comp_index.Comp_ID'], [])
+
     def test_validate_full_invalid_tags(self):
         entry = copy(self.file_entry)
         frame = entry.get_saveframes_by_category('entry_information')[0]
