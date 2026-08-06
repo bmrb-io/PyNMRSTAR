@@ -628,6 +628,21 @@ class TestEntry(unittest.TestCase):
         loop.data[2][column] = '-1'
         self.assertEqual(indexes(), [])
 
+    def test_row_index_tag_prefers_the_dictionary_order(self):
+        """`_Chem_comp_bond` is the one category with two row-index tags, and
+        which of them numbers the loop must not depend on the order the loop
+        happens to list its columns in."""
+
+        from pynmrstar.validation import _row_index_tag
+
+        loop = Loop.from_scratch('_Chem_comp_bond')
+        loop.add_tag(['ID', 'Ordinal'])
+        self.assertEqual(_row_index_tag(loop, utils.get_schema()), 'ID')
+
+        swapped = Loop.from_scratch('_Chem_comp_bond')
+        swapped.add_tag(['Ordinal', 'ID'])
+        self.assertEqual(_row_index_tag(swapped, utils.get_schema()), 'ID')
+
     def test_validate_full_related_tags(self):
         entry = copy(self.file_entry)
         sample = entry.get_saveframes_by_category('sample')[0]

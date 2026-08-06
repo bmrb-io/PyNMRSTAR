@@ -657,14 +657,26 @@ def _ordered_tags(saveframe, schema, category: Optional[str]):
 def _row_index_tag(loop, schema) -> Optional[str]:
     """The tag that numbers a loop's rows, or ``None`` if it has none.
 
-    The dictionary marks one tag per loop category as its row index. A loop
-    whose category it does not recognise has no index to check."""
+    A loop whose category the dictionary does not recognise has no index to
+    check.
 
-    for tag in loop.tags:
-        tag_data = schema.schema.get(f'{loop.category}.{tag}'.lower())
-        if tag_data is not None and (tag_data.get('Row Index Key') or '').strip() == 'Y':
-            return tag
-    return None
+    Nearly every category marks exactly one tag, but not all of them:
+    ``_Chem_comp_bond`` marks both ``ID`` and ``Ordinal``. Where there are two,
+    the one the *dictionary* lists first wins, not the one the loop happens to
+    list first -- a loop is free to order its columns as it likes, and the tag
+    that numbers a category should not depend on that."""
+
+    candidates = [tag for tag in loop.tags
+                  if (schema.schema.get(f'{loop.category}.{tag}'.lower()) or {})
+                  .get('Row Index Key', '').strip() == 'Y']
+    if not candidates:
+        return None
+    if len(candidates) == 1:
+        return candidates[0]
+
+    order = {tag.lower(): at for at, tag in enumerate(schema.schema_order)}
+    return min(candidates,
+               key=lambda tag: order.get(f'{loop.category}.{tag}'.lower(), len(order)))
 
 
 def check_row_indexes(entry, schema, profile: str) -> List[ValidationIssue]:
