@@ -1,11 +1,39 @@
+use std::collections::HashSet;
+
 use pyo3::prelude::*;
-use pyo3::types::IntoPyDict;
-use pyo3::import_exception;
+use pyo3::exceptions::PyValueError;
+use pyo3::types::{IntoPyDict, PyList, PyString};
+use pyo3::{import_exception, intern};
 
 use crate::utils::{fix_multiline_semicolons, is_reserved_keyword, starts_with_ignore_case};
 
 // Import the ParsingError exception from pynmrstar.exceptions
 import_exception!(pynmrstar.exceptions, ParsingError);
+
+// Byte classes used by the tokenizer to scan whitespace and tokens with one table lookup per byte
+const CLASS_OTHER: u8 = 0;
+/// Standard whitespace: space, tab, newline, carriage return, vertical tab
+const CLASS_WHITESPACE: u8 = 1;
+/// Form feed - whitespace, but reported as unusual
+const CLASS_UNUSUAL_WHITESPACE: u8 = 2;
+/// A non-ASCII byte - may begin a multi-byte Unicode whitespace character
+const CLASS_NON_ASCII: u8 = 3;
+
+static BYTE_CLASS: [u8; 256] = {
+    let mut table = [CLASS_OTHER; 256];
+    table[b' ' as usize] = CLASS_WHITESPACE;
+    table[b'\n' as usize] = CLASS_WHITESPACE;
+    table[b'\t' as usize] = CLASS_WHITESPACE;
+    table[b'\r' as usize] = CLASS_WHITESPACE;
+    table[0x0B] = CLASS_WHITESPACE;
+    table[0x0C] = CLASS_UNUSUAL_WHITESPACE;
+    let mut i = 128;
+    while i < 256 {
+        table[i] = CLASS_NON_ASCII;
+        i += 1;
+    }
+    table
+};
 
 // Tokenizer state
 pub struct TokenizerState {
@@ -53,10 +81,16 @@ impl TokenizerState {
         }
         let b = s.as_bytes()[pos];
         // Fast path: ASCII bytes (covers >99% of NMR-STAR content)
-        if b < 128 {
-            return if matches!(b, b' ' | b'\n' | b'\t' | b'\r' | b'\x0B' | b'\x0C') { 1 } else { 0 };
+        match BYTE_CLASS[b as usize] {
+            CLASS_OTHER => 0,
+            CLASS_WHITESPACE | CLASS_UNUSUAL_WHITESPACE => 1,
+            _ => Self::unicode_whitespace_len_at(s, pos),
         }
-        // Slow path: multi-byte Unicode whitespace
+    }
+
+    /// Slow path of whitespace_len_at(), for a non-ASCII byte.
+    #[cold]
+    fn unicode_whitespace_len_at(s: &str, pos: usize) -> usize {
         if !s.is_char_boundary(pos) {
             return 0;
         }
@@ -69,69 +103,69 @@ impl TokenizerState {
     }
 
     fn pass_whitespace(&mut self) {
-        while self.index < self.full_data.len() {
-            let len = Self::whitespace_len_at(&self.full_data, self.index);
-            if len > 0 {
-                let b = self.full_data.as_bytes()[self.index];
-                if b == b'\n' {
-                    self.line_no += 1;
+        let bytes = self.full_data.as_bytes();
+        let mut index = self.index;
+        while index < bytes.len() {
+            let b = bytes[index];
+            match BYTE_CLASS[b as usize] {
+                CLASS_WHITESPACE => {
+                    if b == b'\n' {
+                        self.line_no += 1;
+                    }
+                    index += 1;
                 }
-                if self.unusual_whitespace_line.is_none() && !Self::is_standard_whitespace(b) {
-                    self.unusual_whitespace_line = Some(self.line_no);
+                CLASS_OTHER => break,
+                _ => {
+                    // Form feed, or a non-ASCII byte which may start Unicode whitespace
+                    let len = Self::whitespace_len_at(&self.full_data, index);
+                    if len == 0 {
+                        break;
+                    }
+                    if self.unusual_whitespace_line.is_none() {
+                        self.unusual_whitespace_line = Some(self.line_no);
+                    }
+                    index += len;
                 }
-                self.index += len;
-            } else {
-                break;
             }
         }
+        self.index = index;
     }
 
     fn check_multiline(&self, length: usize) -> bool {
         let end = (self.index + length).min(self.full_data.len());
-        let bytes = self.full_data.as_bytes();
-        for i in self.index..end {
-            if bytes[i] == b'\n' {
-                return true;
-            }
-        }
-        false
+        memchr::memchr(b'\n', &self.full_data.as_bytes()[self.index..end]).is_some()
     }
 
     fn update_line_number(&mut self, start_pos: usize, length: usize) {
         let end = (start_pos + length).min(self.full_data.len());
-        let bytes = self.full_data.as_bytes();
-        for i in start_pos..end {
-            if bytes[i] == b'\n' {
-                self.line_no += 1;
-            }
-        }
+        self.line_no += memchr::memchr_iter(b'\n', &self.full_data.as_bytes()[start_pos..end]).count();
     }
 
     fn find_substring(&self, needle: &str, start_pos: usize) -> Option<usize> {
         if start_pos >= self.full_data.len() {
             return None;
         }
+        let haystack = &self.full_data.as_bytes()[start_pos..];
 
-        // Optimize single-byte searches to work directly with bytes
+        // Single-byte searches (quotes, newlines) use memchr, which is SIMD accelerated
         if needle.len() == 1 {
-            let needle_byte = needle.as_bytes()[0];
-            let bytes = self.full_data.as_bytes();
-            for i in start_pos..bytes.len() {
-                if bytes[i] == needle_byte {
-                    return Some(i - start_pos);
-                }
-            }
-            return None;
+            return memchr::memchr(needle.as_bytes()[0], haystack);
         }
 
-        // Optimize two-byte searches (e.g., "\n;")
+        // Two-byte searches (e.g., "\n;"): find each occurrence of the first byte with
+        //  memchr, and check the byte which follows it
         if needle.len() == 2 {
             let needle_bytes = needle.as_bytes();
-            let bytes = self.full_data.as_bytes();
-            for i in start_pos..bytes.len().saturating_sub(1) {
-                if bytes[i] == needle_bytes[0] && bytes[i + 1] == needle_bytes[1] {
-                    return Some(i - start_pos);
+            let mut offset = 0;
+            while let Some(found) = memchr::memchr(needle_bytes[0], &haystack[offset..]) {
+                let pos = offset + found;
+                if pos + 1 >= haystack.len() {
+                    return None;
                 }
+                if haystack[pos + 1] == needle_bytes[1] {
+                    return Some(pos);
+                }
+                offset = pos + 1;
             }
             return None;
         }
@@ -141,12 +175,19 @@ impl TokenizerState {
     }
 
     fn get_next_whitespace(&self, start_pos: usize) -> usize {
+        let bytes = self.full_data.as_bytes();
         let mut pos = start_pos;
-        while pos < self.full_data.len() {
-            if Self::whitespace_len_at(&self.full_data, pos) > 0 {
-                return pos;
+        while pos < bytes.len() {
+            match BYTE_CLASS[bytes[pos] as usize] {
+                CLASS_OTHER => pos += 1,
+                CLASS_NON_ASCII => {
+                    if Self::whitespace_len_at(&self.full_data, pos) > 0 {
+                        return pos;
+                    }
+                    pos += 1;
+                }
+                _ => return pos,
             }
-            pos += 1;
         }
         pos
     }
@@ -306,17 +347,19 @@ enum TokenValue {
 }
 
 impl TokenValue {
-    fn to_string(&self, full_data: &str) -> String {
-        match self {
-            TokenValue::Indexed(start, end) => full_data[*start..*end].to_string(),
-            TokenValue::Materialized(s) => s.clone(),
-        }
-    }
-
     fn as_str<'a>(&'a self, full_data: &'a str) -> std::borrow::Cow<'a, str> {
         match self {
             TokenValue::Indexed(start, end) => std::borrow::Cow::Borrowed(&full_data[*start..*end]),
             TokenValue::Materialized(s) => std::borrow::Cow::Borrowed(s),
+        }
+    }
+
+    /// Create the Python string for this token directly from the source data, without an
+    /// intermediate Rust String
+    fn to_py<'py>(&self, py: Python<'py>, full_data: &str) -> Bound<'py, PyString> {
+        match self {
+            TokenValue::Indexed(start, end) => PyString::new(py, &full_data[*start..*end]),
+            TokenValue::Materialized(s) => PyString::new(py, s),
         }
     }
 }
@@ -352,6 +395,20 @@ struct ParserContext {
     current_loop_type: Option<String>,
     current_loop_tags_len: usize,
     warned_unusual_whitespace: bool,
+    // The entry's saveframe list, and the names of the saveframes in it. Saveframes are
+    // appended directly, as Entry.add_saveframe() checks for duplicate names by building a
+    // dictionary of every saveframe - O(n^2) over a whole file.
+    frame_list: Py<PyList>,
+    saveframe_names: HashSet<String>,
+    // The string members of definitions.NULL_VALUES, which can't be tag names. None if it has
+    // members other than strings and None, which disables adding tags without Python.
+    null_tag_names: Option<Vec<String>>,
+    // State of the current saveframe, for add_saveframe_tags_fast(). Only reliable while every
+    // tag of the saveframe has been added that way, which sf_fast_path tracks.
+    sf_fast_path: bool,
+    sf_name: String,
+    sf_tag_prefix: Option<String>,
+    sf_tags_lc: HashSet<String>,
 }
 
 impl ParserContext {
@@ -390,7 +447,37 @@ impl ParserContext {
             ].into_py_dict(py)?.into()
         };
 
+        let frame_list = entry.bind(py).getattr("_frame_list")?.cast_into::<PyList>()?;
+        let mut saveframe_names = HashSet::new();
+        for frame in frame_list.iter() {
+            if let Ok(name) = frame.getattr("name")?.extract::<String>() {
+                saveframe_names.insert(name);
+            }
+        }
+
+        let mut null_tag_names = Some(Vec::new());
+        for value in py.import("pynmrstar.definitions")?.getattr("NULL_VALUES")?.try_iter()? {
+            let value = value?;
+            if value.is_none() {
+                continue;
+            }
+            match value.cast_exact::<PyString>() {
+                Ok(s) => null_tag_names.as_mut().unwrap().push(s.to_str()?.to_string()),
+                Err(_) => {
+                    null_tag_names = None;
+                    break;
+                }
+            }
+        }
+
         Ok(ParserContext {
+            frame_list: frame_list.unbind(),
+            saveframe_names,
+            null_tag_names,
+            sf_fast_path: false,
+            sf_name: String::new(),
+            sf_tag_prefix: None,
+            sf_tags_lc: HashSet::new(),
             tokenizer,
             line_number: 0,
             delimiter: ' ',
@@ -566,8 +653,23 @@ fn parse_entry_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
             Some(ctx.source_dict.bind(py).cast()?)
         )?;
 
+        // Equivalent to Entry.add_saveframe(), with the duplicate name check done in O(1)
+        let name: String = saveframe.getattr("name")?.extract()?;
+        if ctx.saveframe_names.contains(&name) {
+            return Err(PyValueError::new_err(format!(
+                "Cannot add a saveframe with name '{}' since a saveframe with that name already exists in the entry.",
+                name
+            )));
+        }
+        ctx.frame_list.bind(py).append(&saveframe)?;
+        ctx.saveframe_names.insert(name.clone());
         ctx.current_saveframe = Some(saveframe.into());
-        ctx.entry.call_method1(py, "add_saveframe", (ctx.current_saveframe.as_ref().unwrap(),))?;
+
+        // Tags can be added without Python unless they need converting using the schema
+        ctx.sf_fast_path = !ctx._convert_data_types && ctx.null_tag_names.is_some();
+        ctx.sf_name = name;
+        ctx.sf_tag_prefix = None;
+        ctx.sf_tags_lc.clear();
 
         // Parse saveframe body
         parse_saveframe_body(py, ctx)?;
@@ -576,30 +678,162 @@ fn parse_entry_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
     Ok(())
 }
 
+/// Split a tag into its category and tag name, if it is a tag which Loop.add_tag() and
+/// Saveframe.add_tag() would store without changing it or raising an error: printable ASCII
+/// (so without whitespace, and lowercased the same way by Python and Rust), a category starting
+/// with '_', exactly one '.', and a tag name which is not null-equivalent. Returns the position
+/// of the '.'.
+fn split_simple_tag(tag: &str, null_tag_names: &[String]) -> Option<usize> {
+    if !tag.starts_with('_') || !tag.bytes().all(|b| (0x21..=0x7E).contains(&b)) {
+        return None;
+    }
+    let dot = tag.find('.')?;
+    let name = &tag[dot + 1..];
+    if name.is_empty() || name.contains('.') || null_tag_names.iter().any(|null| null == name) {
+        return None;
+    }
+    Some(dot)
+}
+
+/// Add tags to a newly created loop directly, rather than through Loop.add_tag(), when they are
+/// all tags which Loop.add_tag() would accept unchanged (see split_simple_tag()) with a single
+/// category and no duplicates. The result is the same: the category is set from the first tag,
+/// and the tag names are stored without it.
+///
+/// Returns false, having changed nothing, if any tag needs the full handling of Loop.add_tag() -
+/// which includes every tag it would reject, so errors are always raised by Python.
+fn add_loop_tags_fast(py: Python, ctx: &ParserContext, loop_obj: &Py<PyAny>, tags: &[TokenValue]) -> PyResult<bool> {
+    let Some(null_tag_names) = &ctx.null_tag_names else { return Ok(false) };
+    let full_data = &ctx.tokenizer.full_data;
+
+    let mut category: Option<&str> = None;
+    let mut names: Vec<&str> = Vec::with_capacity(tags.len());
+    let mut seen: HashSet<String> = HashSet::with_capacity(tags.len());
+    for tag in tags {
+        let TokenValue::Indexed(start, end) = tag else { return Ok(false) };
+        let tag = &full_data[*start..*end];
+        let Some(dot) = split_simple_tag(tag, null_tag_names) else { return Ok(false) };
+        let (tag_category, name) = (&tag[..dot], &tag[dot + 1..]);
+        match category {
+            None => category = Some(tag_category),
+            Some(c) if !c.eq_ignore_ascii_case(tag_category) => return Ok(false),
+            _ => {}
+        }
+        if !seen.insert(name.to_ascii_lowercase()) {
+            return Ok(false);
+        }
+        names.push(name);
+    }
+
+    let loop_obj = loop_obj.bind(py);
+    loop_obj.setattr(intern!(py, "category"), category)?;
+    loop_obj.setattr(intern!(py, "_tags"), PyList::new(py, names)?)?;
+    loop_obj.setattr(intern!(py, "_lc_tags_cache"), py.None())?;
+    Ok(true)
+}
+
+/// Add a batch of tags to the current saveframe directly, rather than through
+/// Saveframe.add_tags(), when they are all tags which Saveframe.add_tag() would accept unchanged:
+/// see split_simple_tag(), plus the saveframe's tag prefix, no duplicates, and an Sf_framecode
+/// matching the saveframe name. The result is the same: the tag prefix is set from the first
+/// tag, Sf_category sets the category, and each tag is stored as [name, value].
+///
+/// Returns false, having changed nothing, if any tag needs the full handling of
+/// Saveframe.add_tag() - which includes every tag it would reject or warn about, so those are
+/// always handled by Python. The rest of the saveframe's tags then go through Python as well.
+fn add_saveframe_tags_fast(py: Python, ctx: &mut ParserContext, pending: &[(TokenValue, TokenValue)]) -> PyResult<bool> {
+    if !ctx.sf_fast_path {
+        return Ok(false);
+    }
+    let full_data = &ctx.tokenizer.full_data;
+    let null_tag_names = ctx.null_tag_names.as_deref().unwrap_or(&[]);
+
+    // Check every tag before changing anything
+    let mut prefix: Option<&str> = ctx.sf_tag_prefix.as_deref();
+    let mut names: Vec<&str> = Vec::with_capacity(pending.len());
+    let mut lc_names: Vec<String> = Vec::with_capacity(pending.len());
+    let mut category_value: Option<&TokenValue> = None;
+    let mut accepted = true;
+    for (tag, value) in pending {
+        let TokenValue::Indexed(start, end) = tag else { accepted = false; break };
+        let tag = &full_data[*start..*end];
+        let Some(dot) = split_simple_tag(tag, null_tag_names) else { accepted = false; break };
+        let (tag_prefix, name) = (&tag[..dot], &tag[dot + 1..]);
+        match prefix {
+            None => prefix = Some(tag_prefix),
+            Some(p) if p != tag_prefix => { accepted = false; break }
+            _ => {}
+        }
+        let lc_name = name.to_ascii_lowercase();
+        if ctx.sf_tags_lc.contains(&lc_name) || lc_names.contains(&lc_name) {
+            accepted = false;
+            break;
+        }
+        if lc_name == "sf_framecode" && value.as_str(full_data) != ctx.sf_name.as_str() {
+            accepted = false;
+            break;
+        }
+        if lc_name == "sf_category" {
+            category_value = Some(value);
+        }
+        names.push(name);
+        lc_names.push(lc_name);
+    }
+    if !accepted {
+        ctx.sf_fast_path = false;
+        return Ok(false);
+    }
+
+    let saveframe = ctx.current_saveframe.as_ref().unwrap().bind(py);
+    let new_prefix = if ctx.sf_tag_prefix.is_none() { prefix.map(str::to_string) } else { None };
+    if let Some(new_prefix) = &new_prefix {
+        saveframe.setattr(intern!(py, "tag_prefix"), new_prefix)?;
+    }
+    let saveframe_tags = saveframe.getattr(intern!(py, "_tags"))?.cast_into::<PyList>()?;
+    for (name, (_, value)) in names.iter().zip(pending) {
+        saveframe_tags.append(PyList::new(py, [PyString::new(py, name), value.to_py(py, full_data)])?)?;
+    }
+    if let Some(value) = category_value {
+        saveframe.setattr(intern!(py, "_category"), value.to_py(py, full_data))?;
+    }
+    saveframe.setattr(intern!(py, "_lc_tags_cache"), py.None())?;
+
+    if new_prefix.is_some() {
+        ctx.sf_tag_prefix = new_prefix;
+    }
+    ctx.sf_tags_lc.extend(lc_names);
+    Ok(true)
+}
+
+/// Add the pending tags to the current saveframe.
+fn flush_saveframe_tags(py: Python, ctx: &mut ParserContext, pending: &mut Vec<(TokenValue, TokenValue)>) -> PyResult<()> {
+    if pending.is_empty() {
+        return Ok(());
+    }
+    let tags_to_add = std::mem::take(pending);
+    if add_saveframe_tags_fast(py, ctx, &tags_to_add)? {
+        return Ok(());
+    }
+
+    let saveframe = ctx.current_saveframe.as_ref().unwrap();
+    // Materialize TokenValues into a list of (str, str) tuples for Python
+    let full_data = &ctx.tokenizer.full_data;
+    let materialized = PyList::new(py, tags_to_add
+        .iter()
+        .map(|(tag, value)| (tag.to_py(py, full_data), value.to_py(py, full_data))))?;
+    saveframe.call_method(py, "add_tags", (materialized,), Some(ctx.add_tags_kwargs.bind(py).cast()?))?;
+    Ok(())
+}
+
 fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
     let mut pending_tags: Vec<(TokenValue, TokenValue)> = Vec::new();
-
-    // Helper to flush pending tags
-    let flush_tags = |ctx: &ParserContext, pending: &mut Vec<(TokenValue, TokenValue)>| -> PyResult<()> {
-        if !pending.is_empty() {
-            let saveframe = ctx.current_saveframe.as_ref().unwrap();
-            // Materialize TokenValues into (String, String) tuples for Python
-            let tags_to_add = std::mem::take(pending);
-            let materialized: Vec<(String, String)> = tags_to_add
-                .iter()
-                .map(|(tag, value)| (tag.to_string(&ctx.tokenizer.full_data), value.to_string(&ctx.tokenizer.full_data)))
-                .collect();
-            saveframe.call_method(py, "add_tags", (materialized,), Some(ctx.add_tags_kwargs.bind(py).cast()?))?;
-        }
-        Ok(())
-    };
 
     while ctx.get_token(py)? {
         let token = ctx.token_str();
 
         if token.eq_ignore_ascii_case("loop_") {
             // Flush any pending tags before processing loop
-            flush_tags(ctx, &mut pending_tags)?;
+            flush_saveframe_tags(py, ctx, &mut pending_tags)?;
             if ctx.delimiter != ' ' {
                 return Err(ctx.raise_error("The loop_ keyword may not be quoted or semicolon-delimited."));
             }
@@ -620,7 +854,7 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
 
         } else if token.eq_ignore_ascii_case("save_") {
             // Flush any pending tags before exiting saveframe
-            flush_tags(ctx, &mut pending_tags)?;
+            flush_saveframe_tags(py, ctx, &mut pending_tags)?;
 
             if ctx.delimiter != ' ' {
                 return Err(ctx.raise_error("The save_ keyword may not be quoted or semicolon-delimited."));
@@ -762,12 +996,11 @@ fn parse_loop_tags(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
             let loop_obj = ctx.current_loop.as_ref().unwrap();
 
             // Batch add all collected tags (materialize to strings for Python)
-            if !tags.is_empty() {
-                let materialized: Vec<String> = tags
+            if !tags.is_empty() && !add_loop_tags_fast(py, ctx, loop_obj, &tags)? {
+                let materialized = PyList::new(py, tags
                     .iter()
-                    .map(|tv| tv.to_string(&ctx.tokenizer.full_data))
-                    .collect();
-                loop_obj.call_method1(py, "add_tag", (materialized.as_slice(),))?;
+                    .map(|tv| tv.to_py(py, &ctx.tokenizer.full_data)))?;
+                loop_obj.call_method1(py, "add_tag", (materialized,))?;
             }
 
             let saveframe = ctx.current_saveframe.as_ref().unwrap();
@@ -857,13 +1090,12 @@ fn parse_loop_data(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
                     )));
                 }
 
-                // Materialize TokenValues into Strings only when passing to Python
+                // Materialize TokenValues into Python strings only when passing to Python
                 let loop_data_to_add = std::mem::take(&mut ctx.loop_data);
                 let data_items_count = loop_data_to_add.len();
-                let materialized: Vec<String> = loop_data_to_add
+                let materialized = PyList::new(py, loop_data_to_add
                     .iter()
-                    .map(|tv| tv.to_string(&ctx.tokenizer.full_data))
-                    .collect();
+                    .map(|tv| tv.to_py(py, &ctx.tokenizer.full_data)))?;
                 loop_obj.call_method(py, "add_data", (materialized,), Some(ctx.add_data_kwargs.bind(py).cast()?))?;
 
                 // Track statistics for adaptive pre-allocation by loop type
@@ -969,7 +1201,7 @@ pub fn parse(
 
     // Preprocess data (same as Python's Parser.load_data)
     // Fix DOS line endings
-    let data = data.replace("\r\n", "\n").replace("\r", "\n");
+    let data = if data.contains('\r') { data.replace("\r\n", "\n").replace("\r", "\n") } else { data };
     // Change '\n; data ' started multi-lines to '\n;\ndata'
     let data = fix_multiline_semicolons(&data);
 

@@ -1,6 +1,23 @@
 Release notes
 =============
 
+3.5.2
+~~~~~
+
+Minor improvements:
+
+- Parsing NMR-STAR is now more than twice as fast again, and nearly three times as fast for entries with many
+  saveframes. Adding a saveframe while parsing previously took time proportional to the number of saveframes
+  already read.
+- Writing NMR-STAR (``str()`` and ``format()`` on entries, saveframes, and loops) is more than twice as fast.
+- The output of both is unchanged.
+- :py:meth:`pynmrstar.Entry.get_json`, :py:meth:`pynmrstar.Saveframe.get_json`, :py:meth:`pynmrstar.Loop.get_json`,
+  :py:meth:`pynmrstar.Entry.get_tag`, :py:meth:`pynmrstar.Saveframe.get_tag`, and :py:meth:`pynmrstar.Loop.get_tag`
+  are now typed to reflect the different shapes of result they return depending on their arguments.
+- Getting a saveframe from an entry using a key which is not a name, an ordinal, or a slice now raises a clear
+  ValueError, rather than a KeyError.
+
+
 3.5.1
 ~~~~~
 

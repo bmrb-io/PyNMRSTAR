@@ -567,6 +567,8 @@ class Saveframe(object):
         Optionally specify a schema if you don't want to use the default schema.
         """
 
+        # Note: when parsing, tags this method would accept unchanged are added without calling it,
+        #  by add_saveframe_tags_fast() in src/parser.rs. Keep that in sync with any new validation here.
         if not isinstance(name, str):
             raise ValueError('Tag names must be strings.')
 

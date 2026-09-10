@@ -487,7 +487,6 @@ class Loop(object):
             raise ValueError('No valid data provided.')
 
         pending_data: List = []
-        lc_tag_index: Mapping[str, int] = self._lc_tags
 
         def format_two_to_one(format_two: Dict[str, List]):
             max_length = max([len(_) for _ in format_two.values()])
@@ -509,6 +508,7 @@ class Loop(object):
             if isinstance(data, dict):
                 data = format_two_to_one(data)
 
+            lc_tag_index: Mapping[str, int] = self._lc_tags
             for pos, row in enumerate(data):
                 current_row = [None]*len(self._tags)
                 for tag, value in row.items():
@@ -625,6 +625,8 @@ class Loop(object):
                 self.add_tag(item, ignore_duplicates=ignore_duplicates, update_data=update_data)
             return
 
+        # Note: when parsing, tags this method would accept unchanged are added without calling it,
+        #  by add_loop_tags_fast() in src/parser.rs. Keep that in sync with any new validation here.
         name = name.strip()
 
         if "." in name:
