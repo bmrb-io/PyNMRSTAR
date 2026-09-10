@@ -66,16 +66,25 @@ class Entry(object):
 
         return (self.entry_id, self._frame_list) == (other.entry_id, other._frame_list)
 
-    def __getitem__(self, item: Union[int, str]) -> 'saveframe_mod.Saveframe':
-        """Get the indicated saveframe."""
+    @overload
+    def __getitem__(self, item: Union[int, str]) -> 'saveframe_mod.Saveframe': ...
 
-        if isinstance(item, int):
-            return self._frame_list[item]
-        elif isinstance(item, str):
+    @overload
+    def __getitem__(self, item: slice) -> List['saveframe_mod.Saveframe']: ...
+
+    def __getitem__(self, item: Union[int, str, slice]) -> Union['saveframe_mod.Saveframe',
+                                                                 List['saveframe_mod.Saveframe']]:
+        """Get the indicated saveframe, by name or by position. A slice returns a list of saveframes."""
+
+        if isinstance(item, str):
             return self.get_saveframe_by_name(item)
-        else:
+
+        # Anything a list accepts as an index - including slices and numpy integers
+        try:
+            return self._frame_list[item]
+        except TypeError:
             raise ValueError("You can only get a saveframe by ordinal or name. You attempted to get: "
-                             f"'{repr(item)}'")
+                             f"'{repr(item)}'") from None
 
     def __init__(self, **kwargs) -> None:
         """ You should not directly instantiate an Entry using this method.
