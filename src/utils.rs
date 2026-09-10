@@ -103,127 +103,179 @@ pub fn quote_value(orig: &Bound<PyAny>, str_conversion_dict: Option<&Bound<'_, P
 }
 
 /// Internal function to quote a value for NMR-STAR format.
-/// This is a simpler version that takes a string directly, used by format_loop.
+/// This is a simpler version that takes a string directly.
 pub fn quote_value_str(s: &str) -> String {
-    let len = s.len();
-
     // Don't allow empty string - return as-is, caller handles this error
-    if len == 0 {
+    if s.is_empty() {
         return String::new();
     }
 
-    // Handle embedded STAR format multiline comments
-    if s.contains("\n;") {
-        let starts_with_newline = s.starts_with('\n');
-        let newline_count = s.bytes().filter(|&b| b == b'\n').count();
-        let mut result = String::with_capacity(len + newline_count * 3 + 8);
+    let quoting = Quoting::of(s);
+    let mut result = String::with_capacity(quoting.quoted_len(s));
+    quoting.write(s, &mut result);
+    result
+}
 
-        if !starts_with_newline {
-            result.push_str("\n   ");
-        }
+// Byte flags used to classify a value for quoting in a single pass
+const QF_NEWLINE: u8 = 1;
+const QF_SINGLE_QUOTE: u8 = 2;
+const QF_DOUBLE_QUOTE: u8 = 4;
+/// ASCII whitespace, as recognized by char::is_whitespace()
+const QF_WHITESPACE: u8 = 8;
+/// A non-ASCII byte - the value may contain Unicode whitespace
+const QF_NON_ASCII: u8 = 16;
 
+static QUOTE_FLAGS: [u8; 256] = {
+    let mut table = [0u8; 256];
+    table[b'\n' as usize] = QF_NEWLINE | QF_WHITESPACE;
+    table[b'\'' as usize] = QF_SINGLE_QUOTE;
+    table[b'"' as usize] = QF_DOUBLE_QUOTE;
+    table[b' ' as usize] = QF_WHITESPACE;
+    table[b'\t' as usize] = QF_WHITESPACE;
+    table[b'\r' as usize] = QF_WHITESPACE;
+    table[0x0B] = QF_WHITESPACE;
+    table[0x0C] = QF_WHITESPACE;
+    let mut i = 128;
+    while i < 256 {
+        table[i] = QF_NON_ASCII;
+        i += 1;
+    }
+    table
+};
+
+/// How a (non-empty) value must be written in NMR-STAR. Determining this separately from
+/// writing the value lets the formatters measure and write values without allocating a
+/// quoted copy of each one.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Quoting {
+    /// Written as-is
+    Bare,
+    /// Wrapped in single quotes
+    Single,
+    /// Wrapped in double quotes
+    Double,
+    /// A multi-line value which already ends with a newline, written as-is
+    Multiline,
+    /// A multi-line value, written with a newline appended
+    MultilineAppendNewline,
+    /// A value containing embedded STAR ("\n;"): every line is indented by three spaces
+    Embedded,
+}
+
+impl Quoting {
+    /// Determine how a non-empty value must be quoted.
+    pub fn of(s: &str) -> Quoting {
         let bytes = s.as_bytes();
-        let mut last_end = 0;
-        for i in memchr_iter(b'\n', bytes) {
-            result.push_str(&s[last_end..=i]);
-            result.push_str("   ");
-            last_end = i + 1;
+        let mut flags = 0u8;
+        for &b in bytes {
+            flags |= QUOTE_FLAGS[b as usize];
         }
-        result.push_str(&s[last_end..]);
-        result.push('\n');
 
-        return result;
-    }
-
-    // If it has newlines but not "\n;", handle multiline
-    if s.contains('\n') {
-        if s.ends_with('\n') {
-            return s.to_string();
-        } else {
-            let mut result = String::with_capacity(len + 1);
-            result.push_str(s);
-            result.push('\n');
-            return result;
+        if flags & QF_NEWLINE != 0 {
+            // Handle embedded STAR format multiline comments
+            if s.contains("\n;") {
+                return Quoting::Embedded;
+            }
+            return if s.ends_with('\n') { Quoting::Multiline } else { Quoting::MultilineAppendNewline };
         }
-    }
 
-    // Check for quotes
-    let has_single = s.contains('\'');
-    let has_double = s.contains('"');
+        let has_single = flags & QF_SINGLE_QUOTE != 0;
+        let has_double = flags & QF_DOUBLE_QUOTE != 0;
 
-    // If it has both single and double quotes, need special handling
-    if has_single && has_double {
-        let mut can_wrap_single = true;
-        let mut can_wrap_double = true;
-
-        let chars: Vec<char> = s.chars().collect();
-        for i in 0..chars.len() - 1 {
-            if chars[i + 1].is_whitespace() {
-                match chars[i] {
-                    '\'' => can_wrap_single = false,
-                    '"' => can_wrap_double = false,
-                    _ => {}
+        // If it has both single and double quotes, it can only be wrapped in a quote which
+        //  is never followed by whitespace within the value
+        if has_single && has_double {
+            let mut can_wrap_single = true;
+            let mut can_wrap_double = true;
+            for (i, &b) in bytes.iter().enumerate() {
+                if (b == b'\'' || b == b'"') && i + 1 < bytes.len() && starts_with_whitespace(&s[i + 1..]) {
+                    if b == b'\'' {
+                        can_wrap_single = false;
+                    } else {
+                        can_wrap_double = false;
+                    }
                 }
             }
+
+            return if can_wrap_single {
+                Quoting::Single
+            } else if can_wrap_double {
+                Quoting::Double
+            } else {
+                // Must use multiline format
+                Quoting::MultilineAppendNewline
+            };
         }
 
-        if !can_wrap_single && !can_wrap_double {
-            // Must use multiline format
-            let mut result = String::with_capacity(len + 1);
-            result.push_str(s);
-            result.push('\n');
-            return result;
-        } else if can_wrap_single {
-            let mut result = String::with_capacity(len + 2);
-            result.push('\'');
-            result.push_str(s);
-            result.push('\'');
-            return result;
+        // Check if we need wrapping: a leading character with special meaning, a
+        //  reserved keyword prefix, or whitespace anywhere
+        let needs_wrapping = matches!(bytes[0], b'_' | b'"' | b'\'' | b'#')
+            || (matches!(bytes[0] | 0x20, b'd' | b's' | b'l' | b'g')
+                && RESERVED_KEYWORDS.iter().any(|kw| starts_with_ignore_case(s, kw)))
+            || flags & QF_WHITESPACE != 0
+            || (flags & QF_NON_ASCII != 0 && s.chars().any(|c| c.is_whitespace()));
+
+        if needs_wrapping {
+            if has_single { Quoting::Double } else { Quoting::Single }
         } else {
-            // can_wrap_double must be true here
-            let mut result = String::with_capacity(len + 2);
-            result.push('"');
-            result.push_str(s);
-            result.push('"');
-            return result;
+            Quoting::Bare
         }
     }
 
-    // Check if we need wrapping
-    let mut needs_wrapping = false;
-
-    if s.starts_with('_') || s.starts_with('"') || s.starts_with('\'') {
-        needs_wrapping = true;
+    /// Whether the quoted value spans lines, and so must be written as a semicolon-delimited value.
+    pub fn is_multiline(self) -> bool {
+        matches!(self, Quoting::Multiline | Quoting::MultilineAppendNewline | Quoting::Embedded)
     }
 
-    if !needs_wrapping {
-        if starts_with_ignore_case(s, "data_") || starts_with_ignore_case(s, "save_") ||
-           starts_with_ignore_case(s, "loop_") || starts_with_ignore_case(s, "stop_") ||
-           starts_with_ignore_case(s, "global_") {
-            needs_wrapping = true;
-        }
-
-        if !needs_wrapping {
-            // Check for whitespace anywhere or '#' at start (would be interpreted as comment)
-            if s.starts_with('#') || s.chars().any(|c| c.is_whitespace()) {
-                needs_wrapping = true;
+    /// The length in bytes of the value once quoted.
+    pub fn quoted_len(self, s: &str) -> usize {
+        match self {
+            Quoting::Bare | Quoting::Multiline => s.len(),
+            Quoting::Single | Quoting::Double => s.len() + 2,
+            Quoting::MultilineAppendNewline => s.len() + 1,
+            Quoting::Embedded => {
+                let prefix = if s.starts_with('\n') { 0 } else { 4 };
+                prefix + s.len() + memchr_iter(b'\n', s.as_bytes()).count() * 3 + 1
             }
         }
     }
 
-    if needs_wrapping {
-        let mut result = String::with_capacity(len + 2);
-        if has_single {
-            result.push('"');
-            result.push_str(s);
-            result.push('"');
-        } else {
-            result.push('\'');
-            result.push_str(s);
-            result.push('\'');
+    /// Append the quoted value to the output.
+    pub fn write(self, s: &str, out: &mut String) {
+        match self {
+            Quoting::Bare | Quoting::Multiline => out.push_str(s),
+            Quoting::Single => {
+                out.push('\'');
+                out.push_str(s);
+                out.push('\'');
+            }
+            Quoting::Double => {
+                out.push('"');
+                out.push_str(s);
+                out.push('"');
+            }
+            Quoting::MultilineAppendNewline => {
+                out.push_str(s);
+                out.push('\n');
+            }
+            Quoting::Embedded => {
+                if !s.starts_with('\n') {
+                    out.push_str("\n   ");
+                }
+                let mut last_end = 0;
+                for i in memchr_iter(b'\n', s.as_bytes()) {
+                    out.push_str(&s[last_end..=i]);
+                    out.push_str("   ");
+                    last_end = i + 1;
+                }
+                out.push_str(&s[last_end..]);
+                out.push('\n');
+            }
         }
-        return result;
     }
+}
 
-    s.to_string()
+/// Whether the string begins with a (Unicode) whitespace character.
+fn starts_with_whitespace(s: &str) -> bool {
+    s.chars().next().map_or(false, |c| c.is_whitespace())
 }

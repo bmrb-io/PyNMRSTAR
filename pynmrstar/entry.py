@@ -5,7 +5,7 @@ import re
 import warnings
 from io import StringIO
 from pathlib import Path
-from typing import TextIO, BinaryIO, Union, List, Optional, Dict, Any, Tuple, Sequence
+from typing import TextIO, BinaryIO, Union, List, Optional, Dict, Any, Tuple, Sequence, Literal, overload
 
 from pynmrstar import definitions, utils, loop as loop_mod, saveframe as saveframe_mod, parser
 from pynmrstar._internal import _json_serialize, _interpret_file, _get_entry_from_database, write_to_file
@@ -71,13 +71,25 @@ class Entry(object):
 
         return (self.entry_id, self._frame_list) == (other.entry_id, other._frame_list)
 
-    def __getitem__(self, item: Union[int, str]) -> 'saveframe_mod.Saveframe':
-        """Get the indicated saveframe."""
+    @overload
+    def __getitem__(self, item: Union[int, str]) -> 'saveframe_mod.Saveframe': ...
 
+    @overload
+    def __getitem__(self, item: slice) -> List['saveframe_mod.Saveframe']: ...
+
+    def __getitem__(self, item: Union[int, str, slice]) -> Union['saveframe_mod.Saveframe',
+                                                                 List['saveframe_mod.Saveframe']]:
+        """Get the indicated saveframe, by name or by position. A slice returns a list of saveframes."""
+
+        if isinstance(item, str):
+            return self.get_saveframe_by_name(item)
+
+        # Anything a list accepts as an index - including slices and numpy integers
         try:
             return self._frame_list[item]
         except TypeError:
-            return self.get_saveframe_by_name(item)
+            raise ValueError("You can only get a saveframe by ordinal or name. You attempted to get: "
+                             f"'{repr(item)}'") from None
 
     def __init__(self, **kwargs) -> None:
         """ You should not directly instantiate an Entry using this method.
@@ -507,6 +519,10 @@ class Entry(object):
         return self.__str__(skip_empty_loops=skip_empty_loops, skip_empty_tags=skip_empty_tags,
                             show_comments=show_comments)
 
+    @overload
+    def get_json(self, serialize: Literal[True] = True) -> str: ...
+    @overload
+    def get_json(self, serialize: Literal[False]) -> dict: ...
     def get_json(self, serialize: bool = True) -> Union[dict, str]:
         """ Returns the entry in JSON format. If serialize is set to
         False a dictionary representation of the entry that is
@@ -562,6 +578,10 @@ class Entry(object):
 
         return ret_frames
 
+    @overload
+    def get_tag(self, tag: str, whole_tag: Literal[False] = False) -> List[Any]: ...
+    @overload
+    def get_tag(self, tag: str, whole_tag: Literal[True]) -> List[List[Any]]: ...
     def get_tag(self, tag: str, whole_tag: bool = False) -> list:
         """ Given a tag (E.g. _Assigned_chem_shift_list.Data_file_name)
         return a list of all values for that tag. Specify whole_tag=True
