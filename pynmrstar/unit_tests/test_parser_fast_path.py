@@ -45,7 +45,7 @@ class TestParserFastPath(unittest.TestCase):
     def test_sample_files(self):
         for name in ['bmr15000_3.str', 'bmr15000_3_denormalized.str', 'dos.str', 'nonewlines.str',
                      'edge_cases.str']:
-            with open(os.path.join(our_path, 'sample_files', name)) as star_file:
+            with open(os.path.join(our_path, 'sample_files', name), encoding='utf-8') as star_file:
                 self.assert_same_as_api(star_file.read())
 
     def test_tags_split_by_loops(self):
