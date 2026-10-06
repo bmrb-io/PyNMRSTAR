@@ -6,18 +6,21 @@ Release notes
 
 Major improvements:
 
-- New :py:meth:`pynmrstar.Entry.validate_full`, which validates an entry against the full NMR-STAR dictionary and
-  returns a list of :py:class:`pynmrstar.ValidationIssue` objects rather than strings. Each issue has a
-  :py:class:`pynmrstar.Severity`, a machine-readable check name (e.g. ``tag.missing``), and the saveframe, loop,
-  tag, and row it came from, so results can be filtered, compared across runs, and located. It ports the checks
-  of BMRB's own validator: saveframe structure (duplicate names and categories, missing mandatory categories,
-  ordering, ``Sf_framecode`` and ``Sf_category`` mismatches), mandatory tags including the dictionary's
-  conditional rules, unknown, misplaced, invalid, duplicated, and out-of-order tags, row index numbering,
-  references to parent values and saveframes that do not exist, local IDs, sample components, data types and
-  lengths, closed enumerations, non-ASCII characters, and empty loop rows. Validate against the requirements of
-  the public archive (``profile='public'``, the default) or BMRB's internal annotation requirements
-  (``profile='internal'``). Dictionary violations which BMRB's validator does not report are available at
-  :py:attr:`pynmrstar.Severity.STRICT`, which must be requested explicitly.
+- New :py:meth:`pynmrstar.Entry.validate_full`, which validates a whole entry against the full NMR-STAR
+  dictionary and returns a list of :py:class:`pynmrstar.ValidationIssue` objects rather than strings. Each issue
+  has a :py:class:`pynmrstar.Severity`, a stable check name (e.g. ``tag.missing``), the saveframe, loop, tag,
+  and row it came from, and a ``details`` dictionary holding the rest of what its message says (the expected
+  value, the tag that should come first, ...), so results can be filtered, compared across runs, located, and
+  reworded. It reports everything :py:meth:`pynmrstar.Entry.validate` does, plus the checks of BMRB's own
+  validator: saveframe structure (duplicate names and categories, missing mandatory categories, ordering,
+  ``Sf_framecode`` and ``Sf_category`` mismatches), mandatory tags including the dictionary's conditional
+  rules, unknown, misplaced, invalid, duplicated, and out-of-order tags, row index numbering, references to
+  parent values and saveframes that do not exist, local IDs, and sample components. Validate against the
+  requirements of the public archive (``profile='public'``, the default) or BMRB's internal annotation
+  requirements (``profile='internal'``). Findings BMRB's validator does not make are at
+  :py:attr:`pynmrstar.Severity.STRICT`, and ``metadata_only=True`` limits the per-value checks to the
+  dictionary's metadata tags, as BMRB's validator does. Messages are written for people and may be reworded in
+  later releases; code that needs fixed wording should build it from the check name and ``details``.
 - :py:class:`pynmrstar.Schema` now loads the whole NMR-STAR dictionary distribution rather than only the tag
   table: enumerations, saveframe categories, per-profile mandatory flags, conditional rules, the relationships
   between tags, and default values. The distribution (dictionary version 3.2.14.0) is packaged with the library
