@@ -14,7 +14,7 @@ from pynmrstar.schema import Schema
 from pynmrstar.validation import Severity, ValidationIssue, _row_index_tag, _value_type, check_saveframes, check_mandatory_tags, \
     check_invalid_tags, check_tag_order, check_row_indexes, check_related_tags, check_local_ids, \
     check_frame_codes, check_sample_saveframe, check_charset, check_empty_rows, check_data_values, \
-    check_data_types
+    check_data_types, check_loop_widths
 
 logger = logging.getLogger('pynmrstar')
 
@@ -1248,11 +1248,12 @@ class Entry(object):
                             each_row[pos] = new_reference
 
     def validate_full(self, schema: Schema = None, profile: str = None,
-                      severities: Sequence[str] = None) -> List[ValidationIssue]:
+                      severities: Sequence[str] = None, metadata_only: bool = False) -> List[ValidationIssue]:
         """Validate the entry against the NMR-STAR dictionary, returning a list
-        of :class:`pynmrstar.validation.ValidationIssue`.
+        of :class:`pynmrstar.ValidationIssue`.
 
-        It differs from :meth:`validate` in two ways that matter:
+        It reports everything :meth:`validate` does, and differs from it in
+        two ways that matter:
 
         * **It returns structured findings rather than strings**, so a caller can
           filter by severity, identify a finding across runs by its ``check``
@@ -1269,9 +1270,13 @@ class Entry(object):
             the requirements of the public archive. BMRB's annotation tooling
             uses ``internal``.
         :param severities: Restrict the result to these severities. By default
-            every severity is returned except :attr:`Severity.STRICT`, which
-            holds dictionary violations that BMRB's own validator does not
-            report -- opt into those explicitly.
+            every severity is returned. :attr:`Severity.STRICT` holds the
+            findings BMRB's own validator does not report, so leaving it out
+            gives that validator's view of the dictionary rules.
+        :param metadata_only: Check values only in the tags and loops the
+            dictionary marks as metadata, skipping the experimental data
+            (chemical shifts, peaks, constraints, ...). This is the reach of
+            BMRB's own validator, and is much faster on a large entry.
         """
 
         my_schema: Schema = utils.get_schema(schema)
@@ -1279,7 +1284,7 @@ class Entry(object):
             profile = definitions.DEFAULT_VALIDATION_PROFILE
 
         if severities is None:
-            wanted = {_ for _ in Severity if _ != Severity.STRICT}
+            wanted = set(Severity)
         else:
             wanted = {Severity(_) for _ in severities}
 
@@ -1290,13 +1295,22 @@ class Entry(object):
         issues.extend(check_tag_order(self, my_schema, profile))
         issues.extend(check_row_indexes(self, my_schema, profile))
         issues.extend(check_related_tags(self, my_schema, profile))
-        issues.extend(check_local_ids(self, my_schema, profile))
-        issues.extend(check_frame_codes(self, my_schema, profile))
+        issues.extend(check_local_ids(self, my_schema, profile, metadata_only))
+        issues.extend(check_frame_codes(self, my_schema, profile, metadata_only))
         issues.extend(check_sample_saveframe(self, my_schema, profile))
-        issues.extend(check_data_types(self, my_schema, profile))
-        issues.extend(check_data_values(self, my_schema, profile))
-        issues.extend(check_empty_rows(self, my_schema, profile))
-        issues.extend(check_charset(self, my_schema, profile))
+        issues.extend(check_data_types(self, my_schema, profile, metadata_only))
+        issues.extend(check_data_values(self, my_schema, profile, metadata_only))
+        issues.extend(check_empty_rows(self, my_schema, profile, metadata_only))
+        issues.extend(check_charset(self, my_schema, profile, metadata_only))
+        issues.extend(check_loop_widths(self, my_schema, profile))
+
+        # A value-mandatory tag that is null breaks two rules at once: the
+        # profile's requirement and the dictionary's NOT NULL. One finding says
+        # it -- the first, which also names the requirement.
+        missing_value = {(_.saveframe, _.tag) for _ in issues if _.check == 'tag.missing_value'}
+        issues = [_ for _ in issues
+                  if not (_.check == 'value.null_not_allowed' and _.row in (None, 0)
+                          and (_.saveframe, _.tag) in missing_value)]
 
         return [_ for _ in issues if _.severity in wanted]
 

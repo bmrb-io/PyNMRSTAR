@@ -146,9 +146,12 @@ class _MetadataScope:
 
     The dictionary flags each tag, and the distinction is the difference between
     the few hundred tags an annotator works with and the millions of numbers
-    underneath them. The referential checks below only apply to the former --
-    they are statements about how an entry's descriptions hang together, and
-    running them over every chemical shift would cost far more and say nothing.
+    underneath them. The parent-value check only ever applies to the former --
+    it is a statement about how an entry's descriptions hang together, and the
+    data's references are largely to chemistry defined outside the entry. The
+    per-value checks apply to the former when ``metadata_only`` is set, which is
+    the reach of the BMRB validator (it loads only metadata into its database),
+    and to everything otherwise.
 
     The rule has one wrinkle worth stating: **a loop is in or out as a whole**.
     Its tags are judged by the category, not individually, so a category with
@@ -161,13 +164,19 @@ class _MetadataScope:
     silently ignored.
     """
 
-    def __init__(self, schema) -> None:
+    def __init__(self, schema, metadata_only: bool = True) -> None:
         self._schema = schema
         self._categories: Optional[Dict[str, bool]] = None
+        # False widens the scope to every tag and loop, which is what
+        # validate_full() does unless it is asked to match the historical
+        # validator's reach.
+        self._metadata_only = metadata_only
 
     def free(self, full_tag: str) -> bool:
         """Whether a saveframe's own tag is metadata. An unknown tag is."""
 
+        if not self._metadata_only:
+            return True
         tag_data = self._schema.schema.get(full_tag.lower())
         return tag_data is None or tag_data.get('Meta data') == 'Y'
 
@@ -175,6 +184,8 @@ class _MetadataScope:
         """Whether a loop of this category is metadata, judged over every tag
         the dictionary places in it."""
 
+        if not self._metadata_only:
+            return True
         if self._categories is None:
             self._categories = {}
             for tag, tag_data in self._schema.schema.items():
@@ -892,6 +903,11 @@ def check_related_tags(entry, schema, profile: str) -> List[ValidationIssue]:
     """
 
     issues: List[ValidationIssue] = []
+    # Always the metadata alone, even when validate_full() reaches further: a
+    # data loop's references are mostly to chemistry defined outside the entry
+    # -- _Atom_chem_shift.Atom_ID's parent is _Chem_comp_atom.Atom_ID, and the
+    # standard residues' atoms are not written into an entry -- so checking them
+    # would report every standard atom as dangling.
     scope = _MetadataScope(schema)
     values = _parent_values(entry, schema, scope)
 
@@ -943,7 +959,7 @@ def check_related_tags(entry, schema, profile: str) -> List[ValidationIssue]:
     return issues
 
 
-def check_local_ids(entry, schema, profile: str) -> List[ValidationIssue]:
+def check_local_ids(entry, schema, profile: str, metadata_only: bool = True) -> List[ValidationIssue]:
     """Report loop rows that claim to belong to a different saveframe.
 
     Ported from the BMRB validator's ``CheckLocalIds`` (function 14). Every
@@ -962,7 +978,7 @@ def check_local_ids(entry, schema, profile: str) -> List[ValidationIssue]:
     """
 
     issues: List[ValidationIssue] = []
-    scope = _MetadataScope(schema)
+    scope = _MetadataScope(schema, metadata_only)
 
     def is_local_id(full_tag: str, in_loop: bool) -> bool:
         tag_data = schema.schema.get(full_tag.lower())
@@ -1022,7 +1038,7 @@ def check_local_ids(entry, schema, profile: str) -> List[ValidationIssue]:
     return issues
 
 
-def check_frame_codes(entry, schema, profile: str) -> List[ValidationIssue]:
+def check_frame_codes(entry, schema, profile: str, metadata_only: bool = True) -> List[ValidationIssue]:
     """Report references to saveframes the entry does not contain.
 
     Ported from the BMRB validator's ``CheckFrameCodes`` (function 10). A value
@@ -1040,7 +1056,7 @@ def check_frame_codes(entry, schema, profile: str) -> List[ValidationIssue]:
     """
 
     issues: List[ValidationIssue] = []
-    scope = _MetadataScope(schema)
+    scope = _MetadataScope(schema, metadata_only)
     names = {saveframe.name for saveframe in entry}
 
     def examine(value: Any, **location) -> None:
@@ -1142,13 +1158,12 @@ class _Value(NamedTuple):
 
 
 def _values(entry, schema, scope: '_MetadataScope') -> Iterator[_Value]:
-    """Every metadata value in an entry, saveframe tags and loop values alike.
+    """Every value in scope in an entry, saveframe tags and loop values alike.
 
-    The three per-value checks below all want the same walk, and all want it
-    over the same subset: what the historical validator loads into its database
-    is metadata only, so a check reading that database never sees a chemical
-    shift. Iterating in one place keeps the three in step, and keeps the cost of
-    a check proportional to the metadata rather than to the file.
+    The per-value checks below all want the same walk over the same subset --
+    the whole entry, or with a metadata-only scope just what the historical
+    validator loads into its database, which never includes a chemical shift.
+    Iterating in one place keeps them in step.
     """
 
     for saveframe in entry:
@@ -1194,7 +1209,7 @@ def _shown(value: str) -> str:
     return _measured(value).replace('\n', '\\n').replace('\r', '\\r')
 
 
-def check_charset(entry, schema, profile: str) -> List[ValidationIssue]:
+def check_charset(entry, schema, profile: str, metadata_only: bool = True) -> List[ValidationIssue]:
     """Report values containing characters NMR-STAR cannot carry.
 
     Ported from the BMRB validator's ``CheckCharset`` (function 19). The format
@@ -1211,7 +1226,7 @@ def check_charset(entry, schema, profile: str) -> List[ValidationIssue]:
 
     issues: List[ValidationIssue] = []
 
-    for item in _values(entry, schema, _MetadataScope(schema)):
+    for item in _values(entry, schema, _MetadataScope(schema, metadata_only)):
         if item.value is None:
             continue
         text = str(item.value)
@@ -1225,7 +1240,7 @@ def check_charset(entry, schema, profile: str) -> List[ValidationIssue]:
     return issues
 
 
-def check_empty_rows(entry, schema, profile: str) -> List[ValidationIssue]:
+def check_empty_rows(entry, schema, profile: str, metadata_only: bool = True) -> List[ValidationIssue]:
     """Report loop rows in which every value is null.
 
     Ported from the BMRB validator's ``CheckEmptyRows`` (function 15). Such a
@@ -1236,7 +1251,7 @@ def check_empty_rows(entry, schema, profile: str) -> List[ValidationIssue]:
     """
 
     issues: List[ValidationIssue] = []
-    scope = _MetadataScope(schema)
+    scope = _MetadataScope(schema, metadata_only)
 
     for saveframe in entry:
         category = _saveframe_category(schema, saveframe)
@@ -1255,7 +1270,36 @@ def check_empty_rows(entry, schema, profile: str) -> List[ValidationIssue]:
     return issues
 
 
-def check_data_values(entry, schema, profile: str) -> List[ValidationIssue]:
+def check_loop_widths(entry, schema, profile: str) -> List[ValidationIssue]:
+    """Report loop rows with more or fewer values than the loop has tags.
+
+    The parser cannot produce one, but a loop edited through its ``data`` list
+    can, and every other check then reads the wrong column. Not a check the
+    BMRB validator makes: its loops come from the parser.
+
+    ``schema`` and ``profile`` are unused; they are accepted so that every
+    entry-level check has the same signature.
+    """
+
+    issues: List[ValidationIssue] = []
+
+    for saveframe in entry:
+        category = _saveframe_category(schema, saveframe)
+        for loop in saveframe:
+            width = len(loop.tags)
+            for number, row in enumerate(loop.data):
+                if len(row) != width:
+                    issues.append(ValidationIssue(
+                        Severity.ERROR, 'row.wrong_width',
+                        f"A row of loop '{loop.category}' in saveframe '{saveframe.name}' has {len(row)} "
+                        f"values, but the loop has {width} tags.",
+                        saveframe=saveframe.name, category=category, loop=loop.category, row=number,
+                        details={'values': len(row), 'tags': width}))
+
+    return issues
+
+
+def check_data_values(entry, schema, profile: str, metadata_only: bool = True) -> List[ValidationIssue]:
     """Report values outside the closed enumeration their tag allows.
 
     Ported from the BMRB validator's ``CheckDataValues`` (function 12). Only
@@ -1273,7 +1317,7 @@ def check_data_values(entry, schema, profile: str) -> List[ValidationIssue]:
 
     issues: List[ValidationIssue] = []
 
-    for item in _values(entry, schema, _MetadataScope(schema)):
+    for item in _values(entry, schema, _MetadataScope(schema, metadata_only)):
         if item.value in definitions.NULL_VALUES:
             continue
         enumeration = schema.enumerations.get(item.tag.lower())
@@ -1307,6 +1351,13 @@ _DIGITS = frozenset('0123456789')
 #: A SQL type of the ``VARCHAR(n)`` family, whose ``n`` is a length limit.
 _SIZED_TYPE = re.compile(r'char(?:\((\d+)\))?$', re.IGNORECASE)
 _WHITESPACE = re.compile(r'\s')
+
+
+@lru_cache(maxsize=None)
+def _compiled(pattern: str) -> 're.Pattern':
+    """A dictionary type's regular expression, compiled once."""
+
+    return re.compile(pattern)
 
 
 def _is_int(value: str) -> bool:
@@ -1427,7 +1478,7 @@ def _value_type(tag_data: Dict[str, Any]) -> tuple:
     return 'STRING', None
 
 
-def check_data_types(entry, schema, profile: str) -> List[ValidationIssue]:
+def check_data_types(entry, schema, profile: str, metadata_only: bool = True) -> List[ValidationIssue]:
     """Report values that are not of the type their tag is declared to hold.
 
     Ported from the BMRB validator's ``CheckDataTypes`` (function 11): numbers
@@ -1435,10 +1486,18 @@ def check_data_types(entry, schema, profile: str) -> List[ValidationIssue]:
     column, and saveframe pointers written without the ``$`` that makes them
     pointers.
 
-    One finding is added that the original cannot make. Its date test knows only
-    that a month is 1-12 and a day 1-31, so ``2024-02-31`` passes it; a day that
-    does not exist is reported at :attr:`Severity.STRICT`, keeping the
-    Java-equivalent band exactly what it always was.
+    Three findings are added that the original does not make:
+
+    * Its date test knows only that a month is 1-12 and a day 1-31, so
+      ``2024-02-31`` passes it; a day that does not exist is reported as
+      ``value.impossible_date`` at :attr:`Severity.STRICT`.
+    * ``value.type_mismatch``: a value that passes the coarse test above but not
+      the pattern of the tag's more specific dictionary type -- an atom name
+      containing a character no atom name may, say. Only checked when nothing
+      else is wrong with the value, and not for a non-ASCII value, which
+      :func:`check_charset` reports and which no pattern would accept.
+    * ``value.null_not_allowed``: a null in a tag the dictionary declares
+      ``NOT NULL``.
 
     ``profile`` is unused; it is accepted so that every entry-level check has
     the same signature.
@@ -1447,16 +1506,28 @@ def check_data_types(entry, schema, profile: str) -> List[ValidationIssue]:
     issues: List[ValidationIssue] = []
     types: Dict[str, tuple] = {}
 
-    for item in _values(entry, schema, _MetadataScope(schema)):
-        if item.value in definitions.NULL_VALUES:
-            continue
-
+    for item in _values(entry, schema, _MetadataScope(schema, metadata_only)):
         folded = item.tag.lower()
         if folded not in types:
             tag_data = schema.schema.get(folded)
-            types[folded] = _value_type(tag_data) if tag_data is not None else (None, None)
-        kind, size = types[folded]
+            if tag_data is None:
+                types[folded] = (None, None, None, None, True)
+            else:
+                bmrb_type = tag_data.get('BMRB data type')
+                pattern = schema.data_types.get(bmrb_type)
+                types[folded] = _value_type(tag_data) + (bmrb_type, _compiled(pattern) if pattern else None,
+                                                         tag_data.get('Nullable') is not False)
+        kind, size, bmrb_type, pattern, nullable = types[folded]
         if kind is None:
+            continue
+
+        if item.value in definitions.NULL_VALUES:
+            if not nullable:
+                issues.append(ValidationIssue(
+                    Severity.ERROR, 'value.null_not_allowed',
+                    f"Tag '{item.tag}' in saveframe '{item.saveframe}' may not be null.",
+                    saveframe=item.saveframe, category=item.category, tag=item.tag,
+                    loop=item.loop, row=item.row, value=item.value))
             continue
 
         value = _measured(str(item.value))
@@ -1492,6 +1563,11 @@ def check_data_types(entry, schema, profile: str) -> List[ValidationIssue]:
             found.append((Severity.ERROR, 'value.too_long',
                           f"Value of '{item.tag}' is {len(value)} characters long; at most {size} are "
                           f"allowed: '{shown}'.", {'max_length': size}))
+
+        if not found and pattern is not None and value.isascii() and not pattern.match(value):
+            found.append((Severity.ERROR, 'value.type_mismatch',
+                          f"Value '{shown}' of '{item.tag}' is not a valid '{bmrb_type}'.",
+                          {'type': bmrb_type, 'pattern': pattern.pattern}))
 
         for severity, check, message, details in found:
             issues.append(ValidationIssue(

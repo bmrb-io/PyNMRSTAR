@@ -844,10 +844,11 @@ class TestEntry(unittest.TestCase):
 
         # A date of the right shape naming a day that does not exist. The
         # original's test knows only that a month is 1-12 and a day 1-31, so
-        # this is ours alone and is filed under STRICT.
+        # this is ours alone and is filed under STRICT -- reported by default,
+        # and left out by asking for the other severities.
         submission[1] = '2010-02-31'
-        self.assertEqual(typed(), [])
-        strict = typed(severities=['strict'])
+        self.assertEqual(typed(severities=['critical', 'error', 'warning', 'info']), [])
+        strict = typed()
         self.assertEqual([_.check for _ in strict], ['value.impossible_date'])
         self.assertEqual(strict[0].tag, '_Entry.Submission_date')
         submission[1] = '2010-02-19'
@@ -894,6 +895,56 @@ class TestEntry(unittest.TestCase):
         software = entry.get_saveframes_by_category('software')[0]
         software['Name'] = 'A program nobody has used before'
         self.assertFalse([_ for _ in enumerated() if _.tag == '_Software.Name'])
+
+    def test_validate_full_reaches_the_data(self):
+        """Per-value checks cover the experimental data as validate() does,
+        unless metadata_only asks for the BMRB validator's narrower reach."""
+
+        entry = copy(self.file_entry)
+        shifts = entry['assigned_chem_shift_list_1']['_Atom_chem_shift']
+        value = shifts.tag_index('Val')
+
+        def found(check, **kwargs):
+            return [_ for _ in entry.validate_full(**kwargs) if _.check == check]
+
+        shifts.data[0][value] = 'abc'
+        self.assertEqual([(_.tag, _.row) for _ in found('value.not_a_float')], [('_Atom_chem_shift.Val', 0)])
+        self.assertEqual(found('value.not_a_float', metadata_only=True), [])
+        shifts.data[0][value] = '1.5'
+
+        # A null in a NOT NULL column
+        shifts.data[3][value] = '.'
+        self.assertEqual([(_.tag, _.row) for _ in found('value.null_not_allowed')],
+                         [('_Atom_chem_shift.Val', 3)])
+        shifts.data[3][value] = '1.5'
+
+        # A value that passes the coarse type test but not the dictionary type's
+        # own pattern: a space, in a code
+        author = entry.get_loops_by_category('_Entry_author')[0]
+        initials = author.tag_index('Middle_initials')
+        author.data[0][initials] = 'A B'
+        issues = found('value.type_mismatch')
+        self.assertEqual([_.tag for _ in issues], ['_Entry_author.Middle_initials'])
+        self.assertEqual(issues[0].details['type'], 'code')
+        author.data[0][initials] = '.'
+
+    def test_validate_full_null_reported_once(self):
+        """A null value-mandatory tag breaks the profile's rule and NOT NULL
+        both; it is reported once, as the missing value."""
+
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+        frame['NMR_STAR_version'] = '.'
+        checks = [_.check for _ in entry.validate_full() if _.tag == '_Entry.NMR_STAR_version']
+        self.assertEqual(checks, ['tag.missing_value'])
+
+    def test_validate_full_loop_widths(self):
+        entry = copy(self.file_entry)
+        loop = entry.get_saveframes_by_category('entity')[0]['_Entity_comp_index']
+        loop.data[1].append('extra')
+        issues = [_ for _ in entry.validate_full() if _.check == 'row.wrong_width']
+        self.assertEqual([(_.loop, _.row) for _ in issues], [('_Entity_comp_index', 1)])
+        self.assertEqual(issues[0].details, {'values': len(loop.tags) + 1, 'tags': len(loop.tags)})
 
     def test_validate_full_empty_rows_and_charset(self):
         entry = copy(self.file_entry)
