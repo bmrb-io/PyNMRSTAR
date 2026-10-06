@@ -827,7 +827,7 @@ class Entry(object):
                                 candidate[1] = self.get_saveframe_by_name(
                                     str(tag[1])[1:]).get_tag('ID')[0]
                             except (KeyError, IndexError):
-                                logger.warning(f'Missing frame of type {tag[0]} pointed to by {candidate[0]}')
+                                logger.warning(f'Missing frame {tag[1]} pointed to by {saveframe.tag_prefix}.{tag[0]}')
                             break
 
             # Now apply the remapping to loops...
@@ -888,7 +888,7 @@ class Entry(object):
                                     try:
                                         row[tag_pos] = self.get_saveframe_by_name(row[x][1:]).get_tag('ID')[0]
                                     except KeyError:
-                                        logger.warning(f"Missing frame of type {tag} pointed to by {conditional_tag}")
+                                        logger.warning(f"Missing frame {row[x]} pointed to by {loop.category}.{tag}")
 
         # Renumber every loop's row-index column, and rewrite the references
         # to the numbers that change. See _renumber_row_indexes().

@@ -30,6 +30,24 @@ Schema class
    :members:
    :exclude-members: convert_tag, val_type, tag_key
 
+Validation results
+~~~~~~~~~~~~~~~~~~
+
+:py:meth:`pynmrstar.Entry.validate_full` returns a list of these.
+
+.. autoclass:: pynmrstar.ValidationIssue
+   :members:
+
+.. autoclass:: pynmrstar.Severity
+   :members:
+   :undoc-members:
+
+Repairs
+~~~~~~~
+
+.. automodule:: pynmrstar.repair
+   :members: insert_mandatory_tags
+
 Exceptions
 ~~~~~~~~~~
 

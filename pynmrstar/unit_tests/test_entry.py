@@ -932,20 +932,23 @@ class TestEntry(unittest.TestCase):
         self.assertTrue(any(issubclass(_.category, DeprecationWarning) for _ in caught))
 
     def test_validate(self):
-        warnings.simplefilter("ignore", DeprecationWarning)
-        # The sample entry spells two enumeration values with different
-        # capitalization than the dictionary does
-        validation = ["Value 'non-polymer' of tag '_Chem_comp.Type' is improperly capitalized but otherwise "
-                      "valid. Should be 'NON-POLYMER'.",
-                      "Value 'PDBe' of tag '_Chem_comp.Processing_site' is improperly capitalized but otherwise "
-                      "valid. Should be 'PDBE'."]
-        self.assertEqual(self.file_entry.validate(), validation)
-        self.file_entry[-1][-1][0][0] = 'a'
-        validation.append(
-            "Value does not match specification: '_Atom_chem_shift.ID':'a'.\n     "
-            "Type specified: int\n     Regular expression for type: '^(?:-?[0-9]*)?$'")
-        self.assertEqual(self.file_entry.validate(), validation)
-        self.file_entry[-1][-1][0][0] = '1'
+        # Only within this test: validate() is deprecated, and a filter set
+        # outside catch_warnings() would hide the warning from every later test
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            # The sample entry spells two enumeration values with different
+            # capitalization than the dictionary does
+            validation = ["Value 'non-polymer' of tag '_Chem_comp.Type' is improperly capitalized but otherwise "
+                          "valid. Should be 'NON-POLYMER'.",
+                          "Value 'PDBe' of tag '_Chem_comp.Processing_site' is improperly capitalized but otherwise "
+                          "valid. Should be 'PDBE'."]
+            self.assertEqual(self.file_entry.validate(), validation)
+            self.file_entry[-1][-1][0][0] = 'a'
+            validation.append(
+                "Value does not match specification: '_Atom_chem_shift.ID':'a'.\n     "
+                "Type specified: int\n     Regular expression for type: '^(?:-?[0-9]*)?$'")
+            self.assertEqual(self.file_entry.validate(), validation)
+            self.file_entry[-1][-1][0][0] = '1'
 
     def test_Entry___setitem__(self):
         """ Test the setting a tag functionality of an entry. """

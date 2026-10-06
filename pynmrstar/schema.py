@@ -366,14 +366,14 @@ class Schema(object):
 
         Codes are the ones the dictionary and the BMRB validator share:
 
-        ==== ====================================================================
+        ===== ====================================================================
         ``I`` invalid -- the tag may not appear here at all
         ``O`` optional
         ``M`` mandatory -- the tag must be present
         ``V`` value-mandatory -- present *and* non-null
         ``C`` conditional -- mandatory if its saveframe is present
         ``R`` value-conditional -- non-null if its saveframe is present
-        ==== ====================================================================
+        ===== ====================================================================
 
         ``M`` and ``V`` are demoted to ``C`` and ``R`` for a tag whose saveframe
         category is itself optional: "mandatory" there can only mean "mandatory
