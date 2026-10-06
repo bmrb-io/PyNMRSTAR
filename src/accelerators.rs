@@ -78,6 +78,7 @@ fn push_spaces(out: &mut String, mut count: usize) {
 /// Comments are handled by Python, this focuses on the heavy lifting of tag/loop formatting.
 #[pyfunction]
 #[pyo3(signature = (name, tag_prefix, tags, formatted_loops, skip_empty_tags=false, str_conversion_dict=None, null_values=None))]
+#[allow(clippy::too_many_arguments)] // Mirrors the arguments Python passes
 pub fn format_saveframe<'py>(
     py: Python<'py>,
     name: &str,
@@ -233,12 +234,10 @@ pub fn format_loop<'py>(
     if data.is_empty() {
         if skip_empty_loops {
             return Ok(String::new());
-        } else {
-            if tags.is_empty() {
-                return Ok("\n   loop_\n\n   stop_\n".to_string());
-            }
-            // Fall through to print tags with no data
+        } else if tags.is_empty() {
+            return Ok("\n   loop_\n\n   stop_\n".to_string());
         }
+        // Otherwise fall through to print tags with no data
     }
 
     if tags.is_empty() && !data.is_empty() {
@@ -288,7 +287,7 @@ pub fn format_loop<'py>(
             )));
         }
 
-        for col_idx in 0..num_cols {
+        for (col_idx, col_width) in col_widths.iter_mut().enumerate() {
             let string_val = converter.convert(py, &row.get(col_idx)?)?;
             let s = string_val.to_str()?;
 
@@ -306,8 +305,8 @@ pub fn format_loop<'py>(
             } else {
                 // Track width (but not for multiline values), +3 for spacing
                 let width = quoting.quoted_len(s) + 3;
-                if width > col_widths[col_idx] {
-                    col_widths[col_idx] = width;
+                if width > *col_width {
+                    *col_width = width;
                 }
             }
             values.push((string_val, quoting));

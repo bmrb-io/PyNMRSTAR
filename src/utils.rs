@@ -268,5 +268,5 @@ impl Quoting {
 
 /// Whether the string begins with a (Unicode) whitespace character.
 fn starts_with_whitespace(s: &str) -> bool {
-    s.chars().next().map_or(false, |c| c.is_whitespace())
+    s.chars().next().is_some_and(|c| c.is_whitespace())
 }

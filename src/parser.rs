@@ -424,21 +424,21 @@ impl ParserContext {
         // Pre-create reusable dictionaries for kwargs
         let source_dict = [("source", source.as_str())].into_py_dict(py)?.into();
 
-        let add_tags_kwargs = if schema.is_some() {
+        let add_tags_kwargs = if let Some(schema) = &schema {
             [
                 ("convert_data_types", convert_data_types.into_pyobject(py)?.to_owned().into_any().unbind()),
-                ("schema", schema.as_ref().unwrap().clone_ref(py))
+                ("schema", schema.clone_ref(py))
             ].into_py_dict(py)?.into()
         } else {
             [("convert_data_types", convert_data_types.into_pyobject(py)?.to_owned().into_any().unbind())]
                 .into_py_dict(py)?.into()
         };
 
-        let add_data_kwargs = if schema.is_some() {
+        let add_data_kwargs = if let Some(schema) = &schema {
             [
                 ("rearrange", true.into_pyobject(py)?.to_owned().into_any().unbind()),
                 ("convert_data_types", convert_data_types.into_pyobject(py)?.to_owned().into_any().unbind()),
-                ("schema", schema.as_ref().unwrap().clone_ref(py))
+                ("schema", schema.clone_ref(py))
             ].into_py_dict(py)?.into()
         } else {
             [
@@ -1015,8 +1015,7 @@ fn parse_loop_tags(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
                     // Look up statistics for this specific loop type
                     if let Some(stats) = ctx.loop_statistics.get(loop_type) {
                         let avg_items_per_loop = stats.total_data_items / stats.loop_count;
-                        let avg_rows = (avg_items_per_loop / tags_len).max(10); // At least 10 rows
-                        avg_rows
+                        (avg_items_per_loop / tags_len).max(10) // At least 10 rows
                     } else {
                         // First time seeing this loop type: use reasonable default
                         100
@@ -1080,6 +1079,8 @@ fn parse_loop_data(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
 
             // Add data to loop
             if !ctx.loop_data.is_empty() {
+                // usize::is_multiple_of() would need Rust 1.87, raising the minimum for building from the sdist
+                #[allow(clippy::manual_is_multiple_of)]
                 if ctx.loop_data.len() % tags_len != 0 {
                     let category = loop_obj.getattr(py, "category")?;
                     return Err(ctx.raise_error(&format!(
