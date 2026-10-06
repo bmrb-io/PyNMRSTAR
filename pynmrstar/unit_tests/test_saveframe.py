@@ -1237,6 +1237,15 @@ class TestSaveframe(unittest.TestCase):
         errors = sf.validate()
         self.assertTrue(any("Cannot properly validate" in e for e in errors))
 
+    def test_validate_non_ascii(self):
+        """Validating a saveframe reports tag values containing non-ASCII characters."""
+
+        frame = self.file_entry['entry_information']
+        frame['Title'] = 'Solution structure of ubiquitin–like protein'
+        errors = frame.validate(validate_schema=False)
+        self.assertEqual(errors, ["Non-ASCII character(s) '–' (U+2013) in tag '_Entry.Title': "
+                                  "'Solution structure of ubiquitin–like protein'."])
+
     def test_validate_schema_false(self):
         """Validating with validate_schema=False skips schema validation."""
 

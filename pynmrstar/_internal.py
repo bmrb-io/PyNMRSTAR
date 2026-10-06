@@ -2,14 +2,17 @@ import decimal
 import json
 import logging
 import os
+import re
+import threading
 import time
 import zlib
+from contextlib import contextmanager
 from datetime import date
 from gzip import GzipFile
 from importlib.metadata import version
 from io import StringIO, BytesIO
 from pathlib import Path
-from typing import Dict, Union, IO, List, Tuple
+from typing import Dict, Union, IO, List, Optional, Tuple
 from urllib.error import URLError
 
 import requests
@@ -206,6 +209,167 @@ def _interpret_file(the_file: Union[str, Path, IO]) -> StringIO:
     return StringIO(buffer.read().decode().replace("\r\n", "\n").replace("\r", "\n"))
 
 
+#: Pass as a ``version`` to fetch the newest dictionary release from the internet.
+LATEST_DICTIONARY: str = 'latest'
+
+
+def _dictionary_cache_root() -> str:
+    """Directory that holds cached dictionary distributions, one subdirectory
+    per release version."""
+
+    root = os.environ.get('XDG_CACHE_HOME') or os.path.join(os.path.expanduser('~'), '.cache')
+    return os.path.join(root, 'pynmrstar')
+
+
+def _dictionary_version(xlschem_text: str) -> str:
+    """Read the dictionary release version out of an xlschem_ann.csv body."""
+
+    from csv import DictReader
+    for row in DictReader(StringIO(xlschem_text)):
+        if row.get('Dictionary sequence') == 'TBL_BEGIN':
+            return row.get('ADIT category view type') or 'unknown'
+    return 'unknown'
+
+
+def _packaged_dictionary_directory() -> str:
+    """The directory holding the dictionary distribution shipped with pynmrstar."""
+
+    return os.path.join(os.path.dirname(os.path.realpath(__file__)), 'reference_files')
+
+
+def read_dictionary_directory(directory: str) -> Dict[str, str]:
+    """Read every distribution file from a local directory (or URL base).
+
+    Raises if any of them is missing: a partial distribution would quietly
+    produce a schema without its enumerations or validation rules."""
+
+    if directory.startswith(('http://', 'https://', 'ftp://')):
+        def _join(base: str, name: str) -> str:
+            return base.rstrip('/') + '/' + name
+    else:
+        _join = os.path.join
+    return {name: _interpret_file(_join(directory, name)).read()
+            for name in pynmrstar.definitions.DICTIONARY_FILES}
+
+
+def packaged_dictionary_version() -> str:
+    """The version of the dictionary distribution shipped with pynmrstar."""
+
+    with open(os.path.join(_packaged_dictionary_directory(), 'xlschem_ann.csv'), encoding='utf-8') as handle:
+        return _dictionary_version(handle.read())
+
+
+def _cache_dictionary(files: Dict[str, str], dictionary_version: str) -> None:
+    """Write a distribution to the cache, best effort.
+
+    The files are written to a scratch directory which is then renamed into
+    place, so the cache only ever holds complete distributions -- an
+    interrupted write, or two processes caching at once, cannot leave behind a
+    truncated file that would be read back on every later run."""
+
+    import shutil
+    import tempfile
+
+    root = _dictionary_cache_root()
+    final = os.path.join(root, dictionary_version)
+    if os.path.isdir(final):
+        return
+    scratch = None
+    try:
+        os.makedirs(root, exist_ok=True)
+        scratch = tempfile.mkdtemp(prefix='.partial-', dir=root)
+        for name, text in files.items():
+            with open(os.path.join(scratch, name), 'w', encoding='utf-8', newline='') as handle:
+                handle.write(text)
+        os.rename(scratch, final)
+        scratch = None
+    except OSError:
+        pass  # caching is best effort; most likely another process won the race
+    finally:
+        if scratch is not None:
+            shutil.rmtree(scratch, ignore_errors=True)
+
+
+def local_dictionary(version: str) -> Optional[Dict[str, str]]:
+    """The distribution files for one release if they are on this machine --
+    packaged with pynmrstar or cached -- and None otherwise. Never touches the
+    network."""
+
+    if version == packaged_dictionary_version():
+        return read_dictionary_directory(_packaged_dictionary_directory())
+    cached = os.path.join(_dictionary_cache_root(), version)
+    if os.path.isdir(cached):
+        try:
+            return read_dictionary_directory(cached)
+        except OSError:
+            return None
+    return None
+
+
+def load_dictionary(version: str = None, source: str = None) -> Tuple[Dict[str, str], str]:
+    """Return ``({filename: contents}, version)`` for the dictionary distribution
+    files a :class:`Schema` is built from.
+
+    * ``version=None`` -- the distribution packaged with pynmrstar. This never
+      touches the network or the cache.
+    * ``version='latest'`` -- the newest release, fetched from ``source``
+      every time and cached under ``${XDG_CACHE_HOME:-~/.cache}/pynmrstar/<version>/``
+      so it can be asked for by number later. Raises ``ValueError`` if it
+      cannot be fetched.
+    * any other ``version`` -- that release: the packaged one if it matches,
+      else a cached copy, else ``source`` if that is what it currently serves.
+      Only the newest release can be downloaded, so an older one is available
+      only if it is packaged or was cached when it was the newest. Raises
+      ``ValueError`` if it cannot be found.
+
+    ``source`` defaults to the ``PYNMRSTAR_DICTIONARY_SOURCE`` environment
+    variable, then :data:`definitions.DICTIONARY_URL`; it may be a URL base or a
+    local directory holding the distribution files."""
+
+    if version is None:
+        files = read_dictionary_directory(_packaged_dictionary_directory())
+        return files, _dictionary_version(files['xlschem_ann.csv'])
+
+    if version != LATEST_DICTIONARY:
+        local = local_dictionary(version)
+        if local is not None:
+            return local, version
+
+    if source is None:
+        source = os.environ.get('PYNMRSTAR_DICTIONARY_SOURCE') or pynmrstar.definitions.DICTIONARY_URL
+    try:
+        fetched = read_dictionary_directory(source)
+    except (requests.exceptions.RequestException, URLError, OSError) as err:
+        raise ValueError(f"Could not fetch the dictionary from '{source}': {err}") from err
+    fetched_version = _dictionary_version(fetched['xlschem_ann.csv'])
+
+    if version != LATEST_DICTIONARY and version != fetched_version:
+        raise ValueError(f"Dictionary version '{version}' is unavailable: it is not the packaged version "
+                         f"({packaged_dictionary_version()}), it is not cached, and the newest release is "
+                         f"'{fetched_version}'.")
+
+    _cache_dictionary(fetched, fetched_version)
+    return fetched, fetched_version
+
+
+# Anything outside the "Basic Latin" unicode block (0x00-0x7f). NMR-STAR is an
+# ASCII format, so non-ASCII characters are reported during validation.
+_non_ascii_pattern = re.compile(r'[^\x00-\x7f]')
+
+
+def _non_ascii_error(tag: str, value: str) -> str:
+    """ Formats the validation error for a value that contains characters
+    outside of ASCII. The offending characters are listed with their code
+    points, since they are often invisible or ambiguous in the file itself."""
+
+    characters: List[str] = []
+    for character in _non_ascii_pattern.findall(value):
+        if character not in characters:
+            characters.append(character)
+    described = ', '.join(f"'{_}' (U+{ord(_):04X})" for _ in characters)
+    return f"Non-ASCII character(s) {described} in tag '{tag}': '{value}'."
+
+
 def get_clean_tag_list(item: Union[str, List[str], Tuple[str]]) -> List[Dict[str, str]]:
     """ Converts the provided item to a list of dictionaries of
     {
@@ -254,3 +418,51 @@ def write_to_file(nmrstar_object: Union['pynmrstar.Entry', 'pynmrstar.Saveframe'
     out_file = open(str(file_name), "w")
     out_file.write(data_to_write)
     out_file.close()
+
+
+# ---------------------------------------------------------------------------
+# Parse-time leniency
+#
+# A few structural problems are detected while building the object model rather
+# than while tokenizing (Saveframe.add_tag). Raising on them makes the library
+# unusable for validation: a validator's input is by definition the not-yet-
+# correct file, and refusing to load it means the very problem you exist to
+# report cannot be reported. These conditions are therefore treated like the
+# tokenizer's existing parse warnings -- logged by default, raised when the
+# caller passes raise_parse_warnings=True.
+#
+# Outside a parse the behaviour is unchanged: building an inconsistent object
+# through the API is a programming error, so it still raises.
+# ---------------------------------------------------------------------------
+
+_parse_state = threading.local()
+
+
+@contextmanager
+def parsing(raise_parse_warnings: bool):
+    """ Marks the enclosing block as a parse, during which recoverable
+    structural problems become warnings rather than exceptions. """
+
+    previous = getattr(_parse_state, 'raise_parse_warnings', None)
+    _parse_state.raise_parse_warnings = raise_parse_warnings
+    try:
+        yield
+    finally:
+        _parse_state.raise_parse_warnings = previous
+
+
+def parse_warning(message: str) -> bool:
+    """ Report a recoverable structural problem.
+
+    Returns True if the caller should recover and continue, False if it should
+    raise its own exception (which keeps the existing error messages and types
+    for direct API use). Raises ParsingError when parsing with
+    raise_parse_warnings=True. """
+
+    state = getattr(_parse_state, 'raise_parse_warnings', None)
+    if state is None:
+        return False
+    if state:
+        raise pynmrstar.exceptions.ParsingError(message)
+    logger.warning(message)
+    return True

@@ -2,16 +2,39 @@ import decimal
 import logging
 import os
 import re
-from csv import DictReader
+from csv import DictReader, reader
 from datetime import date
 from functools import lru_cache
 from io import StringIO
-from typing import Union, List, Optional, Any, Dict, IO
+from pathlib import Path
+from typing import Union, List, Optional, Any, Dict, IO, Set
 
 from pynmrstar import definitions, utils
-from pynmrstar._internal import _interpret_file
+from pynmrstar._internal import _dictionary_version, _interpret_file, load_dictionary, local_dictionary, \
+    read_dictionary_directory
 
 logger = logging.getLogger('pynmrstar')
+
+# Saveframe category names, used to tell real rows in the dictionary's category
+# table from its header rules and sentinels.
+_CATEGORY_NAME = re.compile(r'^[A-Za-z][A-Za-z0-9_]*$')
+
+
+def _is_valid_date(value: str) -> bool:
+    """Whether a value which already matched one of the dictionary's date type
+    patterns is actually a date. The patterns are loose -- they accept a two
+    digit year, month 13, day 32 -- so the fields have to be checked as well."""
+
+    fields = value.split(':', 1)[0].split('-')
+    if len(fields[0]) != 4:
+        return False
+    try:
+        date(int(fields[0]),
+             int(fields[1]) if len(fields) > 1 else 1,
+             int(fields[2]) if len(fields) > 2 else 1)
+    except ValueError:
+        return False
+    return True
 
 
 class Schema(object):
@@ -21,11 +44,32 @@ class Schema(object):
        create an object of this class and then pass it to the methods
        which allow the specification of a schema. """
 
-    def __init__(self, schema_file: Union[str, IO] = None) -> None:
-        """Initialize a BMRB schema. With no arguments the most
-        up-to-date schema will be fetched from the BMRB FTP site.
-        Otherwise pass a URL or a file to load a schema from using the
-        schema_file keyword argument."""
+    def __init__(self, schema_file: Union[str, Path, IO] = None, version: str = None) -> None:
+        """Initialize a BMRB schema.
+
+        With no arguments, the dictionary distribution packaged with
+        pynmrstar is loaded. That never touches the network.
+
+        ``version`` selects a different dictionary release (3.2.14.0 or above):
+
+        * ``'latest'`` downloads the newest release, and caches it under
+          ``~/.cache/pynmrstar`` (``$XDG_CACHE_HOME/pynmrstar``) so that it
+          can later be asked for by number without the network;
+        * a version number loads that release from the packaged copy or the
+          cache, downloading it only if neither has it -- which can only
+          succeed when it is the newest release.
+
+        ``schema_file`` loads the dictionary from somewhere else instead. It may
+        be a local directory holding the distribution files
+        (``definitions.DICTIONARY_FILES``), in which case ``version`` may not be
+        given as well; or a single ``xlschem_ann.csv`` tag table, given as a
+        path, URL, or file object. A single tag table carries only the tags,
+        so the enumerations and validation rules are taken from the packaged
+        or cached distribution of the same version -- or, if ``version`` is
+        given, of that version, downloading it if need be. If none is
+        available, the schema is built from the tag table alone, and a warning
+        is logged because :meth:`pynmrstar.Entry.validate_full` will then be
+        incomplete."""
 
         self.headers: List[str] = []
         self.schema: Dict[str, Dict[str, str]] = {}
@@ -33,36 +77,99 @@ class Schema(object):
         self.category_order: List[str] = []
         self.version: str = "unknown"
         self.data_types: Dict[str, str] = {}
+        # tag (lowercase) -> {'closed': bool, 'values': set of allowed values}
+        self.enumerations: Dict[str, Dict[str, Any]] = {}
+        # saveframe category -> {'id': int, 'flags': str, 'unique': bool}
+        self.saveframe_categories: Dict[str, Dict[str, Any]] = {}
+        # child tag (lowercase) -> the tag whose values it must be drawn from
+        self.parent_tags: Dict[str, str] = {}
+        # tags holding a saveframe's local ID (lowercase)
+        self.local_id_tags: Set[str] = set()
+        # tag (lowercase) -> the value to give it when creating it empty
+        self.default_values: Dict[str, str] = {}
+        # tags a deposition tool fills in by itself (lowercase)
+        self.auto_inserted_tags: Set[str] = set()
+        # tag (lowercase) -> list of conditional mandatory rules
+        self.conditional_rules: Dict[str, List[Dict[str, str]]] = {}
+        # profile name -> resolved mandatory codes, built on demand
+        self._profiles: Dict[str, Dict[str, Dict[str, str]]] = {}
 
-        # Try loading from the internet first
-        if schema_file is None:
-            schema_file = definitions.SCHEMA_URL
         self.schema_file = schema_file
+        distribution: Optional[Dict[str, str]] = None
+        if isinstance(schema_file, (str, Path)) and os.path.isdir(schema_file):
+            if version is not None:
+                raise ValueError('Pass either a dictionary directory as schema_file or a version, not both.')
+            distribution = read_dictionary_directory(str(schema_file))
+            xlschem_text = distribution['xlschem_ann.csv']
+        elif schema_file is not None:
+            xlschem_text = _interpret_file(schema_file).read()
+            if version is not None:
+                distribution, _ = load_dictionary(version)
+            else:
+                distribution = local_dictionary(_dictionary_version(xlschem_text))
+                if distribution is None:
+                    logger.warning(f"No dictionary distribution matching the tag table in '{schema_file}' is "
+                                   f"available, so the schema has no enumerations or validation rules.")
+        else:
+            distribution, _ = load_dictionary(version)
+            xlschem_text = distribution['xlschem_ann.csv']
 
-        # Get whatever schema they specified, wrap in StringIO and pass that to the csv reader
-        schema_stream = _interpret_file(schema_file)
-        fix_newlines = StringIO('\n'.join(schema_stream.read().splitlines()))
+        self._parse_tag_table(xlschem_text)
+        self._parse_relationships()
+        self._load_data_types()
+        if distribution is not None:
+            self._build_enumerations(distribution['adit_enum_hdr.csv'], distribution['adit_enum_dtl.csv'])
+            self._parse_saveframe_categories(distribution['adit_cat_grp_o.csv'])
+            self._parse_conditional_rules(distribution['adit_tag_validation.csv'])
 
-        csv_reader_instance = DictReader(fix_newlines)
-        self.headers = csv_reader_instance.fieldnames
+    def _parse_tag_table(self, xlschem_text: str) -> None:
+        """Populate the tag schema from an xlschem_ann.csv body.
 
-        # Skip the header descriptions and header index values and anything
-        #  else before the real data starts
-        tmp_line = next(csv_reader_instance)
+        Read positionally rather than with :class:`csv.DictReader`, because the
+        header repeats names across column groups -- ``public`` and ``internal``
+        each name both a ``Validate`` column and an ``Overide`` one, and ``small
+        molecule`` appears twice within ``Validate`` alone. Keying by name would
+        silently collapse those to whichever came last, so the per-view
+        validation flags have to be taken by index. The third header row labels
+        the groups, which is what identifies the ``Validate`` block."""
+
+        rows = reader(StringIO('\n'.join(xlschem_text.splitlines())))
         try:
-            while tmp_line['Dictionary sequence'] != "TBL_BEGIN":
-                tmp_line = next(csv_reader_instance)
-        except IndexError:
-            raise ValueError(f"Could not parse a schema from the specified URL: {schema_file}")
-        self.version = tmp_line['ADIT category view type']
+            self.headers = next(rows)
+        except StopIteration:
+            raise ValueError(f"Could not parse a schema from: {self.schema_file}")
+        width = len(self.headers)
 
-        for line in csv_reader_instance:
+        def as_dict(row: List[str]) -> Dict[str, Any]:
+            if len(row) < width:
+                row = row + [''] * (width - len(row))
+            return dict(zip(self.headers, row))
 
-            if line['Dictionary sequence'] == "TBL_END":
+        # Skip the header descriptions and index values before the real data. The
+        # group-label row on the way past tells us where the Validate block is.
+        validate_columns: List[int] = []
+        while True:
+            try:
+                row = next(rows)
+            except StopIteration:
+                raise ValueError(f"Could not parse a schema from: {self.schema_file}")
+            found = [i for i, group in enumerate(row) if group.strip() == 'Validate']
+            if found:
+                validate_columns = found
+            if row and row[0] == 'TBL_BEGIN':
+                self.version = as_dict(row)['ADIT category view type']
                 break
+        self._validate_columns = validate_columns
 
-            single_tag_data: Dict[str, any] = dict(line)
-
+        for row in rows:
+            if row and row[0] == "TBL_END":
+                break
+            single_tag_data: Dict[str, Any] = as_dict(row)
+            # Take the per-view validation flags by position, before the
+            # name-keyed dict loses the duplicated column names.
+            single_tag_data['_validate_flags'] = ''.join(
+                (row[i].strip().upper() or ' ')[:1] if i < len(row) else ' '
+                for i in validate_columns)
             # Convert nulls
             if single_tag_data['Nullable'] == "NOT NULL":
                 single_tag_data['Nullable'] = False
@@ -70,27 +177,237 @@ class Schema(object):
                 single_tag_data['Nullable'] = True
             if '' in single_tag_data:
                 del single_tag_data['']
-
             self.schema[single_tag_data['Tag'].lower()] = single_tag_data
             self.schema_order.append(single_tag_data['Tag'])
             formatted = utils.format_category(single_tag_data['Tag'])
             if formatted not in self.category_order:
                 self.category_order.append(formatted)
 
+    def _parse_relationships(self) -> None:
+        """Derive the ties between tags from the already-parsed tag table.
+
+        Two facts, both of which the tag table states obliquely:
+
+        * **Which tag a value must be drawn from.** A tag that refers to
+          something defined elsewhere -- a residue's entity, an experiment's
+          sample, every ``Entry_ID`` -- names that definition's category and
+          field in ``Foreign Table``/``Foreign Column`` rather than naming the
+          tag. Resolving the pair to a tag once, here, is what lets a check ask
+          "what is this tag's parent" directly. Six references name a category
+          that does not exist (``Constraint_list``, ``Spectral_Peak_list``,
+          ``Org_constr_file_comment_list``) and are dropped, as the dictionary
+          build's own join drops them.
+        * **Which tag carries a saveframe's local ID.** ``lclSfIdFlg`` marks it,
+          with one subtlety: ``_Entry.ID`` and every ``*.Entry_ID`` carry the
+          flag as well, and those identify the *entry*, which is the same in
+          every saveframe. Treating them as local IDs would make every saveframe
+          in a well-formed entry look wrong.
+        * **What to put in a tag created empty, and which tags to create at
+          all.** ``default value`` supplies the first; ``ADIT auto insert``
+          marks tags a deposition tool fills in itself, which a caller adding
+          missing tags should leave to it. Two rules come from the dictionary's
+          own build scripts rather than from a column: a tag that *has* a
+          default is auto-inserted by definition, and every ``*.Entry_ID`` is
+          auto-inserted because the accession number is the depositing tool's to
+          write. (The build also gives every ``*.Entry_ID`` the placeholder
+          BMRB uses before an accession number is assigned. That is one
+          organization's convention rather than the dictionary's, so it stays
+          out of here -- :func:`pynmrstar.repair.insert_mandatory_tags` takes
+          the value as an argument.)
+        """
+
+        by_field: Dict[tuple, str] = {}
+        for tag_data in self.schema.values():
+            category = (tag_data.get('Tag category') or '').strip()
+            field = (tag_data.get('Tag field') or '').strip()
+            if category and field:
+                by_field[(category, field)] = tag_data['Tag']
+
+        for tag, tag_data in self.schema.items():
+            table = (tag_data.get('Foreign Table') or '').strip()
+            column = (tag_data.get('Foreign Column') or '').strip()
+            parent = by_field.get((table, column))
+            if parent is not None:
+                self.parent_tags[tag] = parent
+
+            if (tag_data.get('lclSfIdFlg') or '').strip().upper().startswith('Y'):
+                if tag != '_entry.id' and not tag.endswith('.entry_id'):
+                    self.local_id_tags.add(tag)
+
+            default = (tag_data.get('default value') or '').strip()
+            if default in ('', '?', '.'):
+                default = None
+            if default is not None:
+                self.default_values[tag] = default
+            if default is not None or tag.endswith('.entry_id'):
+                self.auto_inserted_tags.add(tag)
+
+            # The column is a form code rather than a flag: anything above zero
+            # means "inserted automatically", except 8, which the build excludes.
+            auto = (tag_data.get('ADIT auto insert') or '').strip()
+            if auto.isdigit() and int(auto) not in (0, 8):
+                self.auto_inserted_tags.add(tag)
+
+    def _load_data_types(self) -> None:
+        """Load the value-type regular expressions from the packaged reference."""
+
         try:
-            # Read in the data types
             types_file = _interpret_file(os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                                       "reference_files/data_types.csv"))
         except IOError:
             raise ValueError("Could not load the data type definition file from disk!")
-
         csv_reader_instance = DictReader(types_file, fieldnames=['type_name', 'type_definition'])
         for item in csv_reader_instance:
             self.data_types[item['type_name']] = f"^{item['type_definition']}$"
 
+    def _build_enumerations(self, enum_hdr_text: str, enum_dtl_text: str) -> None:
+        """Build enumeration value lists by joining the dictionary's
+        adit_enum_hdr (enumeration id -> tag) with adit_enum_dtl (id -> values).
+        The closed/open flag comes from the already-parsed tag table. Values are
+        stored as the dictionary spells them, alongside a case-folded index so
+        that a value which differs from the dictionary only in capitalization can
+        be reported as such rather than as an unknown value."""
+
+        id_to_tag: Dict[str, str] = {}
+        for row in DictReader(StringIO(enum_hdr_text)):
+            eid = row.get('Enumeration ID')
+            if eid in (None, 'TBL_BEGIN', 'TBL_END', '?'):
+                continue
+            id_to_tag[eid] = row.get('Tag')
+
+        for row in DictReader(StringIO(enum_dtl_text)):
+            eid = row.get('Enumeration ID')
+            if eid in (None, 'TBL_BEGIN', 'TBL_END', '?'):
+                continue
+            tag = id_to_tag.get(eid)
+            if not tag:
+                continue
+            value = (row.get('Enum value') or '').strip()
+            if value == '':
+                continue
+            tag_lower = tag.lower()
+            entry = self.enumerations.get(tag_lower)
+            if entry is None:
+                closed = self.schema.get(tag_lower, {}).get('Item enumeration closed') == 'Y'
+                entry = self.enumerations[tag_lower] = {'closed': closed, 'values': set(), 'folded': {}}
+            entry['values'].add(value)
+            entry['folded'][value.lower()] = value
+
+    def _parse_saveframe_categories(self, cat_grp_text: str) -> None:
+        """Load the saveframe category table from adit_cat_grp_o.csv.
+
+        Each category carries a per-view flag string (see
+        ``definitions.VALIDATION_PROFILES``) and a uniqueness flag: a category
+        that ADIT may replicate can legitimately appear more than once in an
+        entry, any other may not. The category's ordinal is the lowest
+        dictionary sequence among its tags, which is how the dictionary build
+        numbers them."""
+
+        lowest: Dict[str, int] = {}
+        for tag_data in self.schema.values():
+            category = (tag_data.get('SFCategory') or '').strip()
+            sequence = (tag_data.get('Dictionary sequence') or '').strip()
+            if not category or not sequence.isdigit():
+                continue
+            value = int(sequence)
+            if category not in lowest or value < lowest[category]:
+                lowest[category] = value
+
+        for row in DictReader(StringIO('\n'.join(cat_grp_text.splitlines()))):
+            category = (row.get('saveframe_category') or '').strip()
+            # The file carries a rule-off row of dashes between the header and
+            # the data, as well as the usual TBL_BEGIN/TBL_END sentinels.
+            if not _CATEGORY_NAME.match(category):
+                continue
+            replicable = (row.get('ADIT replicable') or '').strip().lower().startswith('y')
+            self.saveframe_categories[category] = {
+                'flags': (row.get('validateFlgs') or '').strip().upper(),
+                'unique': not replicable,
+                'id': lowest.get(category),
+            }
+
+    def _parse_conditional_rules(self, tag_validation_text: str) -> None:
+        """Load the conditional mandatory rules from adit_tag_validation.csv.
+
+        A rule says: when ``control_tag`` has ``value``, the mandatory code of
+        ``tag`` becomes the one in ``flags`` (again indexed by profile). This is
+        what makes, for example, ``_Citation.Journal_abbrev`` mandatory only for
+        a citation whose ``_Citation.Type`` is ``journal``. The control tag is
+        frequently in a *different* saveframe from the tag it governs, which is
+        why resolving these can only be done with the whole entry in hand."""
+
+        for row in DictReader(StringIO('\n'.join(tag_validation_text.splitlines()))):
+            tag = (row.get('Tag') or '').strip()
+            if not tag.startswith('_'):
+                continue
+            self.conditional_rules.setdefault(tag.lower(), []).append({
+                'control_category': (row.get('Control Sf category') or '').strip(),
+                'control_tag': (row.get('Control tag') or '').strip(),
+                'value': (row.get('Flag Value') or '').strip(),
+                'category': (row.get('Sf category') or '').strip(),
+                'flags': (row.get('validateFlgs') or '').strip().upper(),
+            })
+
+    @staticmethod
+    def _profile_index(profile: Optional[str]) -> int:
+        """The position of a named validation profile in a dictionary flag string."""
+
+        if profile is None:
+            profile = definitions.DEFAULT_VALIDATION_PROFILE
+        try:
+            return definitions.VALIDATION_PROFILES.index(profile)
+        except ValueError:
+            raise ValueError(f"Unknown validation profile '{profile}'. Known profiles: "
+                             f"{', '.join(definitions.VALIDATION_PROFILES)}")
+
+    def validation_profile(self, profile: str = None) -> Dict[str, Dict[str, str]]:
+        """The mandatory codes for one view of the dictionary, as
+        ``{'tags': {tag: code}, 'categories': {category: code}}``.
+
+        Codes are the ones the dictionary and the BMRB validator share:
+
+        ===== ====================================================================
+        ``I`` invalid -- the tag may not appear here at all
+        ``O`` optional
+        ``M`` mandatory -- the tag must be present
+        ``V`` value-mandatory -- present *and* non-null
+        ``C`` conditional -- mandatory if its saveframe is present
+        ``R`` value-conditional -- non-null if its saveframe is present
+        ===== ====================================================================
+
+        ``M`` and ``V`` are demoted to ``C`` and ``R`` for a tag whose saveframe
+        category is itself optional: "mandatory" there can only mean "mandatory
+        if that saveframe exists at all". The dictionary build applies the same
+        demotion (``validator.py: fix_loopmandatory``), and reproducing it is
+        what makes these codes match the shipped validator dictionary exactly."""
+
+        if profile is None:
+            profile = definitions.DEFAULT_VALIDATION_PROFILE
+        if profile in self._profiles:
+            return self._profiles[profile]
+
+        index = self._profile_index(profile)
+
+        categories: Dict[str, str] = {}
+        for category, data in self.saveframe_categories.items():
+            categories[category] = data['flags'][index:index + 1].strip() or 'O'
+
+        tags: Dict[str, str] = {}
+        for tag, tag_data in self.schema.items():
+            flags = tag_data.get('_validate_flags') or ''
+            code = flags[index:index + 1].strip().upper() or 'O'
+            if code in ('M', 'V') and categories.get((tag_data.get('SFCategory') or '').strip()) == 'O':
+                code = 'C' if code == 'M' else 'R'
+            tags[tag] = code
+
+        self._profiles[profile] = {'tags': tags, 'categories': categories}
+        return self._profiles[profile]
+
     def __repr__(self) -> str:
         """Return how we can be initialized."""
 
+        if self.schema_file is None:
+            return f"pynmrstar.Schema(version='{self.version}')"
         return f"pynmrstar.Schema(schema_file='{self.schema_file}') version {self.version}"
 
     def __str__(self) -> str:
@@ -269,7 +586,8 @@ class Schema(object):
         for y in range(0, len(values[0])):
             lengths.append(max([len(str(x[y])) for x in values]))
 
-        text = f"""BMRB schema from: '{self.schema_file}' version '{self.version}'
+        source = self.schema_file if self.schema_file is not None else 'the NMR-STAR dictionary distribution'
+        text = f"""BMRB schema from: '{source}' version '{self.version}'
 {''}
   {'Tag_Prefix':<{lengths[0]}} {'Tag':<{lengths[1] - 6}} {'Type':<{lengths[2]}} {'Null_Allowed':<{lengths[3]}} {'SF_Category'}
 """
@@ -345,6 +663,21 @@ class Schema(object):
                 return [f"Value does not match specification: '{capitalized_tag}':'{value}'.\n"
                         f"     Type specified: {bmrb_type}\n"
                         f"     Regular expression for type: '{self.data_types[bmrb_type]}'"]
+
+            if bmrb_type.startswith('yyyy-mm-dd') and not _is_valid_date(value):
+                return [f"Value is not a valid date: '{capitalized_tag}':'{value}'."]
+
+            # Check closed-enumeration membership. Only *closed* enumerations are
+            # enforced; open ones are advisory and not flagged. A value that is in
+            # the enumeration but spelled with different capitalization gets its
+            # own message, since the fix is not the same one.
+            enum = self.enumerations.get(tag.lower())
+            if enum is not None and enum['closed'] and value not in enum['values']:
+                capitalized_value = enum['folded'].get(value.lower())
+                if capitalized_value is not None:
+                    return [f"Value '{value}' of tag '{capitalized_tag}' is improperly capitalized but otherwise "
+                            f"valid. Should be '{capitalized_value}'."]
+                return [f"Value '{value}' is not in the closed enumeration for tag '{capitalized_tag}'."]
 
         # Check the tag capitalization
         if tag != capitalized_tag:
