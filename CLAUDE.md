@@ -34,6 +34,19 @@ coverage report
 cd docs && make html
 ```
 
+## Releasing
+
+Releases are built and uploaded to PyPI by GitHub Actions, not locally:
+
+1. Development happens on `v3-dev`; CI (`.github/workflows/continous_integration.yml`) runs the tests on pushes to it
+   and on pull requests into `v3`.
+2. Bump `version` in `pyproject.toml` (the only place it is set) and add a section to `docs/release-notes.rst`.
+3. Merge `v3-dev` into `v3` with a pull request.
+4. Run `./release.sh`, which checks the above and gives a link to create the GitHub release (tag `vX.Y.Z` on `v3`;
+   pre-releases are tagged on `v3-dev` with `./release.sh v3-dev`).
+5. Publishing the GitHub release runs `.github/workflows/manylinux_wheel_builder.yml`, which builds the wheels
+   (cibuildwheel) and sdist and uploads them to PyPI via trusted publishing.
+
 ## Architecture
 
 ### Core Data Model Hierarchy
