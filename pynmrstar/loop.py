@@ -822,6 +822,8 @@ class Loop(object):
     def get_json(self, serialize: Literal[True] = True) -> str: ...
     @overload
     def get_json(self, serialize: Literal[False]) -> dict: ...
+    @overload
+    def get_json(self, serialize: bool = True) -> Union[dict, str]: ...
     def get_json(self, serialize: bool = True) -> Union[dict, str]:
         """ Returns the loop in JSON format. If serialize is set to
         False a dictionary representation of the loop that is
@@ -866,6 +868,11 @@ class Loop(object):
                 tags: Optional[Union[str, List[str]]] = ...,
                 whole_tag: bool = ...,
                 dict_result: Literal[True] = ...) -> List[Dict[str, Any]]: ...
+    @overload
+    def get_tag(self,
+                tags: Optional[Union[str, List[str]]] = ...,
+                whole_tag: bool = ...,
+                dict_result: bool = ...) -> Union[List[Any], List[Dict[str, Any]]]: ...
     def get_tag(self,
                 tags: Optional[Union[str, List[str]]] = None,
                 whole_tag: bool = False,
