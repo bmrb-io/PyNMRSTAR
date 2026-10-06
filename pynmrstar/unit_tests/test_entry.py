@@ -413,6 +413,35 @@ class TestEntry(unittest.TestCase):
         entry.normalize()
         self.assertEqual([_[at_index] for _ in loop.data], before)
 
+    def test_normalize_renumbers_each_atom_from_its_own_entity(self):
+        """A loop describing two atoms carries a residue reference and an
+        entity per atom. Each reference has to be rewritten from its own
+        atom's entity -- Comp_index_ID_2 from Entity_ID_2, not Entity_ID_1."""
+
+        def entity(entity_id, residues):
+            rows = '\n'.join(f'{_} {entity_id} 1' for _ in residues)
+            return (f'save_entity_{entity_id}\n_Entity.Sf_category entity\n'
+                    f'_Entity.Sf_framecode entity_{entity_id}\n_Entity.ID {entity_id}\n_Entity.Entry_ID 1\n'
+                    f'loop_\n_Entity_comp_index.ID\n_Entity_comp_index.Entity_ID\n_Entity_comp_index.Entry_ID\n'
+                    f'{rows}\nstop_\nsave_\n')
+
+        # Both entities' residues are misnumbered, and differently: entity 1's
+        # residue 5 becomes 3, entity 2's becomes 1.
+        entry = Entry.from_string(
+            'data_1\n' + entity(1, [3, 4, 5]) + entity(2, [5, 6, 7]) +
+            'save_constraints\n_Gen_dist_constraint_list.Sf_category general_distance_constraints\n'
+            '_Gen_dist_constraint_list.Sf_framecode constraints\n_Gen_dist_constraint_list.ID 1\n'
+            '_Gen_dist_constraint_list.Entry_ID 1\nloop_\n_Gen_dist_constraint.ID\n'
+            '_Gen_dist_constraint.Member_ID\n_Gen_dist_constraint.Entity_ID_1\n'
+            '_Gen_dist_constraint.Comp_index_ID_1\n_Gen_dist_constraint.Entity_ID_2\n'
+            '_Gen_dist_constraint.Comp_index_ID_2\n_Gen_dist_constraint.Entry_ID\n'
+            '_Gen_dist_constraint.Gen_dist_constraint_list_ID\n1 1 2 5 1 5 1 1\nstop_\nsave_\n')
+
+        entry.normalize()
+        loop = entry.get_loops_by_category('_Gen_dist_constraint')[0]
+        self.assertEqual(loop.get_tag(['Entity_ID_1', 'Comp_index_ID_1', 'Entity_ID_2', 'Comp_index_ID_2']),
+                         [['2', '1', '1', '3']])
+
     def test_repair_insert_mandatory_tags(self):
         """InsertMandatoryTags (105): a missing required free tag arrives as '?'."""
 

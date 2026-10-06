@@ -19,6 +19,25 @@ from pynmrstar.validation import Severity, ValidationIssue, _row_index_tag, _val
 logger = logging.getLogger('pynmrstar')
 
 
+def _shared_decoration(first: str, second: str) -> int:
+    """How many leading and trailing words two tags' names have in common.
+
+    ``Dipole_1_Comp_index_ID_2`` and ``Dipole_1_Entity_ID_2`` share four
+    (``Dipole``, ``1`` and ``ID``, ``2``) -- the words that say which atom a
+    column describes, as opposed to what it says about that atom."""
+
+    first_words = first.rsplit('.', 1)[-1].lower().split('_')
+    second_words = second.rsplit('.', 1)[-1].lower().split('_')
+    length = min(len(first_words), len(second_words))
+    leading = 0
+    while leading < length and first_words[leading] == second_words[leading]:
+        leading += 1
+    trailing = 0
+    while trailing < length - leading and first_words[-1 - trailing] == second_words[-1 - trailing]:
+        trailing += 1
+    return leading + trailing
+
+
 class Entry(object):
     """An object oriented representation of a BMRB entry. You can initialize this
     object several ways; (e.g. from a file, from the official database,
@@ -989,10 +1008,19 @@ class Entry(object):
                 child_category = child.rsplit('.', 1)[0]
                 # The columns on the referring side that mean the same as the
                 # parent's discriminators: the ones drawing from the same tag.
+                # A category describing several atoms has one such column per
+                # atom -- Entity_ID_1 and Entity_ID_2 beside Comp_index_ID_1 and
+                # Comp_index_ID_2 -- and pairing a reference with another atom's
+                # discriminator would rewrite it from the wrong residue's
+                # renumbering. So pair it with the column that shares its name's
+                # decoration, and leave it alone if that does not settle it.
                 counterparts: List[str] = []
                 for target in wanted:
                     match = [_ for _ in schema.schema
                              if _.rsplit('.', 1)[0] == child_category and points_at(_) == target]
+                    if len(match) > 1:
+                        scores = sorted(((_shared_decoration(child, _), _) for _ in match), reverse=True)
+                        match = [scores[0][1]] if scores[0][0] > scores[1][0] else []
                     if not match:
                         break
                     counterparts.append(match[0])
@@ -1003,6 +1031,11 @@ class Entry(object):
                 names = [schema.schema[_]['Tag'] for _ in counterparts]
                 for saveframe in self._frame_list:
                     for loop in saveframe.loops:
+                        # tag_index() ignores the category of the name it is
+                        # given, so without this every loop with a column of the
+                        # same name would be rewritten as though it were this one.
+                        if (loop.category or '').lower() != child_category:
+                            continue
                         position = loop.tag_index(child_name)
                         if position is None:
                             continue
