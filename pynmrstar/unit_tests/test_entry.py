@@ -184,6 +184,31 @@ class TestEntry(unittest.TestCase):
         self.assertEqual(entry.validate_full(severities=['warning']), [])
         self.assertEqual(len(structural(entry, severities=['error'])), 1)
 
+    def test_validate_full_saveframe_details(self):
+        """Saveframe findings carry the other saveframe they are about, so a
+        consumer can word them without re-deriving it."""
+
+        entry = copy(self.file_entry)
+        first = entry.get_saveframes_by_category('entry_information')[0]
+        second = copy(first)
+        second.name = 'entry_information_2'
+        # Appended after the citations etc., so it is also out of order
+        entry.add_saveframe(second)
+        issues = {_.check: _ for _ in entry.validate_full() if _.saveframe == 'entry_information_2'}
+        self.assertEqual(issues['saveframe.duplicate_category'].details,
+                         {'previous_saveframe': first.name})
+        order = issues['saveframe.order'].details
+        self.assertEqual(order['previous_saveframe'], entry[-2].name)
+        self.assertGreater(order['previous_ordinal'], order['ordinal'])
+
+        # Saveframe names are compared without regard to case
+        entry = copy(self.file_entry)
+        third = copy(first)
+        third.name = first.name.upper()
+        entry.add_saveframe(third)
+        issues = [_ for _ in entry.validate_full() if _.check == 'saveframe.duplicate_name']
+        self.assertEqual([_.details for _ in issues], [{'previous_saveframe': first.name}])
+
     def test_validate_full_mandatory(self):
         entry = copy(self.file_entry)
         checks = lambda: [_ for _ in entry.validate_full(profile='internal') if _.check.startswith('tag.')]
@@ -200,6 +225,9 @@ class TestEntry(unittest.TestCase):
         self.assertEqual([_.check for _ in found], ['tag.missing'])
         self.assertEqual(found[0].saveframe, frame.name)
         self.assertEqual(found[0].category, 'entry_information')
+        # Title is value-mandatory, which a consumer rewording the finding needs
+        # to know: "missing" and "missing, and needs a value" are worded apart
+        self.assertEqual(found[0].details, {'requires_value': True})
 
     def test_validate_full_mandatory_first_value_only(self):
         """A value-mandatory tag in a loop is judged on its *first* value.
@@ -574,6 +602,7 @@ class TestEntry(unittest.TestCase):
         found = invalid()
         self.assertEqual([_.check for _ in found], ['tag.miscapitalized'])
         self.assertIn("Should be '_Entry.Submission_date'", found[0].message)
+        self.assertEqual(found[0].details, {'correct': '_Entry.Submission_date'})
         submission_date[0] = 'Submission_date'
 
         # A tag the profile forbids outright. _Entry.Sf_ID is bookkeeping the
@@ -622,7 +651,7 @@ class TestEntry(unittest.TestCase):
         self.assertEqual(found[0].tag, f'{frame.tag_prefix}.{run[1][0]}')
         self.assertEqual(found[0].saveframe, frame.name)
         self.assertIsNone(found[0].loop)
-        self.assertIn('should be before', found[0].message)
+        self.assertEqual(found[0].details['previous_tag'], f'{frame.tag_prefix}.{run[3][0]}')
 
     def test_validate_full_row_indexes(self):
         entry = copy(self.file_entry)
@@ -650,8 +679,7 @@ class TestEntry(unittest.TestCase):
         loop.data[2][column] = '99'
         found = indexes()
         self.assertEqual([_.check for _ in found], ['row.index_wrong'] * 2)
-        self.assertIn('expected 3', found[0].message)
-        self.assertIn('expected 100', found[1].message)
+        self.assertEqual([_.details for _ in found], [{'expected': 3}, {'expected': 100}])
         loop.data[2][column] = '3'
 
         # A whole loop numbered from zero is reported once, not once per row:
@@ -661,7 +689,7 @@ class TestEntry(unittest.TestCase):
             row[column] = str(number)
         found = indexes()
         self.assertEqual([_.check for _ in found], ['row.index_wrong'])
-        self.assertIn('expected 1', found[0].message)
+        self.assertEqual(found[0].details, {'expected': 1})
         for number, row in enumerate(loop.data):
             row[column] = str(number + 1)
 
@@ -708,8 +736,8 @@ class TestEntry(unittest.TestCase):
         self.assertEqual(found[0].tag, '_Sample_component.Entity_label')
         self.assertEqual(found[0].loop, '_Sample_component')
         self.assertEqual(found[0].row, 0)
-        self.assertIn('parent tag _Entity.Sf_framecode with value no_such_entity',
-                      found[0].message)
+        self.assertEqual(found[0].details, {'parent': '_Entity.Sf_framecode'})
+        self.assertIn("'no_such_entity'", found[0].message)
         components.data[0][column] = '$F5-Phe-cVHP'
         self.assertEqual(related(), [])
 
@@ -739,7 +767,7 @@ class TestEntry(unittest.TestCase):
         self.assertEqual([_.check for _ in found], ['row.invalid_local_id'])
         self.assertEqual(found[0].row, 0)
         self.assertEqual(found[0].tag, '_Sample_component.Sample_ID')
-        self.assertIn('should be 1', found[0].message)
+        self.assertEqual(found[0].details, {'local_id': '1'})
 
         # A null is not excused: a row that does not say which saveframe it
         # belongs to is as unusable as one naming the wrong saveframe.
@@ -773,7 +801,7 @@ class TestEntry(unittest.TestCase):
         entry.get_saveframe_by_name('sample_conditions').name = 'sample_conditions_1'
         found = dangling()
         self.assertTrue(found)
-        self.assertTrue(all(_.message == 'Saveframe not found: sample_conditions' for _ in found))
+        self.assertTrue(all(_.value == '$sample_conditions' for _ in found))
         self.assertTrue(any(_.loop == '_Experiment' for _ in found))
 
     def test_validate_full_data_types(self):
@@ -830,7 +858,7 @@ class TestEntry(unittest.TestCase):
         version[1] = 'v' * 40
         found = typed()
         self.assertEqual([_.check for _ in found], ['value.too_long'])
-        self.assertIn('maxlength = 31', found[0].message)
+        self.assertEqual(found[0].details, {'max_length': 31})
         version[1] = '3.1.1.61'
 
         frame.get_tag('_Entry.Title', whole_tag=True)[0][1] = 't' * 5000
@@ -851,14 +879,14 @@ class TestEntry(unittest.TestCase):
         self.assertEqual([_.check for _ in found], ['value.miscapitalized'] * 2)
         self.assertEqual([_.tag for _ in found],
                          ['_Chem_comp.Type', '_Chem_comp.Processing_site'])
-        self.assertIn('should be NON-POLYMER', found[0].message)
+        self.assertEqual(found[0].details, {'correct': 'NON-POLYMER'})
 
         # A value that is not in the list at any capitalization
         chem_comp.get_tag('_Chem_comp.Type', whole_tag=True)[0][1] = 'gaseous'
         found = [_ for _ in enumerated() if _.tag == '_Chem_comp.Type']
         self.assertEqual([_.check for _ in found], ['value.not_in_enumeration'])
-        self.assertEqual(found[0].message,
-                         'Enumerated value is not in the list: gaseous (_Chem_comp.Type)')
+        self.assertEqual(found[0].value, 'gaseous')
+        self.assertEqual(found[0].details, {})
 
         # An open enumeration lists what has been seen, not what is allowed, so
         # a value outside it is not a finding

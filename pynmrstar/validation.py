@@ -50,14 +50,21 @@ class ValidationIssue:
     which row) rather than as a line number, because pynmrstar's model does not
     carry line numbers -- a caller that needs them renders the entry and maps
     identity onto the render.
+
+    ``check`` names what was found and is stable; ``message`` describes it in
+    words and may be reworded between releases. A caller that needs its own
+    wording should build it from ``check``, the location, ``value`` and
+    ``details`` -- which between them hold everything the message says.
     """
 
-    __slots__ = ['severity', 'check', 'message', 'saveframe', 'category', 'tag', 'loop', 'row', 'value']
+    __slots__ = ['severity', 'check', 'message', 'saveframe', 'category', 'tag', 'loop', 'row', 'value',
+                 'details']
 
     def __init__(self, severity: Severity, check: str, message: str, *,
                  saveframe: Optional[str] = None, category: Optional[str] = None,
                  tag: Optional[str] = None, loop: Optional[str] = None,
-                 row: Optional[int] = None, value: Optional[Any] = None) -> None:
+                 row: Optional[int] = None, value: Optional[Any] = None,
+                 details: Optional[Dict[str, Any]] = None) -> None:
         self.severity: Severity = severity
         #: Machine-readable check name, e.g. ``saveframe.duplicate_name``.
         self.check: str = check
@@ -66,8 +73,13 @@ class ValidationIssue:
         self.category: Optional[str] = category
         self.tag: Optional[str] = tag
         self.loop: Optional[str] = loop
+        #: The row's position in its loop, counting from 0.
         self.row: Optional[int] = row
         self.value: Optional[Any] = value
+        #: Anything else the message is built from, by name -- the expected
+        #: value of a wrong one, the tag that should have come first, and so on.
+        #: Which keys a check provides is part of its definition.
+        self.details: Dict[str, Any] = dict(details) if details else {}
 
     def __repr__(self) -> str:
         return f"<ValidationIssue {self.severity} {self.check}: {self.message}>"
@@ -100,6 +112,7 @@ class ValidationIssue:
             'loop': self.loop,
             'row': self.row,
             'value': self.value,
+            'details': dict(self.details),
         }
 
 
@@ -190,6 +203,7 @@ def check_saveframes(entry, schema, profile: str) -> List[ValidationIssue]:
     present: set = set()
     previous_category: Optional[str] = None
     previous_ordinal: Optional[int] = None
+    previous_saveframe: Optional[str] = None
 
     for saveframe in entry:
         name = saveframe.name
@@ -214,7 +228,8 @@ def check_saveframes(entry, schema, profile: str) -> List[ValidationIssue]:
         if not category:
             issues.append(ValidationIssue(
                 Severity.ERROR, 'saveframe.missing_category',
-                f"Invalid saveframe category for saveframe {name} (missing saveframe label tag?)",
+                f"The category of saveframe '{name}' cannot be determined: the dictionary has no tag "
+                f"'{saveframe.tag_prefix}.Sf_category'.",
                 saveframe=name))
         else:
             present.add(category)
@@ -225,7 +240,8 @@ def check_saveframes(entry, schema, profile: str) -> List[ValidationIssue]:
             if declared and declared[0] != category:
                 issues.append(ValidationIssue(
                     Severity.ERROR, 'saveframe.invalid_category',
-                    f"Invalid saveframe category value for saveframe {name}",
+                    f"Saveframe '{name}' has Sf_category '{_shown(str(declared[0]))}', but its tags are those of "
+                    f"category '{category}'.",
                     saveframe=name, category=category,
                     tag=f'{saveframe.tag_prefix}.Sf_category', value=declared[0]))
 
@@ -234,9 +250,10 @@ def check_saveframes(entry, schema, profile: str) -> List[ValidationIssue]:
                 if category in seen_categories:
                     issues.append(ValidationIssue(
                         Severity.ERROR, 'saveframe.duplicate_category',
-                        f"Duplicate saveframe category: {category} ({name}, previously defined in "
-                        f"saveframe {seen_categories[category]})",
-                        saveframe=name, category=category))
+                        f"Saveframe '{name}' is a second saveframe of category '{category}', which may "
+                        f"appear only once. The first is '{seen_categories[category]}'.",
+                        saveframe=name, category=category,
+                        details={'previous_saveframe': seen_categories[category]}))
                 else:
                     seen_categories[category] = name
 
@@ -246,17 +263,22 @@ def check_saveframes(entry, schema, profile: str) -> List[ValidationIssue]:
                 if previous_ordinal is not None and previous_ordinal > ordinal:
                     issues.append(ValidationIssue(
                         Severity.ERROR, 'saveframe.order',
-                        f"Saveframe order error: {category} ({ordinal}) after "
-                        f"{previous_category} ({previous_ordinal})",
-                        saveframe=name, category=category))
-                previous_ordinal, previous_category = ordinal, category
+                        f"Saveframe '{name}' of category '{category}' should come before saveframe "
+                        f"'{previous_saveframe}' of category '{previous_category}'.",
+                        saveframe=name, category=category,
+                        details={'ordinal': ordinal, 'previous_saveframe': previous_saveframe,
+                                 'previous_category': previous_category,
+                                 'previous_ordinal': previous_ordinal}))
+                previous_ordinal, previous_category, previous_saveframe = ordinal, category, name
 
         # 0-1: duplicate saveframe names, compared without regard to case.
         folded = name.lower()
         if folded in seen_names:
             issues.append(ValidationIssue(
                 Severity.ERROR, 'saveframe.duplicate_name',
-                f"Duplicate saveframe name: {name}", saveframe=name, category=category))
+                f"More than one saveframe is named '{name}' (saveframe names are compared without "
+                f"regard to case).", saveframe=name, category=category,
+                details={'previous_saveframe': seen_names[folded]}))
         else:
             seen_names[folded] = name
 
@@ -267,7 +289,7 @@ def check_saveframes(entry, schema, profile: str) -> List[ValidationIssue]:
         if framecode and framecode[0] not in definitions.NULL_VALUES and framecode[0] != name:
             issues.append(ValidationIssue(
                 Severity.ERROR, 'saveframe.framecode_mismatch',
-                f"Saveframe name does not match label: {name} ({framecode[0]})",
+                f"Saveframe '{name}' has Sf_framecode '{_shown(str(framecode[0]))}'; the two must match.",
                 saveframe=name, category=category,
                 tag=f'{saveframe.tag_prefix}.Sf_framecode', value=framecode[0]))
 
@@ -276,7 +298,8 @@ def check_saveframes(entry, schema, profile: str) -> List[ValidationIssue]:
         if category not in present:
             issues.append(ValidationIssue(
                 Severity.ERROR, 'saveframe.missing_mandatory_category',
-                f"Missing mandatory saveframe category {category}", category=category))
+                f"The entry has no saveframe of category '{category}', which is mandatory.",
+                category=category))
 
     return issues
 
@@ -452,14 +475,17 @@ def check_mandatory_tags(entry, schema, profile: str) -> List[ValidationIssue]:
                 if not values:
                     issues.append(ValidationIssue(
                         Severity.ERROR, 'tag.missing',
-                        f"Missing tag: {full_tag}",
-                        saveframe=saveframe.name, category=category, tag=full_tag))
+                        f"Mandatory tag '{full_tag}' is missing from saveframe '{saveframe.name}'.",
+                        saveframe=saveframe.name, category=category, tag=full_tag,
+                        details={'requires_value': False}))
             elif code in ('V', 'R'):
                 if not values:
                     issues.append(ValidationIssue(
                         Severity.ERROR, 'tag.missing',
-                        f"Missing tag that requires a value: {full_tag}",
-                        saveframe=saveframe.name, category=category, tag=full_tag))
+                        f"Mandatory tag '{full_tag}' is missing from saveframe '{saveframe.name}'. It must "
+                        f"be present and have a value.",
+                        saveframe=saveframe.name, category=category, tag=full_tag,
+                        details={'requires_value': True}))
                 # The first value, and only the first. CheckMandatoryTags does
                 # `has_tag = rs2.next()` and then reads that row's VAL, with no
                 # loop over the result set -- so a value-mandatory column that is
@@ -472,7 +498,7 @@ def check_mandatory_tags(entry, schema, profile: str) -> List[ValidationIssue]:
                 elif _is_null(values[0]):
                     issues.append(ValidationIssue(
                         Severity.ERROR, 'tag.missing_value',
-                        f"Missing value for tag: {full_tag}",
+                        f"Mandatory tag '{full_tag}' in saveframe '{saveframe.name}' has no value.",
                         saveframe=saveframe.name, category=category, tag=full_tag))
 
     return issues
@@ -530,8 +556,16 @@ def check_invalid_tags(entry, schema, profile: str) -> List[ValidationIssue]:
 
         tag_data = schema.schema.get(full_tag.lower())
         if tag_data is None or (tag_data.get('SFCategory') or '').strip() != category:
+            if tag_data is None:
+                message = f"Tag '{full_tag}' is not in the dictionary."
+            elif category is None:
+                message = (f"Tag '{full_tag}' cannot be checked: the category of saveframe "
+                           f"'{saveframe.name}' is not recognized.")
+            else:
+                message = (f"Tag '{full_tag}' belongs in a saveframe of category "
+                           f"'{(tag_data.get('SFCategory') or '').strip()}', not '{category}'.")
             issues.append(ValidationIssue(
-                Severity.ERROR, 'tag.unknown', f"Unknown tag {full_tag}",
+                Severity.ERROR, 'tag.unknown', message,
                 saveframe=saveframe.name, category=category, tag=full_tag, loop=loop))
             return
 
@@ -547,7 +581,8 @@ def check_invalid_tags(entry, schema, profile: str) -> List[ValidationIssue]:
                 Severity.ERROR, 'tag.miscapitalized',
                 f"The tag '{full_tag}' is improperly capitalized but otherwise valid. "
                 f"Should be '{tag_data['Tag']}'.",
-                saveframe=saveframe.name, category=category, tag=full_tag, loop=loop))
+                saveframe=saveframe.name, category=category, tag=full_tag, loop=loop,
+                details={'correct': tag_data['Tag']}))
             return
 
         # Placement. The dictionary's Loopflag says which side of a loop a tag
@@ -555,11 +590,11 @@ def check_invalid_tags(entry, schema, profile: str) -> List[ValidationIssue]:
         # itself is a real one.
         if loop is None and tag_data.get('Loopflag') == 'Y':
             issues.append(ValidationIssue(
-                Severity.ERROR, 'tag.not_in_loop', f"Tag not in loop: {full_tag}",
+                Severity.ERROR, 'tag.not_in_loop', f"Tag '{full_tag}' belongs in a loop.",
                 saveframe=saveframe.name, category=category, tag=full_tag))
         elif loop is not None and tag_data.get('Loopflag') == 'N':
             issues.append(ValidationIssue(
-                Severity.ERROR, 'tag.free_in_loop', f"Free tag in loop: {full_tag}",
+                Severity.ERROR, 'tag.free_in_loop', f"Tag '{full_tag}' may not be in a loop.",
                 saveframe=saveframe.name, category=category, tag=full_tag, loop=loop))
 
         # A tag the profile forbids outright. Resolved through the conditional
@@ -578,7 +613,9 @@ def check_invalid_tags(entry, schema, profile: str) -> List[ValidationIssue]:
             return
         if resolver.code(full_tag.lower(), saveframe, category) == 'I':
             issues.append(ValidationIssue(
-                Severity.ERROR, 'tag.invalid', f"Invalid tag: {full_tag}",
+                Severity.ERROR, 'tag.invalid',
+                f"Tag '{full_tag}' is not allowed in saveframe '{saveframe.name}' by the '{profile}' "
+                f"validation profile.",
                 saveframe=saveframe.name, category=category, tag=full_tag, loop=loop))
 
     for saveframe in entry:
@@ -612,7 +649,8 @@ def check_invalid_tags(entry, schema, profile: str) -> List[ValidationIssue]:
             display = schema.schema.get(full_tag, {}).get('Tag', full_tag)
             for loop in found:
                 issues.append(ValidationIssue(
-                    Severity.ERROR, 'tag.duplicate', f"Duplicate tag: {display}",
+                    Severity.ERROR, 'tag.duplicate',
+                    f"Tag '{display}' appears more than once in saveframe '{saveframe.name}'.",
                     saveframe=saveframe.name, category=category, tag=display, loop=loop))
 
     return issues
@@ -725,7 +763,7 @@ def check_row_indexes(entry, schema, profile: str) -> List[ValidationIssue]:
                 except (TypeError, ValueError):
                     issues.append(ValidationIssue(
                         Severity.ERROR, 'row.index_not_a_number',
-                        f"Not a number: {value}({full_tag})",
+                        f"Row index '{_shown(str(value))}' of '{full_tag}' is not a number.",
                         saveframe=saveframe.name, category=category, tag=full_tag,
                         loop=loop.category, row=number, value=value))
                     expected += 1
@@ -737,9 +775,9 @@ def check_row_indexes(entry, schema, profile: str) -> List[ValidationIssue]:
                 if index != expected:
                     issues.append(ValidationIssue(
                         Severity.ERROR, 'row.index_wrong',
-                        f"Incorrect row index, expected {expected}({full_tag})",
+                        f"Row index of '{full_tag}' is {_shown(str(value))}; expected {expected}.",
                         saveframe=saveframe.name, category=category, tag=full_tag,
-                        loop=loop.category, row=number, value=value))
+                        loop=loop.category, row=number, value=value, details={'expected': expected}))
                 expected = index + 1
 
     return issues
@@ -771,9 +809,10 @@ def check_tag_order(entry, schema, profile: str) -> List[ValidationIssue]:
             if previous_sequence is not None and sequence < previous_sequence:
                 issues.append(ValidationIssue(
                     Severity.ERROR, 'tag.order',
-                    f"Invalid tag order: {full_tag} ({sequence}) should be before "
-                    f"{previous_tag} ({previous_sequence})",
-                    saveframe=saveframe.name, category=category, tag=full_tag, loop=loop))
+                    f"Tag '{full_tag}' should come before '{previous_tag}'.",
+                    saveframe=saveframe.name, category=category, tag=full_tag, loop=loop,
+                    details={'sequence': sequence, 'previous_tag': previous_tag,
+                             'previous_sequence': previous_sequence}))
             previous_tag, previous_sequence = full_tag, sequence
 
     return issues
@@ -873,8 +912,10 @@ def check_related_tags(entry, schema, profile: str) -> List[ValidationIssue]:
             if _dereference(value) not in values.get(parent.lower(), set()):
                 issues.append(ValidationIssue(
                     Severity.ERROR, 'tag.parent_value_missing',
-                    f"Cannot find parent tag {parent} with value {_dereference(value)} ({full_tag})",
-                    saveframe=saveframe.name, category=category, tag=full_tag, value=value))
+                    f"Value '{_shown(str(_dereference(value)))}' of '{full_tag}' does not match any value "
+                    f"of '{parent}' in the entry.",
+                    saveframe=saveframe.name, category=category, tag=full_tag, value=value,
+                    details={'parent': parent}))
 
         for loop in saveframe:
             if not scope.loop(loop.category):
@@ -894,9 +935,10 @@ def check_related_tags(entry, schema, profile: str) -> List[ValidationIssue]:
                     if _dereference(value) not in known:
                         issues.append(ValidationIssue(
                             Severity.ERROR, 'tag.parent_value_missing',
-                            f"Cannot find parent tag {parent} with value {_dereference(value)} ({full_tag})",
+                            f"Value '{_shown(str(_dereference(value)))}' of '{full_tag}' does not match any "
+                            f"value of '{parent}' in the entry.",
                             saveframe=saveframe.name, category=category, tag=full_tag,
-                            loop=loop.category, row=number, value=value))
+                            loop=loop.category, row=number, value=value, details={'parent': parent}))
 
     return issues
 
@@ -947,12 +989,13 @@ def check_local_ids(entry, schema, profile: str) -> List[ValidationIssue]:
                 continue
             issues.append(ValidationIssue(
                 Severity.ERROR, 'saveframe.no_local_id_tag',
-                "Invalid saveframe: no local ID tag in dictionary",
+                f"Saveframe '{saveframe.name}' has no local ID tag.",
                 saveframe=saveframe.name, category=category))
 
         if local_id in definitions.NULL_VALUES:
             issues.append(ValidationIssue(
-                Severity.ERROR, 'saveframe.invalid_local_id', "Invalid local ID",
+                Severity.ERROR, 'saveframe.invalid_local_id',
+                f"Saveframe '{saveframe.name}' has no local ID value.",
                 saveframe=saveframe.name, category=category))
             continue
 
@@ -971,9 +1014,10 @@ def check_local_ids(entry, schema, profile: str) -> List[ValidationIssue]:
                     if value != local_id:
                         issues.append(ValidationIssue(
                             Severity.ERROR, 'row.invalid_local_id',
-                            f"Invalid local ID {value}, should be {local_id}",
+                            f"'{full_tag}' is '{_shown(str(value))}', but the local ID of saveframe "
+                            f"'{saveframe.name}' is '{_shown(str(local_id))}'.",
                             saveframe=saveframe.name, category=category, tag=full_tag,
-                            loop=loop.category, row=number, value=value))
+                            loop=loop.category, row=number, value=value, details={'local_id': local_id}))
 
     return issues
 
@@ -1005,7 +1049,8 @@ def check_frame_codes(entry, schema, profile: str) -> List[ValidationIssue]:
         if value[1:] not in names:
             issues.append(ValidationIssue(
                 Severity.ERROR, 'value.dangling_framecode',
-                f"Saveframe not found: {value[1:]}", value=value, **location))
+                f"'{location['tag']}' refers to saveframe '{_shown(value[1:])}', which does not exist.",
+                value=value, **location))
 
     for saveframe in entry:
         category = _saveframe_category(schema, saveframe)
@@ -1068,7 +1113,8 @@ def check_sample_saveframe(entry, schema, profile: str) -> List[ValidationIssue]
                 if name is not None and entity is not None and null(row, name) and null(row, entity):
                     issues.append(ValidationIssue(
                         Severity.ERROR, 'row.unidentified_sample_component',
-                        "Mol_common_name or Entity_label must have a value",
+                        f"A sample component in saveframe '{saveframe.name}' has neither a "
+                        f"Mol_common_name nor an Entity_label.",
                         saveframe=saveframe.name, category='sample',
                         tag='_Sample_component.Mol_common_name', loop=loop.category, row=number))
 
@@ -1076,8 +1122,8 @@ def check_sample_saveframe(entry, schema, profile: str) -> List[ValidationIssue]
                         and null(row, value) and null(row, minimum) and null(row, maximum)):
                     issues.append(ValidationIssue(
                         Severity.ERROR, 'row.missing_concentration',
-                        "Either Concentration_val or both Concentration_min_val and _max_val "
-                        "must have a value",
+                        f"A sample component in saveframe '{saveframe.name}' has neither a "
+                        f"Concentration_val nor both a Concentration_val_min and Concentration_val_max.",
                         saveframe=saveframe.name, category='sample',
                         tag='_Sample_component.Concentration_val', loop=loop.category, row=number))
 
@@ -1200,7 +1246,9 @@ def check_empty_rows(entry, schema, profile: str) -> List[ValidationIssue]:
             for number, row in enumerate(loop.data):
                 if row and all(value in definitions.NULL_VALUES for value in row):
                     issues.append(ValidationIssue(
-                        Severity.ERROR, 'row.empty', "Empty loop row",
+                        Severity.ERROR, 'row.empty',
+                        f"A row of loop '{loop.category}' in saveframe '{saveframe.name}' contains only "
+                        f"null values.",
                         saveframe=saveframe.name, category=category, loop=loop.category,
                         row=number))
 
@@ -1236,17 +1284,19 @@ def check_data_values(entry, schema, profile: str) -> List[ValidationIssue]:
             continue
 
         capitalized = enumeration['folded'].get(value.lower())
+        details: Dict[str, Any] = {}
         if capitalized is not None:
             check = 'value.miscapitalized'
-            message = (f"Enumerated value is improperly capitalized: {_shown(value)}, should be "
-                       f"{capitalized} ({item.tag})")
+            message = (f"Value '{_shown(value)}' of '{item.tag}' is improperly capitalized but otherwise "
+                       f"valid. Should be '{capitalized}'.")
+            details['correct'] = capitalized
         else:
             check = 'value.not_in_enumeration'
-            message = f"Enumerated value is not in the list: {_shown(value)} ({item.tag})"
+            message = f"Value '{_shown(value)}' of '{item.tag}' is not one of the values the dictionary allows."
 
         issues.append(ValidationIssue(
             Severity.ERROR, check, message, saveframe=item.saveframe, category=item.category,
-            tag=item.tag, loop=item.loop, row=item.row, value=item.value))
+            tag=item.tag, loop=item.loop, row=item.row, value=item.value, details=details))
 
     return issues
 
@@ -1418,32 +1468,34 @@ def check_data_types(entry, schema, profile: str) -> List[ValidationIssue]:
             # lexer recorded; here the marker is still on the value.
             if not value.startswith('$'):
                 found.append((Severity.ERROR, 'value.not_a_framecode',
-                              f"Not a framecode value: {shown} ({item.tag})"))
+                              f"Value '{shown}' of '{item.tag}' should be a saveframe reference, which "
+                              f"starts with '$'.", {}))
                 if _WHITESPACE.search(value):
                     found.append((Severity.ERROR, 'value.framecode_whitespace',
-                                  f"Whitespace in framecode value: {shown} ({item.tag})"))
+                                  f"Saveframe reference '{shown}' of '{item.tag}' contains whitespace.", {}))
         elif kind == 'INTEGER':
             if not _is_int(value):
                 found.append((Severity.ERROR, 'value.not_an_integer',
-                              f"Not an integer value: {shown} ({item.tag})"))
+                              f"Value '{shown}' of '{item.tag}' is not an integer.", {}))
         elif kind == 'FLOAT':
             if not _is_float(value):
                 found.append((Severity.ERROR, 'value.not_a_float',
-                              f"Not a floating-point value: {shown} ({item.tag})"))
+                              f"Value '{shown}' of '{item.tag}' is not a number.", {}))
         elif kind == 'DATE':
             if not _is_iso_date(value):
                 found.append((Severity.ERROR, 'value.not_a_date',
-                              f"Not a valid date: {shown} ({item.tag})"))
+                              f"Value '{shown}' of '{item.tag}' is not a date of the form yyyy-mm-dd.", {}))
             elif not _is_valid_date(value.strip()):
                 found.append((Severity.STRICT, 'value.impossible_date',
-                              f"No such date: {shown} ({item.tag})"))
+                              f"Value '{shown}' of '{item.tag}' is not a real date.", {}))
         elif size is not None and len(value) > size:
             found.append((Severity.ERROR, 'value.too_long',
-                          f"Value too long: {shown} ({item.tag} maxlength = {size})"))
+                          f"Value of '{item.tag}' is {len(value)} characters long; at most {size} are "
+                          f"allowed: '{shown}'.", {'max_length': size}))
 
-        for severity, check, message in found:
+        for severity, check, message, details in found:
             issues.append(ValidationIssue(
                 severity, check, message, saveframe=item.saveframe, category=item.category,
-                tag=item.tag, loop=item.loop, row=item.row, value=item.value))
+                tag=item.tag, loop=item.loop, row=item.row, value=item.value, details=details))
 
     return issues
