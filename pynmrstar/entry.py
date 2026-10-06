@@ -1252,7 +1252,7 @@ class Entry(object):
         """Validate the entry against the NMR-STAR dictionary, returning a list
         of :class:`pynmrstar.validation.ValidationIssue`.
 
-        This supersedes :meth:`validate`. It differs in two ways that matter:
+        It differs from :meth:`validate` in two ways that matter:
 
         * **It returns structured findings rather than strings**, so a caller can
           filter by severity, identify a finding across runs by its ``check``
@@ -1260,8 +1260,8 @@ class Entry(object):
         * **It is entry-wide.** The dictionary's mandatory rules are conditional
           -- whether a tag is required can depend on the value of a tag in a
           *different* saveframe -- so they cannot be evaluated one saveframe at a
-          time. ``Saveframe.validate()`` and ``Loop.validate()`` remain for the
-          checks that genuinely are per-object.
+          time. :meth:`validate`, ``Saveframe.validate()`` and
+          ``Loop.validate()`` check each object on its own.
 
         :param schema: The schema to validate against; the cached one by default.
         :param profile: Which set of the dictionary's validation flags to apply
@@ -1312,17 +1312,12 @@ class Entry(object):
 
         validate_star - Determines if the STAR syntax checks are ran.
 
-        .. deprecated::
-            Use :meth:`validate_full`, which returns structured findings and can
-            evaluate the dictionary's conditional mandatory rules. This method
-            returns plain strings and checks each saveframe independently, so it
-            cannot express either.
+        See also :meth:`validate_full`, which adds the checks that need the
+        whole entry -- the dictionary's mandatory and conditional rules,
+        saveframe and tag ordering, references between saveframes and rows --
+        and returns structured :class:`pynmrstar.ValidationIssue` objects
+        rather than strings.
         """
-
-        warnings.warn('Entry.validate() is deprecated; use Entry.validate_full(), which returns '
-                      'structured ValidationIssue objects and applies the dictionary\'s '
-                      'entry-wide conditional rules.',
-                      DeprecationWarning, stacklevel=2)
 
         errors = []
 

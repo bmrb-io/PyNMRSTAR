@@ -45,8 +45,6 @@ Minor improvements:
 
 Potentially breaking changes:
 
-- :py:meth:`pynmrstar.Entry.validate` is deprecated in favor of :py:meth:`pynmrstar.Entry.validate_full`, and
-  emits a DeprecationWarning.
 - The existing ``validate()`` methods of entries, saveframes, and loops now also report values outside a closed
   enumeration (or which differ from an enumerated value only by capitalization), dates which do not exist,
   non-ASCII characters, and loop rows in which every value is null. Entries which previously validated without

@@ -2,7 +2,6 @@
 import os
 import random
 import unittest
-import warnings
 from copy import deepcopy as copy
 from pathlib import Path
 
@@ -924,31 +923,20 @@ class TestEntry(unittest.TestCase):
         citation.get_tag('_Citation.Type', whole_tag=True)[0][1] = 'thesis'
         self.assertFalse(abbrev_reported())
 
-    def test_validate_deprecated(self):
-        # validate() still works, but says it is on the way out
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
-            self.file_entry.validate()
-        self.assertTrue(any(issubclass(_.category, DeprecationWarning) for _ in caught))
-
     def test_validate(self):
-        # Only within this test: validate() is deprecated, and a filter set
-        # outside catch_warnings() would hide the warning from every later test
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            # The sample entry spells two enumeration values with different
-            # capitalization than the dictionary does
-            validation = ["Value 'non-polymer' of tag '_Chem_comp.Type' is improperly capitalized but otherwise "
-                          "valid. Should be 'NON-POLYMER'.",
-                          "Value 'PDBe' of tag '_Chem_comp.Processing_site' is improperly capitalized but otherwise "
-                          "valid. Should be 'PDBE'."]
-            self.assertEqual(self.file_entry.validate(), validation)
-            self.file_entry[-1][-1][0][0] = 'a'
-            validation.append(
-                "Value does not match specification: '_Atom_chem_shift.ID':'a'.\n     "
-                "Type specified: int\n     Regular expression for type: '^(?:-?[0-9]*)?$'")
-            self.assertEqual(self.file_entry.validate(), validation)
-            self.file_entry[-1][-1][0][0] = '1'
+        # The sample entry spells two enumeration values with different
+        # capitalization than the dictionary does
+        validation = ["Value 'non-polymer' of tag '_Chem_comp.Type' is improperly capitalized but otherwise "
+                      "valid. Should be 'NON-POLYMER'.",
+                      "Value 'PDBe' of tag '_Chem_comp.Processing_site' is improperly capitalized but otherwise "
+                      "valid. Should be 'PDBE'."]
+        self.assertEqual(self.file_entry.validate(), validation)
+        self.file_entry[-1][-1][0][0] = 'a'
+        validation.append(
+            "Value does not match specification: '_Atom_chem_shift.ID':'a'.\n     "
+            "Type specified: int\n     Regular expression for type: '^(?:-?[0-9]*)?$'")
+        self.assertEqual(self.file_entry.validate(), validation)
+        self.file_entry[-1][-1][0][0] = '1'
 
     def test_Entry___setitem__(self):
         """ Test the setting a tag functionality of an entry. """
