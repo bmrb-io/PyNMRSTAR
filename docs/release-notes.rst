@@ -1,6 +1,16 @@
 Release notes
 =============
 
+3.5.3
+~~~~~
+
+Packaging fixes:
+
+- Wheels are now provided for Python 3.14.
+- PyNMRSTAR now declares that it requires Python 3.8 or newer. Versions since 3.4.0 could be installed on Python 3.7,
+  but failed when imported.
+
+
 3.5.2
 ~~~~~
 
