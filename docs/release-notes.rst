@@ -1,21 +1,74 @@
 Release notes
 =============
 
-3.5.2
+3.6.0
 ~~~~~
+
+Major improvements:
+
+- New :py:meth:`pynmrstar.Entry.validate_full`, which validates an entry against the full NMR-STAR dictionary and
+  returns a list of :py:class:`pynmrstar.ValidationIssue` objects rather than strings. Each issue has a
+  :py:class:`pynmrstar.Severity`, a machine-readable check name (e.g. ``tag.missing``), and the saveframe, loop,
+  tag, and row it came from, so results can be filtered, compared across runs, and located. It ports the checks
+  of BMRB's own validator: saveframe structure (duplicate names and categories, missing mandatory categories,
+  ordering, ``Sf_framecode`` and ``Sf_category`` mismatches), mandatory tags including the dictionary's
+  conditional rules, unknown, misplaced, invalid, duplicated, and out-of-order tags, row index numbering,
+  references to parent values and saveframes that do not exist, local IDs, sample components, data types and
+  lengths, closed enumerations, non-ASCII characters, and empty loop rows. Validate against the requirements of
+  the public archive (``profile='public'``, the default) or BMRB's internal annotation requirements
+  (``profile='internal'``). Dictionary violations which BMRB's validator does not report are available at
+  :py:attr:`pynmrstar.Severity.STRICT`, which must be requested explicitly.
+- :py:class:`pynmrstar.Schema` now loads the whole NMR-STAR dictionary distribution rather than only the tag
+  table: enumerations, saveframe categories, per-profile mandatory flags, conditional rules, the relationships
+  between tags, and default values. The distribution (dictionary version 3.2.14.0) is packaged with the library
+  and used by default, without touching the network. ``Schema(version='latest')`` downloads and caches the
+  newest dictionary release, and ``Schema(version='x.y.z.w')`` loads a specific release (3.2.14.0 or later) from
+  the package or the cache, downloading it only if it is the newest release. ``schema_file`` may now also be a
+  directory holding a dictionary distribution.
+- New :py:func:`pynmrstar.repair.insert_mandatory_tags`, which adds the tags (and if need be, loops) the
+  dictionary requires but an entry lacks, and :py:meth:`pynmrstar.Entry.add_row_indexes`, which numbers every
+  loop's row index column.
+- Parsing NMR-STAR is now more than twice as fast again, and nearly three times as fast for entries with many
+  saveframes. Writing NMR-STAR (``str()`` and ``format()`` on entries, saveframes, and loops) is more than twice
+  as fast. The output of both is unchanged.
+- :py:class:`pynmrstar.exceptions.ParsingError` now reliably carries the line the problem is on as its
+  ``line_number`` attribute, including for problems found while adding tags to a saveframe or loop, and
+  correctly for files containing multi-line values that start on the same line as their semicolon.
 
 Minor improvements:
 
-- Parsing NMR-STAR is now more than twice as fast again, and nearly three times as fast for entries with many
-  saveframes. Adding a saveframe while parsing previously took time proportional to the number of saveframes
-  already read.
-- Writing NMR-STAR (``str()`` and ``format()`` on entries, saveframes, and loops) is more than twice as fast.
-- The output of both is unchanged.
 - :py:meth:`pynmrstar.Entry.get_json`, :py:meth:`pynmrstar.Saveframe.get_json`, :py:meth:`pynmrstar.Loop.get_json`,
   :py:meth:`pynmrstar.Entry.get_tag`, :py:meth:`pynmrstar.Saveframe.get_tag`, and :py:meth:`pynmrstar.Loop.get_tag`
   are now typed to reflect the different shapes of result they return depending on their arguments.
 - Getting a saveframe from an entry using a key which is not a name, an ordinal, or a slice now raises a clear
   ValueError, rather than a KeyError.
+
+Potentially breaking changes:
+
+- :py:meth:`pynmrstar.Entry.validate` is deprecated in favor of :py:meth:`pynmrstar.Entry.validate_full`, and
+  emits a DeprecationWarning.
+- The existing ``validate()`` methods of entries, saveframes, and loops now also report values outside a closed
+  enumeration (or which differ from an enumerated value only by capitalization), dates which do not exist,
+  non-ASCII characters, and loop rows in which every value is null. Entries which previously validated without
+  errors may now report some.
+- :py:meth:`pynmrstar.Entry.normalize` now also repairs saveframe references: it sets every ``Sf_framecode`` tag
+  to the name of its saveframe, replaces whitespace in saveframe references with underscores, and adds a
+  missing ``$`` to them. It fills in the ID tag paired with a saveframe reference outside of a loop, as it
+  already did within loops.
+- :py:meth:`pynmrstar.Entry.normalize` now renumbers the row index column the dictionary defines for every loop,
+  rather than only columns named ``ID`` (and never ``_Experiment.ID``), and rewrites the references to the
+  numbers that change. Where a reference cannot be followed unambiguously, or the column already contains
+  duplicate values, a referenced column is left as it is.
+- A ``Sf_framecode`` tag whose value differs from its saveframe's name is now a parse warning rather than an
+  error: it is logged, and only raises a ParsingError when parsing with ``raise_parse_warnings=True``. The
+  saveframe keeps the name from its ``save_`` header, and the mismatch is reported by
+  :py:meth:`pynmrstar.Entry.validate_full`.
+- The text of parse errors has changed: the line number is no longer part of the message, but appended by
+  ``str()`` as "Error detected on line N." and available as ``ParsingError.line_number``.
+- The packaged ``reference_files/schema.csv`` has been replaced by the dictionary distribution's files,
+  starting with ``reference_files/xlschem_ann.csv``. ``pynmrstar.definitions.SCHEMA_URL`` now points at
+  the distribution's tag table rather than the one in the root of the dictionary repository. A
+  :py:class:`pynmrstar.Schema` loaded from the dictionary distribution has a ``schema_file`` of None.
 
 
 3.5.1
@@ -37,6 +90,7 @@ Major improvements:
 - The library now scans for whitespace in a fully unicode-aware manner. It warns when whitespace other than
   that officially allowed in the STAR specification is found (' ', '\\t', '\\r', '\\n', '\\v') but it still parses it without
   issues. If raise_parse_warnings is set, an exception is thrown.
+
 Minor improvements:
 
 - :py:attr:`pynmrstar.Loop.category` is now a property to be able to validate it when set. Previously,
@@ -185,12 +239,14 @@ also allow us to more tightly integrate the c library in the future, leading to 
 Changes:
 
 - Significant speed improvements all over the library:
- - Formatting an Entry object as a string is now up to four times faster under certain circumstances,
-   but significantly faster under all circumstances.
- - Deleting saveframes from entries with a large number of saveframes is now significantly faster
- - :py:class:`pynmrstar.Entry`, :py:class:`pynmrstar.Saveframe`, and :py:class:`pynmrstar.Loop`
-   equality comparisons are much faster (and also more exacting - see the breaking changes).
- - Iterating over saveframes in an entry, Loops in a saveframe, and rows in a loop is now roughly twice as fast
+
+  - Formatting an Entry object as a string is now up to four times faster under certain circumstances,
+    but significantly faster under all circumstances.
+  - Deleting saveframes from entries with a large number of saveframes is now significantly faster
+  - :py:class:`pynmrstar.Entry`, :py:class:`pynmrstar.Saveframe`, and :py:class:`pynmrstar.Loop`
+    equality comparisons are much faster (and also more exacting - see the breaking changes).
+  - Iterating over saveframes in an entry, Loops in a saveframe, and rows in a loop is now roughly twice as fast
+
 -  Added new :py:meth:`pynmrstar.Saveframe.remove_loop`, :py:meth:`pynmrstar.Saveframe.remove_tag`, and
    :py:meth:`pynmrstar.Loop.remove_tag` methods. All are capable of removing more than one loop/tag (respectively)
    at a time. Please use these rather than `del saveframe[tag]` constructions as it is less ambiguous as to whether a tag
