@@ -6,9 +6,9 @@ import unittest
 
 logging.getLogger('pynmrstar').setLevel(logging.FATAL)
 
-# Make dictionary loading hermetic for the test suite: read the packaged
-# distribution files directly (no live network) and use a throwaway cache
-# directory so a stale or newer real cache can't shadow the pinned version.
+# Make dictionary loading hermetic for the test suite. The default schema is the
+# packaged one regardless; this keeps the tests that ask for a download off the
+# network (the "download" reads the packaged files) and out of the real cache.
 import pynmrstar
 
 os.environ['PYNMRSTAR_DICTIONARY_SOURCE'] = os.path.join(os.path.dirname(pynmrstar.__file__),

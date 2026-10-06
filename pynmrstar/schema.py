@@ -6,10 +6,12 @@ from csv import DictReader, reader
 from datetime import date
 from functools import lru_cache
 from io import StringIO
+from pathlib import Path
 from typing import Union, List, Optional, Any, Dict, IO, Set
 
 from pynmrstar import definitions, utils
-from pynmrstar._internal import _interpret_file, load_dictionary
+from pynmrstar._internal import _dictionary_version, _interpret_file, load_dictionary, local_dictionary, \
+    read_dictionary_directory
 
 logger = logging.getLogger('pynmrstar')
 
@@ -42,14 +44,32 @@ class Schema(object):
        create an object of this class and then pass it to the methods
        which allow the specification of a schema. """
 
-    def __init__(self, schema_file: Union[str, IO] = None, version: str = None) -> None:
-        """Initialize a BMRB schema. With no arguments the current dictionary
-        distribution is loaded -- fetched from the internet and cached under
-        ``~/.cache/pynmrstar`` (see ``_internal.load_dictionary``); repeat and
-        command-line invocations then reuse the cache without the network. Pass
-        ``version`` to select a specific cached release (3.2.14.0 or above).
-        Alternatively pass a URL or a file via ``schema_file`` to load just a tag
-        table from there; its enumerations still come from the distribution."""
+    def __init__(self, schema_file: Union[str, Path, IO] = None, version: str = None) -> None:
+        """Initialize a BMRB schema.
+
+        With no arguments, the dictionary distribution packaged with
+        pynmrstar is loaded. That never touches the network.
+
+        ``version`` selects a different dictionary release (3.2.14.0 or above):
+
+        * ``'latest'`` downloads the newest release, and caches it under
+          ``~/.cache/pynmrstar`` (``$XDG_CACHE_HOME/pynmrstar``) so that it
+          can later be asked for by number without the network;
+        * a version number loads that release from the packaged copy or the
+          cache, downloading it only if neither has it -- which can only
+          succeed when it is the newest release.
+
+        ``schema_file`` loads the dictionary from somewhere else instead. It may
+        be a local directory holding the distribution files
+        (``definitions.DICTIONARY_FILES``), in which case ``version`` may not be
+        given as well; or a single ``xlschem_ann.csv`` tag table, given as a
+        path, URL, or file object. A single tag table carries only the tags,
+        so the enumerations and validation rules are taken from the packaged
+        or cached distribution of the same version -- or, if ``version`` is
+        given, of that version, downloading it if need be. If none is
+        available, the schema is built from the tag table alone, and a warning
+        is logged because :meth:`pynmrstar.Entry.validate_full` will then be
+        incomplete."""
 
         self.headers: List[str] = []
         self.schema: Dict[str, Dict[str, str]] = {}
@@ -74,39 +94,33 @@ class Schema(object):
         # profile name -> resolved mandatory codes, built on demand
         self._profiles: Dict[str, Dict[str, Dict[str, str]]] = {}
 
-        enum_hdr: Optional[str] = None
-        enum_dtl: Optional[str] = None
-        cat_grp: Optional[str] = None
-        tag_validation: Optional[str] = None
-        if schema_file is not None:
-            # Explicit tag table (URL/file). Enumerations, if reachable, still
-            # come from the cached/packaged distribution.
-            self.schema_file = schema_file
+        self.schema_file = schema_file
+        distribution: Optional[Dict[str, str]] = None
+        if isinstance(schema_file, (str, Path)) and os.path.isdir(schema_file):
+            if version is not None:
+                raise ValueError('Pass either a dictionary directory as schema_file or a version, not both.')
+            distribution = read_dictionary_directory(str(schema_file))
+            xlschem_text = distribution['xlschem_ann.csv']
+        elif schema_file is not None:
             xlschem_text = _interpret_file(schema_file).read()
-            try:
+            if version is not None:
                 distribution, _ = load_dictionary(version)
-                enum_hdr, enum_dtl = distribution['adit_enum_hdr.csv'], distribution['adit_enum_dtl.csv']
-                cat_grp = distribution['adit_cat_grp_o.csv']
-                tag_validation = distribution['adit_tag_validation.csv']
-            except (ValueError, OSError, IOError):
-                pass
+            else:
+                distribution = local_dictionary(_dictionary_version(xlschem_text))
+                if distribution is None:
+                    logger.warning(f"No dictionary distribution matching the tag table in '{schema_file}' is "
+                                   f"available, so the schema has no enumerations or validation rules.")
         else:
             distribution, _ = load_dictionary(version)
-            self.schema_file = definitions.DICTIONARY_URL
             xlschem_text = distribution['xlschem_ann.csv']
-            enum_hdr, enum_dtl = distribution['adit_enum_hdr.csv'], distribution['adit_enum_dtl.csv']
-            cat_grp = distribution['adit_cat_grp_o.csv']
-            tag_validation = distribution['adit_tag_validation.csv']
 
         self._parse_tag_table(xlschem_text)
         self._parse_relationships()
         self._load_data_types()
-        if enum_hdr is not None and enum_dtl is not None:
-            self._build_enumerations(enum_hdr, enum_dtl)
-        if cat_grp is not None:
-            self._parse_saveframe_categories(cat_grp)
-        if tag_validation is not None:
-            self._parse_conditional_rules(tag_validation)
+        if distribution is not None:
+            self._build_enumerations(distribution['adit_enum_hdr.csv'], distribution['adit_enum_dtl.csv'])
+            self._parse_saveframe_categories(distribution['adit_cat_grp_o.csv'])
+            self._parse_conditional_rules(distribution['adit_tag_validation.csv'])
 
     def _parse_tag_table(self, xlschem_text: str) -> None:
         """Populate the tag schema from an xlschem_ann.csv body.
@@ -392,6 +406,8 @@ class Schema(object):
     def __repr__(self) -> str:
         """Return how we can be initialized."""
 
+        if self.schema_file is None:
+            return f"pynmrstar.Schema(version='{self.version}')"
         return f"pynmrstar.Schema(schema_file='{self.schema_file}') version {self.version}"
 
     def __str__(self) -> str:
@@ -570,7 +586,8 @@ class Schema(object):
         for y in range(0, len(values[0])):
             lengths.append(max([len(str(x[y])) for x in values]))
 
-        text = f"""BMRB schema from: '{self.schema_file}' version '{self.version}'
+        source = self.schema_file if self.schema_file is not None else 'the NMR-STAR dictionary distribution'
+        text = f"""BMRB schema from: '{source}' version '{self.version}'
 {''}
   {'Tag_Prefix':<{lengths[0]}} {'Tag':<{lengths[1] - 6}} {'Type':<{lengths[2]}} {'Null_Allowed':<{lengths[3]}} {'SF_Category'}
 """

@@ -5,7 +5,6 @@ import functools
 import json
 import os
 from typing import Iterable, Any, Dict
-from urllib.error import HTTPError, URLError
 
 import pynmrstar_parser
 
@@ -68,12 +67,8 @@ def get_schema(passed_schema: 'Schema' = None, _cached_schema: Dict[str, Schema]
         return passed_schema
 
     if not _cached_schema:
-        # Schema() resolves the dictionary itself: on-disk cache, then a fetch
-        # from the internet (cached for next time), then the packaged fallback.
-        try:
-            _cached_schema['schema'] = Schema()
-        except (HTTPError, URLError):
-            raise ValueError("Could not load a BMRB schema from the internet or from the local repository.")
+        # The dictionary packaged with pynmrstar; this never touches the network.
+        _cached_schema['schema'] = Schema()
 
     return _cached_schema['schema']
 

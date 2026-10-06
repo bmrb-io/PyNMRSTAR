@@ -4,8 +4,12 @@ import shutil
 import tempfile
 import unittest
 
-from pynmrstar import Schema
-from pynmrstar._internal import load_dictionary
+from io import StringIO
+
+from pynmrstar import Schema, definitions
+from pynmrstar._internal import load_dictionary, packaged_dictionary_version
+
+reference = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "reference_files")
 
 
 class TestSchema(unittest.TestCase):
@@ -182,32 +186,101 @@ class TestSchema(unittest.TestCase):
         self.assertNotIn('_entry.id', default.local_id_tags)
         self.assertNotIn('_sample.entry_id', default.local_id_tags)
 
-    def test_dictionary_cache(self):
-        # load_dictionary() reads the distribution, caches it under
-        # $XDG_CACHE_HOME/pynmrstar/<version>, and reuses the cache next time
-        # (so a subsequent load works even with an unreachable source).
-        reference = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
-                                 "reference_files")
-        cache = tempfile.mkdtemp(prefix="pynmrstar-cache-test-")
+    def _isolated(self, source: str) -> str:
+        """Point the dictionary source and cache at throwaway locations for the
+        rest of the test, and return the cache root."""
+
         saved = {k: os.environ.get(k) for k in ("XDG_CACHE_HOME", "PYNMRSTAR_DICTIONARY_SOURCE")}
-        try:
-            os.environ["XDG_CACHE_HOME"] = cache
-            os.environ["PYNMRSTAR_DICTIONARY_SOURCE"] = reference
+        cache = tempfile.mkdtemp(prefix="pynmrstar-cache-test-")
 
-            files, version = load_dictionary()
-            self.assertNotEqual(version, "unknown")
-            for name in ("xlschem_ann.csv", "adit_enum_hdr.csv", "adit_enum_dtl.csv"):
-                self.assertIn(name, files)
-            self.assertTrue(os.path.isdir(os.path.join(cache, "pynmrstar", version)))
-
-            # With the source now unreachable, it still resolves from the cache.
-            os.environ["PYNMRSTAR_DICTIONARY_SOURCE"] = "http://invalid.invalid/none"
-            _, cached_version = load_dictionary()
-            self.assertEqual(cached_version, version)
-        finally:
+        def restore():
             shutil.rmtree(cache, ignore_errors=True)
             for key, value in saved.items():
                 if value is None:
                     os.environ.pop(key, None)
                 else:
                     os.environ[key] = value
+
+        self.addCleanup(restore)
+        os.environ["XDG_CACHE_HOME"] = cache
+        os.environ["PYNMRSTAR_DICTIONARY_SOURCE"] = source
+        return os.path.join(cache, "pynmrstar")
+
+    def test_default_dictionary_is_packaged(self):
+        # The default never touches the network or the cache, even with an
+        # unreachable source.
+        cache = self._isolated("http://invalid.invalid/none")
+        files, version = load_dictionary()
+        self.assertEqual(version, packaged_dictionary_version())
+        self.assertEqual(sorted(files), sorted(definitions.DICTIONARY_FILES))
+        self.assertFalse(os.path.exists(cache))
+
+        schema = Schema()
+        self.assertEqual(schema.version, packaged_dictionary_version())
+        self.assertTrue(schema.enumerations)
+        self.assertEqual(repr(schema), f"pynmrstar.Schema(version='{schema.version}')")
+        self.assertFalse(os.path.exists(cache))
+
+        # Asking for the packaged version by number does not go anywhere either
+        self.assertEqual(Schema(version=schema.version).version, schema.version)
+
+    def test_latest_dictionary_is_downloaded_and_cached(self):
+        cache = self._isolated(reference)
+        files, version = load_dictionary('latest')
+        self.assertEqual(version, packaged_dictionary_version())
+        # Cached complete, with nothing left over from writing it
+        self.assertEqual(sorted(os.listdir(cache)), [version])
+        self.assertEqual(sorted(os.listdir(os.path.join(cache, version))),
+                         sorted(definitions.DICTIONARY_FILES))
+        for name, text in files.items():
+            with open(os.path.join(cache, version, name), encoding='utf-8', newline='') as handle:
+                self.assertEqual(handle.read(), text)
+
+        # Asking for the newest release when it cannot be fetched is an error,
+        # not a silent fallback to something older.
+        os.environ["PYNMRSTAR_DICTIONARY_SOURCE"] = "http://invalid.invalid/none"
+        self.assertRaises(ValueError, load_dictionary, 'latest')
+
+    def test_specific_dictionary_version(self):
+        cache = self._isolated("http://invalid.invalid/none")
+
+        # Neither packaged, cached nor downloadable
+        self.assertRaises(ValueError, Schema, version='3.2.15.0')
+
+        # Found in the cache without the network
+        os.makedirs(os.path.join(cache, '3.2.15.0'))
+        for name in definitions.DICTIONARY_FILES:
+            shutil.copy(os.path.join(reference, name), os.path.join(cache, '3.2.15.0', name))
+        files, version = load_dictionary('3.2.15.0')
+        self.assertEqual(version, '3.2.15.0')
+
+        # Only the newest release can be downloaded
+        shutil.rmtree(os.path.join(cache, '3.2.15.0'))
+        os.environ["PYNMRSTAR_DICTIONARY_SOURCE"] = reference
+        self.assertRaises(ValueError, load_dictionary, '3.2.15.0')
+
+    def test_schema_file(self):
+        self._isolated("http://invalid.invalid/none")
+
+        # A directory holding a whole distribution
+        schema = Schema(schema_file=reference)
+        self.assertEqual(schema.version, packaged_dictionary_version())
+        self.assertTrue(schema.enumerations)
+        self.assertTrue(schema.saveframe_categories)
+        self.assertRaises(ValueError, Schema, schema_file=reference, version='latest')
+
+        # A single tag table brings the rest of its own version along, from the
+        # packaged copy rather than the network
+        schema = Schema(schema_file=os.path.join(reference, 'xlschem_ann.csv'))
+        self.assertTrue(schema.enumerations)
+        self.assertTrue(schema.conditional_rules)
+
+        # A tag table of a version that is not available stands alone
+        with open(os.path.join(reference, 'xlschem_ann.csv'), encoding='utf-8') as handle:
+            text = handle.read().replace(f',{packaged_dictionary_version()},', ',9.9.9.9,', 1)
+        with self.assertLogs('pynmrstar', level='WARNING'):
+            schema = Schema(schema_file=StringIO(text))
+        self.assertEqual(schema.version, '9.9.9.9')
+        self.assertTrue(schema.schema)
+        self.assertFalse(schema.enumerations)
+        self.assertFalse(schema.saveframe_categories)

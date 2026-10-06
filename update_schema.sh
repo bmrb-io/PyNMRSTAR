@@ -1,13 +1,13 @@
 #!/bin/sh
 #
-# Refresh the packaged *offline-fallback* dictionary files from the NMR-STAR
-# dictionary distribution (the built files, not the source spreadsheet).
+# Refresh the packaged dictionary files from the NMR-STAR dictionary
+# distribution (the built files, not the source spreadsheet).
 #
-# These are only the fallback used when there is no network and no cache. At
-# runtime pynmrstar fetches the current distribution from definitions.DICTIONARY_URL
-# and caches it under ~/.cache/pynmrstar/<version> (see _internal.load_dictionary),
-# so this script only needs to be run occasionally to keep the shipped fallback
-# reasonably current. Only dictionary versions 3.2.14.0 and above are supported.
+# The packaged distribution is what pynmrstar uses by default -- it only goes to
+# the network when asked for Schema(version='latest') or for a version it has
+# neither packaged nor cached (see _internal.load_dictionary). Run this before
+# each release so that the default is the newest dictionary. Only dictionary
+# versions 3.2.14.0 and above are supported.
 
 base="https://raw.githubusercontent.com/bmrb-io/nmr-star-dictionary/nmr-star-development/NMR-STAR/internal_106_distribution"
 ref="pynmrstar/reference_files"

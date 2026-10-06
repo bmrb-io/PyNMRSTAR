@@ -25,9 +25,11 @@ STR_CONVERSION_DICT: dict = {None: "."}
 API_URL: str = "https://api.bmrb.io/v2"
 # Base location of the NMR-STAR dictionary distribution (the built files, not the
 # source spreadsheet). GitHub for now; will point at BMRB.io in future. Only
-# dictionary versions 3.2.14.0 and above are supported. Override the source for
-# development with the PYNMRSTAR_DICTIONARY_SOURCE environment variable (a URL
-# base or a local directory holding the distribution files).
+# dictionary versions 3.2.14.0 and above are supported. pynmrstar ships a copy of
+# the distribution and uses it by default; this is only read when a Schema is
+# asked for the newest release, or for a version that is neither packaged nor
+# cached. Override it with the PYNMRSTAR_DICTIONARY_SOURCE environment variable
+# (a URL base or a local directory holding the distribution files).
 DICTIONARY_URL: str = 'https://raw.githubusercontent.com/bmrb-io/nmr-star-dictionary/' \
                       'nmr-star-development/NMR-STAR/internal_106_distribution'
 # The distribution files a Schema is built from.
