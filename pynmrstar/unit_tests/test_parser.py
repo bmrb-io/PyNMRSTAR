@@ -265,6 +265,24 @@ save_
             Entry.from_string(unterminated)
         self.assertEqual(caught.exception.line_number, 7)
 
+    def test_error_message_names_the_line_once(self):
+        """The line number is an attribute that ParsingError renders itself,
+        so the message it is built from must not carry it as well."""
+
+        unterminated_quote = "data_test\nsave_x\n_A.x 'abc\nsave_\n"
+        with self.assertRaises(ParsingError) as caught:
+            Entry.from_string(unterminated_quote)
+        self.assertEqual(caught.exception.line_number, 3)
+        self.assertEqual(str(caught.exception),
+                         "Invalid file. Single quoted value was not terminated. Error detected on line 3.")
+
+        # Non-standard whitespace names the line it is on, once
+        star = "data_test\nsave_test\n_sf.sf_category test\n_sf.sf_framecode test\nsave_\n"
+        with self.assertRaises(ParsingError) as caught:
+            Entry.from_string(star, raise_parse_warnings=True)
+        self.assertEqual(caught.exception.line_number, 3)
+        self.assertEqual(str(caught.exception).count(' line '), 1)
+
     def test_line_numbers_survive_semicolon_rewriting(self):
         """A `;content` value is split over two lines before tokenizing, which
         pushes the rest of the file down a line. Reported lines must still name

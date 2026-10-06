@@ -263,7 +263,7 @@ impl TokenizerState {
                 self.index += length;
                 return Ok(Some((start, end)));
             } else {
-                return Err(format!("Invalid file. Semicolon-delineated value was not terminated. Error on line: {}", self.token_line));
+                return Err("Invalid file. Semicolon-delineated value was not terminated.".to_string());
             }
         }
 
@@ -288,7 +288,7 @@ impl TokenizerState {
 
                 // Check for newlines
                 if self.check_multiline(end_quote + 1) {
-                    return Err(format!("Invalid file. Single quoted value was not terminated on the same line it began. Error on line: {}", self.token_line));
+                    return Err("Invalid file. Single quoted value was not terminated on the same line it began.".to_string());
                 }
 
                 self.index += 1;
@@ -299,7 +299,7 @@ impl TokenizerState {
                 self.index += end_quote + 1;
                 return Ok(Some((start, end)));
             } else {
-                return Err(format!("Invalid file. Single quoted value was not terminated. Error on line: {}", self.token_line));
+                return Err("Invalid file. Single quoted value was not terminated.".to_string());
             }
         }
 
@@ -324,7 +324,7 @@ impl TokenizerState {
 
                 // Check for newlines
                 if self.check_multiline(end_quote + 1) {
-                    return Err(format!("Invalid file. Double quoted value was not terminated on the same line it began. Error on line: {}", self.token_line));
+                    return Err("Invalid file. Double quoted value was not terminated on the same line it began.".to_string());
                 }
 
                 self.index += 1;
@@ -335,7 +335,7 @@ impl TokenizerState {
                 self.index += end_quote + 1;
                 return Ok(Some((start, end)));
             } else {
-                return Err(format!("Invalid file. Double quoted value was not terminated. Error on line: {}", self.token_line));
+                return Err("Invalid file. Double quoted value was not terminated.".to_string());
             }
         }
 
@@ -572,18 +572,18 @@ impl ParserContext {
                         if !self.warned_unusual_whitespace {
                             if let Some(line) = self.tokenizer.unusual_whitespace_line {
                                 self.warned_unusual_whitespace = true;
-                                let msg = format!(
-                                    "Non-standard whitespace character found on line {}. \
-                                     Only standard whitespace characters (space, tab, newline, \
-                                     vertical tab, carriage return) are expected in NMR-STAR files.",
-                                    self.tokenizer.source_line(line + 1)
-                                );
+                                let line = self.tokenizer.source_line(line + 1);
+                                let msg = "Non-standard whitespace character found. \
+                                           Only standard whitespace characters (space, tab, newline, \
+                                           vertical tab, carriage return) are expected in NMR-STAR files.";
                                 if self.raise_parse_warnings {
-                                    return Err(self.raise_error(&msg));
+                                    // The line the whitespace is on, which need not be the
+                                    // line of the token being read when it is noticed.
+                                    return Err(parsing_error(msg, line));
                                 } else {
                                     let logging = py.import("logging")?;
                                     let logger = logging.call_method1("getLogger", ("pynmrstar",))?;
-                                    logger.call_method1("warning", (msg,))?;
+                                    logger.call_method1("warning", (format!("{} Found on line {}.", msg, line),))?;
                                 }
                             }
                         }
