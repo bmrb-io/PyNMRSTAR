@@ -54,6 +54,20 @@ class TestEntry(unittest.TestCase):
                          self.file_entry.get_saveframe_by_name("entry_information"))
         self.assertEqual(self.file_entry[0], self.file_entry.get_saveframe_by_name("entry_information"))
 
+        # Slices, and anything else a list accepts as an index (such as numpy integers), work as for a list
+        class Index:
+            def __index__(self):
+                return 1
+
+        self.assertEqual(self.file_entry[0:2], list(self.file_entry.frame_list[0:2]))
+        self.assertEqual(self.file_entry[Index()], self.file_entry.frame_list[1])
+
+        self.assertRaises(KeyError, lambda: self.file_entry['no_such_saveframe'])
+        self.assertRaises(IndexError, lambda: self.file_entry[10000])
+        for invalid in (1.0, None, b'entry_information'):
+            with self.subTest(invalid=invalid):
+                self.assertRaises(ValueError, lambda: self.file_entry[invalid])
+
     def test_init(self):
         # Make sure the correct errors are raised
         self.assertRaises(ValueError, Entry)
