@@ -7,8 +7,9 @@ from typing import TextIO, BinaryIO, Union, List, Optional, Any, Dict, Iterable,
 
 from pynmrstar_parser import pynmrstar_parser
 
-from pynmrstar import definitions, entry as entry_mod, loop as loop_mod, utils, parser
-from pynmrstar._internal import _get_comments, _json_serialize, _interpret_file, get_clean_tag_list, write_to_file
+from pynmrstar import _internal, definitions, entry as entry_mod, loop as loop_mod, utils, parser
+from pynmrstar._internal import _get_comments, _json_serialize, _interpret_file, _non_ascii_error, get_clean_tag_list, \
+    write_to_file
 from pynmrstar.exceptions import InvalidStateError
 from pynmrstar.schema import Schema
 
@@ -623,9 +624,16 @@ class Saveframe(object):
             if not self._name:
                 self._name = value
             elif self._name != value:
-                raise ValueError('The Sf_framecode tag cannot be different from the saveframe name. Error '
-                                 f'occurred in tag {self.tag_prefix}.Sf_framecode with value {value} which '
-                                 f'conflicts with the saveframe name {self._name}.')
+                message = ('The Sf_framecode tag cannot be different from the saveframe name. Error '
+                           f'occurred in tag {self.tag_prefix}.Sf_framecode with value {value} which '
+                           f'conflicts with the saveframe name {self._name}.')
+                # While parsing, keep both strings rather than refusing the file:
+                # the saveframe keeps the name from its save_ label and the tag
+                # keeps its own value, so a validator can compare the two and
+                # report the mismatch. Writing the entry back out reproduces the
+                # file as it was read.
+                if not _internal.parse_warning(message):
+                    raise ValueError(message)
         self._tags.append(new_tag)
         if self._lc_tags_cache is not None:
             self._lc_tags_cache[new_tag[0].lower()] = len(self._tags) - 1
@@ -985,7 +993,12 @@ class Saveframe(object):
         the NMR-STAR schema. You can pass your own custom schema if desired,
         otherwise the schema will be fetched from the BMRB servers.
 
-        validate_star - Determines if the STAR syntax checks are ran."""
+        validate_star - Determines if the STAR syntax checks are ran.
+
+        Only the checks a saveframe can answer on its own live here. Anything
+        that depends on the rest of the entry -- whether a tag belongs in a loop
+        at all, whether a mandatory tag is missing, whether a value refers to
+        something that exists -- is in :meth:`pynmrstar.Entry.validate_full`."""
 
         errors = []
 
@@ -1002,6 +1015,13 @@ class Saveframe(object):
                 formatted_tag = self.tag_prefix + "." + tag[0]
                 cur_errors = my_schema.val_type(formatted_tag, tag[1], category=my_category)
                 errors.extend(cur_errors)
+
+        if validate_star:
+            # NMR-STAR is an ASCII format
+            for tag in self._tags:
+                value = str(tag[1])
+                if not value.isascii():
+                    errors.append(_non_ascii_error(f"{self.tag_prefix}.{tag[0]}", value))
 
         # Check the loops for errors
         for each_loop in self._loops:

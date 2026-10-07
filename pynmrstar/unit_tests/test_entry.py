@@ -5,7 +5,7 @@ import unittest
 from copy import deepcopy as copy
 from pathlib import Path
 
-from pynmrstar import Entry, Saveframe, Loop
+from pynmrstar import Entry, Saveframe, Loop, Severity, repair, utils
 from pynmrstar.exceptions import ParsingError
 
 our_path = os.path.dirname(os.path.realpath(__file__))
@@ -131,9 +131,885 @@ class TestEntry(unittest.TestCase):
         self.assertEqual(self.file_entry.get_tag("entry.Submission_date", whole_tag=True),
                          [[u'Submission_date', u'2006-09-07']])
 
+    def test_validate_full(self):
+        def structural(entry, **kwargs):
+            """Only the saveframe-structure findings. An archived entry is
+            structurally clean but does not carry every tag the dictionary
+            wants, so the mandatory-tag findings are a separate question."""
+            return [_ for _ in entry.validate_full(**kwargs) if _.check.startswith('saveframe.')]
+
+        # A real archived entry is structurally clean
+        self.assertEqual(structural(self.file_entry), [])
+
+        entry = copy(self.file_entry)
+
+        # The Sf_framecode tag disagreeing with the saveframe's own name. Set it
+        # through the tag rather than through .name, which keeps the two in step.
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+        frame.get_tag('Sf_framecode', whole_tag=True)[0][1] = 'something_else'
+        issues = structural(entry)
+        self.assertEqual([_.check for _ in issues], ['saveframe.framecode_mismatch'])
+        self.assertEqual(issues[0].severity, Severity.ERROR)
+        self.assertEqual(issues[0].saveframe, frame.name)
+        self.assertEqual(issues[0].value, 'something_else')
+        self.assertEqual(issues[0].tag, '_Entry.Sf_framecode')
+
+        # An Sf_category value that disagrees with the dictionary. The category
+        # a saveframe *is* comes from its tags, so this is a wrong value, not a
+        # different category -- nothing else should be reported.
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+        frame.get_tag('Sf_category', whole_tag=True)[0][1] = 'not_a_category'
+        issues = structural(entry)
+        self.assertEqual([_.check for _ in issues], ['saveframe.invalid_category'])
+        self.assertEqual(issues[0].category, 'entry_information')
+
+        # A missing mandatory saveframe category
+        entry = copy(self.file_entry)
+        entry.remove_saveframe(entry.get_saveframes_by_category('citations')[0])
+        issues = structural(entry)
+        self.assertIn('saveframe.missing_mandatory_category', [_.check for _ in issues])
+
+        # Profiles differ, and an unknown one is rejected. The internal view is
+        # stricter than the public one, so it wants strictly more tags.
+        self.assertEqual(structural(self.file_entry, profile='internal'), [])
+        self.assertGreater(len(self.file_entry.validate_full(profile='internal')),
+                           len(self.file_entry.validate_full(profile='public')))
+        self.assertRaises(ValueError, self.file_entry.validate_full, profile='nope')
+
+        # Severity filtering
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+        frame.get_tag('Sf_framecode', whole_tag=True)[0][1] = 'something_else'
+        self.assertEqual(entry.validate_full(severities=['warning']), [])
+        self.assertEqual(len(structural(entry, severities=['error'])), 1)
+
+    def test_validate_full_saveframe_details(self):
+        """Saveframe findings carry the other saveframe they are about, so a
+        consumer can word them without re-deriving it."""
+
+        entry = copy(self.file_entry)
+        first = entry.get_saveframes_by_category('entry_information')[0]
+        second = copy(first)
+        second.name = 'entry_information_2'
+        # Appended after the citations etc., so it is also out of order
+        entry.add_saveframe(second)
+        issues = {_.check: _ for _ in entry.validate_full() if _.saveframe == 'entry_information_2'}
+        self.assertEqual(issues['saveframe.duplicate_category'].details,
+                         {'previous_saveframe': first.name})
+        order = issues['saveframe.order'].details
+        self.assertEqual(order['previous_saveframe'], entry[-2].name)
+        self.assertGreater(order['previous_ordinal'], order['ordinal'])
+
+        # Saveframe names are compared without regard to case
+        entry = copy(self.file_entry)
+        third = copy(first)
+        third.name = first.name.upper()
+        entry.add_saveframe(third)
+        issues = [_ for _ in entry.validate_full() if _.check == 'saveframe.duplicate_name']
+        self.assertEqual([_.details for _ in issues], [{'previous_saveframe': first.name}])
+
+    def test_validate_full_mandatory(self):
+        entry = copy(self.file_entry)
+        checks = lambda: [_ for _ in entry.validate_full(profile='internal') if _.check.startswith('tag.')]
+
+        # Emptying a value-mandatory tag is reported as a missing value, and
+        # removing it outright as a missing tag -- two different findings.
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+        frame.get_tag('_Entry.Title', whole_tag=True)[0][1] = '.'
+        found = [_ for _ in checks() if _.tag == '_Entry.Title']
+        self.assertEqual([_.check for _ in found], ['tag.missing_value'])
+
+        frame.remove_tag('Title')
+        found = [_ for _ in checks() if _.tag == '_Entry.Title']
+        self.assertEqual([_.check for _ in found], ['tag.missing'])
+        self.assertEqual(found[0].saveframe, frame.name)
+        self.assertEqual(found[0].category, 'entry_information')
+        # Title is value-mandatory, which a consumer rewording the finding needs
+        # to know: "missing" and "missing, and needs a value" are worded apart
+        self.assertEqual(found[0].details, {'requires_value': True})
+
+    def test_validate_full_mandatory_first_value_only(self):
+        """A value-mandatory tag in a loop is judged on its *first* value.
+
+        This is what the BMRB validator does -- CheckMandatoryTags reads one row
+        of its result set and never loops -- and it is not what testing every
+        value would do. Pinned in both directions because getting it wrong in
+        either is silent: `all(...)` under-reports (which it did, missing two
+        findings the Java tool makes on bmr7154) and `any(...)` would
+        over-report.
+        """
+
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('sample_conditions')[0]
+        loop = frame['_Sample_condition_variable']
+        column = loop.tags.index('Val')
+        self.assertGreater(len(loop.data), 1, 'the fixture needs a multi-row loop')
+
+        def missing_value():
+            return [_ for _ in entry.validate_full(profile='internal')
+                    if _.check == 'tag.missing_value' and _.tag == '_Sample_condition_variable.Val']
+
+        # Every row populated: nothing to report.
+        self.assertEqual(missing_value(), [])
+
+        # Null in a row that is not the first: the original never looks at it.
+        original = loop.data[-1][column]
+        loop.data[-1][column] = '.'
+        self.assertEqual(missing_value(), [])
+        loop.data[-1][column] = original
+
+        # Null in the first row: reported, even though every other row has one.
+        original = loop.data[0][column]
+        loop.data[0][column] = '.'
+        found = missing_value()
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0].saveframe, frame.name)
+        loop.data[0][column] = original
+
+    def test_fix_framecodes(self):
+        """Both halves of the BMRB validator's FixFramecodes (75)."""
+
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+
+        # Half one: Sf_framecode is set to the saveframe's own name. Written
+        # through the tag pair rather than the name setter, because the setter
+        # keeps the two in step and the inconsistency only ever arrives from a
+        # parsed file.
+        frame.get_tag('Sf_framecode', whole_tag=True)[0][1] = 'something_else'
+        entry._fix_framecodes()
+        self.assertEqual(frame.get_tag('Sf_framecode')[0], frame.name)
+
+        # Half two: whitespace inside a saveframe-pointer value collapses to a
+        # single underscore -- a framecode with a space cannot be written as a
+        # $reference.
+        shifts = entry.get_saveframes_by_category('assigned_chemical_shifts')[0]
+        shifts.get_tag('Sample_condition_list_label', whole_tag=True)[0][1] = '$a b\tc'
+        entry._fix_framecodes()
+        self.assertEqual(shifts.get_tag('Sample_condition_list_label')[0], '$a_b_c')
+
+    def test_fix_framecodes_leaves_nulls_alone(self):
+        """The original's query excludes NULL, '.' and '?' explicitly: a missing
+        reference is not a misspelt one."""
+
+        entry = copy(self.file_entry)
+        shifts = entry.get_saveframes_by_category('assigned_chemical_shifts')[0]
+        for null in ('.', '?'):
+            shifts.get_tag('Sample_condition_list_label', whole_tag=True)[0][1] = null
+            entry._fix_framecodes()
+            self.assertEqual(shifts.get_tag('Sample_condition_list_label')[0], null)
+
+    def test_mark_framecode_values(self):
+        """MarkFramecodeValues (73): every saveframe pointer carries its $.
+
+        A no-op on an entry read from a well-formed file, since pynmrstar keeps
+        the marker in the value -- so the test has to take one off first, which
+        is the state an entry assembled through the API arrives in."""
+
+        entry = copy(self.file_entry)
+        shifts = entry.get_saveframes_by_category('assigned_chemical_shifts')[0]
+        pointer = shifts.get_tag('Sample_condition_list_label', whole_tag=True)[0]
+        self.assertTrue(pointer[1].startswith('$'))
+
+        pointer[1] = pointer[1].lstrip('$')
+        entry._mark_framecode_values()
+        self.assertEqual(pointer[1], f'${shifts.get_tag("Sample_condition_list_label")[0].lstrip("$")}')
+        self.assertTrue(pointer[1].startswith('$'))
+
+        # Idempotent: running it again must not stack markers.
+        entry._mark_framecode_values()
+        self.assertFalse(pointer[1].startswith('$$'))
+
+    def test_normalize_repairs_framecodes(self):
+        """normalize() includes the framecode repairs, deliberately.
+
+        It means normalizing can remove a validation finding: validate_full()
+        reports a Sf_framecode that disagrees with its saveframe's name, and
+        this fixes exactly that. BMRB's call -- there is no harm in repairing it
+        without warning first -- but it is worth a test saying so out loud, so
+        that nobody 'fixes' the interaction later by accident."""
+
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+        frame.get_tag('Sf_framecode', whole_tag=True)[0][1] = 'something_else'
+
+        # The mismatch is a finding before normalizing ...
+        mismatches = [_ for _ in entry.validate_full(profile='internal')
+                      if _.check == 'saveframe.framecode_mismatch']
+        self.assertEqual(len(mismatches), 1)
+
+        # ... and normalize() repairs it, so it is not one afterwards.
+        entry.normalize()
+        self.assertEqual(frame.get_tag('Sf_framecode')[0], frame.name)
+        self.assertEqual([_ for _ in entry.validate_full(profile='internal')
+                          if _.check == 'saveframe.framecode_mismatch'], [])
+
+    def test_add_row_indexes(self):
+        """Every loop with a row-index column is renumbered 1, 2, 3, ..."""
+
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+        loop = frame['_Entry_author']
+        position = loop.tags.index('Ordinal')
+        expected = [str(_) for _ in range(1, len(loop.data) + 1)]
+
+        # A gap is filled ...
+        loop.data[1][position] = '.'
+        entry.add_row_indexes()
+        self.assertEqual([_[position] for _ in loop.data], expected)
+
+        # ... and so is a column that is complete but wrong. The dictionary
+        # names the index tag, so it is found under 'Ordinal' here and 'ID'
+        # elsewhere without the caller saying which.
+        for row, value in zip(loop.data, [str(_ * 10) for _ in range(1, len(loop.data) + 1)]):
+            row[position] = value
+        entry.add_row_indexes()
+        self.assertEqual([_[position] for _ in loop.data], expected)
+
+    def test_normalize_renumbers_a_referenced_row_index(self):
+        """normalize() renumbers a referenced row index and brings its
+        references with it.
+
+        _Entity_comp_index.ID is a row index that both _Entity_poly_seq and
+        _Atom_chem_shift point at. Renumbering it without rewriting those would
+        silently reassign every chemical shift to the wrong residue."""
+
+        entry = copy(self.file_entry)
+        entity = entry.get_saveframes_by_category('entity')[0]
+        index = entity['_Entity_comp_index']
+        at_index = index.tags.index('ID')
+        shifts = entry['assigned_chem_shift_list_1']['_Atom_chem_shift']
+        at_shift = shifts.tags.index('Comp_index_ID')
+
+        # Multiply every residue number by ten, on both sides, so the numbering
+        # is consistent but wrong.
+        for row in index.data:
+            row[at_index] = str(int(row[at_index]) * 10)
+        for row in shifts.data:
+            row[at_shift] = str(int(row[at_shift]) * 10)
+
+        entry.normalize()
+        self.assertEqual([_[at_index] for _ in index.data],
+                         [str(_) for _ in range(1, len(index.data) + 1)])
+        self.assertTrue({str(_[at_shift]) for _ in shifts.data}
+                        .issubset({str(_[at_index]) for _ in index.data}))
+
+    def test_normalize_will_not_renumber_an_ambiguous_row_index(self):
+        """With two loops of a category and no discriminator on the referring
+        side, the reference cannot be followed -- so the column is left exactly
+        as it is rather than corrupted.
+
+        Reached here by removing the Entity_ID column the second entity's
+        residues would otherwise be told apart by."""
+
+        entry = copy(self.file_entry)
+        entity = entry.get_saveframes_by_category('entity')[0]
+        second = copy(entity)
+        second.name = 'entity_2'
+        entry.add_saveframe(second)
+
+        for frame in (entity, second):
+            loop = frame['_Entity_comp_index']
+            position = loop.tag_index('Entity_ID')
+            for row in loop.data:
+                del row[position]
+            del loop.tags[position]
+            loop._lc_tags_cache = None
+
+        loop = entity['_Entity_comp_index']
+        at_index = loop.tags.index('ID')
+        scrambled = [str(int(_[at_index]) * 10) for _ in loop.data]
+        for row, value in zip(loop.data, scrambled):
+            row[at_index] = value
+
+        entry.normalize()
+        self.assertEqual([_[at_index] for _ in loop.data], scrambled)
+
+    def test_normalize_leaves_a_duplicated_row_index_alone(self):
+        """A referenced index column that already repeats a value has no
+        old -> new mapping to follow, so it is left for check_row_indexes to
+        report rather than guessed at."""
+
+        entry = copy(self.file_entry)
+        loop = entry.get_saveframes_by_category('entity')[0]['_Entity_comp_index']
+        at_index = loop.tags.index('ID')
+        loop.data[1][at_index] = loop.data[0][at_index]
+        before = [_[at_index] for _ in loop.data]
+
+        entry.normalize()
+        self.assertEqual([_[at_index] for _ in loop.data], before)
+
+    def test_normalize_renumbers_each_atom_from_its_own_entity(self):
+        """A loop describing two atoms carries a residue reference and an
+        entity per atom. Each reference has to be rewritten from its own
+        atom's entity -- Comp_index_ID_2 from Entity_ID_2, not Entity_ID_1."""
+
+        def entity(entity_id, residues):
+            rows = '\n'.join(f'{_} {entity_id} 1' for _ in residues)
+            return (f'save_entity_{entity_id}\n_Entity.Sf_category entity\n'
+                    f'_Entity.Sf_framecode entity_{entity_id}\n_Entity.ID {entity_id}\n_Entity.Entry_ID 1\n'
+                    f'loop_\n_Entity_comp_index.ID\n_Entity_comp_index.Entity_ID\n_Entity_comp_index.Entry_ID\n'
+                    f'{rows}\nstop_\nsave_\n')
+
+        # Both entities' residues are misnumbered, and differently: entity 1's
+        # residue 5 becomes 3, entity 2's becomes 1.
+        entry = Entry.from_string(
+            'data_1\n' + entity(1, [3, 4, 5]) + entity(2, [5, 6, 7]) +
+            'save_constraints\n_Gen_dist_constraint_list.Sf_category general_distance_constraints\n'
+            '_Gen_dist_constraint_list.Sf_framecode constraints\n_Gen_dist_constraint_list.ID 1\n'
+            '_Gen_dist_constraint_list.Entry_ID 1\nloop_\n_Gen_dist_constraint.ID\n'
+            '_Gen_dist_constraint.Member_ID\n_Gen_dist_constraint.Entity_ID_1\n'
+            '_Gen_dist_constraint.Comp_index_ID_1\n_Gen_dist_constraint.Entity_ID_2\n'
+            '_Gen_dist_constraint.Comp_index_ID_2\n_Gen_dist_constraint.Entry_ID\n'
+            '_Gen_dist_constraint.Gen_dist_constraint_list_ID\n1 1 2 5 1 5 1 1\nstop_\nsave_\n')
+
+        entry.normalize()
+        loop = entry.get_loops_by_category('_Gen_dist_constraint')[0]
+        self.assertEqual(loop.get_tag(['Entity_ID_1', 'Comp_index_ID_1', 'Entity_ID_2', 'Comp_index_ID_2']),
+                         [['2', '1', '1', '3']])
+
+    def test_repair_insert_mandatory_tags(self):
+        """InsertMandatoryTags (105): a missing required free tag arrives as '?'."""
+
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+        self.assertEqual(frame.get_tag('Title'), file_entry.get_tag('_Entry.Title'))
+        frame.remove_tag('Title')
+
+        repair.insert_mandatory_tags(entry, profile='internal')
+        self.assertEqual(frame.get_tag('Title'), ['?'])
+
+    def test_repair_insert_mandatory_tags_skips_optional_and_auto(self):
+        """Two kinds of tag it must not add, for two different reasons.
+
+        An optional tag is nobody's to add. An *auto-inserted* one is the
+        depositing tool's -- and since every tag carrying a dictionary default
+        value is in that set, this is also what makes the value written by this
+        method always '?'. Judged on what the method *adds*, since an entry read
+        from a file already carries plenty of both, and on the free tags alone,
+        since a loop it has to create deliberately arrives whole."""
+
+        entry = copy(self.file_entry)
+        schema = utils.get_schema()
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+        codes = schema.validation_profile('internal')['tags']
+
+        def entry_tags(kind) -> set:
+            return {_ for _ in schema.schema
+                    if schema.schema[_].get('SFCategory') == 'entry_information'
+                    and (schema.schema[_].get('Loopflag') or '').strip() != 'Y'
+                    and (kind(codes.get(_), _ in schema.auto_inserted_tags))}
+
+        optional = entry_tags(lambda code, auto: code == 'O' and not auto)
+        auto = entry_tags(lambda code, auto: code in ('M', 'V') and auto)
+        self.assertTrue(optional and auto)
+
+        def present() -> set:
+            return {f'{frame.tag_prefix}.{name}'.lower() for name, _ in frame.tags}
+
+        before = present()
+        repair.insert_mandatory_tags(entry, profile='internal')
+        added = present() - before
+        self.assertTrue(added)
+        self.assertEqual(added.intersection(optional | auto), set())
+
+    def test_repair_insert_mandatory_tags_creates_a_missing_loop(self):
+        """A required tag whose whole loop is missing brings the loop with it --
+        every column of the category, one row, the row index numbered 0."""
+
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+        frame.remove_loop(frame['_Entry_author'])
+
+        repair.insert_mandatory_tags(entry, profile='internal', entry_id='NEED_ACC_NUM')
+        loop = frame['_Entry_author']
+
+        self.assertEqual(len(loop.data), 1)
+        self.assertEqual(loop.data[0][loop.tag_index('Ordinal')], '0')
+        self.assertEqual(loop.data[0][loop.tag_index('Entry_ID')], 'NEED_ACC_NUM')
+        self.assertEqual(loop.data[0][loop.tag_index('Family_name')], '?')
+        # Optional columns come along too: the loop is a form to fill in.
+        self.assertIn('middle_initials', [_.lower() for _ in loop.tags])
+        # Sf_ID is bookkeeping, not a column for anyone to fill in.
+        self.assertNotIn('sf_id', [_.lower() for _ in loop.tags])
+
+    def test_repair_insert_mandatory_tags_fills_an_existing_loop(self):
+        """A loop that exists gets the missing column, valued in every row."""
+
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+        loop = frame['_Entry_author']
+        self.assertGreater(len(loop.data), 1)
+        position = loop.tag_index('Family_name')
+        for row in loop.data:
+            del row[position]
+        del loop.tags[position]
+        loop._lc_tags_cache = None
+
+        repair.insert_mandatory_tags(entry, profile='internal')
+        loop = frame['_Entry_author']
+        self.assertEqual([_[loop.tag_index('Family_name')] for _ in loop.data],
+                         ['?'] * len(loop.data))
+
+    def test_repair_insert_mandatory_tags_honours_a_conditional_rule(self):
+        """A conditional rule decides it, and it is scoped to the saveframe.
+
+        _Entity.Nstd_monomer is value-mandatory, except in an entity whose Type
+        is 'non-polymer', where the dictionary demotes it to optional. Two
+        entities differing only in that tag must therefore come out
+        differently."""
+
+        entry = copy(self.file_entry)
+        polymer, non_polymer = entry.get_saveframes_by_category('entity')[0], None
+        non_polymer = copy(polymer)
+        non_polymer.name = 'entity_non_polymer'
+        for frame in (polymer, non_polymer):
+            frame.remove_tag('Nstd_monomer')
+        polymer.add_tag('Type', 'polymer', update=True)
+        non_polymer.add_tag('Type', 'non-polymer', update=True)
+        entry.add_saveframe(non_polymer)
+
+        repair.insert_mandatory_tags(entry, profile='internal')
+        self.assertEqual(polymer.get_tag('Nstd_monomer'), ['?'])
+        self.assertEqual(non_polymer.get_tag('Nstd_monomer'), [])
+
+    def test_validate_full_invalid_tags(self):
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+
+        def invalid():
+            return [_ for _ in entry.validate_full(profile='internal')
+                    if _.check in ('tag.unknown', 'tag.miscapitalized', 'tag.free_in_loop',
+                                   'tag.duplicate', 'tag.invalid')]
+
+        # An archived entry uses no tag it should not
+        self.assertEqual(invalid(), [])
+
+        # A tag the dictionary has never heard of
+        frame.add_tag('_Entry.Bogus_invented_tag', 'fnord')
+        found = invalid()
+        self.assertEqual([_.check for _ in found], ['tag.unknown'])
+        self.assertEqual(found[0].tag, '_Entry.Bogus_invented_tag')
+        self.assertEqual(found[0].saveframe, frame.name)
+        frame.remove_tag('Bogus_invented_tag')
+
+        # A real tag spelled with the wrong capitalization. pynmrstar's own
+        # lookups ignore case, but the dictionary does not, so this is reported
+        # -- with the spelling it should have had.
+        submission_date = frame.get_tag('_Entry.Submission_date', whole_tag=True)[0]
+        submission_date[0] = 'SUBMISSION_date'
+        found = invalid()
+        self.assertEqual([_.check for _ in found], ['tag.miscapitalized'])
+        self.assertIn("Should be '_Entry.Submission_date'", found[0].message)
+        self.assertEqual(found[0].details, {'correct': '_Entry.Submission_date'})
+        submission_date[0] = 'Submission_date'
+
+        # A tag the profile forbids outright. _Entry.Sf_ID is bookkeeping the
+        # internal view does not accept in the file.
+        frame.add_tag('_Entry.Sf_ID', '1')
+        self.assertEqual([_.check for _ in invalid()], ['tag.invalid'])
+        frame.remove_tag('Sf_ID')
+
+        # A loop whose columns are all tags the dictionary marks as free. That
+        # is one category, so it parses, but every column is misplaced -- and
+        # both columns are already free tags of this saveframe, so each is also
+        # reported as a duplicate, once per occurrence.
+        loop = Loop.from_scratch(category='_Entry')
+        loop.add_tag(['_Entry.Experimental_method', '_Entry.Origination'])
+        loop.add_data(['NMR', 'author'])
+        frame.add_loop(loop)
+        found = invalid()
+        self.assertEqual(sorted(_.check for _ in found),
+                         ['tag.duplicate'] * 4 + ['tag.free_in_loop'] * 2)
+        self.assertEqual({_.tag for _ in found},
+                         {'_Entry.Experimental_method', '_Entry.Origination'})
+
+    def test_validate_full_tag_order(self):
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+
+        def order():
+            return [_ for _ in entry.validate_full(profile='internal') if _.check == 'tag.order']
+
+        # An archived entry is written in dictionary order
+        self.assertEqual(order(), [])
+
+        # Move the fourth of four consecutive tags to the front of them, so the
+        # run reads 10, 40, 20, 30. Exactly one finding is right: order is
+        # compared against the tag immediately before, so only the tag that
+        # actually goes backwards is reported. Comparing against the highest
+        # sequence seen so far would report the two after it as well.
+        tags = frame.tags
+        start = next(i for i in range(len(tags) - 3)
+                     if not any('.' in tags[i + n][0] for n in range(4)))
+        run = tags[start:start + 4]
+        tags[start:start + 4] = [run[0], run[3], run[1], run[2]]
+
+        found = order()
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0].tag, f'{frame.tag_prefix}.{run[1][0]}')
+        self.assertEqual(found[0].saveframe, frame.name)
+        self.assertIsNone(found[0].loop)
+        self.assertEqual(found[0].details['previous_tag'], f'{frame.tag_prefix}.{run[3][0]}')
+
+    def test_validate_full_row_indexes(self):
+        entry = copy(self.file_entry)
+        loop = entry.get_saveframes_by_category('entity')[0]['_Entity_comp_index']
+        column = loop.tag_index('ID')
+
+        def indexes():
+            return [_ for _ in entry.validate_full(profile='internal')
+                    if _.check.startswith('row.')]
+
+        # An archived entry numbers its rows 1, 2, 3, ...
+        self.assertEqual(indexes(), [])
+
+        # A non-numeric index
+        loop.data[2][column] = '.'
+        found = indexes()
+        self.assertEqual([_.check for _ in found], ['row.index_not_a_number'])
+        self.assertEqual(found[0].row, 2)
+        self.assertEqual(found[0].tag, '_Entity_comp_index.ID')
+        self.assertEqual(found[0].loop, '_Entity_comp_index')
+        loop.data[2][column] = '3'
+
+        # A lone wrong index costs two findings: the row itself, and the row
+        # after it, which goes back to counting from where it left off.
+        loop.data[2][column] = '99'
+        found = indexes()
+        self.assertEqual([_.check for _ in found], ['row.index_wrong'] * 2)
+        self.assertEqual([_.details for _ in found], [{'expected': 3}, {'expected': 100}])
+        loop.data[2][column] = '3'
+
+        # A whole loop numbered from zero is reported once, not once per row:
+        # the count resyncs to the value actually found, and every row after
+        # the first is consistent with it.
+        for number, row in enumerate(loop.data):
+            row[column] = str(number)
+        found = indexes()
+        self.assertEqual([_.check for _ in found], ['row.index_wrong'])
+        self.assertEqual(found[0].details, {'expected': 1})
+        for number, row in enumerate(loop.data):
+            row[column] = str(number + 1)
+
+        # A negative index is neither "not a number" nor compared -- it only
+        # advances the count, which is what the original does.
+        loop.data[2][column] = '-1'
+        self.assertEqual(indexes(), [])
+
+    def test_row_index_tag_prefers_the_dictionary_order(self):
+        """`_Chem_comp_bond` is the one category with two row-index tags, and
+        which of them numbers the loop must not depend on the order the loop
+        happens to list its columns in."""
+
+        from pynmrstar.validation import _row_index_tag
+
+        loop = Loop.from_scratch('_Chem_comp_bond')
+        loop.add_tag(['ID', 'Ordinal'])
+        self.assertEqual(_row_index_tag(loop, utils.get_schema()), 'ID')
+
+        swapped = Loop.from_scratch('_Chem_comp_bond')
+        swapped.add_tag(['Ordinal', 'ID'])
+        self.assertEqual(_row_index_tag(swapped, utils.get_schema()), 'ID')
+
+    def test_validate_full_related_tags(self):
+        entry = copy(self.file_entry)
+        sample = entry.get_saveframes_by_category('sample')[0]
+        components = sample['_Sample_component']
+
+        def related():
+            return [_ for _ in entry.validate_full(profile='internal')
+                    if _.check == 'tag.parent_value_missing']
+
+        # Every reference in an archived entry resolves
+        self.assertEqual(related(), [])
+
+        # A loop value pointing at a saveframe that is not there. The reference
+        # is written '$name' and the saveframe is named plainly, so the two only
+        # compare once the marker is stripped -- if they did not, this would be
+        # reported even when correct.
+        column = components.tag_index('Entity_label')
+        components.data[0][column] = '$no_such_entity'
+        found = related()
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0].tag, '_Sample_component.Entity_label')
+        self.assertEqual(found[0].loop, '_Sample_component')
+        self.assertEqual(found[0].row, 0)
+        self.assertEqual(found[0].details, {'parent': '_Entity.Sf_framecode'})
+        self.assertIn("'no_such_entity'", found[0].message)
+        components.data[0][column] = '$F5-Phe-cVHP'
+        self.assertEqual(related(), [])
+
+        # ... and the same mistake in a saveframe's own tag
+        shifts = entry.get_saveframes_by_category('assigned_chemical_shifts')[0]
+        shifts['Sample_condition_list_label'] = '$no_such_conditions'
+        found = related()
+        self.assertEqual(len(found), 1)
+        self.assertIsNone(found[0].loop)
+        self.assertEqual(found[0].tag, '_Assigned_chem_shift_list.Sample_condition_list_label')
+
+    def test_validate_full_local_ids(self):
+        entry = copy(self.file_entry)
+        sample = entry.get_saveframes_by_category('sample')[0]
+        components = sample['_Sample_component']
+        column = components.tag_index('Sample_ID')
+
+        def local_ids():
+            return [_ for _ in entry.validate_full(profile='internal')
+                    if _.check.endswith('local_id') or _.check.endswith('local_id_tag')]
+
+        self.assertEqual(local_ids(), [])
+
+        # A row filed under a different saveframe of the same category
+        components.data[0][column] = '2'
+        found = local_ids()
+        self.assertEqual([_.check for _ in found], ['row.invalid_local_id'])
+        self.assertEqual(found[0].row, 0)
+        self.assertEqual(found[0].tag, '_Sample_component.Sample_ID')
+        self.assertEqual(found[0].details, {'local_id': '1'})
+
+        # A null is not excused: a row that does not say which saveframe it
+        # belongs to is as unusable as one naming the wrong saveframe.
+        components.data[0][column] = '.'
+        self.assertEqual([_.check for _ in local_ids()], ['row.invalid_local_id'])
+        components.data[0][column] = '1'
+
+        # A saveframe whose own ID is null cannot be compared against at all,
+        # and its loops are not reported -- one finding, not one per row.
+        sample['ID'] = '.'
+        self.assertEqual([_.check for _ in local_ids()], ['saveframe.invalid_local_id'])
+
+        # No ID tag at all is two findings: the missing tag and the missing
+        # value. The entry information saveframe is exempt -- its ID is the
+        # entry's accession number, which is not local to it.
+        sample.remove_tag('ID')
+        self.assertEqual([_.check for _ in local_ids()],
+                         ['saveframe.no_local_id_tag', 'saveframe.invalid_local_id'])
+
+    def test_validate_full_frame_codes(self):
+        entry = copy(self.file_entry)
+
+        def dangling():
+            return [_ for _ in entry.validate_full(profile='internal')
+                    if _.check == 'value.dangling_framecode']
+
+        self.assertEqual(dangling(), [])
+
+        # Renaming a saveframe without updating the references to it -- which
+        # is what rename_saveframe() exists to avoid -- leaves them dangling
+        entry.get_saveframe_by_name('sample_conditions').name = 'sample_conditions_1'
+        found = dangling()
+        self.assertTrue(found)
+        self.assertTrue(all(_.value == '$sample_conditions' for _ in found))
+        self.assertTrue(any(_.loop == '_Experiment' for _ in found))
+
+    def test_validate_full_data_types(self):
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+
+        def typed(severities=None):
+            return [_ for _ in entry.validate_full(profile='internal', severities=severities)
+                    if _.check.startswith('value.') and _.check != 'value.miscapitalized']
+
+        # An archived entry holds the types it declares
+        self.assertEqual(typed(), [])
+
+        # A saveframe pointer written without the '$' that makes it one, and
+        # with a space in it, which is two findings rather than one
+        sample = entry.get_saveframes_by_category('sample')[0]['_Sample_component']
+        column = sample.tag_index('Entity_label')
+        sample.data[0][column] = 'F5 Phe cVHP'
+        self.assertEqual([_.check for _ in typed()],
+                         ['value.not_a_framecode', 'value.framecode_whitespace'])
+        sample.data[0][column] = '$F5-Phe-cVHP'
+
+        # An integer, a float and a date that are none of those things
+        datum = frame['_Datum']
+        count = datum.tag_index('Count')
+        datum.data[0][count] = 'six hundred'
+        found = typed()
+        self.assertEqual([_.check for _ in found], ['value.not_an_integer'])
+        self.assertEqual((found[0].loop, found[0].row), ('_Datum', 0))
+        datum.data[0][count] = '602'
+
+        entity = entry.get_saveframes_by_category('entity')[0]
+        entity['Formula_weight'] = '1.2.3'
+        self.assertEqual([_.check for _ in typed()], ['value.not_a_float'])
+        entity['Formula_weight'] = '3958.3'
+
+        submission = frame.get_tag('_Entry.Submission_date', whole_tag=True)[0]
+        submission[1] = '2010-13-01'
+        self.assertEqual([_.check for _ in typed()], ['value.not_a_date'])
+
+        # A date of the right shape naming a day that does not exist. The
+        # original's test knows only that a month is 1-12 and a day 1-31, so
+        # this is ours alone and is filed under STRICT -- reported by default,
+        # and left out by asking for the other severities.
+        submission[1] = '2010-02-31'
+        self.assertEqual(typed(severities=['critical', 'error', 'warning', 'info']), [])
+        strict = typed()
+        self.assertEqual([_.check for _ in strict], ['value.impossible_date'])
+        self.assertEqual(strict[0].tag, '_Entry.Submission_date')
+        submission[1] = '2010-02-19'
+
+        # A value longer than its column. The size comes from the dictionary's
+        # SQL type; _Entry.Title is TEXT and so has none at all.
+        version = frame.get_tag('_Entry.NMR_STAR_version', whole_tag=True)[0]
+        version[1] = 'v' * 40
+        found = typed()
+        self.assertEqual([_.check for _ in found], ['value.too_long'])
+        self.assertEqual(found[0].details, {'max_length': 31})
+        version[1] = '3.1.1.61'
+
+        frame.get_tag('_Entry.Title', whole_tag=True)[0][1] = 't' * 5000
+        self.assertEqual(typed(), [])
+
+    def test_validate_full_data_values(self):
+        entry = copy(self.file_entry)
+        chem_comp = entry.get_saveframes_by_category('chem_comp')[0]
+
+        def enumerated():
+            return [_ for _ in entry.validate_full(profile='internal')
+                    if _.check in ('value.not_in_enumeration', 'value.miscapitalized')]
+
+        # The sample entry writes two closed-enumeration values in the wrong
+        # case. They are findings -- the original compares case-sensitively --
+        # but they get the message that names the spelling to use.
+        found = enumerated()
+        self.assertEqual([_.check for _ in found], ['value.miscapitalized'] * 2)
+        self.assertEqual([_.tag for _ in found],
+                         ['_Chem_comp.Type', '_Chem_comp.Processing_site'])
+        self.assertEqual(found[0].details, {'correct': 'NON-POLYMER'})
+
+        # A value that is not in the list at any capitalization
+        chem_comp.get_tag('_Chem_comp.Type', whole_tag=True)[0][1] = 'gaseous'
+        found = [_ for _ in enumerated() if _.tag == '_Chem_comp.Type']
+        self.assertEqual([_.check for _ in found], ['value.not_in_enumeration'])
+        self.assertEqual(found[0].value, 'gaseous')
+        self.assertEqual(found[0].details, {})
+
+        # An open enumeration lists what has been seen, not what is allowed, so
+        # a value outside it is not a finding
+        self.assertFalse(utils.get_schema().enumerations['_software.name']['closed'])
+        software = entry.get_saveframes_by_category('software')[0]
+        software['Name'] = 'A program nobody has used before'
+        self.assertFalse([_ for _ in enumerated() if _.tag == '_Software.Name'])
+
+    def test_validate_full_reaches_the_data(self):
+        """Per-value checks cover the experimental data as validate() does,
+        unless metadata_only asks for the BMRB validator's narrower reach."""
+
+        entry = copy(self.file_entry)
+        shifts = entry['assigned_chem_shift_list_1']['_Atom_chem_shift']
+        value = shifts.tag_index('Val')
+
+        def found(check, **kwargs):
+            return [_ for _ in entry.validate_full(**kwargs) if _.check == check]
+
+        shifts.data[0][value] = 'abc'
+        self.assertEqual([(_.tag, _.row) for _ in found('value.not_a_float')], [('_Atom_chem_shift.Val', 0)])
+        self.assertEqual(found('value.not_a_float', metadata_only=True), [])
+        shifts.data[0][value] = '1.5'
+
+        # A null in a NOT NULL column
+        shifts.data[3][value] = '.'
+        self.assertEqual([(_.tag, _.row) for _ in found('value.null_not_allowed')],
+                         [('_Atom_chem_shift.Val', 3)])
+        shifts.data[3][value] = '1.5'
+
+        # A value that passes the coarse type test but not the dictionary type's
+        # own pattern: a space, in a code
+        author = entry.get_loops_by_category('_Entry_author')[0]
+        initials = author.tag_index('Middle_initials')
+        author.data[0][initials] = 'A B'
+        issues = found('value.type_mismatch')
+        self.assertEqual([_.tag for _ in issues], ['_Entry_author.Middle_initials'])
+        self.assertEqual(issues[0].details['type'], 'code')
+        author.data[0][initials] = '.'
+
+    def test_validate_full_null_reported_once(self):
+        """A null value-mandatory tag breaks the profile's rule and NOT NULL
+        both; it is reported once, as the missing value."""
+
+        entry = copy(self.file_entry)
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+        frame['NMR_STAR_version'] = '.'
+        checks = [_.check for _ in entry.validate_full() if _.tag == '_Entry.NMR_STAR_version']
+        self.assertEqual(checks, ['tag.missing_value'])
+
+    def test_validate_full_loop_widths(self):
+        entry = copy(self.file_entry)
+        loop = entry.get_saveframes_by_category('entity')[0]['_Entity_comp_index']
+        loop.data[1].append('extra')
+        issues = [_ for _ in entry.validate_full() if _.check == 'row.wrong_width']
+        self.assertEqual([(_.loop, _.row) for _ in issues], [('_Entity_comp_index', 1)])
+        self.assertEqual(issues[0].details, {'values': len(loop.tags) + 1, 'tags': len(loop.tags)})
+
+    def test_validate_full_empty_rows_and_charset(self):
+        entry = copy(self.file_entry)
+        loop = entry.get_saveframes_by_category('entity')[0]['_Entity_comp_index']
+
+        def found(check):
+            return [_ for _ in entry.validate_full(profile='internal') if _.check == check]
+
+        self.assertEqual(found('row.empty'), [])
+        self.assertEqual(found('value.non_ascii'), [])
+
+        # A row of nothing but nulls, in all the spellings of null
+        loop.data.append(['.', '?', '', None] + ['.'] * (len(loop.tags) - 4))
+        empty = found('row.empty')
+        self.assertEqual(len(empty), 1)
+        self.assertEqual(empty[0].row, len(loop.data) - 1)
+        self.assertEqual(empty[0].loop, '_Entity_comp_index')
+
+        # One non-null value is enough to make a row worth keeping, however
+        # little it says
+        loop.data[-1][0] = 'x'
+        self.assertEqual(found('row.empty'), [])
+        loop.data.pop()
+
+        # NMR-STAR is ASCII. The message names the characters and their code
+        # points, because they are usually invisible in the file.
+        frame = entry.get_saveframes_by_category('entry_information')[0]
+        frame['Title'] = 'Solution structure of a ubiquitin–like protein'
+        non_ascii = found('value.non_ascii')
+        self.assertEqual([_.tag for _ in non_ascii], ['_Entry.Title'])
+        self.assertIn("'–' (U+2013)", non_ascii[0].message)
+
+        # A finding is consumed one line at a time, so a multi-line value must
+        # not put a newline in the message
+        frame['Title'] = 'Two\nlines–long\n'
+        non_ascii = found('value.non_ascii')
+        self.assertEqual(len(non_ascii), 1)
+        self.assertNotIn('\n', non_ascii[0].message)
+
+    def test_validate_full_conditional(self):
+        # _Citation.Journal_abbrev is required only of a journal citation, so
+        # changing the citation's type changes whether its absence is reported.
+        entry = copy(self.file_entry)
+        citation = entry.get_saveframes_by_category('citations')[0]
+        citation.get_tag('_Citation.Class', whole_tag=True)[0][1] = 'entry citation'
+
+        def abbrev_reported():
+            return any(_.tag == '_Citation.Journal_abbrev'
+                       for _ in entry.validate_full(profile='internal'))
+
+        citation.get_tag('_Citation.Type', whole_tag=True)[0][1] = 'journal'
+        citation.remove_tag('Journal_abbrev')
+        self.assertTrue(abbrev_reported())
+
+        citation.get_tag('_Citation.Type', whole_tag=True)[0][1] = 'thesis'
+        self.assertFalse(abbrev_reported())
+
     def test_validate(self):
-        validation = []
-        self.assertEqual(self.file_entry.validate(), [])
+        # The sample entry spells two enumeration values with different
+        # capitalization than the dictionary does
+        validation = ["Value 'non-polymer' of tag '_Chem_comp.Type' is improperly capitalized but otherwise "
+                      "valid. Should be 'NON-POLYMER'.",
+                      "Value 'PDBe' of tag '_Chem_comp.Processing_site' is improperly capitalized but otherwise "
+                      "valid. Should be 'PDBE'."]
+        self.assertEqual(self.file_entry.validate(), validation)
         self.file_entry[-1][-1][0][0] = 'a'
         validation.append(
             "Value does not match specification: '_Atom_chem_shift.ID':'a'.\n     "

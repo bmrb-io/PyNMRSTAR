@@ -23,5 +23,36 @@ NULL_VALUES = ['', ".", "?", None]
 STR_CONVERSION_DICT: dict = {None: "."}
 
 API_URL: str = "https://api.bmrb.io/v2"
-SCHEMA_URL: str = 'https://raw.githubusercontent.com/bmrb-io/nmr-star-dictionary/master/xlschem_ann.csv'
+# Base location of the NMR-STAR dictionary distribution (the built files, not the
+# source spreadsheet). GitHub for now; will point at BMRB.io in future. Only
+# dictionary versions 3.2.14.0 and above are supported. pynmrstar ships a copy of
+# the distribution and uses it by default; this is only read when a Schema is
+# asked for the newest release, or for a version that is neither packaged nor
+# cached. Override it with the PYNMRSTAR_DICTIONARY_SOURCE environment variable
+# (a URL base or a local directory holding the distribution files).
+DICTIONARY_URL: str = 'https://raw.githubusercontent.com/bmrb-io/nmr-star-dictionary/' \
+                      'nmr-star-production/NMR-STAR/internal_106_distribution'
+# Where one specific release's distribution lives: each release is tagged
+# ``nmr-star-v<version>`` in the dictionary repository. Read for a version that
+# is neither packaged nor cached, unless PYNMRSTAR_DICTIONARY_SOURCE is set.
+DICTIONARY_RELEASE_URL: str = 'https://raw.githubusercontent.com/bmrb-io/nmr-star-dictionary/' \
+                              'nmr-star-v{version}/NMR-STAR/internal_106_distribution'
+# The distribution files a Schema is built from.
+DICTIONARY_FILES: tuple = ('xlschem_ann.csv', 'adit_enum_hdr.csv', 'adit_enum_dtl.csv',
+                           'adit_cat_grp_o.csv', 'adit_tag_validation.csv')
+
+# The dictionary carries one set of validation flags per "view" -- the six
+# ``Validate`` columns of xlschem_ann.csv, in this order. A flag string (in
+# xlschem_ann, adit_cat_grp_o and adit_tag_validation alike) is indexed by the
+# position of the profile in this tuple. BMRB's annotators' validator uses
+# ``internal`` (DICTMODE = 1 in nmr-star-dictionary-scripts); a depositor
+# checking a file against the public archive's requirements wants ``public``.
+#
+# Only ``public`` and ``internal`` are populated as of dictionary 3.2.14.0; the
+# remaining columns exist but are blank.
+VALIDATION_PROFILES: tuple = ('public', 'internal', 'small_molecule',
+                              'small_molecule_struct', 'metabolomics', 'entry_completeness')
+DEFAULT_VALIDATION_PROFILE: str = 'public'
+# Kept for backwards compatibility (the schema tag table alone).
+SCHEMA_URL: str = f'{DICTIONARY_URL}/xlschem_ann.csv'
 FTP_URL: str = "https://bmrb.io/ftp/pub/bmrb"

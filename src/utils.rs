@@ -7,20 +7,26 @@ pub const RESERVED_KEYWORDS: [&str; 5] = ["data_", "save_", "loop_", "stop_", "g
 /// Fix multiline semicolon values where content appears on the same line as the semicolon.
 /// Transforms patterns like `\n;content\n` to `\n;\ncontent\n`.
 /// This is equivalent to the regex: `\n;([^\n]+?)\n` -> `\n;\n$1\n`
-pub fn fix_multiline_semicolons(data: &str) -> String {
+///
+/// Returns the rewritten data along with the line numbers, *in the rewritten
+/// data*, of each line a break was inserted after. Every inserted break pushes
+/// the rest of the file down a line, so anything reporting a position has to
+/// undo that before naming a line of the file the user actually has.
+pub fn fix_multiline_semicolons(data: &str) -> (String, Vec<usize>) {
     let bytes = data.as_bytes();
     let len = bytes.len();
 
     // Quick check: if no semicolons exist, return as-is
     if memchr::memchr(b';', bytes).is_none() {
-        return data.to_string();
+        return (data.to_string(), Vec::new());
     }
 
     let mut result = String::with_capacity(len + 64);
     let mut last_end = 0;
+    let mut inserted_lines: Vec<usize> = Vec::new();
 
     // Find all newlines and check if pattern `\n;[^\n]+\n` follows
-    for nl_pos in memchr_iter(b'\n', bytes) {
+    for (newline_count, nl_pos) in memchr_iter(b'\n', bytes).enumerate() {
         // Check if we have `\n;` pattern (need at least 2 more chars: ; and something)
         if nl_pos + 2 < len && bytes[nl_pos + 1] == b';' {
             let after_semi = nl_pos + 2;
@@ -33,6 +39,9 @@ pub fn fix_multiline_semicolons(data: &str) -> String {
                     result.push_str(&data[last_end..after_semi]);
                     // Insert the extra newline
                     result.push('\n');
+                    // The semicolon sits on the line after the newlines seen so
+                    // far, plus one line for each break already inserted above it
+                    inserted_lines.push(newline_count + 2 + inserted_lines.len());
                     // Update position to continue from the content
                     last_end = after_semi;
                 }
@@ -42,7 +51,7 @@ pub fn fix_multiline_semicolons(data: &str) -> String {
 
     // Append remaining data
     result.push_str(&data[last_end..]);
-    result
+    (result, inserted_lines)
 }
 
 pub fn is_reserved_keyword(token: &str) -> bool {
