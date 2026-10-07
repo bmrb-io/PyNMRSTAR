@@ -56,8 +56,9 @@ class Schema(object):
           ``~/.cache/pynmrstar`` (``$XDG_CACHE_HOME/pynmrstar``) so that it
           can later be asked for by number without the network;
         * a version number loads that release from the packaged copy or the
-          cache, downloading it only if neither has it -- which can only
-          succeed when it is the newest release.
+          cache, downloading (and caching) it only if neither has it. Each
+          release is tagged in the dictionary repository, so any release from
+          3.2.14.0 on can be downloaded.
 
         ``schema_file`` loads the dictionary from somewhere else instead. It may
         be a local directory holding the distribution files

@@ -306,6 +306,19 @@ def local_dictionary(version: str) -> Optional[Dict[str, str]]:
     return None
 
 
+def _fetch_dictionary(source: str) -> Tuple[Dict[str, str], str]:
+    """Read a whole distribution from a URL base or local directory, and return
+    it with the version it contains. Raises ``ValueError`` if it cannot be
+    read."""
+
+    try:
+        fetched = read_dictionary_directory(source)
+    # _get_url_reliably raises KeyError for a 404
+    except (requests.exceptions.RequestException, URLError, OSError, KeyError) as err:
+        raise ValueError(f"Could not fetch the dictionary from '{source}': {err}") from err
+    return fetched, _dictionary_version(fetched['xlschem_ann.csv'])
+
+
 def load_dictionary(version: str = None, source: str = None) -> Tuple[Dict[str, str], str]:
     """Return ``({filename: contents}, version)`` for the dictionary distribution
     files a :class:`Schema` is built from.
@@ -317,14 +330,16 @@ def load_dictionary(version: str = None, source: str = None) -> Tuple[Dict[str, 
       so it can be asked for by number later. Raises ``ValueError`` if it
       cannot be fetched.
     * any other ``version`` -- that release: the packaged one if it matches,
-      else a cached copy, else ``source`` if that is what it currently serves.
-      Only the newest release can be downloaded, so an older one is available
-      only if it is packaged or was cached when it was the newest. Raises
-      ``ValueError`` if it cannot be found.
+      else a cached copy, else the release tagged for it in the dictionary
+      repository (:data:`definitions.DICTIONARY_RELEASE_URL`), else ``source``
+      if that is what it currently serves. A release downloaded either way is
+      cached. Raises ``ValueError`` if it cannot be found.
 
     ``source`` defaults to the ``PYNMRSTAR_DICTIONARY_SOURCE`` environment
     variable, then :data:`definitions.DICTIONARY_URL`; it may be a URL base or a
-    local directory holding the distribution files."""
+    local directory holding the distribution files. Passing ``source`` or
+    setting the environment variable means only it is read: the tagged releases
+    are not looked up."""
 
     if version is None:
         files = read_dictionary_directory(_packaged_dictionary_directory())
@@ -336,17 +351,31 @@ def load_dictionary(version: str = None, source: str = None) -> Tuple[Dict[str, 
             return local, version
 
     if source is None:
-        source = os.environ.get('PYNMRSTAR_DICTIONARY_SOURCE') or pynmrstar.definitions.DICTIONARY_URL
-    try:
-        fetched = read_dictionary_directory(source)
-    except (requests.exceptions.RequestException, URLError, OSError) as err:
-        raise ValueError(f"Could not fetch the dictionary from '{source}': {err}") from err
-    fetched_version = _dictionary_version(fetched['xlschem_ann.csv'])
+        source = os.environ.get('PYNMRSTAR_DICTIONARY_SOURCE')
+    release_error = None
+    if version != LATEST_DICTIONARY and source is None:
+        release = pynmrstar.definitions.DICTIONARY_RELEASE_URL.format(version=version)
+        try:
+            fetched, fetched_version = _fetch_dictionary(release)
+        except ValueError as err:
+            # Not tagged (yet) -- it may still be the newest release
+            release_error = err
+        else:
+            if fetched_version != version:
+                raise ValueError(f"The dictionary release tagged for version '{version}' at '{release}' "
+                                 f"contains version '{fetched_version}'.")
+            _cache_dictionary(fetched, fetched_version)
+            return fetched, fetched_version
+
+    if source is None:
+        source = pynmrstar.definitions.DICTIONARY_URL
+    fetched, fetched_version = _fetch_dictionary(source)
 
     if version != LATEST_DICTIONARY and version != fetched_version:
+        tagged = f" no release is tagged for it ({release_error})," if release_error else ""
         raise ValueError(f"Dictionary version '{version}' is unavailable: it is not the packaged version "
-                         f"({packaged_dictionary_version()}), it is not cached, and the newest release is "
-                         f"'{fetched_version}'.")
+                         f"({packaged_dictionary_version()}), it is not cached,{tagged} and the newest release "
+                         f"is '{fetched_version}'.")
 
     _cache_dictionary(fetched, fetched_version)
     return fetched, fetched_version

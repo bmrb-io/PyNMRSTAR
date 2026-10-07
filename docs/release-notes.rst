@@ -26,8 +26,8 @@ Major improvements:
   between tags, and default values. The distribution (dictionary version 3.2.14.0) is packaged with the library
   and used by default, without touching the network. ``Schema(version='latest')`` downloads and caches the
   newest dictionary release, and ``Schema(version='x.y.z.w')`` loads a specific release (3.2.14.0 or later) from
-  the package or the cache, downloading it only if it is the newest release. ``schema_file`` may now also be a
-  directory holding a dictionary distribution.
+  the package or the cache, otherwise downloading the release tagged ``nmr-star-vx.y.z.w`` in the dictionary
+  repository and caching it. ``schema_file`` may now also be a directory holding a dictionary distribution.
 - New :py:func:`pynmrstar.repair.insert_mandatory_tags`, which adds the tags (and if need be, loops) the
   dictionary requires but an entry lacks, and :py:meth:`pynmrstar.Entry.add_row_indexes`, which numbers every
   loop's row index column.
@@ -57,8 +57,9 @@ Potentially breaking changes:
   ``str()`` as "Error detected on line N." and available as ``ParsingError.line_number``.
 - The packaged ``reference_files/schema.csv`` has been replaced by the dictionary distribution's files,
   starting with ``reference_files/xlschem_ann.csv``. ``pynmrstar.definitions.SCHEMA_URL`` now points at
-  the distribution's tag table rather than the one in the root of the dictionary repository. A
-  :py:class:`pynmrstar.Schema` loaded from the dictionary distribution has a ``schema_file`` of None.
+  the distribution's tag table on the ``nmr-star-production`` branch rather than the one in the root of the
+  dictionary repository. A :py:class:`pynmrstar.Schema` loaded from the dictionary distribution has a
+  ``schema_file`` of None.
 
 
 3.5.3

@@ -259,6 +259,57 @@ class TestSchema(unittest.TestCase):
         os.environ["PYNMRSTAR_DICTIONARY_SOURCE"] = reference
         self.assertRaises(ValueError, load_dictionary, '3.2.15.0')
 
+    def _release(self, directory: str, version: str) -> None:
+        """Write a copy of the packaged distribution, relabelled as ``version``,
+        to ``directory``."""
+
+        os.makedirs(directory)
+        for name in definitions.DICTIONARY_FILES:
+            with open(os.path.join(reference, name), encoding='utf-8', newline='') as handle:
+                text = handle.read()
+            if name == 'xlschem_ann.csv':
+                text = text.replace(f'TBL_BEGIN,,new,{packaged_dictionary_version()},',
+                                    f'TBL_BEGIN,,new,{version},', 1)
+            with open(os.path.join(directory, name), 'w', encoding='utf-8', newline='') as handle:
+                handle.write(text)
+
+    def test_tagged_dictionary_release(self):
+        cache = self._isolated("unused")
+        del os.environ["PYNMRSTAR_DICTIONARY_SOURCE"]
+
+        # Stand-ins for the dictionary repository: one directory per tag, and
+        # one for the production branch
+        releases = tempfile.mkdtemp(prefix="pynmrstar-releases-test-")
+        self.addCleanup(shutil.rmtree, releases, True)
+        for name, value in (('DICTIONARY_RELEASE_URL', os.path.join(releases, 'nmr-star-v{version}')),
+                            ('DICTIONARY_URL', os.path.join(releases, 'production'))):
+            self.addCleanup(setattr, definitions, name, getattr(definitions, name))
+            setattr(definitions, name, value)
+        self._release(os.path.join(releases, 'nmr-star-v3.2.15.0'), '3.2.15.0')
+        self._release(os.path.join(releases, 'production'), '3.2.16.0')
+
+        # An older release is downloaded by its tag, and cached
+        files, version = load_dictionary('3.2.15.0')
+        self.assertEqual(version, '3.2.15.0')
+        self.assertEqual(sorted(os.listdir(os.path.join(cache, '3.2.15.0'))),
+                         sorted(definitions.DICTIONARY_FILES))
+        self.assertEqual(Schema(version='3.2.15.0').version, '3.2.15.0')
+
+        # The newest release is found even before it is tagged
+        self.assertEqual(load_dictionary('3.2.16.0')[1], '3.2.16.0')
+
+        # Neither tagged nor the newest
+        self.assertRaises(ValueError, load_dictionary, '3.2.17.0')
+
+        # A tag that holds some other version is an error, not that version
+        self._release(os.path.join(releases, 'nmr-star-v3.2.18.0'), '3.2.15.1')
+        self.assertRaises(ValueError, load_dictionary, '3.2.18.0')
+
+        # An explicit source is the only place looked
+        self._release(os.path.join(releases, 'nmr-star-v3.2.19.0'), '3.2.19.0')
+        self.assertRaises(ValueError, load_dictionary, '3.2.19.0', os.path.join(releases, 'production'))
+        self.assertEqual(load_dictionary('3.2.19.0')[1], '3.2.19.0')
+
     def test_schema_file(self):
         self._isolated("http://invalid.invalid/none")
 

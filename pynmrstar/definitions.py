@@ -31,7 +31,12 @@ API_URL: str = "https://api.bmrb.io/v2"
 # cached. Override it with the PYNMRSTAR_DICTIONARY_SOURCE environment variable
 # (a URL base or a local directory holding the distribution files).
 DICTIONARY_URL: str = 'https://raw.githubusercontent.com/bmrb-io/nmr-star-dictionary/' \
-                      'nmr-star-development/NMR-STAR/internal_106_distribution'
+                      'nmr-star-production/NMR-STAR/internal_106_distribution'
+# Where one specific release's distribution lives: each release is tagged
+# ``nmr-star-v<version>`` in the dictionary repository. Read for a version that
+# is neither packaged nor cached, unless PYNMRSTAR_DICTIONARY_SOURCE is set.
+DICTIONARY_RELEASE_URL: str = 'https://raw.githubusercontent.com/bmrb-io/nmr-star-dictionary/' \
+                              'nmr-star-v{version}/NMR-STAR/internal_106_distribution'
 # The distribution files a Schema is built from.
 DICTIONARY_FILES: tuple = ('xlschem_ann.csv', 'adit_enum_hdr.csv', 'adit_enum_dtl.csv',
                            'adit_cat_grp_o.csv', 'adit_tag_validation.csv')
