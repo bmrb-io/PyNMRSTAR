@@ -230,7 +230,10 @@ class Entry(object):
                                                        skip_empty_tags=skip_empty_tags, show_comments=show_comments))
                 seen_saveframes[saveframe_obj.category] = True
 
-        return f"data_{self.entry_id}\n\n" + "\n".join(sf_strings)
+        if not sf_strings:
+            return f"data_{self.entry_id}\n\n"
+        # Joined in one go, as the saveframes can be large
+        return "\n".join([f"data_{self.entry_id}\n", *sf_strings])
 
     @property
     def category_list(self) -> List[str]:

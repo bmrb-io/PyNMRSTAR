@@ -248,6 +248,20 @@ impl Quoting {
         }
     }
 
+    /// Write the quoted value of a single-line value to the start of `out`.
+    pub fn write_into(self, s: &str, out: &mut [u8]) {
+        let s = s.as_bytes();
+        match self {
+            Quoting::Single | Quoting::Double => {
+                let quote = if self == Quoting::Single { b'\'' } else { b'"' };
+                out[0] = quote;
+                out[1..=s.len()].copy_from_slice(s);
+                out[s.len() + 1] = quote;
+            }
+            _ => out[..s.len()].copy_from_slice(s),
+        }
+    }
+
     /// Append the quoted value to the output.
     pub fn write(self, s: &str, out: &mut String) {
         match self {

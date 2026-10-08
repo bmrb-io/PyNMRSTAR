@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyIndexError, PyValueError};
 use pyo3::import_exception;
 use pyo3::intern;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
@@ -38,12 +38,16 @@ impl<'a, 'py> Converter<'a, 'py> {
     }
 
     /// Returns the string to print for a value.
-    fn convert(&self, py: Python<'py>, value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyString>> {
-        if !self.str_lookup {
-            if let Ok(s) = value.cast_exact::<PyString>() {
-                return Ok(s.clone());
+    fn convert(&self, py: Python<'py>, value: Bound<'py, PyAny>) -> PyResult<Bound<'py, PyString>> {
+        let value = if self.str_lookup {
+            value
+        } else {
+            match value.cast_into_exact::<PyString>() {
+                Ok(s) => return Ok(s),
+                Err(err) => err.into_inner(),
             }
-        }
+        };
+        let value = &value;
 
         // Apply STR_CONVERSION_DICT if provided
         let converted = if let Some(dict) = self.exact_dict {
@@ -77,7 +81,7 @@ fn push_spaces(out: &mut String, mut count: usize) {
 /// Format a saveframe in NMR-STAR format.
 /// Comments are handled by Python, this focuses on the heavy lifting of tag/loop formatting.
 #[pyfunction]
-#[pyo3(signature = (name, tag_prefix, tags, formatted_loops, skip_empty_tags=false, str_conversion_dict=None, null_values=None))]
+#[pyo3(signature = (name, tag_prefix, tags, formatted_loops, skip_empty_tags=false, str_conversion_dict=None, null_values=None, comment=""))]
 #[allow(clippy::too_many_arguments)] // Mirrors the arguments Python passes
 pub fn format_saveframe<'py>(
     py: Python<'py>,
@@ -88,6 +92,7 @@ pub fn format_saveframe<'py>(
     skip_empty_tags: bool,
     str_conversion_dict: Option<&Bound<'py, PyAny>>,
     null_values: Option<&Bound<'py, PyAny>>,
+    comment: &str,
 ) -> PyResult<String> {
     let converter = Converter::new(str_conversion_dict);
     let formatted_loops = formatted_loops.iter().map(|l| l.to_str()).collect::<PyResult<Vec<&str>>>()?;
@@ -98,11 +103,12 @@ pub fn format_saveframe<'py>(
     }
 
     // Estimate capacity for result string
-    let estimated_size = 100 + tags.len() * (tag_prefix.len() + 50)
+    let estimated_size = 100 + comment.len() + tags.len() * (tag_prefix.len() + 50)
         + formatted_loops.iter().map(|s| s.len()).sum::<usize>();
     let mut result = String::with_capacity(estimated_size);
 
-    // Print the saveframe header
+    // Print the comment, which goes before the saveframe, and the saveframe header
+    result.push_str(comment);
     result.push_str("save_");
     result.push_str(name);
     result.push('\n');
@@ -132,7 +138,7 @@ pub fn format_saveframe<'py>(
             }
         }
 
-        let string_val = converter.convert(py, tag_value)?;
+        let string_val = converter.convert(py, tag_value.clone())?;
         let string_val = string_val.to_str()?;
         if string_val.is_empty() {
             return Err(PyValueError::new_err(format!(
@@ -200,12 +206,165 @@ impl<'py> Row<'py> {
         }
     }
 
-    fn get(&self, index: usize) -> PyResult<Bound<'py, PyAny>> {
+    /// Call `f` with the index and value of each of the row's first `len` values.
+    fn for_each(&self, len: usize, mut f: impl FnMut(usize, Bound<'py, PyAny>) -> PyResult<()>) -> PyResult<()> {
+        let mut count = 0;
+        let mut f = |value| {
+            f(count, value)?;
+            count += 1;
+            Ok::<_, PyErr>(())
+        };
         match self {
-            Row::List(list) => list.get_item(index),
-            Row::Tuple(tuple) => tuple.get_item(index),
-            Row::Other(values) => Ok(values[index].clone()),
+            Row::List(list) => list.iter().take(len).try_for_each(&mut f)?,
+            Row::Tuple(tuple) => tuple.iter().take(len).try_for_each(&mut f)?,
+            Row::Other(values) => values.iter().take(len).try_for_each(|value| f(value.clone()))?,
         }
+        // Converting a value can run Python code, which could shorten a list
+        if count < len {
+            return Err(PyIndexError::new_err("list index out of range"));
+        }
+        Ok(())
+    }
+}
+
+/// What the first pass of format_loop() learns of a loop's values: the widths of its columns,
+/// and the values which differ from the one above them - which, as equal values are very often
+/// the same string (parsed files share one string between equal values), are most often few.
+struct Measured<'py> {
+    num_cols: usize,
+    /// The width of each column
+    widths: Vec<usize>,
+    /// The space the multiline values take
+    multiline_size: usize,
+    /// For each row, a bit for each column, set when its value differs from the one above
+    changed: Vec<u64>,
+    /// The values whose bits are set, in order, and how each must be quoted
+    values: Vec<(Bound<'py, PyString>, Quoting)>,
+}
+
+impl<'py> Measured<'py> {
+    fn new(num_rows: usize, num_cols: usize) -> Self {
+        Measured {
+            num_cols,
+            widths: vec![4; num_cols], // minimum width of 4
+            multiline_size: 0,
+            changed: vec![0; num_rows * num_cols.div_ceil(64)],
+            values: Vec::new(),
+        }
+    }
+
+    /// Add the value of a column of a row, which differs from the one above it. Values must be
+    /// added in order.
+    fn add(&mut self, row_idx: usize, col_idx: usize, value: Bound<'py, PyString>, category: &str) -> PyResult<()> {
+        let s = value.to_str()?;
+        if s.is_empty() {
+            return Err(PyValueError::new_err(format!(
+                "Cannot generate NMR-STAR for entry, as empty strings are not valid tag values in NMR-STAR. Please either replace the empty strings with None objects, or set pynmrstar.definitions.STR_CONVERSION_DICT[''] = None.\nLoop: {} Row: {} Column: {}",
+                category, row_idx, col_idx
+            )));
+        }
+        let quoting = Quoting::of(s);
+        if quoting.is_multiline() {
+            self.multiline_size += quoting.quoted_len(s) + 5;
+        } else {
+            // Track width (but not for multiline values), +3 for spacing
+            let width = quoting.quoted_len(s) + 3;
+            if width > self.widths[col_idx] {
+                self.widths[col_idx] = width;
+            }
+        }
+        self.changed[row_idx * self.num_cols.div_ceil(64) + col_idx / 64] |= 1 << (col_idx % 64);
+        self.values.push((value, quoting));
+        Ok(())
+    }
+
+    /// The columns of a row whose values differ from the ones above them.
+    fn changed_columns(&self, row_idx: usize) -> impl Iterator<Item = usize> + '_ {
+        let words = self.num_cols.div_ceil(64);
+        self.changed[row_idx * words..][..words].iter().enumerate().flat_map(|(word_idx, &word)| {
+            let mut bits = word;
+            std::iter::from_fn(move || {
+                (bits != 0).then(|| {
+                    let col_idx = word_idx * 64 + bits.trailing_zeros() as usize;
+                    bits &= bits - 1;
+                    col_idx
+                })
+            })
+        })
+    }
+
+    /// Print the data rows after the header.
+    fn write(&self, header: &str) -> PyResult<String> {
+        // Print into a buffer allocated once at (at least) the final size
+        let num_rows = self.changed.len() / self.num_cols.div_ceil(64);
+        let row_size = 6 + self.widths.iter().sum::<usize>();
+        let mut result = String::with_capacity(header.len() + num_rows * row_size + self.multiline_size + 16);
+        result.push_str(header);
+        let mut values = self.values.iter();
+
+        if self.multiline_size == 0 {
+            // Every row is then the same width, and each value is at its column's offset. Each
+            //  row starts as a copy of the row above, so only the values which differ from the
+            //  ones above them need writing.
+            let offsets: Vec<usize> = self.widths.iter().scan(5, |pos, width| {
+                let offset = *pos;
+                *pos += width;
+                Some(offset)
+            }).collect();
+            // The length of the value written above in each column
+            let mut lengths_above = vec![0; self.num_cols];
+            let mut out = result.into_bytes();
+            for row_idx in 0..num_rows {
+                let start = out.len();
+                if row_idx == 0 {
+                    out.resize(start + row_size, b' ');
+                    out[start + row_size - 1] = b'\n';
+                } else {
+                    out.extend_from_within(start - row_size..start);
+                }
+                let line = &mut out[start..];
+                for col_idx in self.changed_columns(row_idx) {
+                    let (value, quoting) = values.next().expect("a value was added for each changed column");
+                    let s = value.to_str()?;
+                    let pos = offsets[col_idx];
+                    let len = quoting.quoted_len(s);
+                    quoting.write_into(s, &mut line[pos..]);
+                    // Clear what remains of the value above
+                    if lengths_above[col_idx] > len {
+                        line[pos + len..pos + lengths_above[col_idx]].fill(b' ');
+                    }
+                    lengths_above[col_idx] = len;
+                }
+            }
+            result = String::from_utf8(out).expect("only whole strings and ASCII were written");
+        } else {
+            let mut row = vec![None; self.num_cols];
+            for row_idx in 0..num_rows {
+                for col_idx in self.changed_columns(row_idx) {
+                    row[col_idx] = values.next();
+                }
+                result.push_str("     ");
+                for (value, col_width) in row.iter().zip(&self.widths) {
+                    let (value, quoting) = value.expect("the first row has every column's value");
+                    let s = value.to_str()?;
+                    if quoting.is_multiline() {
+                        // Multiline value - format specially
+                        result.push_str("\n;\n");
+                        quoting.write(s, &mut result);
+                        result.push_str(";\n");
+                    } else {
+                        // Pad to column width
+                        quoting.write(s, &mut result);
+                        push_spaces(&mut result, col_width - quoting.quoted_len(s));
+                    }
+                }
+                result.push('\n');
+            }
+        }
+
+        // Close the loop
+        result.push_str("\n   stop_\n");
+        Ok(result)
     }
 }
 
@@ -268,14 +427,12 @@ pub fn format_loop<'py>(
     }
 
     // First pass: convert every value to a string, determine how it must be quoted, and
-    //  track the column widths. The strings are kept (borrowed from Python) so they can be
-    //  written out directly in the second pass.
+    //  track the column widths
     let converter = Converter::new(str_conversion_dict);
     let num_cols = tags.len();
-    let num_rows = data.len();
-    let mut values: Vec<(Bound<'py, PyString>, Quoting)> = Vec::with_capacity(num_rows * num_cols);
-    let mut col_widths: Vec<usize> = vec![4; num_cols]; // minimum width of 4
-    let mut multiline_size = 0;
+    let mut measured = Measured::new(data.len(), num_cols);
+    // The string last read in each column
+    let mut previous: Vec<Option<Bound<'py, PyString>>> = vec![None; num_cols];
 
     for (row_idx, row) in data.iter().enumerate() {
         let row = Row::new(row)?;
@@ -287,57 +444,18 @@ pub fn format_loop<'py>(
             )));
         }
 
-        for (col_idx, col_width) in col_widths.iter_mut().enumerate() {
-            let string_val = converter.convert(py, &row.get(col_idx)?)?;
-            let s = string_val.to_str()?;
-
-            // Empty strings are not allowed - return error
-            if s.is_empty() {
-                return Err(PyValueError::new_err(format!(
-                    "Cannot generate NMR-STAR for entry, as empty strings are not valid tag values in NMR-STAR. Please either replace the empty strings with None objects, or set pynmrstar.definitions.STR_CONVERSION_DICT[''] = None.\nLoop: {} Row: {} Column: {}",
-                    category, row_idx, col_idx
-                )));
+        row.for_each(num_cols, |col_idx, value| {
+            let string_val = converter.convert(py, value)?;
+            // A value which is the same string as the one above it is already measured
+            let previous = &mut previous[col_idx];
+            if previous.as_ref().is_some_and(|previous| previous.is(&string_val)) {
+                return Ok(());
             }
-
-            let quoting = Quoting::of(s);
-            if quoting.is_multiline() {
-                multiline_size += quoting.quoted_len(s) + 5;
-            } else {
-                // Track width (but not for multiline values), +3 for spacing
-                let width = quoting.quoted_len(s) + 3;
-                if width > *col_width {
-                    *col_width = width;
-                }
-            }
-            values.push((string_val, quoting));
-        }
+            *previous = Some(string_val.clone());
+            measured.add(row_idx, col_idx, string_val, category)
+        })?;
     }
 
-    // Second pass: print the data rows into a buffer allocated once at (at least) the final size
-    let row_size = 6 + col_widths.iter().sum::<usize>();
-    let mut result = String::with_capacity(header.len() + num_rows * row_size + multiline_size + 16);
-    result.push_str(&header);
-
-    for row in values.chunks_exact(num_cols) {
-        result.push_str("     ");
-        for (col_idx, (string_val, quoting)) in row.iter().enumerate() {
-            let s = string_val.to_str()?;
-            if quoting.is_multiline() {
-                // Multiline value - format specially
-                result.push_str("\n;\n");
-                quoting.write(s, &mut result);
-                result.push_str(";\n");
-            } else {
-                // Pad to column width
-                quoting.write(s, &mut result);
-                push_spaces(&mut result, col_widths[col_idx] - quoting.quoted_len(s));
-            }
-        }
-        result.push('\n');
-    }
-
-    // Close the loop
-    result.push_str("\n   stop_\n");
-
-    Ok(result)
+    // Second pass: print the data rows
+    measured.write(&header)
 }

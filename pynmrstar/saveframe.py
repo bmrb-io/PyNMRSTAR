@@ -529,9 +529,10 @@ class Saveframe(object):
                 formatted_loops,
                 skip_empty_tags,
                 definitions.STR_CONVERSION_DICT,
-                definitions.NULL_VALUES
+                definitions.NULL_VALUES,
+                comment_prefix
             )
-            return comment_prefix + result
+            return result
         except ValueError as e:
             # Convert ValueError from Rust to InvalidStateError for consistency
             raise InvalidStateError(str(e))
