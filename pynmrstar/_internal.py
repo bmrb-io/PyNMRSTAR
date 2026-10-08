@@ -175,6 +175,13 @@ def _interpret_file(the_file: Union[str, Path, IO]) -> StringIO:
     the_file could be a URL, a file location, a file object, or a
     gzipped version of any of the above."""
 
+    return StringIO(_interpret_file_text(the_file))
+
+
+def _interpret_file_text(the_file: Union[str, Path, IO]) -> str:
+    """Returns the text of the_file, which can be anything _interpret_file() accepts, with its line endings
+    normalized to newlines."""
+
     if hasattr(the_file, 'read'):
         read_data: Union[bytes, str] = the_file.read()
         if type(read_data) == bytes:
@@ -206,7 +213,11 @@ def _interpret_file(the_file: Union[str, Path, IO]) -> StringIO:
         pass
 
     buffer.seek(0)
-    return StringIO(buffer.read().decode().replace("\r\n", "\n").replace("\r", "\n"))
+    text = buffer.read().decode()
+    # Searching for a single character is much faster than replace() scanning the text twice
+    if '\r' in text:
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
+    return text
 
 
 #: Pass as a ``version`` to fetch the newest dictionary release from the internet.

@@ -1,6 +1,17 @@
 Release notes
 =============
 
+3.6.1
+~~~~~
+
+Minor improvements:
+
+- Parsing NMR-STAR is now between 1.3 and 2 times as fast, with the largest gains for the largest entries.
+- Parsed entries take around 40% less memory, and the most memory used while parsing a large entry is around a
+  quarter of what it was.
+- The result of parsing is unchanged.
+
+
 3.6.0
 ~~~~~
 

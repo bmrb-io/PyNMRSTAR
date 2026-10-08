@@ -123,9 +123,8 @@ class Loop(object):
         tmp_entry = entry_mod.Entry.from_scratch(0)
 
         # Load the BMRB entry from the file
-        star_buffer = StringIO(f"data_0 save_internaluseyoushouldntseethis_frame _internal.use internal "
-                               f"{star_buffer.read()} save_")
-        parser.parse(star_buffer.read(),
+        parser.parse(f"data_0 save_internaluseyoushouldntseethis_frame _internal.use internal "
+                     f"{star_buffer.read()} save_",
                      parse_into=tmp_entry,
                      source=self.source,
                      convert_data_types=kwargs.get('convert_data_types', False),
