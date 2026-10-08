@@ -1,3 +1,4 @@
+import gc
 import logging
 
 import pynmrstar_parser
@@ -14,6 +15,11 @@ def parse(data: str,
           raise_parse_warnings: bool = False,
           convert_data_types: bool = False,
           schema: 'schema_mod.Schema' = None) -> None:
+    # Parsing allocates a list for every row of every loop. Each counts towards triggering a garbage
+    #  collection, which traverses the rows allocated so far, but parsing creates no reference cycles
+    #  for it to find - with large files, collecting took over 10% of the time spent parsing.
+    gc_was_enabled = gc.isenabled()
+    gc.disable()
     try:
         with _internal.parsing(raise_parse_warnings):
             pynmrstar_parser.parse(data, parse_into, source, raise_parse_warnings, convert_data_types, schema)
@@ -26,3 +32,6 @@ def parse(data: str,
         # Anything else raised while building the object model: still a bad
         # file, but without a line number to report.
         raise ParsingError(str(e))
+    finally:
+        if gc_was_enabled:
+            gc.enable()

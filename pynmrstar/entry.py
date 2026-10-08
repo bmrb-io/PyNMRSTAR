@@ -3,12 +3,11 @@ import json
 import logging
 import re
 import warnings
-from io import StringIO
 from pathlib import Path
 from typing import TextIO, BinaryIO, Union, List, Optional, Dict, Any, Tuple, Sequence, Literal, overload
 
 from pynmrstar import definitions, utils, loop as loop_mod, saveframe as saveframe_mod, parser
-from pynmrstar._internal import _json_serialize, _interpret_file, _get_entry_from_database, write_to_file
+from pynmrstar._internal import _json_serialize, _interpret_file_text, _get_entry_from_database, write_to_file
 from pynmrstar.exceptions import InvalidStateError
 from pynmrstar.schema import Schema
 from pynmrstar.validation import Severity, ValidationIssue, _row_index_tag, _value_type, check_saveframes, check_mandatory_tags, \
@@ -130,11 +129,10 @@ class Entry(object):
                              "Entry.from_scratch(), and Entry.from_json().")
 
         if 'the_string' in kwargs:
-            # Parse from a string by wrapping it in StringIO
-            star_buffer: StringIO = StringIO(kwargs['the_string'])
+            star_text: str = kwargs['the_string']
             self.source = "from_string()"
         elif 'file_name' in kwargs:
-            star_buffer = _interpret_file(kwargs['file_name'])
+            star_text = _interpret_file_text(kwargs['file_name'])
             self.source = f"from_file('{kwargs['file_name']}')"
         # Creating from template (schema)
         elif 'all_tags' in kwargs:
@@ -164,7 +162,7 @@ class Entry(object):
             return
 
         # Load the BMRB entry from the file
-        parser.parse(star_buffer.read(),
+        parser.parse(star_text,
                      parse_into=self,
                      source=self.source,
                      convert_data_types=kwargs.get('convert_data_types', False),
@@ -232,7 +230,10 @@ class Entry(object):
                                                        skip_empty_tags=skip_empty_tags, show_comments=show_comments))
                 seen_saveframes[saveframe_obj.category] = True
 
-        return f"data_{self.entry_id}\n\n" + "\n".join(sf_strings)
+        if not sf_strings:
+            return f"data_{self.entry_id}\n\n"
+        # Joined in one go, as the saveframes can be large
+        return "\n".join([f"data_{self.entry_id}\n", *sf_strings])
 
     @property
     def category_list(self) -> List[str]:

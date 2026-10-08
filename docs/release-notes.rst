@@ -1,6 +1,23 @@
 Release notes
 =============
 
+3.6.1
+~~~~~
+
+Minor improvements:
+
+- Parsing NMR-STAR is now between 1.3 and 2 times as fast, with the largest gains for the largest entries.
+- Parsed entries take around 40% less memory, and the most memory used while parsing a large entry is around a
+  quarter of what it was.
+- Writing NMR-STAR (``str()`` and ``format()`` on entries, saveframes, and loops) is between 1.5 and 3 times as
+  fast, with the largest gains for the largest entries.
+- The result of parsing, and the output written, are unchanged.
+- Altogether, parsing is now around 8 to 13 times as fast, and writing around 11 to 30 times as fast, as in 3.3.6,
+  the last release using the C module.
+- Supports free-threaded Python 3.14 and later (3.14t) without enabling the GIL, so several threads can parse and
+  write entries at once.
+
+
 3.6.0
 ~~~~~
 

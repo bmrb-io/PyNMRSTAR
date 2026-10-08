@@ -49,13 +49,15 @@ def _get_comments(_comment_cache: Dict[str, Dict[str, str]] = {}) -> Dict[str, D
         # No comments will be printed
         return {}
 
-    # Load the comments
+    # Load the comments. They are added to the cache all at once, so another thread never sees only some.
     comment_records = comment_entry[0][0].get_tag(["category", "comment", "every_flag"])
     comment_map = {'N': False, 'Y': True}
+    comments = {}
     for comment in comment_records:
         if comment[1] != ".":
-            _comment_cache[comment[0]] = {'comment': comment[1].rstrip() + "\n\n",
-                                          'every_flag': comment_map[comment[2]]}
+            comments[comment[0]] = {'comment': comment[1].rstrip() + "\n\n",
+                                    'every_flag': comment_map[comment[2]]}
+    _comment_cache.update(comments)
 
     return _comment_cache
 
@@ -175,6 +177,13 @@ def _interpret_file(the_file: Union[str, Path, IO]) -> StringIO:
     the_file could be a URL, a file location, a file object, or a
     gzipped version of any of the above."""
 
+    return StringIO(_interpret_file_text(the_file))
+
+
+def _interpret_file_text(the_file: Union[str, Path, IO]) -> str:
+    """Returns the text of the_file, which can be anything _interpret_file() accepts, with its line endings
+    normalized to newlines."""
+
     if hasattr(the_file, 'read'):
         read_data: Union[bytes, str] = the_file.read()
         if type(read_data) == bytes:
@@ -206,7 +215,11 @@ def _interpret_file(the_file: Union[str, Path, IO]) -> StringIO:
         pass
 
     buffer.seek(0)
-    return StringIO(buffer.read().decode().replace("\r\n", "\n").replace("\r", "\n"))
+    text = buffer.read().decode()
+    # Searching for a single character is much faster than replace() scanning the text twice
+    if '\r' in text:
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
+    return text
 
 
 #: Pass as a ``version`` to fetch the newest dictionary release from the internet.

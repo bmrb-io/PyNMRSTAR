@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashSet;
 
 use pyo3::prelude::*;
@@ -36,8 +37,9 @@ static BYTE_CLASS: [u8; 256] = {
 };
 
 // Tokenizer state
-pub struct TokenizerState {
-    pub full_data: String,
+pub struct TokenizerState<'a> {
+    /// The data being tokenized, which is borrowed from the caller unless it had to be changed
+    pub full_data: Cow<'a, str>,
     index: usize,
     pub line_no: usize,
     /// Line number (1-based) on which the token last returned by get_token began.
@@ -53,10 +55,10 @@ pub struct TokenizerState {
     inserted_lines: Vec<usize>,
 }
 
-impl TokenizerState {
+impl<'a> TokenizerState<'a> {
     pub fn new() -> Self {
         TokenizerState {
-            full_data: String::new(),
+            full_data: Cow::Borrowed(""),
             index: 0,
             line_no: 0,
             token_line: 0,
@@ -67,7 +69,7 @@ impl TokenizerState {
     }
 
     fn reset(&mut self) {
-        self.full_data.clear();
+        self.full_data = Cow::Borrowed("");
         self.index = 0;
         self.line_no = 0;
         self.token_line = 0;
@@ -91,7 +93,7 @@ impl TokenizerState {
         matches!(b, b' ' | b'\n' | b'\t' | b'\r' | b'\x0B')
     }
 
-    pub fn load_string(&mut self, data: String, inserted_lines: Vec<usize>) {
+    pub fn load_string(&mut self, data: Cow<'a, str>, inserted_lines: Vec<usize>) {
         self.reset();
         self.full_data = data;
         self.inserted_lines = inserted_lines;
@@ -240,7 +242,8 @@ impl TokenizerState {
                 let start = self.index;
                 let end = self.index + length;
                 self.last_delimiter = '#';
-                self.update_line_number(self.index, length + 1);
+                // The comment runs to the first newline, so that is the only newline passed
+                self.line_no += 1;
                 self.index += length + 1;
                 return Ok(Some((start, end)));
             } else {
@@ -295,7 +298,7 @@ impl TokenizerState {
                 let start = self.index;
                 let end = self.index + end_quote;
                 self.last_delimiter = '\'';
-                self.update_line_number(self.index, end_quote + 1);
+                // check_multiline() has made sure the value holds no newline, so the line is unchanged
                 self.index += end_quote + 1;
                 return Ok(Some((start, end)));
             } else {
@@ -331,7 +334,7 @@ impl TokenizerState {
                 let start = self.index;
                 let end = self.index + end_quote;
                 self.last_delimiter = '"';
-                self.update_line_number(self.index, end_quote + 1);
+                // check_multiline() has made sure the value holds no newline, so the line is unchanged
                 self.index += end_quote + 1;
                 return Ok(Some((start, end)));
             } else {
@@ -353,7 +356,10 @@ impl TokenizerState {
             self.last_delimiter = '$';
         }
 
-        self.update_line_number(self.index, end_pos - self.index + 1);
+        // The token ends at the first whitespace, so the only newline it can pass is the one ending it
+        if self.full_data.as_bytes().get(end_pos) == Some(&b'\n') {
+            self.line_no += 1;
+        }
         let ws_len = Self::whitespace_len_at(&self.full_data, end_pos);
         if ws_len > 0 && self.unusual_whitespace_line.is_none()
             && !Self::is_standard_whitespace(self.full_data.as_bytes()[end_pos])
@@ -367,28 +373,108 @@ impl TokenizerState {
     }
 }
 
-// Represents a token either as indices into tokenizer.full_data or as a materialized string
-// (for rare processed tokens from embedded STAR format)
-enum TokenValue {
-    Indexed(usize, usize),      // Indices into ctx.tokenizer.full_data
-    Materialized(String),        // Pre-materialized string (< 0.1% of tokens)
+/// The Python strings created for short tokens, so that equal values share one string object.
+/// NMR-STAR is very repetitive - a 10 MB entry has some two million loop values, but only around
+/// twelve thousand distinct ones - so this saves most of the string allocations, and their memory.
+///
+/// It is direct-mapped: a value replaces whichever value was in its slot. A file can therefore make
+/// it miss, but never make it slow, as one keyed by a hash table could be made to.
+struct StringCache {
+    slots: Vec<CacheSlot>,
+    shift: u32,
+}
+
+struct CacheSlot {
+    /// The key of the token in this slot (see StringCache::key()), and the string created for it
+    key: (u64, u64),
+    string: Option<Py<PyString>>,
+}
+
+impl StringCache {
+    /// The longest token cached: its bytes and its length must fit in the 16 bytes of a key
+    const MAX_LEN: usize = 15;
+
+    /// A cache sized for parsing data_len bytes: larger files have more distinct values, but a
+    /// small file should not pay to allocate a large cache.
+    fn new(data_len: usize) -> Self {
+        let bits = (data_len / 64).max(1).ilog2().clamp(8, 15);
+        let slots = (0..1usize << bits).map(|_| CacheSlot { key: (0, 0), string: None }).collect();
+        StringCache { slots, shift: 64 - bits }
+    }
+
+    /// A token of at most MAX_LEN bytes, packed into 16 bytes: its bytes in order, padded with
+    /// zeros, with its length in the last byte. Built from (overlapping) loads of whole words, as
+    /// copying a variable number of bytes is relatively slow.
+    #[inline]
+    fn key(bytes: &[u8]) -> (u64, u64) {
+        let len = bytes.len();
+        let word = |at: usize| u64::from_le_bytes(bytes[at..at + 8].try_into().unwrap());
+        let half = |at: usize| u32::from_le_bytes(bytes[at..at + 4].try_into().unwrap()) as u64;
+        let (low, high) = match len {
+            0 => (0, 0),
+            1..=3 => {
+                let low = bytes[0] as u64 | (bytes[len / 2] as u64) << (8 * (len / 2))
+                    | (bytes[len - 1] as u64) << (8 * (len - 1));
+                (low, 0)
+            }
+            4..=7 => (half(0) | half(len - 4) << (8 * (len - 4)), 0),
+            8 => (word(0), 0),
+            _ => (word(0), word(len - 8) >> (8 * (16 - len))),
+        };
+        (low, high | (len as u64) << 56)
+    }
+
+    /// The Python string for a token.
+    #[inline]
+    fn get<'py>(&mut self, py: Python<'py>, token: &str) -> Bound<'py, PyString> {
+        if token.len() > Self::MAX_LEN {
+            return PyString::new(py, token);
+        }
+        let key = Self::key(token.as_bytes());
+        // Multiply-shift hashing of each half of the key
+        let hash = key.0.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ key.1.wrapping_mul(0xC2B2_AE3D_27D4_EB4F);
+        let slot = &mut self.slots[(hash >> self.shift) as usize];
+        if slot.key == key {
+            if let Some(string) = &slot.string {
+                return string.bind(py).clone();
+            }
+        }
+        let string = PyString::new(py, token);
+        slot.key = key;
+        slot.string = Some(string.clone().unbind());
+        string
+    }
+}
+
+/// A token: the position of its text in the tokenizer's data or, for the rare token whose text had
+/// to be changed (embedded STAR), in ParserContext::rewritten. Kept small, as one is stored for
+/// every value of a loop until the loop ends.
+#[derive(Clone, Copy)]
+struct TokenValue {
+    start: usize,
+    end: usize,
 }
 
 impl TokenValue {
-    fn as_str<'a>(&'a self, full_data: &'a str) -> std::borrow::Cow<'a, str> {
-        match self {
-            TokenValue::Indexed(start, end) => std::borrow::Cow::Borrowed(&full_data[*start..*end]),
-            TokenValue::Materialized(s) => std::borrow::Cow::Borrowed(s),
+    /// Set in start for a token whose text is in ParserContext::rewritten
+    const REWRITTEN: usize = 1 << (usize::BITS - 1);
+
+    fn is_rewritten(self) -> bool {
+        self.start & Self::REWRITTEN != 0
+    }
+
+    fn as_str<'a>(self, full_data: &'a str, rewritten: &'a str) -> &'a str {
+        if self.is_rewritten() {
+            &rewritten[self.start & !Self::REWRITTEN..self.end]
+        } else {
+            &full_data[self.start..self.end]
         }
     }
 
     /// Create the Python string for this token directly from the source data, without an
     /// intermediate Rust String
-    fn to_py<'py>(&self, py: Python<'py>, full_data: &str) -> Bound<'py, PyString> {
-        match self {
-            TokenValue::Indexed(start, end) => PyString::new(py, &full_data[*start..*end]),
-            TokenValue::Materialized(s) => PyString::new(py, s),
-        }
+    fn to_py<'py>(self, py: Python<'py>, full_data: &str, rewritten: &str, cache: &mut StringCache) -> Bound<'py, PyString> {
+        cache.get(py, self.as_str(full_data, rewritten))
     }
 }
 
@@ -397,8 +483,8 @@ struct LoopStatistics {
     loop_count: usize,
 }
 
-struct ParserContext {
-    tokenizer: TokenizerState,
+struct ParserContext<'a> {
+    tokenizer: TokenizerState<'a>,
     line_number: usize,
     delimiter: char,
     token: Option<(usize, usize)>,
@@ -407,6 +493,8 @@ struct ParserContext {
     current_saveframe: Option<Py<PyAny>>,
     current_loop: Option<Py<PyAny>>,
     loop_data: Vec<TokenValue>,  // Store indices instead of materialized strings
+    /// The text of the tokens which had to be changed, which TokenValues can refer to
+    rewritten: String,
     seen_data: bool,
     in_loop: bool,
     _source: String,
@@ -437,11 +525,12 @@ struct ParserContext {
     sf_name: String,
     sf_tag_prefix: Option<String>,
     sf_tags_lc: HashSet<String>,
+    string_cache: StringCache,
 }
 
-impl ParserContext {
+impl<'a> ParserContext<'a> {
     fn new(py: Python, entry: Py<PyAny>, source: String, raise_parse_warnings: bool,
-           convert_data_types: bool, schema: Option<Py<PyAny>>, tokenizer: TokenizerState) -> PyResult<Self> {
+           convert_data_types: bool, schema: Option<Py<PyAny>>, tokenizer: TokenizerState<'a>) -> PyResult<Self> {
         // Cache module/class lookups at initialization
         let saveframe_mod = py.import("pynmrstar.saveframe")?;
         let saveframe_class = saveframe_mod.getattr("Saveframe")?.into();
@@ -506,6 +595,7 @@ impl ParserContext {
             sf_name: String::new(),
             sf_tag_prefix: None,
             sf_tags_lc: HashSet::new(),
+            string_cache: StringCache::new(tokenizer.full_data.len()),
             tokenizer,
             line_number: 0,
             delimiter: ' ',
@@ -515,6 +605,7 @@ impl ParserContext {
             current_saveframe: None,
             current_loop: None,
             loop_data: Vec::new(),
+            rewritten: String::new(),
             seen_data: false,
             in_loop: false,
             _source: source,
@@ -609,6 +700,19 @@ impl ParserContext {
             &self.tokenizer.full_data[start..end]
         } else {
             ""
+        }
+    }
+
+    /// The current token, as a TokenValue which stays valid as further tokens are read.
+    fn token_value(&mut self) -> TokenValue {
+        if let Some(processed) = &self.processed_token {
+            let start = self.rewritten.len();
+            self.rewritten.push_str(processed);
+            TokenValue { start: start | TokenValue::REWRITTEN, end: self.rewritten.len() }
+        } else if let Some((start, end)) = self.token {
+            TokenValue { start, end }
+        } else {
+            TokenValue { start: 0, end: 0 }
         }
     }
 
@@ -786,8 +890,10 @@ fn add_loop_tags_fast(py: Python, ctx: &ParserContext, loop_obj: &Py<PyAny>, tag
     let mut names: Vec<&str> = Vec::with_capacity(tags.len());
     let mut seen: HashSet<String> = HashSet::with_capacity(tags.len());
     for (tag, _) in tags {
-        let TokenValue::Indexed(start, end) = tag else { return Ok(false) };
-        let tag = &full_data[*start..*end];
+        if tag.is_rewritten() {
+            return Ok(false);
+        }
+        let tag = tag.as_str(full_data, "");
         let Some(dot) = split_simple_tag(tag, null_tag_names) else { return Ok(false) };
         let (tag_category, name) = (&tag[..dot], &tag[dot + 1..]);
         match category {
@@ -822,17 +928,22 @@ fn add_saveframe_tags_fast(py: Python, ctx: &mut ParserContext, pending: &[(Toke
         return Ok(false);
     }
     let full_data = &ctx.tokenizer.full_data;
+    let rewritten = &ctx.rewritten;
+    let cache = &mut ctx.string_cache;
     let null_tag_names = ctx.null_tag_names.as_deref().unwrap_or(&[]);
 
     // Check every tag before changing anything
     let mut prefix: Option<&str> = ctx.sf_tag_prefix.as_deref();
     let mut names: Vec<&str> = Vec::with_capacity(pending.len());
     let mut lc_names: Vec<String> = Vec::with_capacity(pending.len());
-    let mut category_value: Option<&TokenValue> = None;
+    let mut category_value: Option<TokenValue> = None;
     let mut accepted = true;
     for (tag, value, _) in pending {
-        let TokenValue::Indexed(start, end) = tag else { accepted = false; break };
-        let tag = &full_data[*start..*end];
+        if tag.is_rewritten() {
+            accepted = false;
+            break;
+        }
+        let tag = tag.as_str(full_data, rewritten);
         let Some(dot) = split_simple_tag(tag, null_tag_names) else { accepted = false; break };
         let (tag_prefix, name) = (&tag[..dot], &tag[dot + 1..]);
         match prefix {
@@ -845,12 +956,12 @@ fn add_saveframe_tags_fast(py: Python, ctx: &mut ParserContext, pending: &[(Toke
             accepted = false;
             break;
         }
-        if lc_name == "sf_framecode" && value.as_str(full_data) != ctx.sf_name.as_str() {
+        if lc_name == "sf_framecode" && value.as_str(full_data, rewritten) != ctx.sf_name.as_str() {
             accepted = false;
             break;
         }
         if lc_name == "sf_category" {
-            category_value = Some(value);
+            category_value = Some(*value);
         }
         names.push(name);
         lc_names.push(lc_name);
@@ -867,10 +978,10 @@ fn add_saveframe_tags_fast(py: Python, ctx: &mut ParserContext, pending: &[(Toke
     }
     let saveframe_tags = saveframe.getattr(intern!(py, "_tags"))?.cast_into::<PyList>()?;
     for (name, (_, value, _)) in names.iter().zip(pending) {
-        saveframe_tags.append(PyList::new(py, [PyString::new(py, name), value.to_py(py, full_data)])?)?;
+        saveframe_tags.append(PyList::new(py, [PyString::new(py, name), value.to_py(py, full_data, rewritten, cache)])?)?;
     }
     if let Some(value) = category_value {
-        saveframe.setattr(intern!(py, "_category"), value.to_py(py, full_data))?;
+        saveframe.setattr(intern!(py, "_category"), value.to_py(py, full_data, rewritten, cache))?;
     }
     saveframe.setattr(intern!(py, "_lc_tags_cache"), py.None())?;
 
@@ -894,9 +1005,11 @@ fn flush_saveframe_tags(py: Python, ctx: &mut ParserContext, pending: &mut Vec<(
     let saveframe = ctx.current_saveframe.as_ref().unwrap();
     // Materialize TokenValues into a list of (str, str) tuples for Python
     let full_data = &ctx.tokenizer.full_data;
+    let rewritten = &ctx.rewritten;
+    let cache = &mut ctx.string_cache;
     let materialized = PyList::new(py, tags_to_add
         .iter()
-        .map(|(tag, value, _)| (tag.to_py(py, full_data), value.to_py(py, full_data))))?;
+        .map(|(tag, value, _)| (tag.to_py(py, full_data, rewritten, cache), value.to_py(py, full_data, rewritten, cache))))?;
     let tags_before = tag_count(py, saveframe)?;
     if let Err(error) = saveframe.call_method(py, "add_tags", (materialized,),
                                               Some(ctx.add_tags_kwargs.bind(py).cast()?)) {
@@ -968,13 +1081,7 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
 
             // Capture tag name as TokenValue
             let tag_line = ctx.line_number;
-            let tag_name = if let Some(ref processed) = ctx.processed_token {
-                TokenValue::Materialized(processed.clone())
-            } else if let Some((start, end)) = ctx.token {
-                TokenValue::Indexed(start, end)
-            } else {
-                TokenValue::Materialized(String::new())
-            };
+            let tag_name = ctx.token_value();
 
             // Get tag value
             if !ctx.get_token(py)? {
@@ -1001,13 +1108,7 @@ fn parse_saveframe_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
             }
 
             // Capture value as TokenValue
-            let value_token = if let Some(ref processed) = ctx.processed_token {
-                TokenValue::Materialized(processed.clone())
-            } else if let Some((start, end)) = ctx.token {
-                TokenValue::Indexed(start, end)
-            } else {
-                TokenValue::Materialized(String::new())
-            };
+            let value_token = ctx.token_value();
 
             // Collect tag-value pair for batch addition
             pending_tags.push((tag_name, value_token, tag_line));
@@ -1067,13 +1168,7 @@ fn parse_loop_tags(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
             }
 
             // Capture tag as TokenValue
-            let tag_value = if let Some(ref processed) = ctx.processed_token {
-                TokenValue::Materialized(processed.clone())
-            } else if let Some((start, end)) = ctx.token {
-                TokenValue::Indexed(start, end)
-            } else {
-                TokenValue::Materialized(String::new())
-            };
+            let tag_value = ctx.token_value();
 
             // Collect tag for batch addition
             tags.push((tag_value, ctx.line_number));
@@ -1083,9 +1178,10 @@ fn parse_loop_tags(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
 
             // Batch add all collected tags (materialize to strings for Python)
             if !tags.is_empty() && !add_loop_tags_fast(py, ctx, loop_obj, &tags)? {
+                let cache = &mut ctx.string_cache;
                 let materialized = PyList::new(py, tags
                     .iter()
-                    .map(|(tv, _)| tv.to_py(py, &ctx.tokenizer.full_data)))?;
+                    .map(|(tv, _)| tv.to_py(py, &ctx.tokenizer.full_data, &ctx.rewritten, cache)))?;
                 let tags_before = tag_count(py, loop_obj)?;
                 if let Err(error) = loop_obj.call_method1(py, "add_tag", (materialized,)) {
                     let lines: Vec<usize> = tags.iter().map(|(_, line)| *line).collect();
@@ -1181,13 +1277,42 @@ fn parse_loop_data(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
                     )));
                 }
 
-                // Materialize TokenValues into Python strings only when passing to Python
-                let loop_data_to_add = std::mem::take(&mut ctx.loop_data);
-                let data_items_count = loop_data_to_add.len();
-                let materialized = PyList::new(py, loop_data_to_add
-                    .iter()
-                    .map(|tv| tv.to_py(py, &ctx.tokenizer.full_data)))?;
-                loop_obj.call_method(py, "add_data", (materialized,), Some(ctx.add_data_kwargs.bind(py).cast()?))?;
+                // Materialize TokenValues into Python strings only when passing to Python, as rows.
+                //  loop_data is cleared rather than taken below, so its buffer is reused by every loop.
+                let data_items_count = ctx.loop_data.len();
+                let full_data = &ctx.tokenizer.full_data;
+                let rewritten = &ctx.rewritten;
+                let cache = &mut ctx.string_cache;
+                // The text and string of the value above, in each column. Most values are the same
+                //  as the one above them, and comparing with it is cheaper than the cache.
+                let mut above: Vec<Option<(&str, Bound<PyString>)>> = vec![None; tags_len];
+                let rows = ctx.loop_data.chunks_exact(tags_len).map(|row| {
+                    PyList::new(py, row.iter().zip(above.iter_mut()).map(|(tv, above)| {
+                        let text = tv.as_str(full_data, rewritten);
+                        match above {
+                            Some((above_text, string)) if *above_text == text => string.clone(),
+                            _ => {
+                                let string = cache.get(py, text);
+                                *above = Some((text, string.clone()));
+                                string
+                            }
+                        }
+                    }))
+                });
+
+                // Unless the values need converting, the rows are added just as Loop.add_data() would
+                let loop_data = loop_obj.getattr(py, intern!(py, "data"))?.into_bound(py);
+                match loop_data.cast_exact::<PyList>() {
+                    Ok(loop_data) if !ctx._convert_data_types => {
+                        for row in rows {
+                            loop_data.append(row?)?;
+                        }
+                    }
+                    _ => {
+                        let rows = PyList::new(py, rows.collect::<PyResult<Vec<_>>>()?)?;
+                        loop_obj.call_method(py, "add_data", (rows,), Some(ctx.add_data_kwargs.bind(py).cast()?))?;
+                    }
+                }
 
                 // Track statistics for adaptive pre-allocation by loop type
                 if let Some(loop_type) = &ctx.current_loop_type {
@@ -1245,7 +1370,7 @@ fn parse_loop_data(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
                 );
 
                 if !ctx.loop_data.is_empty() {
-                    let last_value = ctx.loop_data.last().unwrap().as_str(&ctx.tokenizer.full_data);
+                    let last_value = ctx.loop_data.last().unwrap().as_str(&ctx.tokenizer.full_data, &ctx.rewritten);
                     error.push_str(&format!(" Last loop data element parsed: '{}'.", last_value));
                 }
 
@@ -1253,14 +1378,7 @@ fn parse_loop_data(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
             }
 
             // Store token as indices or materialized string
-            let token_value = if let Some(ref processed) = ctx.processed_token {
-                TokenValue::Materialized(processed.clone())
-            } else if let Some((start, end)) = ctx.token {
-                TokenValue::Indexed(start, end)
-            } else {
-                // Should never happen
-                TokenValue::Materialized(String::new())
-            };
+            let token_value = ctx.token_value();
             ctx.loop_data.push(token_value);
             ctx.seen_data = true;
         }
@@ -1280,7 +1398,7 @@ fn parse_loop_data(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
 #[pyo3(signature = (data, entry, source, raise_parse_warnings, convert_data_types, schema=None))]
 pub fn parse(
     py: Python,
-    data: String,
+    data: &str,
     entry: Py<PyAny>,
     source: String,
     raise_parse_warnings: bool,
@@ -1292,9 +1410,10 @@ pub fn parse(
 
     // Preprocess data (same as Python's Parser.load_data)
     // Fix DOS line endings
-    let data = if data.contains('\r') { data.replace("\r\n", "\n").replace("\r", "\n") } else { data };
+    // The data is borrowed from Python, and only copied if it needs changing
+    let data = if data.contains('\r') { Cow::Owned(data.replace("\r\n", "\n").replace("\r", "\n")) } else { Cow::Borrowed(data) };
     // Change '\n; data ' started multi-lines to '\n;\ndata'
-    let (data, inserted_lines) = fix_multiline_semicolons(&data);
+    let (data, inserted_lines) = fix_multiline_semicolons(data);
 
     // Create tokenizer and load data
     let mut tokenizer = TokenizerState::new();
@@ -1308,4 +1427,25 @@ pub fn parse(
     parse_entry_body(py, &mut ctx)?;
 
     Ok(entry)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::StringCache;
+
+    #[test]
+    fn cache_keys_are_the_zero_padded_bytes_and_length() {
+        let data = b"abcdefghijklmnop\x00\x00";
+        for start in 0..3 {
+            for len in 0..=StringCache::MAX_LEN {
+                let token = &data[start..start + len];
+                let mut packed = [0u8; 16];
+                packed[..len].copy_from_slice(token);
+                packed[15] = len as u8;
+                let expected = (u64::from_le_bytes(packed[..8].try_into().unwrap()),
+                                u64::from_le_bytes(packed[8..].try_into().unwrap()));
+                assert_eq!(StringCache::key(token), expected, "start {} len {}", start, len);
+            }
+        }
+    }
 }

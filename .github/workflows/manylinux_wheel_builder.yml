@@ -27,8 +27,8 @@ jobs:
           # cibuildwheel 4 drops Python 3.8, so stay on 3.x while we support it
           # PyPy wheels are only built when enabled (only PyPy 3.11+ is supported by PyO3)
           CIBW_ENABLE: "pypy"
-          # Skip the free-threaded builds - the Rust module doesn't declare support for running without the GIL
-          CIBW_SKIP: "cp31?t-*"
+          # Free-threaded wheels are built for 3.14t and later; PyO3 does not support free-threaded 3.13
+          CIBW_SKIP: "cp313t-*"
           # Keep supporting glibc 2.17 (e.g. RHEL 7), rather than cibuildwheel's default of manylinux_2_28
           CIBW_MANYLINUX_X86_64_IMAGE: "manylinux2014"
           # Ensure cibuildwheel uses PEP 517 build

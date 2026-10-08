@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::exceptions::PyValueError;
 use memchr::memchr_iter;
+use std::borrow::Cow;
 
 pub const RESERVED_KEYWORDS: [&str; 5] = ["data_", "save_", "loop_", "stop_", "global_"];
 
@@ -12,16 +13,17 @@ pub const RESERVED_KEYWORDS: [&str; 5] = ["data_", "save_", "loop_", "stop_", "g
 /// data*, of each line a break was inserted after. Every inserted break pushes
 /// the rest of the file down a line, so anything reporting a position has to
 /// undo that before naming a line of the file the user actually has.
-pub fn fix_multiline_semicolons(data: &str) -> (String, Vec<usize>) {
+pub fn fix_multiline_semicolons(data: Cow<'_, str>) -> (Cow<'_, str>, Vec<usize>) {
     let bytes = data.as_bytes();
     let len = bytes.len();
 
     // Quick check: if no semicolons exist, return as-is
     if memchr::memchr(b';', bytes).is_none() {
-        return (data.to_string(), Vec::new());
+        return (data, Vec::new());
     }
 
-    let mut result = String::with_capacity(len + 64);
+    // Only allocated once a newline needs inserting, as most files need none
+    let mut result: Option<String> = None;
     let mut last_end = 0;
     let mut inserted_lines: Vec<usize> = Vec::new();
 
@@ -36,6 +38,7 @@ pub fn fix_multiline_semicolons(data: &str) -> (String, Vec<usize>) {
                 if memchr::memchr(b'\n', &bytes[after_semi..]).is_some() {
                     // We found the pattern: \n;[content]\n
                     // Copy everything up to and including \n;
+                    let result = result.get_or_insert_with(|| String::with_capacity(len + 64));
                     result.push_str(&data[last_end..after_semi]);
                     // Insert the extra newline
                     result.push('\n');
@@ -49,9 +52,14 @@ pub fn fix_multiline_semicolons(data: &str) -> (String, Vec<usize>) {
         }
     }
 
-    // Append remaining data
-    result.push_str(&data[last_end..]);
-    (result, inserted_lines)
+    match result {
+        None => (data, inserted_lines),
+        Some(mut result) => {
+            // Append remaining data
+            result.push_str(&data[last_end..]);
+            (Cow::Owned(result), inserted_lines)
+        }
+    }
 }
 
 pub fn is_reserved_keyword(token: &str) -> bool {
@@ -237,6 +245,20 @@ impl Quoting {
                 let prefix = if s.starts_with('\n') { 0 } else { 4 };
                 prefix + s.len() + memchr_iter(b'\n', s.as_bytes()).count() * 3 + 1
             }
+        }
+    }
+
+    /// Write the quoted value of a single-line value to the start of `out`.
+    pub fn write_into(self, s: &str, out: &mut [u8]) {
+        let s = s.as_bytes();
+        match self {
+            Quoting::Single | Quoting::Double => {
+                let quote = if self == Quoting::Single { b'\'' } else { b'"' };
+                out[0] = quote;
+                out[1..=s.len()].copy_from_slice(s);
+                out[s.len() + 1] = quote;
+            }
+            _ => out[..s.len()].copy_from_slice(s),
         }
     }
 

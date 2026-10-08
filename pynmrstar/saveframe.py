@@ -233,8 +233,7 @@ class Saveframe(object):
         tmp_entry = entry_mod.Entry.from_scratch(0)
 
         # Load the BMRB entry from the file
-        star_buffer = StringIO("data_1 " + star_buffer.read())
-        parser.parse(star_buffer.read(),
+        parser.parse("data_1 " + star_buffer.read(),
                      parse_into=tmp_entry,
                      source=self.source,
                      convert_data_types=kwargs.get('convert_data_types', False),
@@ -530,9 +529,10 @@ class Saveframe(object):
                 formatted_loops,
                 skip_empty_tags,
                 definitions.STR_CONVERSION_DICT,
-                definitions.NULL_VALUES
+                definitions.NULL_VALUES,
+                comment_prefix
             )
-            return comment_prefix + result
+            return result
         except ValueError as e:
             # Convert ValueError from Rust to InvalidStateError for consistency
             raise InvalidStateError(str(e))
