@@ -4,6 +4,12 @@ Release notes
 3.6.2
 ~~~~~
 
+Minor improvements:
+
+- The packaged NMR-STAR dictionary is now version 3.2.14.1. It fixes the ``Temp_calibration_method``
+  enumeration of ``_Auto_relaxation_list``, ``_Heteronucl_T1rho_list``, and ``_Heteronucl_T2_list``, in which
+  "solid lead nitrate" had been truncated to "solid", so validation reported the real value as not allowed.
+
 Bug fixes:
 
 - :py:meth:`pynmrstar.Entry.from_database` can load chemcomps again (e.g. ``Entry.from_database('chemcomp_ATP')``).

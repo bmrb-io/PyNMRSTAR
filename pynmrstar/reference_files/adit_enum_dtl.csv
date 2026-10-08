@@ -142,7 +142,7 @@ TBL_BEGIN,?,?,?
 229,3,us-1,enumeration_text
 225,1,methanol,MeOH
 225,2,monoethylene glycol,MEG
-225,3,solid,enumeration_text
+225,3,solid lead nitrate,enumeration_text
 225,4,KBr adamantane blend,enumeration_text
 225,5,Na5[TmDOTP],enumeration_text
 225,6,no calibration applied,enumeration_text
@@ -3070,7 +3070,7 @@ E = 2k(l2-l)(r - (l2+l)/2) for r < l2"
 211,4,ms,enumeration_text
 208,1,methanol,enumeration_text
 208,2,monoethylene glycol,enumeration_text
-208,3,solid,enumeration_text
+208,3,solid lead nitrate,enumeration_text
 208,4,KBr adamantane blend,enumeration_text
 208,5,Na5[TmDOTP],enumeration_text
 208,6,no calibration applied,enumeration_text
@@ -3091,7 +3091,7 @@ E = 2k(l2-l)(r - (l2+l)/2) for r < l2"
 217,4,ms,enumeration_text
 214,1,methanol,enumeration_text
 214,2,monoethylene glycol,enumeration_text
-214,3,solid,enumeration_text
+214,3,solid lead nitrate,enumeration_text
 214,4,KBr adamantane blend,enumeration_text
 214,5,Na5[TmDOTP],enumeration_text
 214,6,no calibration applied,enumeration_text
