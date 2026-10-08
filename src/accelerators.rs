@@ -248,13 +248,19 @@ impl<'py> Measured<'py> {
             num_cols,
             widths: vec![4; num_cols], // minimum width of 4
             multiline_size: 0,
-            changed: vec![0; num_rows * num_cols.div_ceil(64)],
+            changed: Vec::with_capacity(num_rows * num_cols.div_ceil(64)),
             values: Vec::new(),
         }
     }
 
-    /// Add the value of a column of a row, which differs from the one above it. Values must be
-    /// added in order.
+    /// Start the next row. The rows printed are those started, which can differ from the
+    /// number expected when the data changes while it is read.
+    fn add_row(&mut self) {
+        self.changed.resize(self.changed.len() + self.num_cols.div_ceil(64), 0);
+    }
+
+    /// Add the value of a column of the current row, which differs from the one above it.
+    /// Values must be added in order.
     fn add(&mut self, row_idx: usize, col_idx: usize, value: Bound<'py, PyString>, category: &str) -> PyResult<()> {
         let s = value.to_str()?;
         if s.is_empty() {
@@ -273,7 +279,8 @@ impl<'py> Measured<'py> {
                 self.widths[col_idx] = width;
             }
         }
-        self.changed[row_idx * self.num_cols.div_ceil(64) + col_idx / 64] |= 1 << (col_idx % 64);
+        let row_start = self.changed.len() - self.num_cols.div_ceil(64);
+        self.changed[row_start + col_idx / 64] |= 1 << (col_idx % 64);
         self.values.push((value, quoting));
         Ok(())
     }
@@ -444,6 +451,7 @@ pub fn format_loop<'py>(
             )));
         }
 
+        measured.add_row();
         row.for_each(num_cols, |col_idx, value| {
             let string_val = converter.convert(py, value)?;
             // A value which is the same string as the one above it is already measured

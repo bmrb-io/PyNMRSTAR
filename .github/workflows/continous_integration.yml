@@ -37,6 +37,14 @@ jobs:
             python-version: '3.9'
           - os: windows-latest
             python-version: '3.8'
+
+          # Free-threaded Python, which runs the module without the GIL
+          - os: ubuntu-latest
+            python-version: '3.14t'
+          - os: macos-latest
+            python-version: '3.14t'
+          - os: windows-latest
+            python-version: '3.14t'
     steps:
       - uses: actions/checkout@v4
       - name: Setup python version ${{ matrix.python-version }}
@@ -49,5 +57,8 @@ jobs:
           cache: false
       - name: Install package
         run: python3 -m pip install -e .
+      - name: Check the GIL stays disabled
+        if: endsWith(matrix.python-version, 't')
+        run: python3 -c "import sys, pynmrstar; assert not sys._is_gil_enabled(), 'importing pynmrstar enabled the GIL'"
       - name: Run tests
         run: python3 -m pynmrstar.unit_tests

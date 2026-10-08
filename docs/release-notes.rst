@@ -14,6 +14,8 @@ Minor improvements:
 - The result of parsing, and the output written, are unchanged.
 - Altogether, parsing is now around 8 to 13 times as fast, and writing around 11 to 30 times as fast, as in 3.3.6,
   the last release using the C module.
+- Supports free-threaded Python 3.14 and later (3.14t) without enabling the GIL, so several threads can parse and
+  write entries at once.
 
 
 3.6.0

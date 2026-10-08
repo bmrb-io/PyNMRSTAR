@@ -49,13 +49,15 @@ def _get_comments(_comment_cache: Dict[str, Dict[str, str]] = {}) -> Dict[str, D
         # No comments will be printed
         return {}
 
-    # Load the comments
+    # Load the comments. They are added to the cache all at once, so another thread never sees only some.
     comment_records = comment_entry[0][0].get_tag(["category", "comment", "every_flag"])
     comment_map = {'N': False, 'Y': True}
+    comments = {}
     for comment in comment_records:
         if comment[1] != ".":
-            _comment_cache[comment[0]] = {'comment': comment[1].rstrip() + "\n\n",
-                                          'every_flag': comment_map[comment[2]]}
+            comments[comment[0]] = {'comment': comment[1].rstrip() + "\n\n",
+                                    'every_flag': comment_map[comment[2]]}
+    _comment_cache.update(comments)
 
     return _comment_cache
 
