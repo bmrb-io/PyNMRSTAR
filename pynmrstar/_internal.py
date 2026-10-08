@@ -113,9 +113,15 @@ def _get_entry_from_database(entry_num: Union[str, int],
     """ Fetches an entry from the API (or falls back to the FTP site) in
     as reliable and robust a way as possible. Used by Entry.from_database(). """
 
-    entry_num = str(entry_num).lower()
-    if entry_num.startswith("bmr"):
-        entry_num = entry_num[3:]
+    entry_num = str(entry_num).strip()
+    # The API looks chemcomps up case-sensitively, by their uppercase PDB ligand code ('chemcomp_ATP'), so
+    #  only the prefix can be normalized. Everything else is lowercase ('bmse000001').
+    if entry_num.lower().startswith("chemcomp_"):
+        entry_num = "chemcomp_" + entry_num[9:].upper()
+    else:
+        entry_num = entry_num.lower()
+        if entry_num.startswith("bmr"):
+            entry_num = entry_num[3:]
 
     # Try to load the entry using JSON
 

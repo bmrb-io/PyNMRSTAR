@@ -76,6 +76,12 @@ class TestEntry(unittest.TestCase):
         self.assertEqual(self.file_entry, Entry.from_string(str(self.file_entry)))
         self.assertEqual(str(self.file_entry), str(Entry.from_string(str(self.file_entry))))
         self.assertRaises(IOError, Entry.from_database, 0)
+        # Chemcomps are found whatever the case of the ligand code or prefix
+        for chemcomp_id in ('chemcomp_ATP', 'chemcomp_atp', 'ChemComp_Atp'):
+            chemcomp = Entry.from_database(chemcomp_id)
+            self.assertEqual(chemcomp.get_saveframes_by_category('chem_comp')[0]['ID'], ['ATP'])
+            self.assertEqual(chemcomp.source, 'from_database(chemcomp_ATP)')
+        self.assertRaises(IOError, Entry.from_database, 'chemcomp_NOTALIGAND')
 
         self.assertEqual(str(Entry.from_scratch(15000)), "data_15000\n\n")
         self.assertEqual(Entry.from_file(os.path.join(our_path, "sample_files", "bmr15000_3.str.gz")), self.file_entry)

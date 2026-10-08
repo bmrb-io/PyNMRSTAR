@@ -1,6 +1,15 @@
 Release notes
 =============
 
+3.6.2
+~~~~~
+
+Bug fixes:
+
+- :py:meth:`pynmrstar.Entry.from_database` can load chemcomps again (e.g. ``Entry.from_database('chemcomp_ATP')``).
+  It lowercased the ID it was given, but the API looks chemcomps up by their uppercase ligand code, so every chemcomp
+  was reported as not existing. The ligand code may now be given in any case.
+
 3.6.1
 ~~~~~
 
