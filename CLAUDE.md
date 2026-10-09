@@ -36,6 +36,13 @@ cd docs && make html
 
 ## Releasing
 
+**Keep `pyproject.toml`'s `version` in step with `docs/release-notes.rst`.** Whenever you add release notes, check that
+the version at the top of `docs/release-notes.rst` matches `version` in `pyproject.toml`. If you start a new section,
+bump `version` to match in the same commit. If you add to an existing section, make sure `version` already matches it.
+Never leave notes for an unreleased version while `pyproject.toml` still names the last released one. If you do, `v3`
+gets merged and tagged with the old version, and the PyPI upload fails because that version already exists. (This
+happened with 3.6.2.)
+
 Releases are built and uploaded to PyPI by GitHub Actions, not locally:
 
 1. Development happens on `v3-dev`; CI (`.github/workflows/continous_integration.yml`) runs the tests on pushes to it
