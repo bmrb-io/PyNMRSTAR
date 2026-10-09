@@ -816,7 +816,9 @@ class Entry(object):
                 # names the saveframe, so the ID is whatever that saveframe's
                 # own ID tag says. The loop version of this is below; free tags
                 # need it too, and _Entity.Nonpolymer_comp_label paired with
-                # _Entity.Nonpolymer_comp_ID is the common case.
+                # _Entity.Nonpolymer_comp_ID is the common case. A saveframe
+                # with no ID of its own says nothing about what the ID should
+                # be, so the value already there is kept rather than nulled.
                 elif tag_schema['Foreign Table'] and tag_schema['Foreign Column'] == 'Sf_framecode':
                     if tag[1] in definitions.NULL_VALUES:
                         continue
@@ -829,10 +831,12 @@ class Entry(object):
                                 candidate_schema['Foreign Column'] == 'ID' and \
                                 candidate_schema['entryIdFlg'] != 'Y':
                             try:
-                                candidate[1] = self.get_saveframe_by_name(
-                                    str(tag[1])[1:]).get_tag('ID')[0]
+                                target_id = self.get_saveframe_by_name(str(tag[1])[1:]).get_tag('ID')[0]
                             except (KeyError, IndexError):
                                 logger.warning(f'Missing frame {tag[1]} pointed to by {saveframe.tag_prefix}.{tag[0]}')
+                            else:
+                                if target_id not in definitions.NULL_VALUES:
+                                    candidate[1] = target_id
                             break
 
             # Now apply the remapping to loops...
@@ -891,9 +895,14 @@ class Entry(object):
                                                            f".{tag_schema['Foreign Column']}")
                                             continue
                                     try:
-                                        row[tag_pos] = self.get_saveframe_by_name(row[x][1:]).get_tag('ID')[0]
-                                    except KeyError:
+                                        target_id = self.get_saveframe_by_name(row[x][1:]).get_tag('ID')[0]
+                                    except (KeyError, IndexError):
                                         logger.warning(f"Missing frame {row[x]} pointed to by {loop.category}.{tag}")
+                                    else:
+                                        # As for the free tags above: no ID on
+                                        # the target keeps the one already here.
+                                        if target_id not in definitions.NULL_VALUES:
+                                            row[tag_pos] = target_id
 
         # Renumber every loop's row-index column, and rewrite the references
         # to the numbers that change. See _renumber_row_indexes().
@@ -938,6 +947,10 @@ class Entry(object):
         anything refers to it: old → new is not a function there, so there is no
         correct way to follow it. ``validate_full``'s ``check_row_indexes`` is
         what reports that.
+
+        A null reference stays null. A row that had no number gets one, but
+        nothing could have been pointing at it, so no reference follows it --
+        which is also why several null indexes do not count as duplicates.
         """
 
         # Which tags refer to which, and the primary key of each loop category
@@ -995,13 +1008,22 @@ class Entry(object):
 
                 before = [row[position] for row in loop.data]
                 keys = [tuple(str(row[_]) for _ in columns) for row in loop.data]
-                if len(set(zip(keys, (str(_) for _ in before)))) != len(before):
+                # Several blank indexes are not duplicates: nothing can refer
+                # to a blank, so numbering them leaves no reference to follow.
+                numbered = [(key, str(old)) for key, old in zip(keys, before)
+                            if old not in definitions.NULL_VALUES]
+                if len(set(numbered)) != len(numbered):
                     continue
 
                 loop.renumber_rows(index_tag)
 
                 _, table = remaps.setdefault(full_index, (discriminators, {}))
                 for key, old, row in zip(keys, before, loop.data):
+                    # A row that had no number cannot have been referred to,
+                    # and a blank reference is not a reference to it: mapping
+                    # '.' would point every blank reference at this row.
+                    if old in definitions.NULL_VALUES:
+                        continue
                     table[(key, str(old))] = row[position]
 
         for parent_index, (discriminators, table) in remaps.items():

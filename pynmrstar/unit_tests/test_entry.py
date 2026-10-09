@@ -76,6 +76,12 @@ class TestEntry(unittest.TestCase):
         self.assertEqual(self.file_entry, Entry.from_string(str(self.file_entry)))
         self.assertEqual(str(self.file_entry), str(Entry.from_string(str(self.file_entry))))
         self.assertRaises(IOError, Entry.from_database, 0)
+        # Chemcomps are found whatever the case of the ligand code or prefix
+        for chemcomp_id in ('chemcomp_ATP', 'chemcomp_atp', 'ChemComp_Atp'):
+            chemcomp = Entry.from_database(chemcomp_id)
+            self.assertEqual(chemcomp.get_saveframes_by_category('chem_comp')[0]['ID'], ['ATP'])
+            self.assertEqual(chemcomp.source, 'from_database(chemcomp_ATP)')
+        self.assertRaises(IOError, Entry.from_database, 'chemcomp_NOTALIGAND')
 
         self.assertEqual(str(Entry.from_scratch(15000)), "data_15000\n\n")
         self.assertEqual(Entry.from_file(os.path.join(our_path, "sample_files", "bmr15000_3.str.gz")), self.file_entry)
@@ -468,6 +474,65 @@ class TestEntry(unittest.TestCase):
         loop = entry.get_loops_by_category('_Gen_dist_constraint')[0]
         self.assertEqual(loop.get_tag(['Entity_ID_1', 'Comp_index_ID_1', 'Entity_ID_2', 'Comp_index_ID_2']),
                          [['2', '1', '1', '3']])
+
+    def test_normalize_keeps_blank_references_to_a_row_index_blank(self):
+        """A row with no index gets a number, but a blank reference is not a
+        reference to that row, so it must stay blank rather than follow it."""
+
+        entry = Entry.from_string(
+            'data_1\nsave_entity_1\n_Entity.Sf_category entity\n_Entity.Sf_framecode entity_1\n'
+            '_Entity.ID 1\n_Entity.Entry_ID 1\n'
+            'loop_\n_Entity_comp_index.ID\n_Entity_comp_index.Comp_ID\n_Entity_comp_index.Entity_ID\n'
+            '_Entity_comp_index.Entry_ID\n1 ALA 1 1\n. GLY 1 1\nstop_\n'
+            'loop_\n_Entity_poly_seq.Hetero\n_Entity_poly_seq.Mon_ID\n_Entity_poly_seq.Num\n'
+            '_Entity_poly_seq.Comp_index_ID\n_Entity_poly_seq.Entity_ID\n_Entity_poly_seq.Entry_ID\n'
+            '. ALA 1 1 1 1\n. GLY 2 . 1 1\nstop_\nsave_\n')
+
+        entry.normalize()
+        self.assertEqual(entry['entity_1']['_Entity_comp_index'].get_tag('ID'), ['1', '2'])
+        self.assertEqual(entry['entity_1']['_Entity_poly_seq'].get_tag('Comp_index_ID'), ['1', '.'])
+
+    def test_normalize_numbers_several_blank_row_indexes(self):
+        """Several blank indexes are not duplicates -- nothing can refer to a
+        blank -- so a referenced column with more than one is still numbered,
+        and the references to its numbered rows still follow."""
+
+        entry = Entry.from_string(
+            'data_1\nsave_entity_1\n_Entity.Sf_category entity\n_Entity.Sf_framecode entity_1\n'
+            '_Entity.ID 1\n_Entity.Entry_ID 1\n'
+            'loop_\n_Entity_comp_index.ID\n_Entity_comp_index.Comp_ID\n_Entity_comp_index.Entity_ID\n'
+            '_Entity_comp_index.Entry_ID\n. ALA 1 1\n7 GLY 1 1\n. SER 1 1\nstop_\n'
+            'loop_\n_Entity_poly_seq.Hetero\n_Entity_poly_seq.Mon_ID\n_Entity_poly_seq.Num\n'
+            '_Entity_poly_seq.Comp_index_ID\n_Entity_poly_seq.Entity_ID\n_Entity_poly_seq.Entry_ID\n'
+            '. ALA 1 . 1 1\n. GLY 2 7 1 1\n. SER 3 . 1 1\nstop_\nsave_\n')
+
+        entry.normalize()
+        self.assertEqual(entry['entity_1']['_Entity_comp_index'].get_tag('ID'), ['1', '2', '3'])
+        self.assertEqual(entry['entity_1']['_Entity_poly_seq'].get_tag('Comp_index_ID'), ['.', '2', '.'])
+
+    def test_normalize_keeps_an_id_its_label_cannot_supply(self):
+        """A *_label names a saveframe and the *_ID beside it is set from that
+        saveframe's ID -- but a saveframe with no ID says nothing about it, so
+        the value already there is kept. The free-tag and loop cases alike."""
+
+        entry = Entry.from_string(
+            'data_1\nsave_entity_1\n_Entity.Sf_category entity\n_Entity.Sf_framecode entity_1\n'
+            '_Entity.ID 1\n_Entity.Entry_ID 1\n_Entity.Type non-polymer\n'
+            '_Entity.Nonpolymer_comp_ID ZN\n_Entity.Nonpolymer_comp_label $chem_comp_ZN\n'
+            'loop_\n_Entity_comp_index.ID\n_Entity_comp_index.Comp_ID\n_Entity_comp_index.Comp_label\n'
+            '_Entity_comp_index.Entity_ID\n_Entity_comp_index.Entry_ID\n1 ZN $chem_comp_ZN 1 1\nstop_\nsave_\n'
+            'save_chem_comp_ZN\n_Chem_comp.Sf_category chem_comp\n_Chem_comp.Sf_framecode chem_comp_ZN\n'
+            '_Chem_comp.ID .\n_Chem_comp.Entry_ID 1\nsave_\n')
+
+        entry.normalize()
+        self.assertEqual(entry['entity_1'].get_tag('Nonpolymer_comp_ID'), ['ZN'])
+        self.assertEqual(entry['entity_1']['_Entity_comp_index'].get_tag('Comp_ID'), ['ZN'])
+
+        # ... and an ID the target does carry still wins.
+        entry['chem_comp_ZN'].add_tag('ID', 'ZN2', update=True)
+        entry.normalize()
+        self.assertEqual(entry['entity_1'].get_tag('Nonpolymer_comp_ID'), ['ZN2'])
+        self.assertEqual(entry['entity_1']['_Entity_comp_index'].get_tag('Comp_ID'), ['ZN2'])
 
     def test_repair_insert_mandatory_tags(self):
         """InsertMandatoryTags (105): a missing required free tag arrives as '?'."""

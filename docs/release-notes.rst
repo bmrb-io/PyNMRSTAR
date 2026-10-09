@@ -1,6 +1,30 @@
 Release notes
 =============
 
+3.6.2
+~~~~~
+
+Minor improvements:
+
+- The packaged NMR-STAR dictionary is now version 3.2.14.1. It fixes the ``Temp_calibration_method``
+  enumeration of ``_Auto_relaxation_list``, ``_Heteronucl_T1rho_list``, and ``_Heteronucl_T2_list``, in which
+  "solid lead nitrate" had been truncated to "solid", so validation reported the real value as not allowed.
+
+Bug fixes:
+
+- :py:meth:`pynmrstar.Entry.from_database` can load chemcomps again (e.g. ``Entry.from_database('chemcomp_ATP')``).
+  It lowercased the ID it was given, but the API looks chemcomps up by their uppercase ligand code, so every chemcomp
+  was reported as not existing. The ligand code may now be given in any case.
+- :py:meth:`pynmrstar.Entry.normalize` no longer nulls an ``*_ID`` tag whose ``*_label`` points at a saveframe with no
+  ID of its own; the existing value is kept. For example, ``_Entity.Nonpolymer_comp_ID`` was wiped when the
+  ``chem_comp`` saveframe it named had a null ``_Chem_comp.ID``. This applies to both free and loop tags.
+- :py:meth:`pynmrstar.Entry.normalize` no longer fills in blank references to a loop's row index. When a row that had
+  no index was numbered, every blank reference to that index was pointed at it. For example, a blank
+  ``_Entity_poly_seq.Comp_index_ID`` would be made to name whichever residue had been missing its
+  ``_Entity_comp_index.ID``. Blank references now stay blank.
+- :py:meth:`pynmrstar.Entry.normalize` now numbers a row-index column that other tags refer to even when it has
+  more than one blank. Several blanks were treated as duplicate indexes, so the column was left unnumbered.
+
 3.6.1
 ~~~~~
 
