@@ -492,6 +492,24 @@ class TestEntry(unittest.TestCase):
         self.assertEqual(entry['entity_1']['_Entity_comp_index'].get_tag('ID'), ['1', '2'])
         self.assertEqual(entry['entity_1']['_Entity_poly_seq'].get_tag('Comp_index_ID'), ['1', '.'])
 
+    def test_normalize_numbers_several_blank_row_indexes(self):
+        """Several blank indexes are not duplicates -- nothing can refer to a
+        blank -- so a referenced column with more than one is still numbered,
+        and the references to its numbered rows still follow."""
+
+        entry = Entry.from_string(
+            'data_1\nsave_entity_1\n_Entity.Sf_category entity\n_Entity.Sf_framecode entity_1\n'
+            '_Entity.ID 1\n_Entity.Entry_ID 1\n'
+            'loop_\n_Entity_comp_index.ID\n_Entity_comp_index.Comp_ID\n_Entity_comp_index.Entity_ID\n'
+            '_Entity_comp_index.Entry_ID\n. ALA 1 1\n7 GLY 1 1\n. SER 1 1\nstop_\n'
+            'loop_\n_Entity_poly_seq.Hetero\n_Entity_poly_seq.Mon_ID\n_Entity_poly_seq.Num\n'
+            '_Entity_poly_seq.Comp_index_ID\n_Entity_poly_seq.Entity_ID\n_Entity_poly_seq.Entry_ID\n'
+            '. ALA 1 . 1 1\n. GLY 2 7 1 1\n. SER 3 . 1 1\nstop_\nsave_\n')
+
+        entry.normalize()
+        self.assertEqual(entry['entity_1']['_Entity_comp_index'].get_tag('ID'), ['1', '2', '3'])
+        self.assertEqual(entry['entity_1']['_Entity_poly_seq'].get_tag('Comp_index_ID'), ['.', '2', '.'])
+
     def test_normalize_keeps_an_id_its_label_cannot_supply(self):
         """A *_label names a saveframe and the *_ID beside it is set from that
         saveframe's ID -- but a saveframe with no ID says nothing about it, so

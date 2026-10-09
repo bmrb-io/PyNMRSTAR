@@ -949,7 +949,8 @@ class Entry(object):
         what reports that.
 
         A null reference stays null. A row that had no number gets one, but
-        nothing could have been pointing at it, so no reference follows it.
+        nothing could have been pointing at it, so no reference follows it --
+        which is also why several null indexes do not count as duplicates.
         """
 
         # Which tags refer to which, and the primary key of each loop category
@@ -1007,7 +1008,11 @@ class Entry(object):
 
                 before = [row[position] for row in loop.data]
                 keys = [tuple(str(row[_]) for _ in columns) for row in loop.data]
-                if len(set(zip(keys, (str(_) for _ in before)))) != len(before):
+                # Several blank indexes are not duplicates: nothing can refer
+                # to a blank, so numbering them leaves no reference to follow.
+                numbered = [(key, str(old)) for key, old in zip(keys, before)
+                            if old not in definitions.NULL_VALUES]
+                if len(set(numbered)) != len(numbered):
                     continue
 
                 loop.renumber_rows(index_tag)

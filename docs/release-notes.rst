@@ -22,6 +22,8 @@ Bug fixes:
   no index was numbered, every blank reference to that index was pointed at it. For example, a blank
   ``_Entity_poly_seq.Comp_index_ID`` would be made to name whichever residue had been missing its
   ``_Entity_comp_index.ID``. Blank references now stay blank.
+- :py:meth:`pynmrstar.Entry.normalize` now numbers a row-index column that other tags refer to even when it has
+  more than one blank. Several blanks were treated as duplicate indexes, so the column was left unnumbered.
 
 3.6.1
 ~~~~~
