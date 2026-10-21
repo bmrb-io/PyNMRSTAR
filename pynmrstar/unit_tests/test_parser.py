@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
+import os
+import subprocess
+import sys
 import unittest
 
+import pynmrstar
 from pynmrstar import Entry, Saveframe, Loop
 from pynmrstar.exceptions import ParsingError
 
@@ -311,3 +315,31 @@ save_
         with self.assertRaises(ParsingError) as caught:
             Entry.from_string(star)
         self.assertEqual(caught.exception.line_number, 9)
+
+    @unittest.skipUnless(sys.platform.startswith('linux'), 'needs /proc and RLIMIT_AS')
+    def test_loop_with_many_tags_and_little_data(self):
+        """The parser reserves room for a loop's data from its number of tags. That must be
+        bounded by the size of the file: a loop with many tags and one value must not reserve
+        hundreds of times more memory than the file holds. Rust aborts the whole process when
+        such an allocation fails, so this is parsed in a child with its address space capped."""
+
+        # 200,000 tags is about 2.4 MB of input, for which 100 rows of 16 byte values each
+        #  would reserve 320 MB. The cap leaves 150 MB beyond what the child already uses.
+        child = (
+            "import resource\n"
+            "from pynmrstar import Entry\n"
+            "star = 'data_1 save_a loop_ ' + ' '.join(f'_a.b{i}' for i in range(200000)) + ' 1 stop_ save_'\n"
+            "status = dict(line.split(':', 1) for line in open('/proc/self/status'))\n"
+            "in_use = int(status['VmSize'].split()[0]) * 1024\n"
+            "resource.setrlimit(resource.RLIMIT_AS, (in_use + 150 * 1024 * 1024, resource.RLIM_INFINITY))\n"
+            "try:\n"
+            "    Entry.from_string(star)\n"
+            "except Exception as error:\n"
+            "    print(type(error).__name__)\n"
+        )
+        package_parent = os.path.dirname(os.path.dirname(os.path.abspath(pynmrstar.__file__)))
+        result = subprocess.run([sys.executable, '-c', child], cwd=package_parent,
+                                capture_output=True, text=True, timeout=120)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        # One value for 200,000 tags is not a whole row
+        self.assertEqual(result.stdout.strip(), 'ParsingError')

@@ -1210,7 +1210,11 @@ fn parse_loop_tags(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
                     // No loop type detected (shouldn't happen): use default
                     100
                 };
-                ctx.loop_data.reserve(tags_len * estimated_rows);
+                // Never reserve for more values than the rest of the input could hold: each
+                //  takes at least one character and a separator. Otherwise a loop with many
+                //  tags and little data reserves far more memory than the file is large.
+                let remaining = ctx.tokenizer.full_data.len().saturating_sub(ctx.tokenizer.index);
+                ctx.loop_data.reserve((tags_len * estimated_rows).min(remaining / 2));
             }
 
             // Parse loop data (without consuming current token)
