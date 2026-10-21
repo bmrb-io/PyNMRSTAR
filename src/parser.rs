@@ -525,6 +525,10 @@ struct ParserContext<'a> {
     sf_name: String,
     sf_tag_prefix: Option<String>,
     sf_tags_lc: HashSet<String>,
+    // The lowercased categories of the current saveframe's loops, for the duplicate check
+    //  Saveframe.add_loop() would make. Its check builds Saveframe.loop_dict, a dictionary of
+    //  every loop in the saveframe - O(n^2) over a saveframe with many loops.
+    sf_loop_categories: HashSet<String>,
     string_cache: StringCache,
 }
 
@@ -595,6 +599,7 @@ impl<'a> ParserContext<'a> {
             sf_name: String::new(),
             sf_tag_prefix: None,
             sf_tags_lc: HashSet::new(),
+            sf_loop_categories: HashSet::new(),
             string_cache: StringCache::new(tokenizer.full_data.len()),
             tokenizer,
             line_number: 0,
@@ -850,6 +855,7 @@ fn parse_entry_body(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
         ctx.sf_name = name;
         ctx.sf_tag_prefix = None;
         ctx.sf_tags_lc.clear();
+        ctx.sf_loop_categories.clear();
 
         // Parse saveframe body
         parse_saveframe_body(py, ctx)?;
@@ -1189,8 +1195,7 @@ fn parse_loop_tags(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
                 }
             }
 
-            let saveframe = ctx.current_saveframe.as_ref().unwrap();
-            saveframe.call_method1(py, "add_loop", (loop_obj,))?;
+            add_loop_to_saveframe(py, ctx)?;
 
             // Preallocate loop_data Vec based on number of tags
             // Use adaptive sizing based on loop type statistics
@@ -1223,6 +1228,26 @@ fn parse_loop_tags(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
         }
     }
 
+    Ok(())
+}
+
+/// Equivalent to Saveframe.add_loop() for the current loop, with the duplicate category check
+/// done in O(1). Categories are lowercased by Python, so they match exactly as they would there.
+fn add_loop_to_saveframe(py: Python, ctx: &mut ParserContext) -> PyResult<()> {
+    let loop_obj = ctx.current_loop.as_ref().unwrap().bind(py);
+    let category = loop_obj.getattr(intern!(py, "category"))?;
+    // A loop without a category is never a duplicate, as Saveframe.loop_dict leaves it out
+    if !category.is_none() {
+        let lc_category: String = category.call_method0(intern!(py, "lower"))?.extract()?;
+        if !ctx.sf_loop_categories.insert(lc_category) {
+            return Err(PyValueError::new_err(format!(
+                "You cannot have two loops with the same category in one saveframe. Category: '{}'.",
+                category.extract::<String>()?
+            )));
+        }
+    }
+    let saveframe = ctx.current_saveframe.as_ref().unwrap().bind(py);
+    saveframe.getattr(intern!(py, "_loops"))?.cast_into::<PyList>()?.append(loop_obj)?;
     Ok(())
 }
 

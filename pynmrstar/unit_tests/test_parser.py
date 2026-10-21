@@ -2,6 +2,7 @@
 import os
 import subprocess
 import sys
+import time
 import unittest
 
 import pynmrstar
@@ -343,3 +344,33 @@ save_
         self.assertEqual(result.returncode, 0, result.stderr)
         # One value for 200,000 tags is not a whole row
         self.assertEqual(result.stdout.strip(), 'ParsingError')
+
+    def test_duplicate_loop_categories(self):
+        """Loops are added to their saveframe without Saveframe.add_loop(), so check that its
+        duplicate category check still applies: case-insensitively, within one saveframe."""
+
+        with self.assertRaisesRegex(ParsingError, "two loops with the same category.*'_a'"):
+            Entry.from_string('data_x save_s _S.Sf_category s loop_ _A.a 1 stop_ loop_ _a.b 2 stop_ save_')
+        with self.assertRaisesRegex(ParsingError, "two loops with the same category.*'_äb'"):
+            Entry.from_string('data_x save_s _S.Sf_category s loop_ _ÄB.a 1 stop_ loop_ _äb.b 2 stop_ save_')
+
+        # The same category in different saveframes is fine
+        entry = Entry.from_string('data_x save_s _S.Sf_category s loop_ _A.a 1 stop_ save_ '
+                                  'save_t _S.Sf_category t loop_ _A.a 1 stop_ save_')
+        self.assertEqual([[loop.category for loop in frame] for frame in entry], [['_A'], ['_A']])
+
+        # As are several loops without tags, which have no category
+        with self.assertLogs('pynmrstar', level='WARNING'):
+            entry = Entry.from_string('data_x save_s _S.Sf_category s loop_ stop_ loop_ stop_ save_')
+        self.assertEqual([loop.category for loop in entry[0]], [None, None])
+
+    def test_many_loops_in_one_saveframe(self):
+        """Adding a loop must not take time proportional to the loops already in the saveframe.
+        Through Saveframe.add_loop() these 20,000 loops took about 47 seconds; now well under one."""
+
+        loops = '\n'.join(f'loop_ _T{i}.a _T{i}.b\n1 2\nstop_' for i in range(20000))
+        start = time.perf_counter()
+        entry = Entry.from_string(f'data_x save_s _S.Sf_category s\n{loops}\nsave_\n')
+        self.assertLess(time.perf_counter() - start, 10)
+        self.assertEqual(len(entry[0].loops), 20000)
+        self.assertEqual(entry[0].loops[-1].category, '_T19999')

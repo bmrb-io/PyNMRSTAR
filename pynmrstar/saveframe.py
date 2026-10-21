@@ -540,6 +540,8 @@ class Saveframe(object):
     def add_loop(self, loop_to_add: 'loop_mod.Loop') -> None:
         """Add a loop to the saveframe loops."""
 
+        # Note: when parsing, loops are added without calling this method, by add_loop_to_saveframe() in
+        #  src/parser.rs. Keep that in sync with any new validation here.
         if loop_to_add.category in self.loop_dict or str(loop_to_add.category).lower() in self.loop_dict:
             if loop_to_add.category is None:
                 raise ValueError("You cannot have two loops with the same category in one saveframe. You are getting "
