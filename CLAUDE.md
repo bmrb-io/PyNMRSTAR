@@ -97,6 +97,14 @@ Container protocol is fully supported (`__getitem__`, `__iter__`, `__len__`, etc
 
 Tags follow the pattern `_Category.tag_name`. Categories are extracted/formatted via `format_category()` which adds the `_` prefix and strips the tag suffix.
 
+### Pure Rust Implementation (`nmrstar/`)
+
+`nmrstar/` is a separate, pure Rust crate (no Python) implementing the same library, independent of the PyO3
+extension in `src/`. Its tests in `nmrstar/tests/` are ports of `pynmrstar/unit_tests`, one-to-one by name, and it
+reads the dictionary and comments from `pynmrstar/reference_files` at compile time. Build and test it with
+`cd nmrstar && cargo test`. When changing behaviour in the Python library, make
+the same change there and port the test; `nmrstar/README.md` lists the deliberate differences.
+
 ## Test Structure
 
 Tests are in `pynmrstar/unit_tests/`:

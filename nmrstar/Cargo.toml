@@ -1,0 +1,28 @@
+[package]
+name = "nmrstar"
+version = "3.6.2"
+edition = "2021"
+rust-version = "1.82"
+description = "Read, write, manipulate and validate NMR-STAR files. A pure Rust implementation of PyNMR-STAR."
+license = "MIT"
+authors = ["Jon Wedell <wedell@uchc.edu>"]
+repository = "https://github.com/bmrb-io/PyNMRSTAR"
+keywords = ["bmrb", "nmr", "nmrstar", "star", "parser"]
+
+[features]
+default = ["network"]
+# Fetching entries and files over HTTP(S): Entry::from_database(), URLs passed to from_file()
+network = ["dep:ureq"]
+
+[dependencies]
+memchr = "2"
+compact_str = "0.8"
+regex = "1"
+flate2 = "1"
+serde_json = "1"
+log = "0.4"
+ureq = { version = "2", optional = true }
+
+[dev-dependencies]
+tempfile = "3"
+rand = "0.8"
